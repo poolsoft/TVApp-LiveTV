@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <android.media.tv.TvView
+        android:id="@+id/tv_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:keepScreenOn="true" />
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/iptv_player_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:keepScreenOn="true"
+        android:visibility="gone"
+        app:show_buffering="when_playing"
+        app:use_controller="false" />
+
+    <android.media.tv.TvView
+        android:id="@+id/secondary_tv_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/secondary_iptv_player_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        app:show_buffering="when_playing"
+        app:use_controller="false" />
+
+    <LinearLayout
+        android:id="@+id/audio_only_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="72dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/audio_only_icon"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:contentDescription="@string/radio_broadcast"
+                android:src="@drawable/ic_radio" />
+
+            <ImageView
+                android:id="@+id/audio_only_sound_icon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="18dp"
+                android:contentDescription="@string/audio_available"
+                android:src="@drawable/ic_audio"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/audio_only_channel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:maxWidth="520dp"
+            android:textColor="@color/text_primary"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/audio_only_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/channel_panel"
+        android:layout_width="480dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start|center_vertical"
+        android:background="@drawable/bg_glass_panel"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="18dp"
+            android:paddingTop="13dp"
+            android:paddingBottom="9dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/channel_list"
+                android:textAllCaps="true"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/channel_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="15dp"
+            android:background="#526579" />
+
+          <LinearLayout
+              android:id="@+id/source_filter_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+              android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp">
+
+                <ImageButton
+                    android:id="@+id/all_filter"
+                    android:layout_width="46dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/bg_filter_icon"
+                    android:contentDescription="@string/all_channels"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_list"
+                    android:tooltipText="@string/all_channels" />
+
+                <ImageButton
+                    android:id="@+id/satellite_filter"
+                    android:layout_width="46dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_filter_icon"
+                    android:contentDescription="@string/satellite_channels"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_source_tif"
+                    android:tooltipText="@string/satellite_channels" />
+
+                <ImageButton
+                    android:id="@+id/iptv_filter"
+                    android:layout_width="46dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_filter_icon"
+                    android:contentDescription="@string/iptv_filter"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_source_iptv"
+                    android:tooltipText="@string/iptv_filter" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/advanced_filter_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/favorite_filter"
+                android:layout_width="46dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_filter_icon"
+                android:contentDescription="@string/favorites"
+                android:padding="10dp"
+                android:src="@drawable/ic_star"
+                android:tooltipText="@string/favorites" />
+
+            <ImageButton
+                android:id="@+id/scan_button"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_filter_icon"
+                android:contentDescription="@string/scan_channels"
+                android:padding="10dp"
+                android:src="@drawable/ic_scan"
+                android:tooltipText="@string/scan_channels" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/channel_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:paddingHorizontal="8dp" />
+
+        <LinearLayout
+            android:id="@+id/channel_actions"
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_red_line" />
+                <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_red" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/edit_short" android:textColor="@color/text_primary" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_green_line" />
+                <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_green" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/audio" android:textColor="@color/text_primary" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_yellow_line" />
+                <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_yellow" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/subtitle" android:textColor="@color/text_primary" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_blue_line" />
+                <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_blue" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/display_short" android:textColor="@color/text_primary" android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/info_bar"
+        android:layout_width="match_parent"
+        android:layout_height="190dp"
+        android:layout_gravity="end|top"
+        android:background="@drawable/bg_info"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="33"
+                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:paddingHorizontal="18dp">
+
+                <TextView
+                    android:id="@+id/now_number"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/accent"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/now_channel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:layout_marginTop="3dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_marginVertical="13dp"
+                android:background="#526579" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="51"
+                android:gravity="center_vertical"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp">
+
+                <TextView
+                    android:id="@+id/current_program"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <LinearLayout
+                    android:id="@+id/program_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/program_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="11sp" />
+
+                    <ProgressBar
+                        android:id="@+id/info_progress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="7dp"
+                        android:layout_marginHorizontal="14dp"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progressBackgroundTint="#52606B"
+                        android:progressTint="@color/accent" />
+
+                    <TextView
+                        android:id="@+id/program_remaining"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/next_program"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:drawableStart="@drawable/ic_clock_small"
+                    android:drawablePadding="7dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:layout_marginVertical="13dp"
+                android:background="#526579" />
+
+            <LinearLayout
+                android:id="@+id/clock_panel"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="16"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp">
+
+                <TextView
+                    android:id="@+id/clock_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/clock_date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center"
+                    android:maxLines="2"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginHorizontal="14dp"
+            android:background="#526579" />
+
+        <LinearLayout
+            android:id="@+id/technical_row"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:gravity="start|center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <FrameLayout
+                android:id="@+id/tech_slot_quality_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <TextView
+                    android:id="@+id/quality_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:background="@drawable/bg_tech_badge"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/radio_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:drawableStart="@drawable/ic_radio"
+                    android:drawablePadding="6dp"
+                    android:text="RADIO"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_source"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+
+                <ImageView
+                    android:id="@+id/source_badge_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:contentDescription="@string/channel_source"
+                    android:src="@drawable/ic_source_tif" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_audio"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <TextView
+                    android:id="@+id/dolby_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:drawableStart="@drawable/ic_dolby"
+                    android:drawablePadding="6dp"
+                    android:text="DOLBY AUDIO"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/audio_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:drawableStart="@drawable/ic_audio"
+                    android:drawablePadding="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <TextView
+                    android:id="@+id/subtitle_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:drawableStart="@drawable/ic_subtitle"
+                    android:drawablePadding="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_aspect"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <TextView
+                    android:id="@+id/aspect_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:background="@drawable/bg_tech_badge"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_resolution"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <TextView
+                    android:id="@+id/resolution_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="start|center_vertical"
+                    android:background="@drawable/bg_tech_badge"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/tech_slot_lock"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+                <ImageView
+                    android:id="@+id/lock_badge"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:contentDescription="@string/locked_channel"
+                    android:src="@drawable/ic_lock"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/status_panel"
+        android:layout_width="560dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_status"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/status_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="23sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/input_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/accent"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/status_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/retry_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_focusable"
+                android:text="@string/retry"
+                android:textColor="@color/text_primary" />
+
+            <Button
+                android:id="@+id/close_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/bg_focusable"
+                android:text="@string/close"
+                android:textColor="@color/text_primary" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

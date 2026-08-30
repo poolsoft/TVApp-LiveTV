@@ -1,0 +1,185 @@
+package com.tvapp.livetv.ui
+
+import android.media.tv.TvContract
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
+import com.tvapp.livetv.R
+import com.tvapp.livetv.data.ProgramSummary
+import com.tvapp.livetv.databinding.ItemChannelBinding
+import com.tvapp.livetv.model.LiveChannel
+
+class ChannelAdapter(
+    private val onSelected: (LiveChannel) -> Unit,
+    private val onManage: (LiveChannel) -> Unit,
+    private val onFocused: (LiveChannel) -> Unit,
+) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
+    private val channels = mutableListOf<LiveChannel>()
+    private var programs: Map<Long, ProgramSummary> = emptyMap()
+    private var rowOptions = ChannelRowOptions()
+    private var selectedId: Long? = null
+
+    fun submitList(items: List<LiveChannel>) {
+        val previous = channels.toList()
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = previous.size
+            override fun getNewListSize() = items.size
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int) =
+                previous[oldItemPosition].sourceKey == items[newItemPosition].sourceKey
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int) =
+                previous[oldItemPosition] == items[newItemPosition]
+        })
+        channels.clear()
+        channels.addAll(items)
+        diff.dispatchUpdatesTo(this)
+    }
+
+    fun select(sourceKey: String) {
+        val oldId = selectedId
+        val channel = channels.firstOrNull { it.sourceKey == sourceKey } ?: return
+        if (oldId == channel.id) return
+        selectedId = channel.id
+        oldId?.let { id ->
+            val oldIndex = channels.indexOfFirst { it.id == id }
+            if (oldIndex >= 0) notifyItemChanged(oldIndex, PAYLOAD_SELECTION)
+        }
+        val newIndex = channels.indexOfFirst { it.sourceKey == sourceKey }
+        if (newIndex >= 0) notifyItemChanged(newIndex, PAYLOAD_SELECTION)
+    }
+
+    fun submitPrograms(items: Map<Long, ProgramSummary>) {
+        val previous = programs
+        programs = items
+        channels.forEachIndexed { index, channel ->
+            if (previous[channel.id] != items[channel.id]) {
+                notifyItemChanged(index, PAYLOAD_PROGRAM)
+            }
+        }
+    }
+
+    fun applyRowOptions(options: ChannelRowOptions) {
+        rowOptions = options
+        notifyItemRangeChanged(0, itemCount)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
+        val binding = ItemChannelBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return ChannelViewHolder(binding)
+    }
+
+    override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
+        val channel = channels[position]
+        holder.bind(channel, programs[channel.id])
+    }
+
+    override fun onBindViewHolder(
+        holder: ChannelViewHolder,
+        position: Int,
+        payloads: MutableList<Any>,
+    ) {
+        if (payloads.isEmpty()) {
+            onBindViewHolder(holder, position)
+            return
+        }
+        val channel = channels[position]
+        if (PAYLOAD_PROGRAM in payloads) holder.bindProgram(channel, programs[channel.id])
+        if (PAYLOAD_SELECTION in payloads) holder.bindSelection(channel)
+    }
+
+    override fun getItemCount(): Int = channels.size
+
+    inner class ChannelViewHolder(
+        private val binding: ItemChannelBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(channel: LiveChannel, program: ProgramSummary?) = with(binding) {
+            val metrics = root.resources.displayMetrics
+            val screenHeight = metrics.heightPixels
+            val rowHeight = (screenHeight * ROW_HEIGHT_FRACTION).toInt()
+            root.layoutParams = root.layoutParams.apply { height = rowHeight }
+            channelLogo.layoutParams = channelLogo.layoutParams.apply {
+                width = (rowHeight * LOGO_WIDTH_FRACTION).toInt()
+                height = (rowHeight * LOGO_HEIGHT_FRACTION).toInt()
+            }
+            channelNumber.layoutParams = channelNumber.layoutParams.apply {
+                width = (metrics.widthPixels * NUMBER_WIDTH_FRACTION).toInt()
+            }
+            channelNumber.text = channel.displayNumber.ifBlank { "-" }
+            channelName.text = channel.displayName
+            channelQuality.visibility = View.GONE
+            channelTypeIcon.setImageResource(
+                if (channel.isRadioChannel()) R.drawable.ic_radio else R.drawable.ic_channel_tv,
+            )
+            channelEncryptedIcon.visibility = if (channel.encrypted) View.VISIBLE else View.GONE
+            channelHiddenIcon.visibility = View.GONE
+            channelFavoriteIcon.visibility = View.GONE
+            bindProgram(channel, program)
+            val fallbackLogo = if (channel.isRadioChannel()) {
+                R.drawable.ic_radio
+            } else {
+                R.drawable.ic_tv
+            }
+            channelLogo.setImageResource(fallbackLogo)
+            if (channel.source == LiveChannel.Source.TIF) {
+                runCatching {
+                    channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id))
+                }
+            }
+            if (channelLogo.drawable == null) {
+                channelLogo.setImageResource(fallbackLogo)
+            }
+            channelLogo.visibility = if (rowOptions.showLogo) View.VISIBLE else View.GONE
+            channelProgram.visibility = if (rowOptions.showProgram) View.VISIBLE else View.GONE
+            programProgress.visibility = if (rowOptions.showProgress) View.VISIBLE else View.GONE
+            sourceBadge.visibility = View.GONE
+            bindSelection(channel)
+            root.setOnClickListener {
+                select(channel.sourceKey)
+                onSelected(channel)
+            }
+            root.setOnLongClickListener {
+                onManage(channel)
+                true
+            }
+            root.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) onFocused(channel)
+            }
+        }
+
+        fun bindProgram(channel: LiveChannel, program: ProgramSummary?) = with(binding) {
+            channelProgram.text = program?.title.orEmpty().ifBlank {
+                root.context.getString(R.string.no_program_information)
+            }
+            val now = System.currentTimeMillis()
+            programProgress.progress = if (program == null) {
+                0
+            } else {
+                val duration = (program.endTimeMillis - program.startTimeMillis).coerceAtLeast(1L)
+                (((now - program.startTimeMillis) * 100L / duration).coerceIn(0L, 100L)).toInt()
+            }
+            sourceBadge.text = channel.source.name
+        }
+
+        fun bindSelection(channel: LiveChannel) {
+            binding.root.isSelected = channel.id == selectedId
+        }
+    }
+
+    private companion object {
+        const val ROW_HEIGHT_FRACTION = 0.105f
+        const val LOGO_WIDTH_FRACTION = 0.58f
+        const val LOGO_HEIGHT_FRACTION = 0.45f
+        const val NUMBER_WIDTH_FRACTION = 0.042f
+        const val PAYLOAD_PROGRAM = "program"
+        const val PAYLOAD_SELECTION = "selection"
+    }
+}
+
+data class ChannelRowOptions(
+    val showLogo: Boolean = false,
+    val showProgram: Boolean = true,
+    val showProgress: Boolean = true,
+    val showSourceBadge: Boolean = false,
+)

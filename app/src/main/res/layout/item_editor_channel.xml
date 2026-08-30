@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="58dp"
+    android:layout_marginVertical="2dp"
+    android:background="@drawable/bg_channel"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="14dp">
+
+    <TextView
+        android:id="@+id/selection_mark"
+        android:layout_width="30dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/accent"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/channel_number"
+        android:layout_width="64dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/channel_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="17sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical|end"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/editor_source_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginEnd="7dp"
+            android:contentDescription="@string/channel_source" />
+
+        <TextView
+            android:id="@+id/editor_quality"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_tech_badge"
+            android:paddingHorizontal="4dp"
+            android:textColor="@color/text_primary"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/editor_type_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="7dp"
+            android:contentDescription="@string/channel_type" />
+
+        <ImageView
+            android:id="@+id/editor_encrypted_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="7dp"
+            android:contentDescription="@string/encrypted_channel"
+            android:src="@drawable/ic_lock"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/editor_hidden_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="7dp"
+            android:contentDescription="@string/hidden_channel"
+            android:src="@drawable/ic_eye_off"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/editor_favorite_icon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="7dp"
+            android:contentDescription="@string/favorite_channel"
+            android:src="@drawable/ic_star"
+            android:visibility="gone" />
+    </LinearLayout>
+
+</LinearLayout>

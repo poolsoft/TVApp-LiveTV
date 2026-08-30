@@ -1,0 +1,204 @@
+package com.tvapp.livetv.data
+
+import android.content.Context
+import android.net.Uri
+import androidx.room.withTransaction
+import com.tvapp.livetv.data.local.IptvChannelEntity
+import com.tvapp.livetv.data.local.IptvSourceEntity
+import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.model.LiveChannel
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
+import java.util.zip.GZIPInputStream
+
+data class IptvSourceSummary(
+    val source: IptvSourceEntity,
+    val channelCount: Int,
+    val selectedChannelCount: Int,
+)
+
+data class IptvImportResult(
+    val sourceId: Long,
+    val sourceName: String,
+    val channelCount: Int,
+)
+
+class IptvRepository(context: Context) {
+    private val appContext = context.applicationContext
+    private val database = TVAppDatabase.getInstance(appContext)
+    private val dao = database.iptvDao()
+
+    suspend fun sources(): List<IptvSourceSummary> = dao.getSources().map { source ->
+        IptvSourceSummary(
+            source,
+            dao.channelCount(source.id),
+            dao.selectedChannelCount(source.id),
+        )
+    }
+
+    suspend fun sourceChannels(sourceId: Long): List<IptvChannelEntity> =
+        dao.getChannelsForSource(sourceId)
+
+    suspend fun setSelectedChannels(sourceId: Long, sourceKeys: Set<String>) {
+        database.withTransaction {
+            dao.clearSelectedChannels(sourceId)
+            sourceKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
+                if (chunk.isNotEmpty()) dao.selectChannels(chunk)
+            }
+        }
+    }
+
+    suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
+        LiveChannel(
+            id = stableLongId(channel.sourceKey),
+            sourceKey = channel.sourceKey,
+            inputId = "iptv:${channel.sourceId}",
+            displayNumber = (channel.originalIndex + 1).toString(),
+            displayName = channel.displayName,
+            uri = channel.streamUrl,
+            source = LiveChannel.Source.IPTV,
+            logoUrl = channel.logoUrl,
+            groupTitle = channel.groupTitle,
+            epgId = channel.tvgId,
+            userAgent = channel.userAgent,
+            referrer = channel.referrer,
+        )
+    }
+
+    suspend fun importUrl(location: String): IptvImportResult {
+        val normalized = location.trim()
+        require(normalized.startsWith("http://") || normalized.startsWith("https://"))
+        val connection = URL(normalized).openConnection() as HttpURLConnection
+        connection.connectTimeout = CONNECTION_TIMEOUT_MS
+        connection.readTimeout = READ_TIMEOUT_MS
+        connection.instanceFollowRedirects = true
+        connection.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+        try {
+            connection.connect()
+            check(connection.responseCode in 200..299) {
+                "HTTP ${connection.responseCode} ${connection.responseMessage}"
+            }
+            val compressed = connection.contentEncoding.equals("gzip", ignoreCase = true) ||
+                normalized.substringBefore('?').endsWith(".gz", ignoreCase = true)
+            val input = if (compressed) GZIPInputStream(connection.inputStream) else connection.inputStream
+            val name = Uri.parse(normalized).lastPathSegment
+                ?.substringBeforeLast('.')
+                ?.takeIf(String::isNotBlank)
+                ?: Uri.parse(normalized).host
+                ?: "IPTV"
+            return input.use { importStream(normalized, KIND_URL, name, it) }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    suspend fun importDocument(uri: Uri, name: String): IptvImportResult {
+        val input = checkNotNull(appContext.contentResolver.openInputStream(uri))
+        val compressed = uri.lastPathSegment?.endsWith(".gz", ignoreCase = true) == true
+        val decoded = if (compressed) GZIPInputStream(input) else input
+        return decoded.use { importStream(uri.toString(), KIND_DOCUMENT, name, it) }
+    }
+
+    suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
+        KIND_URL -> importUrl(source.location)
+        KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name)
+        else -> error("Bilinmeyen IPTV kaynak türü: ${source.kind}")
+    }
+
+    suspend fun delete(source: IptvSourceEntity) {
+        dao.deleteSource(source)
+    }
+
+    private suspend fun importStream(
+        location: String,
+        kind: String,
+        name: String,
+        input: InputStream,
+    ): IptvImportResult {
+        val parsed = M3uParser.parse(InputStreamReader(input, Charsets.UTF_8))
+        require(parsed.isNotEmpty()) { "Listede oynatılabilir IPTV kanalı bulunamadı." }
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val existing = dao.getSourceByLocation(location)
+            val sourceId = existing?.id ?: dao.insertSource(
+                IptvSourceEntity(name = name, location = location, kind = kind),
+            )
+            check(sourceId > 0) { "IPTV kaynağı kaydedilemedi." }
+            val selectedChannels = if (existing == null) {
+                emptyList()
+            } else {
+                dao.getChannelsForSource(sourceId)
+                    .filter { it.selected }
+            }
+            val selectedKeys = selectedChannels.mapTo(mutableSetOf()) { it.sourceKey }
+            val selectedTvgIds = selectedChannels.mapNotNullTo(mutableSetOf()) {
+                it.tvgId?.trim()?.takeIf(String::isNotBlank)
+            }
+            val selectedNames = selectedChannels.asSequence()
+                .filter { it.tvgId.isNullOrBlank() }
+                .mapTo(mutableSetOf()) { selectionName(it.displayName, it.groupTitle) }
+            val source = (existing ?: IptvSourceEntity(
+                id = sourceId,
+                name = name,
+                location = location,
+                kind = kind,
+            )).copy(name = name, kind = kind, enabled = true, lastUpdatedAt = now)
+            dao.updateSource(source)
+            dao.deleteChannelsForSource(sourceId)
+            dao.upsertChannels(parsed.mapIndexed { index, item ->
+                val tvgId = item.tvgId?.trim()?.takeIf(String::isNotBlank)
+                val identity = tvgId?.let { "id:$it" } ?: listOf(
+                    "name:${selectionName(item.name, item.groupTitle)}",
+                    item.streamUrl.substringBefore('?'),
+                ).joinToString("|")
+                val sourceKey = "iptv:$sourceId:${sha256(identity).take(24)}"
+                IptvChannelEntity(
+                    sourceKey = sourceKey,
+                    sourceId = sourceId,
+                    tvgId = item.tvgId,
+                    tvgName = item.tvgName,
+                    displayName = item.name,
+                    streamUrl = item.streamUrl,
+                    logoUrl = item.logoUrl,
+                    groupTitle = item.groupTitle,
+                    userAgent = item.userAgent,
+                    referrer = item.referrer,
+                    originalIndex = index,
+                    selected = sourceKey in selectedKeys ||
+                        tvgId != null && tvgId in selectedTvgIds ||
+                        tvgId == null && selectionName(item.name, item.groupTitle) in selectedNames,
+                    lastSeenAt = now,
+                )
+            })
+            IptvImportResult(sourceId, source.name, parsed.size)
+        }
+    }
+
+    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+
+    private fun stableLongId(value: String): Long {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+        var result = 0L
+        for (index in 0 until Long.SIZE_BYTES) {
+            result = (result shl 8) or (digest[index].toLong() and 0xff)
+        }
+        return result or Long.MIN_VALUE
+    }
+
+    private fun selectionName(name: String, group: String?): String =
+        "${group.orEmpty().trim().lowercase()}|${name.trim().lowercase()}"
+
+    companion object {
+        const val KIND_URL = "URL"
+        const val KIND_DOCUMENT = "DOCUMENT"
+        private const val CONNECTION_TIMEOUT_MS = 15_000
+        private const val READ_TIMEOUT_MS = 30_000
+        private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
+        private const val SELECTION_UPDATE_CHUNK_SIZE = 500
+    }
+}
