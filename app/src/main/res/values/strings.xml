@@ -54,6 +54,8 @@
     <string name="target_start_number">Başlangıç kanal numarası</string>
     <string name="move_target_order">Kanal sırası gir</string>
     <string name="move_target_preview">Hedef sıra: %1$s</string>
+    <string name="editor_channel_number_preview">Kanal: %1$s</string>
+    <string name="channel_number_not_found">Bu numarada kanal bulunamadı.</string>
     <string name="selected_channel_count">%1$d seçili kanal mevcut sıraları korunarak taşınacak.</string>
     <string name="move">Taşı</string>
     <string name="save_order">Sırayı kaydet</string>
@@ -86,7 +88,17 @@
     <string name="unlock_channel">Kanal kilidini kaldır</string>
     <string name="channel_locked">Bu kanal çocuk kilidiyle korunuyor.</string>
     <string name="wrong_pin">PIN yanlış.</string>
+    <string name="create_parental_pin">4 haneli çocuk kilidi PIN’i oluşturun</string>
+    <string name="pin_remote_hint">PIN’i kumandanın sayı tuşlarıyla girin</string>
+    <string name="press_ok_to_unlock">Kilidi açmak için OK tuşuna basın</string>
+    <string name="iptv_live_edge">CANLI</string>
+    <string name="iptv_returned_live">Canlı yayına dönüldü</string>
+    <string name="iptv_vod_playing">Oynatılıyor</string>
+    <string name="iptv_vod_paused">Duraklatıldı</string>
+    <string name="iptv_vod_stopped">Durduruldu</string>
+    <string name="iptv_vod_remote_hint">⏯ Oynat/Duraklat    ⏪/⏩ 30 sn    ■ Durdur</string>
     <string name="home_recent_channels">Son izlenen kanallar</string>
+    <string name="home_watch_next_description">Canlı TV · Kanal %1$s</string>
     <string name="xmltv_alternative_epg">Alternatif EPG (XMLTV)</string>
     <string name="xmltv_from_url">XMLTV URL ekle / güncelle</string>
     <string name="xmltv_from_file">XMLTV dosyasından içe aktar</string>
@@ -186,6 +198,10 @@
     <string name="iptv_source_remote_hint">OK: Kanalları seç · OK uzun bas: Liste işlemleri</string>
     <string name="iptv_channels_loading">Kanallar yükleniyor…</string>
     <string name="iptv_selection_count">%1$d / %2$d kanal ana listeye seçildi · OK: Seç/Kaldır · Yeşil: Kaydet</string>
+    <string name="iptv_filtered_selection_count">%1$d / %2$d kanal seçili · Filtrede %3$d kanal · OK: Seç/Kaldır · Yeşil: Kaydet</string>
+    <string name="iptv_category_filter">Kategori</string>
+    <string name="all_iptv_categories">Tüm kategoriler</string>
+    <string name="clear_visible_iptv_selection">Görünenleri temizle</string>
     <string name="clear_iptv_selection">Kırmızı · Temizle</string>
     <string name="save_iptv_selection">Yeşil · Kaydet</string>
     <string name="iptv_selection_ok_hint">OK · Seç / Kaldır</string>

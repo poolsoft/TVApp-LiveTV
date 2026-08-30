@@ -4,14 +4,17 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.ProgramRepository
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ActivityProgramGuideBinding
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.GuideProgramAdapter
 import com.tvapp.livetv.ui.ProgramGuideChannelAdapter
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +30,7 @@ class ProgramGuideActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProgramGuideBinding
     private lateinit var channelRepository: ChannelRepository
     private lateinit var programRepository: ProgramRepository
+    private lateinit var parentalControlStore: ParentalControlStore
     private lateinit var channelAdapter: ProgramGuideChannelAdapter
     private lateinit var programAdapter: GuideProgramAdapter
     private var channels: List<LiveChannel> = emptyList()
@@ -38,9 +42,14 @@ class ProgramGuideActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityProgramGuideBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         channelRepository = ChannelRepository(this)
         programRepository = ProgramRepository(this)
-        channelAdapter = ProgramGuideChannelAdapter(::scheduleChannelPrograms, ::openChannel)
+        parentalControlStore = ParentalControlStore(this)
+        channelAdapter = ProgramGuideChannelAdapter(
+            ::scheduleChannelPrograms,
+            ::openChannel,
+        ) { channel -> parentalControlStore.isLocked(channel.sourceKey) }
         programAdapter = GuideProgramAdapter(::showProgramDetail, ::openProgram)
         binding.guideChannelList.layoutManager = LinearLayoutManager(this)
         binding.guideChannelList.adapter = channelAdapter
@@ -57,6 +66,9 @@ class ProgramGuideActivity : AppCompatActivity() {
     private fun applyPercentageGeometry() {
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
+        binding.guideOverlay.layoutParams = binding.guideOverlay.layoutParams.apply {
+            this.width = (width * OVERLAY_WIDTH_FRACTION).toInt()
+        }
         binding.guideHeader.layoutParams = binding.guideHeader.layoutParams.apply {
             this.height = (height * HEADER_HEIGHT_FRACTION).toInt()
         }
@@ -83,7 +95,17 @@ class ProgramGuideActivity : AppCompatActivity() {
                 channelRepository.channels().getOrDefault(emptyList())
             }
             channels = loaded
-            channelAdapter.submitList(loaded)
+            val currentPrograms = withContext(Dispatchers.IO) {
+                runCatching {
+                    programRepository.currentPrograms(
+                        loaded.asSequence()
+                            .filter { it.source == LiveChannel.Source.TIF }
+                            .map { it.id }
+                            .toSet(),
+                    )
+                }.getOrDefault(emptyMap())
+            }
+            channelAdapter.submitList(loaded, currentPrograms)
             if (loaded.isEmpty()) {
                 binding.emptyPrograms.visibility = View.VISIBLE
                 binding.emptyPrograms.setText(R.string.no_channels_title)
@@ -167,32 +189,62 @@ class ProgramGuideActivity : AppCompatActivity() {
 
     private fun focusChannel(sourceKey: String?) {
         val position = channelAdapter.positionOf(sourceKey).takeIf { it >= 0 } ?: 0
-        binding.guideChannelList.scrollToPosition(position)
-        binding.guideChannelList.post {
-            binding.guideChannelList.findViewHolderForAdapterPosition(position)
-                ?.itemView?.requestFocus()
-        }
+        focusRecyclerPosition(binding.guideChannelList, position)
+    }
+
+    private fun moveRecyclerFocus(recyclerView: RecyclerView, offset: Int): Boolean {
+        val count = recyclerView.adapter?.itemCount ?: 0
+        if (count == 0) return false
+        val focusedView = recyclerView.findFocus()
+        val current = focusedView?.let { recyclerView.findContainingViewHolder(it) }
+            ?.bindingAdapterPosition
+            ?.takeIf { it != RecyclerView.NO_POSITION }
+            ?: 0
+        val target = (current + offset).coerceIn(0, count - 1)
+        focusRecyclerPosition(recyclerView, target)
+        return true
+    }
+
+    private fun focusRecyclerPosition(recyclerView: RecyclerView, position: Int) {
+        recyclerView.scrollToPosition(position)
+        recyclerView.postDelayed({
+            recyclerView.findViewHolderForAdapterPosition(position)
+                ?.itemView
+                ?.requestFocus()
+        }, FOCUS_AFTER_LAYOUT_DELAY_MS)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> when {
+                    binding.programList.hasFocus() -> moveRecyclerFocus(binding.programList, -1)
+                    binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, -1)
+                    else -> false
+                }.also { handled -> if (handled) return true }
+                KeyEvent.KEYCODE_DPAD_DOWN -> when {
+                    binding.programList.hasFocus() -> moveRecyclerFocus(binding.programList, 1)
+                    binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, 1)
+                    else -> false
+                }.also { handled -> if (handled) return true }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> if (binding.guideChannelList.hasFocus() &&
                     programs.isNotEmpty()
                 ) {
-                    binding.programList.scrollToPosition(0)
-                    binding.programList.post {
-                        binding.programList.findViewHolderForAdapterPosition(0)
-                            ?.itemView?.requestFocus()
-                    }
+                    focusRecyclerPosition(binding.programList, 0)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.programList.hasFocus()) {
                     focusChannel(focusedChannel?.sourceKey)
                     return true
                 }
-                KeyEvent.KEYCODE_INFO -> {
+                KeyEvent.KEYCODE_INFO,
+                KeyEvent.KEYCODE_GUIDE -> {
                     finish()
+                    return true
+                }
+                KeyEvent.KEYCODE_SETTINGS,
+                KeyEvent.KEYCODE_TV_CONTENTS_MENU -> {
+                    startActivity(Intent(this, DisplaySettingsActivity::class.java))
                     return true
                 }
             }
@@ -210,9 +262,11 @@ class ProgramGuideActivity : AppCompatActivity() {
         const val EXTRA_SELECTED_SOURCE_KEY = "selected-source-key"
         private const val HEADER_HEIGHT_FRACTION = 0.12f
         private const val DETAIL_HEIGHT_FRACTION = 0.18f
+        private const val OVERLAY_WIDTH_FRACTION = 0.66f
         private const val OUTER_HORIZONTAL_PADDING_FRACTION = 0.03f
         private const val COLUMN_PADDING_FRACTION = 0.008f
         private const val CHANNEL_FOCUS_DELAY_MS = 250L
+        private const val FOCUS_AFTER_LAYOUT_DELAY_MS = 100L
         private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
     }

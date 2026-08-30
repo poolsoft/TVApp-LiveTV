@@ -25,8 +25,34 @@
 
     <LinearLayout
         android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/iptv_category_filter"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <Spinner
+            android:id="@+id/category_filter"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="14dp"
+            android:background="@drawable/bg_focusable"
+            android:focusable="true"
+            android:nextFocusDown="@id/channel_list"
+            android:popupBackground="#F21A2026"
+            android:spinnerMode="dropdown" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="8dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
@@ -40,7 +66,8 @@
             android:dividerHeight="1dp"
             android:listSelector="@drawable/bg_focusable"
             android:nextFocusLeft="@id/clear_button"
-            android:nextFocusRight="@id/save_button" />
+            android:nextFocusRight="@id/save_button"
+            android:nextFocusUp="@id/category_filter" />
 
         <View
             android:layout_width="1dp"
@@ -108,41 +135,98 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="58dp"
-        android:layout_marginTop="12dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <Button
+        <LinearLayout
             android:id="@+id/clear_button"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
             android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
             android:nextFocusUp="@id/channel_list"
-            android:text="@string/clear_iptv_selection"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <View
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/key_red" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/clear_visible_iptv_selection"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/category_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:nextFocusUp="@id/category_filter"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <View
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/key_yellow" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/iptv_category_filter"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="10dp"
+            android:layout_marginHorizontal="12dp"
             android:layout_weight="1"
             android:gravity="center"
             android:text="@string/iptv_selection_ok_hint"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
 
-        <Button
+        <LinearLayout
             android:id="@+id/save_button"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
             android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
             android:nextFocusUp="@id/channel_list"
-            android:text="@string/save_iptv_selection"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <View
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/key_green" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/save_iptv_selection"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

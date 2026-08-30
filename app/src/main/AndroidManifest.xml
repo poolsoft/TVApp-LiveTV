@@ -28,6 +28,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".home.WatchNextRemovedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.tv.action.WATCH_NEXT_PROGRAM_BROWSABLE_DISABLED" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".IptvSourcesActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
@@ -48,13 +57,19 @@
 
         <activity
             android:name=".DisplaySettingsActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@style/Theme.TVApp.SettingsOverlay"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="com.tvapp.livetv.OPEN_SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ProgramGuideActivity"
             android:exported="false"
+            android:theme="@style/Theme.TVApp.GuideOverlay"
             android:screenOrientation="landscape" />
 
         <activity

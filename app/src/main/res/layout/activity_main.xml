@@ -88,6 +88,115 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/parental_lock_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_status"
+        android:focusable="false"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:contentDescription="@string/locked_channel"
+            android:src="@drawable/ic_lock" />
+
+        <TextView
+            android:id="@+id/parental_lock_channel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:maxWidth="520dp"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/press_ok_to_unlock"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/iptv_playback_controls"
+        android:layout_width="720dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:background="@drawable/bg_status"
+        android:focusable="false"
+        android:orientation="vertical"
+        android:padding="18dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/iptv_control_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/iptv_control_state"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/accent"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/iptv_control_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="12dp"
+            android:max="1000"
+            android:progressBackgroundTint="#52606B"
+            android:progressTint="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/iptv_control_position"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/iptv_control_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/iptv_vod_remote_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/channel_panel"
         android:layout_width="480dp"
         android:layout_height="match_parent"
@@ -133,38 +242,38 @@
             android:layout_height="wrap_content"
               android:gravity="center"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp">
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp">
 
                 <ImageButton
                     android:id="@+id/all_filter"
-                    android:layout_width="46dp"
-                    android:layout_height="42dp"
+                    android:layout_width="36dp"
+                    android:layout_height="32dp"
                     android:background="@drawable/bg_filter_icon"
                     android:contentDescription="@string/all_channels"
-                    android:padding="10dp"
+                    android:padding="7dp"
                     android:src="@drawable/ic_list"
                     android:tooltipText="@string/all_channels" />
 
                 <ImageButton
                     android:id="@+id/satellite_filter"
-                    android:layout_width="46dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="10dp"
+                    android:layout_width="36dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="7dp"
                     android:background="@drawable/bg_filter_icon"
                     android:contentDescription="@string/satellite_channels"
-                    android:padding="10dp"
+                    android:padding="7dp"
                     android:src="@drawable/ic_source_tif"
                     android:tooltipText="@string/satellite_channels" />
 
                 <ImageButton
                     android:id="@+id/iptv_filter"
-                    android:layout_width="46dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="10dp"
+                    android:layout_width="36dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="7dp"
                     android:background="@drawable/bg_filter_icon"
                     android:contentDescription="@string/iptv_filter"
-                    android:padding="10dp"
+                    android:padding="7dp"
                     android:src="@drawable/ic_source_iptv"
                     android:tooltipText="@string/iptv_filter" />
         </LinearLayout>

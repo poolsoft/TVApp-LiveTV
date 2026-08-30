@@ -8,4 +8,5 @@
     <color name="accent">#33B5E5</color>
     <color name="text_primary">#F7F7F8</color>
     <color name="text_secondary">#B7BBC4</color>
+    <color name="remote_red">#FF3B4E</color>
 </resources>

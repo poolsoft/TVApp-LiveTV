@@ -2,22 +2,27 @@ package com.tvapp.livetv.ui
 
 import android.media.tv.TvContract
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.tvapp.livetv.R
+import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ItemGuideChannelBinding
 import com.tvapp.livetv.model.LiveChannel
 
 class ProgramGuideChannelAdapter(
     private val onFocused: (LiveChannel) -> Unit,
     private val onSelected: (LiveChannel) -> Unit,
+    private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ProgramGuideChannelAdapter.ViewHolder>() {
     private val channels = mutableListOf<LiveChannel>()
+    private var currentPrograms: Map<Long, ProgramSummary> = emptyMap()
     private var selectedKey: String? = null
 
-    fun submitList(items: List<LiveChannel>) {
+    fun submitList(items: List<LiveChannel>, programs: Map<Long, ProgramSummary>) {
         channels.clear()
         channels.addAll(items)
+        currentPrograms = programs
         notifyDataSetChanged()
     }
 
@@ -52,10 +57,22 @@ class ProgramGuideChannelAdapter(
             }
             channelNumber.text = channel.displayNumber
             channelName.text = channel.displayName
+            val program = currentPrograms[channel.id].takeIf {
+                channel.source == LiveChannel.Source.TIF
+            }
+            currentProgram.text = program?.title ?: root.context.getString(R.string.no_program_information)
+            programProgress.progress = program?.let {
+                val duration = (it.endTimeMillis - it.startTimeMillis).coerceAtLeast(1L)
+                (((System.currentTimeMillis() - it.startTimeMillis) * 100L) / duration)
+                    .toInt().coerceIn(0, 100)
+            } ?: 0
             channelLogo.setImageResource(R.drawable.ic_tv)
             runCatching { channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id)) }
             if (channelLogo.drawable == null) channelLogo.setImageResource(R.drawable.ic_tv)
             root.isSelected = channel.sourceKey == selectedKey
+            guideLockIcon.visibility = if (
+                channel.locked || channel.encrypted || isParentalLocked(channel)
+            ) View.VISIBLE else View.GONE
             root.setOnFocusChangeListener { _, focused -> if (focused) onFocused(channel) }
             root.setOnClickListener { onSelected(channel) }
         }

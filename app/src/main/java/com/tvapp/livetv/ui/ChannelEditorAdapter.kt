@@ -12,6 +12,7 @@ import com.tvapp.livetv.model.LiveChannel
 class ChannelEditorAdapter(
     private val onFocused: (LiveChannel) -> Unit,
     private val onClicked: (LiveChannel) -> Unit,
+    private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ChannelEditorAdapter.ViewHolder>() {
     private val channels = mutableListOf<LiveChannel>()
     private var selectedKeys: Set<String> = emptySet()
@@ -81,7 +82,11 @@ class ChannelEditorAdapter(
             editorTypeIcon.setImageResource(
                 if (channel.isRadioChannel()) R.drawable.ic_radio else R.drawable.ic_channel_tv,
             )
-            editorEncryptedIcon.visibility = if (channel.encrypted) View.VISIBLE else View.GONE
+            val locked = channel.encrypted || channel.locked || isParentalLocked(channel)
+            editorEncryptedIcon.visibility = if (locked) View.VISIBLE else View.GONE
+            editorEncryptedIcon.contentDescription = root.context.getString(
+                if (isParentalLocked(channel)) R.string.locked_channel else R.string.encrypted_channel,
+            )
             editorHiddenIcon.visibility = if (channel.hidden) View.VISIBLE else View.GONE
             editorFavoriteIcon.visibility = if (channel.favorite) View.VISIBLE else View.GONE
             root.alpha = if (channel.hidden) 0.52f else 1f

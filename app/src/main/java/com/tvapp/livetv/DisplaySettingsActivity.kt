@@ -2,14 +2,13 @@ package com.tvapp.livetv
 
 import android.app.Activity
 import android.os.Bundle
-import android.text.InputType
-import android.widget.EditText
-import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.FragmentActivity
-import androidx.leanback.preference.LeanbackPreferenceFragmentCompat
+import android.view.Gravity
+import android.view.WindowManager
+import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceScreen
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
@@ -18,14 +17,24 @@ import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
-import com.tvapp.livetv.settings.ParentalControlStore
 
-class DisplaySettingsActivity : FragmentActivity() {
+class DisplaySettingsActivity : AppCompatActivity() {
     private var changed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_display_settings)
+        val metrics = resources.displayMetrics
+        window.setGravity(Gravity.END or Gravity.CENTER_VERTICAL)
+        window.setLayout(
+            (metrics.widthPixels * OSD_WIDTH_FRACTION).toInt(),
+            (metrics.heightPixels * OSD_HEIGHT_FRACTION).toInt(),
+        )
+        window.attributes = window.attributes.apply {
+            x = (metrics.widthPixels * OSD_EDGE_GAP_FRACTION).toInt()
+            dimAmount = 0f
+        }
+        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.settings_host, DisplaySettingsFragment())
@@ -42,18 +51,21 @@ class DisplaySettingsActivity : FragmentActivity() {
         if (changed) setResult(Activity.RESULT_OK)
         super.finish()
     }
+
+    private companion object {
+        const val OSD_WIDTH_FRACTION = 0.44f
+        const val OSD_HEIGHT_FRACTION = 0.92f
+        const val OSD_EDGE_GAP_FRACTION = 0.008f
+    }
 }
 
-class DisplaySettingsFragment : LeanbackPreferenceFragmentCompat() {
+class DisplaySettingsFragment : PreferenceFragmentCompat() {
     private lateinit var store: DisplayPreferencesStore
     private lateinit var sleepTimerStore: SleepTimerStore
-    private lateinit var parentalControlStore: ParentalControlStore
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         store = DisplayPreferencesStore(requireContext())
         sleepTimerStore = SleepTimerStore(requireContext())
-        parentalControlStore = ParentalControlStore(requireContext())
-        setTitle(getString(R.string.display_settings))
         preferenceScreen = buildScreen(store.load())
     }
 
@@ -168,47 +180,7 @@ class DisplaySettingsFragment : LeanbackPreferenceFragmentCompat() {
                 ) { update { copy(launchOnBoot = it) } })
             }
 
-            addAttachedCategory(R.string.parental_controls) {
-                addPreference(Preference(context).apply {
-                    key = KEY_PARENTAL_PIN
-                    title = getString(R.string.parental_pin)
-                    summary = getString(
-                        if (parentalControlStore.hasPin()) R.string.pin_configured
-                        else R.string.pin_not_configured,
-                    )
-                    isPersistent = false
-                    setOnPreferenceClickListener {
-                        showPinEditor()
-                        true
-                    }
-                })
-            }
         }
-    }
-
-    private fun showPinEditor() {
-        val input = EditText(requireContext()).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            hint = getString(R.string.four_digit_pin)
-        }
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.parental_pin)
-            .setView(input)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val pin = input.text.toString()
-                if (pin.length == 4 && pin.all(Char::isDigit)) {
-                    parentalControlStore.setPin(pin)
-                    (activity as? DisplaySettingsActivity)?.markChanged()
-                    preferenceScreen = buildScreen(store.load())
-                } else {
-                    AlertDialog.Builder(requireContext())
-                        .setMessage(R.string.pin_must_be_four_digits)
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun PreferenceScreen.addAttachedCategory(
@@ -304,6 +276,5 @@ class DisplaySettingsFragment : LeanbackPreferenceFragmentCompat() {
         const val KEY_SUBTITLES = "ui-subtitles"
         const val KEY_SLEEP_TIMER = "playback-sleep-timer"
         const val KEY_LAUNCH_ON_BOOT = "ui-launch-on-boot"
-        const val KEY_PARENTAL_PIN = "parental-pin"
     }
 }

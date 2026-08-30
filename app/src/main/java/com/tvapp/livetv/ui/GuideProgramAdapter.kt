@@ -64,6 +64,6 @@ class GuideProgramAdapter(
 
     private companion object {
         const val ROW_HEIGHT_FRACTION = 0.082f
-        const val TIME_WIDTH_FRACTION = 0.095f
+        const val TIME_WIDTH_FRACTION = 0.055f
     }
 }

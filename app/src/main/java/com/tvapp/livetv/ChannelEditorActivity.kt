@@ -22,6 +22,7 @@ import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.settings.ChannelSourceFilterStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
+import com.tvapp.livetv.ui.ParentalPinDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -51,6 +52,8 @@ class ChannelEditorActivity : AppCompatActivity() {
     private var channelLoadJob: Job? = null
     private var moveTargetJob: Job? = null
     private var moveTargetInput = ""
+    private var navigationNumberJob: Job? = null
+    private var navigationNumberInput = ""
     private var previewSourceKey: String? = null
     private var operationInProgress = false
     private var restoredStateApplied = false
@@ -103,7 +106,10 @@ class ChannelEditorActivity : AppCompatActivity() {
         backupRepository = AppBackupRepository(this)
         parentalControlStore = ParentalControlStore(this)
         xmlTvRepository = XmlTvRepository(this)
-        adapter = ChannelEditorAdapter(::onChannelFocused, ::onChannelClicked)
+        adapter = ChannelEditorAdapter(
+            ::onChannelFocused,
+            ::onChannelClicked,
+        ) { channel -> parentalControlStore.isLocked(channel.sourceKey) }
         iptvPreview = IptvPlaybackController(this, binding.previewIptv)
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.channelList.adapter = adapter
@@ -184,11 +190,20 @@ class ChannelEditorActivity : AppCompatActivity() {
         binding.previewNumber.text = channel.displayNumber
         binding.previewName.text = channel.displayName
         binding.previewState.text = when {
+            parentalControlStore.isLocked(channel.sourceKey) -> getString(R.string.locked_channel)
             channel.hidden -> getString(R.string.channel_skipped)
             channel.favorite -> getString(R.string.channel_favorite)
             else -> getString(R.string.channel_active)
         }
         previewJob?.cancel()
+        if (parentalControlStore.isLocked(channel.sourceKey)) {
+            previewSourceKey = null
+            binding.previewTv.reset()
+            binding.previewTv.visibility = View.GONE
+            iptvPreview.stop()
+            binding.previewIptv.visibility = View.GONE
+            return
+        }
         if (mode == Mode.MOVE || previewSourceKey == channel.sourceKey) return
         previewSourceKey = channel.sourceKey
         previewJob = lifecycleScope.launch {
@@ -292,6 +307,45 @@ class ChannelEditorActivity : AppCompatActivity() {
             delay(MOVE_TARGET_DELAY_MS)
             commitMoveTargetInput()
         }
+    }
+
+    private fun appendNavigationDigit(digit: Int) {
+        if (navigationNumberInput.length >= MAX_CHANNEL_NUMBER_DIGITS) {
+            navigationNumberInput = ""
+        }
+        navigationNumberInput += digit
+        binding.syncStatus.text = getString(
+            R.string.editor_channel_number_preview,
+            navigationNumberInput,
+        )
+        navigationNumberJob?.cancel()
+        navigationNumberJob = lifecycleScope.launch {
+            delay(NAVIGATION_NUMBER_DELAY_MS)
+            focusEnteredChannelNumber()
+        }
+    }
+
+    private fun focusEnteredChannelNumber() {
+        val entered = navigationNumberInput
+        navigationNumberInput = ""
+        navigationNumberJob?.cancel()
+        navigationNumberJob = null
+        val target = channels.firstOrNull { it.displayNumber == entered }
+            ?: entered.toIntOrNull()
+                ?.takeIf { it in 1..channels.size }
+                ?.let { channels[it - 1] }
+        if (target == null) {
+            binding.syncStatus.setText(R.string.channel_number_not_found)
+            return
+        }
+        focusChannel(target.sourceKey)
+        updateModeLabels()
+    }
+
+    private fun clearNavigationNumberInput() {
+        navigationNumberJob?.cancel()
+        navigationNumberJob = null
+        navigationNumberInput = ""
     }
 
     private fun commitMoveTargetInput() {
@@ -414,24 +468,38 @@ class ChannelEditorActivity : AppCompatActivity() {
     }
 
     private fun toggleChannelLock(channel: LiveChannel) {
-        if (!parentalControlStore.hasPin()) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.pin_not_configured)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
+        if (parentalControlStore.isLocked(channel.sourceKey)) {
+            ParentalPinDialog.verify(this, getString(R.string.unlock_channel)) {
+                setChannelLocked(channel, false)
+            }
             return
         }
-        parentalControlStore.setLocked(
-            channel.sourceKey,
-            !parentalControlStore.isLocked(channel.sourceKey),
-        )
+        if (parentalControlStore.hasPin()) {
+            setChannelLocked(channel, true)
+        } else {
+            ParentalPinDialog.create(this) { setChannelLocked(channel, true) }
+        }
+    }
+
+    private fun setChannelLocked(channel: LiveChannel, locked: Boolean) {
+        parentalControlStore.setLocked(channel.sourceKey, locked)
+        if (locked && focusedChannel?.sourceKey == channel.sourceKey) {
+            previewJob?.cancel()
+            previewSourceKey = null
+            binding.previewTv.reset()
+            binding.previewTv.visibility = View.GONE
+            iptvPreview.stop()
+            binding.previewIptv.visibility = View.GONE
+        }
         binding.syncStatus.text = getString(
-            if (parentalControlStore.isLocked(channel.sourceKey)) {
+            if (locked) {
                 R.string.lock_channel
             } else {
                 R.string.unlock_channel
             },
         )
+        adapter.notifyDataSetChanged()
+        setResult(RESULT_OK)
     }
 
     private fun showNumberEditor(channel: LiveChannel) {
@@ -757,14 +825,14 @@ class ChannelEditorActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_PAGE_DOWN,
         )
         val handlesBack = event.keyCode == KeyEvent.KEYCODE_BACK
-        val moveDigit = if (mode == Mode.MOVE) digitForKeyCode(event.keyCode) else null
+        val digit = digitForKeyCode(event.keyCode)
 
         // Vendor TV firmware may attach system actions to the key-up phase of color keys.
         // Consume the complete press once the editor owns that remote key.
         if (event.action != KeyEvent.ACTION_DOWN) {
             return if (
                 editorColor != null || handlesMoveDirection || handlesPage || handlesBack ||
-                handlesMoveConfirm || moveDigit != null
+                handlesMoveConfirm || digit != null
             ) {
                 true
             } else {
@@ -772,7 +840,7 @@ class ChannelEditorActivity : AppCompatActivity() {
             }
         }
         if (event.repeatCount > 0 && !handlesMoveDirection) {
-            return if (editorColor != null || handlesBack || handlesMoveConfirm || moveDigit != null) {
+            return if (editorColor != null || handlesBack || handlesMoveConfirm || digit != null) {
                 true
             } else {
                 super.dispatchKeyEvent(event)
@@ -784,6 +852,8 @@ class ChannelEditorActivity : AppCompatActivity() {
                 "scanCode=${event.scanCode}, deviceId=${event.deviceId}, source=${event.source}, " +
                 "mode=$mode, focused=${focusedChannel?.sourceKey}, selected=${selectedKeys.size}",
         )
+
+        if (editorColor != null || handlesBack) clearNavigationNumberInput()
 
         when (editorColor) {
             EditorColor.RED -> if (mode == Mode.MOVE) showMoveTargetEditor() else toggleSkipped()
@@ -801,8 +871,9 @@ class ChannelEditorActivity : AppCompatActivity() {
                 Mode.MOVE -> cancelMode()
             }
             EditorColor.BLUE -> if (mode == Mode.NORMAL) showSourceManagement()
-            null -> if (moveDigit != null) {
-                appendMoveTargetDigit(moveDigit)
+            null -> if (digit != null) {
+                if (mode == Mode.MOVE) appendMoveTargetDigit(digit)
+                else appendNavigationDigit(digit)
             } else when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> if (mode == Mode.MOVE) moveBlock(-1)
                     else if (!wrapEditorList(-1)) return super.dispatchKeyEvent(event)
@@ -882,6 +953,7 @@ class ChannelEditorActivity : AppCompatActivity() {
         previewJob?.cancel()
         channelLoadJob?.cancel()
         moveTargetJob?.cancel()
+        navigationNumberJob?.cancel()
         binding.previewTv.reset()
         iptvPreview.release()
         super.onDestroy()
@@ -899,6 +971,7 @@ class ChannelEditorActivity : AppCompatActivity() {
         const val EXTRA_SELECTED_SOURCE_KEY = "com.tvapp.livetv.extra.SELECTED_SOURCE_KEY"
         private const val PREVIEW_DELAY_MS = 450L
         private const val MOVE_TARGET_DELAY_MS = 1_200L
+        private const val NAVIGATION_NUMBER_DELAY_MS = 900L
         private const val MAX_CHANNEL_NUMBER_DIGITS = 4
         private const val STATE_FOCUSED_SOURCE_KEY = "editor-focused-source-key"
         private const val STATE_MODE = "editor-mode"

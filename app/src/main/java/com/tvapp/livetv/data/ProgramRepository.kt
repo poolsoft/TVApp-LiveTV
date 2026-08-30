@@ -129,16 +129,14 @@ class ProgramRepository(context: Context) {
             TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
         )
         return contentResolver.query(
-            TvContract.Programs.CONTENT_URI,
-            projection,
-            "${TvContract.Programs.COLUMN_CHANNEL_ID} = ? AND " +
-                "${TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS} > ? AND " +
-                "${TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS} < ?",
-            arrayOf(
-                channelId.toString(),
-                startTimeMillis.toString(),
-                endTimeMillis.toString(),
+            TvContract.buildProgramsUriForChannel(
+                channelId,
+                startTimeMillis,
+                endTimeMillis,
             ),
+            projection,
+            null,
+            null,
             "${TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS} ASC",
         )?.use { cursor ->
             val titleIndex = cursor.getColumnIndexOrThrow(TvContract.Programs.COLUMN_TITLE)

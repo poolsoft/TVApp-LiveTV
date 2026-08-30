@@ -37,6 +37,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
+import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.settings.ChannelPanelSide
@@ -49,6 +50,7 @@ import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
+import com.tvapp.livetv.ui.ParentalPinDialog
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
+        private const val INFO_OUTER_MARGIN_FRACTION = 0.007f
         private const val INFO_VERTICAL_PADDING_FRACTION = 0.012f
         private const val CHANNEL_ACTIONS_HEIGHT_FRACTION = 0.12f
         private const val LIST_HORIZONTAL_PADDING_FRACTION = 0.006f
@@ -80,6 +83,12 @@ class MainActivity : AppCompatActivity() {
         private const val AUDIO_ONLY_CONFIRM_DELAY_MS = 3_000L
         private const val CHANNEL_PANEL_TIMEOUT_MS = 10_000L
         private const val INTERNAL_MINI_WIDTH_FRACTION = 0.38f
+        private const val IPTV_CONTROLS_WIDTH_FRACTION = 0.68f
+        private const val IPTV_CONTROLS_BOTTOM_MARGIN_FRACTION = 0.045f
+        private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
+        private const val IPTV_LIVE_CHECK_INTERVAL_MS = 12_000L
+        private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
+        private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
     }
 
     private lateinit var binding: ActivityMainBinding
@@ -125,6 +134,9 @@ class MainActivity : AppCompatActivity() {
     private var focusedProgramJob: Job? = null
     private var visibleProgramsJob: Job? = null
     private var sleepTimerJob: Job? = null
+    private var iptvControlsJob: Job? = null
+    private var iptvLiveHealthJob: Job? = null
+    private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private val tvListingsPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -142,6 +154,7 @@ class MainActivity : AppCompatActivity() {
     private val channelEditor = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
+        unlockedChannels.removeAll { parentalControlStore.isLocked(it) }
         pendingEditorChannelKey = result.data?.getStringExtra(
             ChannelEditorActivity.EXTRA_SELECTED_SOURCE_KEY,
         )
@@ -214,10 +227,18 @@ class MainActivity : AppCompatActivity() {
             debugLog.recordDebug("IPTV_PLAYBACK_FAILURE | ${error.errorCodeName}: ${error.message}")
             showPlaybackError(currentChannel, error.message ?: error.errorCodeName)
         }
+        iptvPlayback.onContentKindChanged = { kind ->
+            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+                currentIptvContentKind = kind
+                if (kind == IptvContentKind.LIVE) startIptvLiveHealthMonitor()
+                else iptvLiveHealthJob?.cancel()
+            }
+        }
         adapter = ChannelAdapter(
             ::confirmListChannel,
             ::showChannelManagement,
             ::scheduleFocusedTune,
+            { channel -> parentalControlStore.isLocked(channel.sourceKey) },
         )
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.channelList.adapter = adapter
@@ -418,34 +439,37 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectChannel(channel: LiveChannel) {
         if (parentalControlStore.isLocked(channel.sourceKey) && channel.sourceKey !in unlockedChannels) {
-            requestChannelPin(channel)
+            showLockedChannel(channel)
             return
         }
         playSelectedChannel(channel)
     }
 
+    private fun showLockedChannel(channel: LiveChannel) {
+        focusedTuneJob?.cancel()
+        audioOnlyJob?.cancel()
+        playback.stop()
+        iptvPlayback.stop()
+        currentChannel = channel
+        adapter.select(channel.sourceKey)
+        binding.tvView.visibility = View.GONE
+        binding.iptvPlayerView.visibility = View.GONE
+        binding.audioOnlyPanel.visibility = View.GONE
+        binding.statusPanel.visibility = View.GONE
+        binding.parentalLockChannel.text = channel.displayName
+        binding.parentalLockPanel.visibility = View.VISIBLE
+        binding.nowChannel.text = channel.displayName
+        binding.nowNumber.text = channel.displayNumber
+        updateTechnicalBadges(channel, emptyList())
+        showInfoBar()
+        loadPrograms(channel)
+    }
+
     private fun requestChannelPin(channel: LiveChannel) {
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            hint = getString(R.string.four_digit_pin)
+        ParentalPinDialog.verify(this, channel.displayName) {
+            unlockedChannels.add(channel.sourceKey)
+            playSelectedChannel(channel)
         }
-        AlertDialog.Builder(this)
-            .setTitle(channel.displayName)
-            .setMessage(R.string.channel_locked)
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                if (parentalControlStore.verify(input.text.toString())) {
-                    unlockedChannels.add(channel.sourceKey)
-                    playSelectedChannel(channel)
-                } else {
-                    binding.statusPanel.visibility = View.VISIBLE
-                    binding.statusTitle.setText(R.string.channel_locked)
-                    binding.statusMessage.setText(R.string.wrong_pin)
-                    binding.closeButton.requestFocus()
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
     }
 
     private fun playSelectedChannel(channel: LiveChannel) {
@@ -455,6 +479,11 @@ class MainActivity : AppCompatActivity() {
         focusedTuneJob?.cancel()
         audioOnlyJob?.cancel()
         currentChannel = channel
+        currentIptvContentKind = IptvContentKind.UNKNOWN
+        iptvControlsJob?.cancel()
+        iptvLiveHealthJob?.cancel()
+        binding.iptvPlaybackControls.visibility = View.GONE
+        binding.parentalLockPanel.visibility = View.GONE
         playbackHistory.record(channel.sourceKey)
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching {
@@ -715,6 +744,104 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun startIptvLiveHealthMonitor() {
+        iptvLiveHealthJob?.cancel()
+        val sourceKey = currentChannel?.sourceKey ?: return
+        iptvLiveHealthJob = lifecycleScope.launch {
+            while (currentChannel?.sourceKey == sourceKey) {
+                delay(IPTV_LIVE_CHECK_INTERVAL_MS)
+                if (iptvPlayback.catchUpToLive(IPTV_MAX_LIVE_OFFSET_MS)) {
+                    debugLog.recordDebug("IPTV_LIVE_EDGE_CORRECTED | channel=$sourceKey")
+                }
+            }
+        }
+    }
+
+    private fun handleIptvMediaKey(keyCode: Int) {
+        when (currentIptvContentKind) {
+            IptvContentKind.LIVE -> {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PLAY,
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> iptvPlayback.goLive()
+                    else -> return
+                }
+                showIptvPlaybackControls(R.string.iptv_returned_live)
+            }
+            IptvContentKind.VOD -> {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> iptvPlayback.togglePlayPause()
+                    KeyEvent.KEYCODE_MEDIA_PLAY -> iptvPlayback.play()
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> iptvPlayback.pause()
+                    KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS)
+                    KeyEvent.KEYCODE_MEDIA_REWIND,
+                    KeyEvent.KEYCODE_MEDIA_PREVIOUS -> iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS)
+                    KeyEvent.KEYCODE_MEDIA_STOP -> iptvPlayback.stopVod()
+                    else -> return
+                }
+                showIptvPlaybackControls(
+                    if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP) R.string.iptv_vod_stopped
+                    else if (iptvPlayback.playbackSnapshot().isPlaying) {
+                        R.string.iptv_vod_playing
+                    } else {
+                        R.string.iptv_vod_paused
+                    },
+                )
+            }
+            IptvContentKind.UNKNOWN -> {
+                if (keyCode !in setOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+                    return
+                }
+                iptvPlayback.togglePlayPause()
+            }
+        }
+    }
+
+    private fun showIptvPlaybackControls(stateText: Int) {
+        binding.iptvPlaybackControls.visibility = View.VISIBLE
+        binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
+        binding.iptvControlState.setText(stateText)
+        val vod = currentIptvContentKind == IptvContentKind.VOD
+        binding.iptvControlProgress.visibility = if (vod) View.VISIBLE else View.GONE
+        binding.iptvControlPosition.visibility = if (vod) View.VISIBLE else View.GONE
+        binding.iptvControlHint.visibility = if (vod) View.VISIBLE else View.GONE
+        iptvControlsJob?.cancel()
+        iptvControlsJob = lifecycleScope.launch {
+            val startedAt = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startedAt < IPTV_CONTROL_TIMEOUT_MS) {
+                if (vod) updateVodPlaybackControls()
+                delay(500L)
+            }
+            binding.iptvPlaybackControls.visibility = View.GONE
+        }
+    }
+
+    private fun updateVodPlaybackControls() {
+        val state = iptvPlayback.playbackSnapshot()
+        val duration = state.durationMillis.coerceAtLeast(1L)
+        binding.iptvControlProgress.progress =
+            ((state.positionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
+        binding.iptvControlPosition.text = getString(
+            R.string.program_time_format,
+            formatPlaybackTime(state.positionMillis),
+            formatPlaybackTime(state.durationMillis),
+        )
+    }
+
+    private fun formatPlaybackTime(milliseconds: Long): String {
+        val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1_000L)
+        val hours = totalSeconds / 3_600L
+        val minutes = (totalSeconds % 3_600L) / 60L
+        val seconds = totalSeconds % 60L
+        return if (hours > 0L) {
+            String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
+    }
+
     private fun applyDisplayPreferences() {
         displayPreferences = displayPreferencesStore.load()
         adapter.applyRowOptions(
@@ -808,7 +935,9 @@ class MainActivity : AppCompatActivity() {
                 R.drawable.ic_source_tif
             },
         )
-        binding.lockBadge.visibility = if (channel.encrypted || channel.locked) {
+        binding.lockBadge.visibility = if (
+            channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey)
+        ) {
             View.VISIBLE
         } else {
             View.GONE
@@ -1075,6 +1204,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openProgramGuide() {
+        hideChannelPanel()
+        infoBarJob?.cancel()
+        binding.infoBar.visibility = View.GONE
         programGuide.launch(
             Intent(this, ProgramGuideActivity::class.java).putExtra(
                 ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY,
@@ -1093,6 +1225,13 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.move_down),
             getString(R.string.change_channel_number),
             getString(R.string.change_channel_name),
+            getString(
+                if (parentalControlStore.isLocked(channel.sourceKey)) {
+                    R.string.unlock_channel
+                } else {
+                    R.string.lock_channel
+                },
+            ),
             getString(if (multiViewActive) R.string.close_multi_view else R.string.open_multi_view),
         )
         AlertDialog.Builder(this)
@@ -1104,11 +1243,39 @@ class MainActivity : AppCompatActivity() {
                     2 -> updateChannel { repository.moveChannel(channel.sourceKey, 1) }
                     3 -> showChannelNumberEditor(channel)
                     4 -> showChannelNameEditor(channel)
-                    5 -> if (multiViewActive) stopMultiView() else startMultiView(channel)
+                    5 -> toggleChannelLock(channel)
+                    6 -> if (multiViewActive) stopMultiView() else startMultiView(channel)
                 }
             }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun toggleChannelLock(channel: LiveChannel) {
+        if (parentalControlStore.isLocked(channel.sourceKey)) {
+            ParentalPinDialog.verify(this, getString(R.string.unlock_channel)) {
+                parentalControlStore.setLocked(channel.sourceKey, false)
+                unlockedChannels.remove(channel.sourceKey)
+                updateTechnicalBadges(channel, playback.allTracks())
+                adapter.notifyDataSetChanged()
+                loadChannels()
+            }
+            return
+        }
+        val lockChannel = {
+            parentalControlStore.setLocked(channel.sourceKey, true)
+            unlockedChannels.remove(channel.sourceKey)
+            updateTechnicalBadges(channel, playback.allTracks())
+            adapter.notifyDataSetChanged()
+            if (currentChannel?.sourceKey == channel.sourceKey) {
+                hideChannelPanel()
+                showLockedChannel(channel)
+            }
+            loadChannels()
+        }
+        if (parentalControlStore.hasPin()) lockChannel() else {
+            ParentalPinDialog.create(this, lockChannel)
+        }
     }
 
     private fun startMultiView(channel: LiveChannel) {
@@ -1347,6 +1514,7 @@ class MainActivity : AppCompatActivity() {
         val screenHeight = resources.displayMetrics.heightPixels
         val verticalMargin = (screenHeight * VERTICAL_MARGIN_FRACTION).toInt()
         val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
+        val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
         val panelWidth = if (channelPanelExpanded) {
             (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
         } else {
@@ -1375,9 +1543,9 @@ class MainActivity : AppCompatActivity() {
         binding.infoBar.layoutParams =
             (binding.infoBar.layoutParams as FrameLayout.LayoutParams).apply {
                 width = if (channelPanelExpanded) {
-                    screenWidth - panelWidth - overlayGap
+                    screenWidth - panelWidth - overlayGap - infoOuterMargin
                 } else {
-                    screenWidth - panelWidth - overlayGap
+                    screenWidth - panelWidth - overlayGap - infoOuterMargin
                 }
                 height = (screenHeight * INFO_HEIGHT_FRACTION).toInt()
                 gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
@@ -1389,7 +1557,11 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     Gravity.BOTTOM
                 }
-                setMargins(0, verticalMargin, 0, verticalMargin)
+                if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
+                    setMargins(0, verticalMargin, infoOuterMargin, verticalMargin)
+                } else {
+                    setMargins(infoOuterMargin, verticalMargin, 0, verticalMargin)
+                }
             }
         val infoHorizontalPadding = (screenWidth * INFO_HORIZONTAL_PADDING_FRACTION).toInt()
         val infoVerticalPadding = (screenHeight * INFO_VERTICAL_PADDING_FRACTION).toInt()
@@ -1399,6 +1571,12 @@ class MainActivity : AppCompatActivity() {
             infoHorizontalPadding,
             infoVerticalPadding,
         )
+        binding.iptvPlaybackControls.layoutParams =
+            (binding.iptvPlaybackControls.layoutParams as FrameLayout.LayoutParams).apply {
+                width = (screenWidth * IPTV_CONTROLS_WIDTH_FRACTION).toInt()
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = (screenHeight * IPTV_CONTROLS_BOTTOM_MARGIN_FRACTION).toInt()
+            }
     }
 
     private fun startClock() {
@@ -1493,6 +1671,71 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (binding.statusPanel.visibility == View.VISIBLE) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    binding.statusPanel.visibility = View.GONE
+                }
+                return true
+            }
+            return super.dispatchKeyEvent(event)
+        }
+        val isIptvMediaKey = event.keyCode in setOf(
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_STOP,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+            KeyEvent.KEYCODE_MEDIA_REWIND,
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+        ) && currentChannel?.source == LiveChannel.Source.IPTV
+        if (isIptvMediaKey) {
+            if (event.action == KeyEvent.ACTION_DOWN) handleIptvMediaKey(event.keyCode)
+            return true
+        }
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            binding.iptvPlaybackControls.visibility == View.VISIBLE &&
+            currentIptvContentKind == IptvContentKind.VOD
+        ) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS)
+                    showIptvPlaybackControls(
+                        if (iptvPlayback.playbackSnapshot().isPlaying) {
+                            R.string.iptv_vod_playing
+                        } else R.string.iptv_vod_paused,
+                    )
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS)
+                    showIptvPlaybackControls(
+                        if (iptvPlayback.playbackSnapshot().isPlaying) {
+                            R.string.iptv_vod_playing
+                        } else R.string.iptv_vod_paused,
+                    )
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    iptvPlayback.togglePlayPause()
+                    showIptvPlaybackControls(
+                        if (iptvPlayback.playbackSnapshot().isPlaying) {
+                            R.string.iptv_vod_playing
+                        } else {
+                            R.string.iptv_vod_paused
+                        },
+                    )
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK -> {
+                    iptvControlsJob?.cancel()
+                    binding.iptvPlaybackControls.visibility = View.GONE
+                    return true
+                }
+            }
+        }
         val isPictureInPictureKey = event.keyCode == KeyEvent.KEYCODE_WINDOW
         if (event.action != KeyEvent.ACTION_DOWN && isPictureInPictureKey) return true
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -1507,6 +1750,11 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_LAST_CHANNEL -> openPreviousChannel()
                 KeyEvent.KEYCODE_DPAD_CENTER -> if (numberInput.isNotEmpty()) {
                     commitChannelNumber()
+                } else if (
+                    binding.parentalLockPanel.visibility == View.VISIBLE &&
+                    currentChannel != null
+                ) {
+                    requestChannelPin(requireNotNull(currentChannel))
                 } else if (binding.channelPanel.visibility != View.VISIBLE) {
                     toggleChannelPanel()
                 } else {
@@ -1556,20 +1804,14 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
-                KeyEvent.KEYCODE_PROG_BLUE -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    openDisplaySettings()
-                } else {
-                    enterTvPictureInPicture()
-                }
+                KeyEvent.KEYCODE_PROG_BLUE -> openDisplaySettings()
                 KeyEvent.KEYCODE_WINDOW -> enterTvPictureInPicture()
                 KeyEvent.KEYCODE_LANGUAGE_SWITCH -> showAudioTracks()
                 KeyEvent.KEYCODE_CAPTIONS -> showSubtitleTracks()
-                KeyEvent.KEYCODE_SETTINGS -> openDisplaySettings()
-                KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_INFO -> if (channelPanelExpanded) {
-                    openProgramGuide()
-                } else {
-                    showChannelPanel(expanded = true)
-                }
+                KeyEvent.KEYCODE_SETTINGS,
+                KeyEvent.KEYCODE_TV_CONTENTS_MENU -> openDisplaySettings()
+                KeyEvent.KEYCODE_GUIDE,
+                KeyEvent.KEYCODE_INFO -> openProgramGuide()
                 KeyEvent.KEYCODE_MENU -> toggleChannelPanel()
                 else -> {
                     val digit = when (event.keyCode) {
@@ -1610,6 +1852,8 @@ class MainActivity : AppCompatActivity() {
         visibleProgramsJob?.cancel()
         channelLoadJob?.cancel()
         sleepTimerJob?.cancel()
+        iptvControlsJob?.cancel()
+        iptvLiveHealthJob?.cancel()
         clockJob?.cancel()
         playback.stop()
         iptvPlayback.release()

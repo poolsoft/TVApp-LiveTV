@@ -23,7 +23,11 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
     private lateinit var repository: IptvRepository
     private lateinit var preview: IptvPlaybackController
     private var sourceId: Long = -1L
+    private var allChannels: List<IptvChannelEntity> = emptyList()
     private var channels: List<IptvChannelEntity> = emptyList()
+    private val selectedKeys = mutableSetOf<String>()
+    private var categories: List<String> = emptyList()
+    private var selectedCategory: String? = null
     private var previewJob: Job? = null
     private var focusedPosition = 0
 
@@ -45,7 +49,16 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
         binding.title.text = intent.getStringExtra(EXTRA_SOURCE_NAME)
             ?: getString(R.string.select_iptv_channels)
         binding.channelList.choiceMode = android.widget.ListView.CHOICE_MODE_MULTIPLE
-        binding.channelList.setOnItemClickListener { _, _, _, _ -> updateSelectionCount() }
+        binding.channelList.setOnItemClickListener { _, _, position, _ ->
+            channels.getOrNull(position)?.let { channel ->
+                if (binding.channelList.isItemChecked(position)) {
+                    selectedKeys.add(channel.sourceKey)
+                } else {
+                    selectedKeys.remove(channel.sourceKey)
+                }
+            }
+            updateSelectionCount()
+        }
         binding.channelList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,
@@ -60,8 +73,26 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
         binding.clearButton.setOnClickListener {
+            channels.forEach { selectedKeys.remove(it.sourceKey) }
             channels.indices.forEach { binding.channelList.setItemChecked(it, false) }
             updateSelectionCount()
+        }
+        binding.categoryButton.setOnClickListener {
+            binding.categoryFilter.requestFocus()
+            binding.categoryFilter.performClick()
+        }
+        binding.categoryFilter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long,
+            ) {
+                selectedCategory = categories.getOrNull(position - 1)
+                if (allChannels.isNotEmpty()) applyCategoryFilter()
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
         binding.saveButton.setOnClickListener { saveSelection() }
         loadChannels()
@@ -75,6 +106,10 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
             }
             KeyEvent.KEYCODE_PROG_GREEN -> {
                 saveSelection()
+                true
+            }
+            KeyEvent.KEYCODE_PROG_YELLOW -> {
+                binding.categoryButton.performClick()
                 true
             }
             else -> super.onKeyDown(keyCode, event)
@@ -110,24 +145,22 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
                 runCatching { repository.sourceChannels(sourceId) }
             }
             result.onSuccess { loaded ->
-                channels = loaded
-                binding.channelList.adapter = ArrayAdapter(
+                allChannels = loaded
+                selectedKeys.clear()
+                selectedKeys.addAll(loaded.filter { it.selected }.map { it.sourceKey })
+                categories = loaded.asSequence()
+                    .mapNotNull { it.groupTitle?.trim()?.takeIf(String::isNotBlank) }
+                    .distinct()
+                    .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                    .toList()
+                binding.categoryFilter.adapter = ArrayAdapter(
                     this@IptvChannelSelectionActivity,
-                    R.layout.item_iptv_channel_selection,
-                    loaded.map { channel ->
-                        listOfNotNull(
-                            channel.displayName,
-                            channel.groupTitle?.takeIf(String::isNotBlank),
-                        ).joinToString("  ·  ")
-                    },
-                )
-                loaded.forEachIndexed { index, channel ->
-                    binding.channelList.setItemChecked(index, channel.selected)
+                    R.layout.item_iptv_category,
+                    listOf(getString(R.string.all_iptv_categories)) + categories,
+                ).apply {
+                    setDropDownViewResource(R.layout.item_iptv_category)
                 }
-                updateSelectionCount()
-                focusedPosition = loaded.indexOfFirst { it.selected }.takeIf { it >= 0 } ?: 0
-                binding.channelList.setSelection(focusedPosition)
-                binding.channelList.requestFocus()
+                applyCategoryFilter(requestListFocus = true)
             }.onFailure { error ->
                 binding.status.text = error.message ?: error.javaClass.simpleName
             }
@@ -136,10 +169,6 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
 
     private fun saveSelection() {
         binding.saveButton.isEnabled = false
-        val selectedKeys = channels.indices
-            .asSequence()
-            .filter { binding.channelList.isItemChecked(it) }
-            .mapTo(mutableSetOf()) { channels[it].sourceKey }
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching { repository.setSelectedChannels(sourceId, selectedKeys) }
@@ -155,8 +184,39 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
     }
 
     private fun updateSelectionCount() {
-        val count = channels.indices.count { binding.channelList.isItemChecked(it) }
-        binding.status.text = getString(R.string.iptv_selection_count, count, channels.size)
+        binding.status.text = getString(
+            R.string.iptv_filtered_selection_count,
+            selectedKeys.size,
+            allChannels.size,
+            channels.size,
+        )
+    }
+
+    private fun applyCategoryFilter(requestListFocus: Boolean = false) {
+        val focusedKey = channels.getOrNull(focusedPosition)?.sourceKey
+        channels = allChannels.filter { channel ->
+            selectedCategory == null || channel.groupTitle?.trim() == selectedCategory
+        }
+        binding.channelList.adapter = ArrayAdapter(
+            this,
+            R.layout.item_iptv_channel_selection,
+            channels.map { channel ->
+                listOfNotNull(
+                    channel.displayName,
+                    channel.groupTitle?.takeIf(String::isNotBlank),
+                ).joinToString("  ·  ")
+            },
+        )
+        channels.forEachIndexed { index, channel ->
+            binding.channelList.setItemChecked(index, channel.sourceKey in selectedKeys)
+        }
+        focusedPosition = channels.indexOfFirst { it.sourceKey == focusedKey }
+            .takeIf { it >= 0 }
+            ?: channels.indexOfFirst { it.sourceKey in selectedKeys }.takeIf { it >= 0 }
+            ?: 0
+        binding.channelList.setSelection(focusedPosition)
+        if (requestListFocus) binding.channelList.requestFocus()
+        updateSelectionCount()
     }
 
     private fun schedulePreview(position: Int) {

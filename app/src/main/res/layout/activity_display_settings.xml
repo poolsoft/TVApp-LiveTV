@@ -3,4 +3,5 @@
     android:id="@+id/settings_host"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent" />
+    android:background="@drawable/bg_settings_osd"
+    android:padding="8dp" />
