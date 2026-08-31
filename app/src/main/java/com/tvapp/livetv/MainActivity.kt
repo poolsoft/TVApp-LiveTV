@@ -1293,10 +1293,8 @@ class MainActivity : AppCompatActivity() {
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
         lifecycleScope.launch {
-            val (sources, allChannels) = withContext(Dispatchers.IO) {
-                iptvRepository.sources() to iptvRepository.libraryLiveChannels(null, null)
-            }
-            if (allChannels.isEmpty()) {
+            val sources = withContext(Dispatchers.IO) { iptvRepository.sources() }
+            if (sources.isEmpty()) {
                 val emptyDialog = AlertDialog.Builder(this@MainActivity)
                     .setTitle(R.string.iptv_library)
                     .setMessage(R.string.iptv_library_empty)
@@ -1314,6 +1312,8 @@ class MainActivity : AppCompatActivity() {
             val preferences = getSharedPreferences(IPTV_LIBRARY_FILTER_PREFS, MODE_PRIVATE)
             val savedSourceId = preferences.getLong(IPTV_LIBRARY_SOURCE_ID, -1L)
                 .takeUnless { it == -1L }
+                ?.takeIf { saved -> sources.any { it.source.id == saved } }
+            val initialSourceId = savedSourceId ?: sources.maxOf { it.source.id }
             val savedType = runCatching {
                 IptvLibraryContentType.valueOf(
                     preferences.getString(
@@ -1324,9 +1324,8 @@ class MainActivity : AppCompatActivity() {
             }.getOrDefault(IptvLibraryContentType.ALL)
             val savedCategory = preferences.getString(IPTV_LIBRARY_CATEGORY, null)
 
-            val sourceIds = listOf<Long?>(null) + sources.map { it.source.id }
-            val sourceNames = listOf(getString(R.string.iptv_library_all_sources)) +
-                sources.map { it.source.name }
+            val sourceIds = sources.map { it.source.id }
+            val sourceNames = sources.map { it.source.name }
             val contentTypes = IptvLibraryContentType.entries
             val contentTypeNames = listOf(
                 getString(R.string.iptv_library_all_content),
@@ -1351,17 +1350,18 @@ class MainActivity : AppCompatActivity() {
             val categorySpinner = labeledSpinner(R.string.iptv_library_categories)
             sourceSpinner.adapter = dialogSpinnerAdapter(sourceNames)
             typeSpinner.adapter = dialogSpinnerAdapter(contentTypeNames)
-            sourceSpinner.setSelection(sourceIds.indexOf(savedSourceId).coerceAtLeast(0))
+            sourceSpinner.setSelection(sourceIds.indexOf(initialSourceId).coerceAtLeast(0))
             typeSpinner.setSelection(contentTypes.indexOf(savedType).coerceAtLeast(0))
 
+            var sourceChannels = withContext(Dispatchers.IO) {
+                iptvRepository.libraryLiveChannels(initialSourceId, null)
+            }
             var categories: List<String?> = emptyList()
             fun refreshCategories(preferred: String? = null) {
-                val sourceId = sourceIds.getOrNull(sourceSpinner.selectedItemPosition)
                 val type = contentTypes.getOrElse(typeSpinner.selectedItemPosition) {
                     IptvLibraryContentType.ALL
                 }
-                categories = listOf(null) + allChannels.asSequence()
-                    .filter { sourceId == null || it.iptvSourceId() == sourceId }
+                categories = listOf(null) + sourceChannels.asSequence()
                     .filter { type == IptvLibraryContentType.ALL || it.iptvContentType() == type }
                     .mapNotNull { it.groupTitle?.trim()?.takeIf(String::isNotBlank) }
                     .distinct()
@@ -1372,7 +1372,33 @@ class MainActivity : AppCompatActivity() {
                 )
                 categorySpinner.setSelection(categories.indexOf(preferred).coerceAtLeast(0))
             }
-            val filterListener = object : AdapterView.OnItemSelectedListener {
+            var sourceLoadGeneration = 0
+            val sourceListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long,
+                ) {
+                    val sourceId = sourceIds.getOrNull(position) ?: return
+                    val generation = ++sourceLoadGeneration
+                    lifecycleScope.launch {
+                        val loaded = withContext(Dispatchers.IO) {
+                            iptvRepository.libraryLiveChannels(sourceId, null)
+                        }
+                        if (generation == sourceLoadGeneration) {
+                            sourceChannels = loaded
+                            refreshCategories()
+                            debugLog.recordDebug(
+                                "IPTV_LIBRARY_SOURCE_LOADED | source=$sourceId, count=${loaded.size}",
+                            )
+                        }
+                    }
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
+            val typeListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(
                     parent: AdapterView<*>?,
                     view: View?,
@@ -1382,10 +1408,9 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             }
-            sourceSpinner.onItemSelectedListener = filterListener
-            typeSpinner.onItemSelectedListener = filterListener
+            sourceSpinner.onItemSelectedListener = sourceListener
+            typeSpinner.onItemSelectedListener = typeListener
             refreshCategories(savedCategory)
-            categorySpinner.post { refreshCategories(savedCategory) }
 
             val dialog = AlertDialog.Builder(this@MainActivity)
                 .setTitle(R.string.iptv_library_filter_title)
@@ -1396,24 +1421,35 @@ class MainActivity : AppCompatActivity() {
                 .create()
             dialog.setOnShowListener {
                 dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                    val sourceId = sourceIds.getOrNull(sourceSpinner.selectedItemPosition)
+                    val sourceIndex = sourceSpinner.selectedItemPosition
+                    val sourceId = sourceIds.getOrNull(sourceIndex)
+                        ?: return@setOnClickListener
                     val type = contentTypes.getOrElse(typeSpinner.selectedItemPosition) {
                         IptvLibraryContentType.ALL
                     }
                     val category = categories.getOrNull(categorySpinner.selectedItemPosition)
-                    preferences.edit()
-                        .putLong(IPTV_LIBRARY_SOURCE_ID, sourceId ?: -1L)
-                        .putString(IPTV_LIBRARY_CONTENT_TYPE, type.name)
-                        .putString(IPTV_LIBRARY_CATEGORY, category)
-                        .apply()
-                    applyIptvLibraryFilter(
-                        allChannels,
-                        sourceId,
-                        sourceNames[sourceSpinner.selectedItemPosition],
-                        type,
-                        category,
-                    )
-                    dialog.dismiss()
+                    dialog.getButton(DialogInterface.BUTTON_POSITIVE).isEnabled = false
+                    lifecycleScope.launch {
+                        val selectedChannels = withContext(Dispatchers.IO) {
+                            iptvRepository.libraryLiveChannels(sourceId, null)
+                        }
+                        preferences.edit()
+                            .putLong(IPTV_LIBRARY_SOURCE_ID, sourceId)
+                            .putString(IPTV_LIBRARY_CONTENT_TYPE, type.name)
+                            .putString(IPTV_LIBRARY_CATEGORY, category)
+                            .apply()
+                        debugLog.recordDebug(
+                            "IPTV_LIBRARY_APPLY | source=$sourceId, count=${selectedChannels.size}",
+                        )
+                        applyIptvLibraryFilter(
+                            selectedChannels,
+                            sourceId,
+                            sourceNames[sourceIndex],
+                            type,
+                            category,
+                        )
+                        dialog.dismiss()
+                    }
                 }
                 dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
                     applyChannelFilter(
@@ -1433,17 +1469,23 @@ class MainActivity : AppCompatActivity() {
     private fun openSavedIptvLibrary() {
         focusedTuneJob?.cancel()
         lifecycleScope.launch {
-            val (sources, allChannels) = withContext(Dispatchers.IO) {
-                iptvRepository.sources() to iptvRepository.libraryLiveChannels(null, null)
+            val sources = withContext(Dispatchers.IO) { iptvRepository.sources() }
+            if (sources.isEmpty()) {
+                showIptvLibraryFilterDialog()
+                return@launch
+            }
+            val preferences = getSharedPreferences(IPTV_LIBRARY_FILTER_PREFS, MODE_PRIVATE)
+            val savedSourceId = preferences.getLong(IPTV_LIBRARY_SOURCE_ID, -1L)
+                .takeUnless { it == -1L }
+                ?.takeIf { saved -> sources.any { it.source.id == saved } }
+            val sourceId = savedSourceId ?: sources.maxOf { it.source.id }
+            val allChannels = withContext(Dispatchers.IO) {
+                iptvRepository.libraryLiveChannels(sourceId, null)
             }
             if (allChannels.isEmpty()) {
                 showIptvLibraryFilterDialog()
                 return@launch
             }
-            val preferences = getSharedPreferences(IPTV_LIBRARY_FILTER_PREFS, MODE_PRIVATE)
-            val sourceId = preferences.getLong(IPTV_LIBRARY_SOURCE_ID, -1L)
-                .takeUnless { it == -1L }
-                ?.takeIf { saved -> sources.any { it.source.id == saved } }
             val contentType = runCatching {
                 IptvLibraryContentType.valueOf(
                     preferences.getString(
@@ -1453,8 +1495,12 @@ class MainActivity : AppCompatActivity() {
                 )
             }.getOrDefault(IptvLibraryContentType.ALL)
             val category = preferences.getString(IPTV_LIBRARY_CATEGORY, null)
-            val sourceName = sources.firstOrNull { it.source.id == sourceId }?.source?.name
-                ?: getString(R.string.iptv_library_all_sources)
+                ?.takeIf { savedSourceId != null }
+            val sourceName = sources.first { it.source.id == sourceId }.source.name
+            preferences.edit().putLong(IPTV_LIBRARY_SOURCE_ID, sourceId).apply()
+            debugLog.recordDebug(
+                "IPTV_LIBRARY_OPEN | source=$sourceId, count=${allChannels.size}",
+            )
             applyIptvLibraryFilter(
                 allChannels,
                 sourceId,
@@ -1540,32 +1586,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun prepareIptvGrid() {
         repeat(4) { index ->
-            val cell = FrameLayout(this).apply {
-                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_grid_cell)
-                isFocusable = false
-            }
-            val playerView = PlayerView(this).apply {
-                useController = false
-                keepScreenOn = true
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                ).apply { setMargins(4.dp, 4.dp, 4.dp, 4.dp) }
-            }
-            val label = TextView(this).apply {
-                setBackgroundColor(0xB3000000.toInt())
-                setPadding(12.dp, 7.dp, 12.dp, 7.dp)
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
-                textSize = 14f
-                maxLines = 1
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.BOTTOM,
-                ).apply { setMargins(4.dp, 4.dp, 4.dp, 4.dp) }
-            }
-            cell.addView(playerView)
-            cell.addView(label)
+            val cell = layoutInflater.inflate(
+                R.layout.view_iptv_grid_cell,
+                binding.iptvGrid,
+                false,
+            ) as FrameLayout
+            val playerView = cell.findViewById<PlayerView>(R.id.grid_player)
+            val label = cell.findViewById<TextView>(R.id.grid_label)
             cell.layoutParams = GridLayout.LayoutParams(
                 GridLayout.spec(index / 2, 1, 1f),
                 GridLayout.spec(index % 2, 1, 1f),
