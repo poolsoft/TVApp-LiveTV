@@ -89,16 +89,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="dev-latest"
+          TAG="dev-r${{ steps.version.outputs.revision }}"
           TITLE="TVApp Development"
           NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" TVApp.apk version.json --clobber
-            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
-          else
-            gh release create "$TAG" TVApp.apk version.json \
-              --target "$(git rev-parse HEAD)" \
-              --title "$TITLE" \
-              --notes "$NOTES" \
-              --latest
-          fi
+          gh release create "$TAG" TVApp.apk version.json \
+            --target "$(git rev-parse HEAD)" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            --latest
