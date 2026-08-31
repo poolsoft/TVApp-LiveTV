@@ -32,7 +32,11 @@ class AppUpdateManager(private val context: Context) {
             sha256 = root.getString("sha256").lowercase(),
             mandatory = root.optBoolean("mandatory", false),
         )
-        update.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
+        val installedApkHash = sha256(File(context.applicationInfo.sourceDir))
+        update.takeIf {
+            it.versionCode > BuildConfig.VERSION_CODE ||
+                (it.versionCode == BuildConfig.VERSION_CODE && it.sha256 != installedApkHash)
+        }
     }
 
     suspend fun download(update: AppUpdate): Uri = withContext(Dispatchers.IO) {

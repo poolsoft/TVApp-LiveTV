@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,10 +7,21 @@ plugins {
 }
 
 val buildNumber = rootProject.file(".build").readText().trim().toInt()
+val localSigningProperties = Properties().apply {
+    val propertiesFile = rootProject.file("../.signing/TVApp-release.properties")
+    if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
+}
+val localSigningDirectory = rootProject.file("../.signing")
 val releaseKeystorePath = System.getenv("TVAPP_KEYSTORE_PATH")
+    ?: localSigningProperties.getProperty("keystore")?.let {
+        localSigningDirectory.resolve(it).absolutePath
+    }
 val releaseKeyAlias = System.getenv("TVAPP_KEY_ALIAS")
+    ?: localSigningProperties.getProperty("alias")
 val releaseKeyPassword = System.getenv("TVAPP_KEY_PASSWORD")
+    ?: localSigningProperties.getProperty("keyPassword")
 val releaseStorePassword = System.getenv("TVAPP_STORE_PASSWORD")
+    ?: localSigningProperties.getProperty("storePassword")
 val updateManifestUrl = System.getenv("TVAPP_UPDATE_MANIFEST_URL")
     ?: "https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json"
 
@@ -47,6 +60,9 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
         getByName("release") {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false

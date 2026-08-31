@@ -112,8 +112,17 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 ```
 
 Sürüm numarası kökteki `.build` dosyasından okunur. Örneğin `.build` değeri `12` ise
-APK'nın `versionCode` değeri `12`, görünen sürümü `0.1.12` olur. Yerel olarak sayacı artırmak
-için `./gradlew incrementBuild` kullanılabilir.
+APK'nın `versionCode` değeri `12`, görünen sürümü `0.1.12` olur. Build sayısının tek sahibi
+GitHub Action'dır; normal yerel test derlemelerinde `.build` elle artırılmamalıdır.
+
+Yerel makinede `../.signing/TVApp-release.properties` bulunursa debug APK da release APK ile
+aynı anahtarla imzalanır. Böylece yerel derleme ve Action çıktısı aynı uygulamanın üzerine
+kurulabilir. Yerel APK mevcut build numarasını kullanır; kod GitHub'a gönderildiğinde Action
+bir sonraki build numarasını ayırıp daha yüksek sürümlü release üretir.
+
+Uygulama içi denetim, build numarası aynı fakat kurulu APK'nın SHA-256 özeti release APK'dan
+farklıysa son release'i yeniden kurmayı da önerir. Ancak yerel APK'ya release'den daha yüksek
+bir `versionCode` verilirse Android bunu downgrade sayar; uygulama bu sistem kuralını aşmaz.
 
 ## GitHub Actions ve uygulama içi güncelleme
 
