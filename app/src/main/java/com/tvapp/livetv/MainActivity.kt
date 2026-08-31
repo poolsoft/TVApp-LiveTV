@@ -26,6 +26,8 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import android.widget.FrameLayout
+import android.widget.GridLayout
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.ProgramRepository
@@ -129,6 +132,15 @@ class MainActivity : AppCompatActivity() {
     private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
     private var multiViewActive = false
+    private var iptvOverlayActive = false
+    private var iptvGridActive = false
+    private var gridActiveIndex = 0
+    private var gridReturnChannel: LiveChannel? = null
+    private var gridChannels: List<LiveChannel> = emptyList()
+    private val gridSelectedKeys = mutableListOf<String>()
+    private val gridCells = mutableListOf<FrameLayout>()
+    private val gridLabels = mutableListOf<TextView>()
+    private val gridControllers = mutableListOf<IptvPlaybackController>()
     private val unlockedChannels = mutableSetOf<String>()
     private val loggedRemoteKeyCodes = mutableSetOf<Int>()
     private var favoriteFilter = false
@@ -217,7 +229,7 @@ class MainActivity : AppCompatActivity() {
         secondaryIptvPlayback = IptvPlaybackController(this, binding.secondaryIptvPlayerView)
         secondaryIptvPlayback.onPlaybackError = { error ->
             debugLog.recordDebug("MULTIVIEW_IPTV_FAILURE | ${error.errorCodeName}: ${error.message}")
-            stopMultiView()
+            if (iptvOverlayActive) stopIptvOverlay() else stopMultiView()
         }
         playbackHistory = PlaybackHistoryStore(this)
         displayPreferencesStore = DisplayPreferencesStore(this)
@@ -230,6 +242,7 @@ class MainActivity : AppCompatActivity() {
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
         debugLog = CrashReportStore(this)
+        prepareIptvGrid()
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
         if (intent.getBooleanExtra(BootLaunchReceiver.EXTRA_STARTED_AFTER_BOOT, false)) {
             debugLog.recordDebug("MAIN_STARTED_AFTER_BOOT")
@@ -502,6 +515,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
+        if (iptvOverlayActive) stopIptvOverlay()
+        if (iptvGridActive) stopIptvGrid(resumePrevious = false)
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
@@ -509,6 +524,7 @@ class MainActivity : AppCompatActivity() {
         audioOnlyJob?.cancel()
         currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
+        updateChannelActionLabels()
         currentIptvContentKind = IptvContentKind.UNKNOWN
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
@@ -1522,6 +1538,243 @@ class MainActivity : AppCompatActivity() {
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).toInt()
 
+    private fun prepareIptvGrid() {
+        repeat(4) { index ->
+            val cell = FrameLayout(this).apply {
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_grid_cell)
+                isFocusable = false
+            }
+            val playerView = PlayerView(this).apply {
+                useController = false
+                keepScreenOn = true
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ).apply { setMargins(4.dp, 4.dp, 4.dp, 4.dp) }
+            }
+            val label = TextView(this).apply {
+                setBackgroundColor(0xB3000000.toInt())
+                setPadding(12.dp, 7.dp, 12.dp, 7.dp)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                textSize = 14f
+                maxLines = 1
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM,
+                ).apply { setMargins(4.dp, 4.dp, 4.dp, 4.dp) }
+            }
+            cell.addView(playerView)
+            cell.addView(label)
+            cell.layoutParams = GridLayout.LayoutParams(
+                GridLayout.spec(index / 2, 1, 1f),
+                GridLayout.spec(index % 2, 1, 1f),
+            ).apply {
+                width = 0
+                height = 0
+                setMargins(3.dp, 3.dp, 3.dp, 3.dp)
+            }
+            binding.iptvGrid.addView(cell)
+            gridCells += cell
+            gridLabels += label
+            gridControllers += IptvPlaybackController(this, playerView).apply {
+                onPlaybackError = { error ->
+                    debugLog.recordDebug(
+                        "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}: ${error.message}",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun availableLiveIptvChannels(): List<LiveChannel> {
+        val candidates = if (
+            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY &&
+            iptvLibraryChannels.isNotEmpty()
+        ) {
+            iptvLibraryChannels
+        } else {
+            channels
+        }
+        return candidates.asSequence()
+            .filter { it.source == LiveChannel.Source.IPTV }
+            .filter { it.iptvContentType() != IptvLibraryContentType.VOD }
+            .distinctBy { it.sourceKey }
+            .toList()
+    }
+
+    private fun showIptvPipPicker() {
+        val choices = availableLiveIptvChannels()
+        if (choices.isEmpty()) {
+            Toast.makeText(this, R.string.iptv_pip_no_channels, Toast.LENGTH_LONG).show()
+            return
+        }
+        channelPanelJob?.cancel()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_pip_title)
+            .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
+                startIptvOverlay(choices[which])
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun startIptvOverlay(channel: LiveChannel) {
+        if (currentChannel?.source != LiveChannel.Source.TIF) return
+        if (multiViewActive) stopMultiView()
+        if (iptvGridActive) stopIptvGrid(resumePrevious = true)
+        iptvOverlayActive = true
+        secondaryPlayback.stop()
+        binding.secondaryTvView.visibility = View.GONE
+        val width = (resources.displayMetrics.widthPixels * 0.32f).toInt()
+        val height = (width * 9f / 16f).toInt()
+        binding.secondaryIptvPlayerView.layoutParams =
+            (binding.secondaryIptvPlayerView.layoutParams as FrameLayout.LayoutParams).apply {
+                this.width = width
+                this.height = height
+                gravity = Gravity.END or Gravity.BOTTOM
+                setMargins(20.dp, 20.dp, 20.dp, 20.dp)
+            }
+        binding.secondaryIptvPlayerView.elevation = 16.dp.toFloat()
+        binding.secondaryIptvPlayerView.visibility = View.VISIBLE
+        secondaryIptvPlayback.play(channel)
+        secondaryIptvPlayback.setMuted(true)
+        hideChannelPanel()
+        debugLog.recordDebug("IPTV_OVERLAY_START | channel=${channel.sourceKey}")
+    }
+
+    private fun stopIptvOverlay() {
+        if (!iptvOverlayActive) return
+        iptvOverlayActive = false
+        secondaryIptvPlayback.stop()
+        binding.secondaryIptvPlayerView.visibility = View.GONE
+        debugLog.recordDebug("IPTV_OVERLAY_STOP")
+    }
+
+    private fun showIptvGridPicker() {
+        val choices = availableLiveIptvChannels()
+        if (choices.isEmpty()) {
+            Toast.makeText(this, R.string.iptv_grid_no_channels, Toast.LENGTH_LONG).show()
+            return
+        }
+        channelPanelJob?.cancel()
+        val checked = BooleanArray(choices.size) { index ->
+            choices[index].sourceKey in gridSelectedKeys ||
+                (gridSelectedKeys.isEmpty() && choices[index].sourceKey == currentChannel?.sourceKey)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_grid_title)
+            .setMultiChoiceItems(
+                choices.map { it.displayName }.toTypedArray(),
+                checked,
+            ) { target, which, isChecked ->
+                checked[which] = isChecked
+                if (isChecked && checked.count { it } > 4) {
+                    checked[which] = false
+                    (target as AlertDialog).listView.setItemChecked(which, false)
+                    Toast.makeText(this, R.string.iptv_grid_maximum, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setPositiveButton(R.string.iptv_grid_start, null)
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val selected = choices.filterIndexed { index, _ -> checked[index] }.take(4)
+                if (selected.isEmpty()) {
+                    Toast.makeText(this, R.string.iptv_grid_empty, Toast.LENGTH_SHORT).show()
+                } else {
+                    gridSelectedKeys.clear()
+                    gridSelectedKeys += selected.map { it.sourceKey }
+                    dialog.dismiss()
+                    startIptvGrid(selected)
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun startIptvGrid(selected: List<LiveChannel>) {
+        if (selected.isEmpty()) return
+        if (multiViewActive) stopMultiView()
+        stopIptvOverlay()
+        gridReturnChannel = currentChannel
+        gridChannels = selected.take(4)
+        gridActiveIndex = 0
+        iptvGridActive = true
+        playback.stop()
+        iptvPlayback.stop()
+        binding.tvView.visibility = View.GONE
+        binding.iptvPlayerView.visibility = View.GONE
+        binding.audioOnlyPanel.visibility = View.GONE
+        binding.parentalLockPanel.visibility = View.GONE
+        binding.statusPanel.visibility = View.GONE
+        hideChannelPanel()
+        binding.infoBar.visibility = View.GONE
+        binding.iptvGrid.visibility = View.VISIBLE
+        gridControllers.forEachIndexed { index, controller ->
+            val channel = gridChannels.getOrNull(index)
+            gridCells[index].visibility = if (channel == null) View.INVISIBLE else View.VISIBLE
+            if (channel == null) {
+                controller.stop()
+                gridLabels[index].text = ""
+            } else {
+                gridLabels[index].text = channel.displayName
+                controller.play(channel)
+            }
+        }
+        updateIptvGridFocus()
+        debugLog.recordDebug(
+            "IPTV_GRID_START | channels=${gridChannels.joinToString { it.sourceKey }}",
+        )
+    }
+
+    private fun updateIptvGridFocus() {
+        gridCells.forEachIndexed { index, cell ->
+            cell.background = ContextCompat.getDrawable(
+                this,
+                if (index == gridActiveIndex) {
+                    R.drawable.bg_grid_cell_selected
+                } else {
+                    R.drawable.bg_grid_cell
+                },
+            )
+            gridControllers[index].setMuted(index != gridActiveIndex)
+        }
+    }
+
+    private fun moveIptvGridFocus(keyCode: Int) {
+        val candidate = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (gridActiveIndex % 2 == 1) gridActiveIndex - 1 else -1
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (gridActiveIndex % 2 == 0) gridActiveIndex + 1 else -1
+            KeyEvent.KEYCODE_DPAD_UP -> gridActiveIndex - 2
+            KeyEvent.KEYCODE_DPAD_DOWN -> gridActiveIndex + 2
+            else -> -1
+        }
+        if (candidate in gridChannels.indices) {
+            gridActiveIndex = candidate
+            updateIptvGridFocus()
+        }
+    }
+
+    private fun stopIptvGrid(resumePrevious: Boolean) {
+        if (!iptvGridActive) return
+        val previous = gridReturnChannel
+        iptvGridActive = false
+        gridControllers.forEach(IptvPlaybackController::stop)
+        binding.iptvGrid.visibility = View.GONE
+        gridChannels = emptyList()
+        gridReturnChannel = null
+        if (resumePrevious && previous != null) playSelectedChannel(previous, recordHistory = false)
+        debugLog.recordDebug("IPTV_GRID_STOP | resume=$resumePrevious")
+    }
+
+    private fun openActiveGridChannel() {
+        val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
+        stopIptvGrid(resumePrevious = false)
+        selectChannel(channel, recordHistory = false)
+    }
+
     private fun showChannelManagement(channel: LiveChannel) {
         val actions = arrayOf(
             getString(if (channel.favorite) R.string.remove_favorite else R.string.add_favorite),
@@ -1585,6 +1838,7 @@ class MainActivity : AppCompatActivity() {
     private fun startMultiView(channel: LiveChannel) {
         val primary = currentChannel ?: return
         if (channel.sourceKey == primary.sourceKey) return
+        stopIptvOverlay()
         multiViewActive = true
         internalMiniPlayerActive = false
         val screenWidth = resources.displayMetrics.widthPixels
@@ -1780,7 +2034,13 @@ class MainActivity : AppCompatActivity() {
     private fun updateChannelActionLabels() {
         val library = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
         binding.redActionLabel.setText(R.string.edit_short)
-        binding.greenActionLabel.setText(R.string.empty_action)
+        binding.greenActionLabel.setText(
+            if (library || currentChannel?.source == LiveChannel.Source.IPTV) {
+                R.string.iptv_grid
+            } else {
+                R.string.iptv_pip
+            },
+        )
         binding.yellowActionLabel.setText(
             if (library) R.string.select_list_short else R.string.empty_action,
         )
@@ -1984,6 +2244,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleBackNavigation() {
         when {
+            iptvGridActive -> stopIptvGrid(resumePrevious = true)
+            iptvOverlayActive -> stopIptvOverlay()
             multiViewActive -> stopMultiView()
             internalMiniPlayerActive -> toggleInternalMiniPlayer()
             binding.statusPanel.visibility == View.VISIBLE -> {
@@ -2011,6 +2273,20 @@ class MainActivity : AppCompatActivity() {
                 "REMOTE_KEY | screen=main, name=${KeyEvent.keyCodeToString(event.keyCode)}, " +
                     "code=${event.keyCode}, scan=${event.scanCode}, device=${event.deviceId}",
             )
+        }
+        if (iptvGridActive) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN -> moveIptvGridFocus(event.keyCode)
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER -> openActiveGridChannel()
+                    KeyEvent.KEYCODE_BACK -> stopIptvGrid(resumePrevious = true)
+                }
+            }
+            return true
         }
         if (binding.statusPanel.visibility == View.VISIBLE) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -2139,10 +2415,15 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
-                KeyEvent.KEYCODE_PROG_GREEN -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    Unit
-                } else {
-                    return super.dispatchKeyEvent(event)
+                KeyEvent.KEYCODE_PROG_GREEN -> {
+                    if (
+                        channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ||
+                        currentChannel?.source == LiveChannel.Source.IPTV
+                    ) {
+                        showIptvGridPicker()
+                    } else {
+                        showIptvPipPicker()
+                    }
                 }
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility == View.VISIBLE) {
                     if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
@@ -2222,6 +2503,7 @@ class MainActivity : AppCompatActivity() {
         iptvPlayback.release()
         secondaryPlayback.stop()
         secondaryIptvPlayback.release()
+        gridControllers.forEach(IptvPlaybackController::release)
         super.onDestroy()
     }
 

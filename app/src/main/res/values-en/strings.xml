@@ -247,6 +247,15 @@
     <string name="delete">Delete</string>
     <string name="delete_iptv_source_confirm">Delete &quot;%1$s&quot; and all its channels?</string>
     <string name="iptv_source_deleted">IPTV list deleted.</string>
+    <string name="iptv_grid">Grid</string>
+    <string name="iptv_grid_title">Select IPTV grid channels</string>
+    <string name="iptv_grid_start">Open grid</string>
+    <string name="iptv_grid_maximum">You can select up to 4 channels.</string>
+    <string name="iptv_grid_empty">Select at least one channel for the grid.</string>
+    <string name="iptv_grid_no_channels">No live IPTV channels are available for the grid.</string>
+    <string name="iptv_pip">PiP</string>
+    <string name="iptv_pip_title">IPTV channel to open in PiP</string>
+    <string name="iptv_pip_no_channels">No live IPTV channels are available for PiP.</string>
     <plurals name="input_count">
         <item quantity="one">%d tuner input found</item>
         <item quantity="other">%d tuner inputs found</item>

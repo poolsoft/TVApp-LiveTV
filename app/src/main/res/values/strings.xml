@@ -247,6 +247,15 @@
     <string name="delete">Sil</string>
     <string name="delete_iptv_source_confirm">“%1$s” listesi ve kanalları silinsin mi?</string>
     <string name="iptv_source_deleted">IPTV listesi silindi.</string>
+    <string name="iptv_grid">Grid</string>
+    <string name="iptv_grid_title">IPTV Grid kanallarını seç</string>
+    <string name="iptv_grid_start">Grid’i aç</string>
+    <string name="iptv_grid_maximum">En fazla 4 kanal seçilebilir.</string>
+    <string name="iptv_grid_empty">Grid için en az bir kanal seçin.</string>
+    <string name="iptv_grid_no_channels">Grid için kullanılabilir canlı IPTV kanalı yok.</string>
+    <string name="iptv_pip">PiP</string>
+    <string name="iptv_pip_title">PiP’te açılacak IPTV kanalı</string>
+    <string name="iptv_pip_no_channels">PiP için kullanılabilir canlı IPTV kanalı yok.</string>
     <plurals name="input_count">
         <item quantity="one">%d tuner girişi bulundu</item>
         <item quantity="other">%d tuner girişi bulundu</item>
