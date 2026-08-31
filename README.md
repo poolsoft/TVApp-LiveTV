@@ -111,23 +111,24 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat assembleDebug
 ```
 
-Sürüm numarası kökteki `.build` dosyasından okunur. Örneğin `.build` değeri `12` ise
-APK'nın `versionCode` değeri `12`, görünen sürümü `0.1.12` olur. Build sayısının tek sahibi
-GitHub Action'dır; normal yerel test derlemelerinde `.build` elle artırılmamalıdır.
+Sürüm numarası kökteki `.build` dosyasından okunur. Geliştirme döneminde bu değer sabittir;
+yerel APK ile Action APK'sı aynı `versionCode` ve aynı imzayı kullanır. `.build` üretim sürüm
+politikası belirlenene kadar elle veya Action tarafından artırılmaz.
 
 Yerel makinede `../.signing/TVApp-release.properties` bulunursa debug APK da release APK ile
 aynı anahtarla imzalanır. Böylece yerel derleme ve Action çıktısı aynı uygulamanın üzerine
-kurulabilir. Yerel APK mevcut build numarasını kullanır; kod GitHub'a gönderildiğinde Action
-bir sonraki build numarasını ayırıp daha yüksek sürümlü release üretir.
+kurulabilir. Her push sabit `dev-latest` GitHub release'indeki `TVApp.apk` ve `version.json`
+dosyalarını yeniler.
 
 Uygulama içi denetim, build numarası aynı fakat kurulu APK'nın SHA-256 özeti release APK'dan
-farklıysa son release'i yeniden kurmayı da önerir. Ancak yerel APK'ya release'den daha yüksek
-bir `versionCode` verilirse Android bunu downgrade sayar; uygulama bu sistem kuralını aşmaz.
+farklıysa son development release'ini aynı sürüm koduyla yeniden kurmayı önerir. Güncelleme
+revizyonu `version.json` içinde ayrıca tutulur; Android sürüm koduna dönüştürülmez.
 
 ## GitHub Actions ve uygulama içi güncelleme
 
 `.github/workflows/release.yml`, `main` dalındaki kod değişikliklerinde veya elle
-çalıştırıldığında build sayısını artırır, testleri çalıştırır ve imzalı release APK üretir.
+çalıştırıldığında testleri çalıştırır ve imzalı development APK üretir. `dev-latest` release'i
+yerinde güncellenir; yeni bir sürüm tag'i oluşturulmaz.
 Release'e şu dosyalar eklenir:
 
 - `TVApp.apk`

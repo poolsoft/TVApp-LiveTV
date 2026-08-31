@@ -79,17 +79,6 @@ android {
     }
 }
 
-tasks.register("incrementBuild") {
-    group = "versioning"
-    description = "Increments the tracked .build version counter."
-    doLast {
-        val buildFile = rootProject.file(".build")
-        val next = buildFile.readText().trim().toInt() + 1
-        buildFile.writeText("$next\n")
-        println("TVApp build number: $next")
-    }
-}
-
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")

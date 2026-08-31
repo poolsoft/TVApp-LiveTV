@@ -36,14 +36,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Increment build number
+      - name: Read development version
         id: version
         shell: bash
         run: |
-          BUILD=$(( $(tr -d '[:space:]' < .build) + 1 ))
-          printf '%s\n' "$BUILD" > .build
+          BUILD=$(tr -d '[:space:]' < .build)
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "version=0.1.$BUILD" >> "$GITHUB_OUTPUT"
+          echo "revision=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore release keystore
         shell: bash
@@ -75,6 +75,7 @@ jobs:
             "versionCode": ${{ steps.version.outputs.build }},
             "versionName": "${{ steps.version.outputs.version }}",
             "build": ${{ steps.version.outputs.build }},
+            "revision": ${{ steps.version.outputs.revision }},
             "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp.apk",
             "sha256": "$SHA256",
             "publishedAt": "$PUBLISHED_AT",
@@ -83,23 +84,23 @@ jobs:
           EOF
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
-      - name: Save build number
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .build
-          git commit -m "chore: build ${{ steps.version.outputs.build }} [skip ci]"
-          git push
-
-      - name: Publish GitHub release
+      - name: Publish development release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          gh release create "$TAG" TVApp.apk version.json \
-            --target "$(git rev-parse HEAD)" \
-            --title "TVApp ${{ steps.version.outputs.version }}" \
-            --notes "Build ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }}" \
-            --latest
+          TAG="dev-latest"
+          TITLE="TVApp Development"
+          NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }}"
+          git tag --force "$TAG" "$(git rev-parse HEAD)"
+          git push --force origin "$TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" TVApp.apk version.json --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" TVApp.apk version.json \
+              --target "$(git rev-parse HEAD)" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --latest
+          fi
