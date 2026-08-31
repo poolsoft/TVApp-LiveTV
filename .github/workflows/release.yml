@@ -92,8 +92,6 @@ jobs:
           TAG="dev-latest"
           TITLE="TVApp Development"
           NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }}"
-          git tag --force "$TAG" "$(git rev-parse HEAD)"
-          git push --force origin "$TAG"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" TVApp.apk version.json --clobber
             gh release edit "$TAG" --title "$TITLE" --notes "$NOTES" --latest
