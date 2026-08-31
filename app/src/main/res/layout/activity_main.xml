@@ -213,6 +213,7 @@
             android:paddingBottom="9dp">
 
             <TextView
+                android:id="@+id/channel_list_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/channel_list"
@@ -336,7 +337,7 @@
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_red_line" />
                 <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_red" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/edit_short" android:textColor="@color/text_primary" android:textSize="11sp" />
+                <TextView android:id="@+id/red_action_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/edit_short" android:textColor="@color/text_primary" android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -347,7 +348,7 @@
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_green_line" />
                 <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_green" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/audio" android:textColor="@color/text_primary" android:textSize="11sp" />
+                <TextView android:id="@+id/green_action_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/audio" android:textColor="@color/text_primary" android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -358,7 +359,7 @@
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_yellow_line" />
                 <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_yellow" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/subtitle" android:textColor="@color/text_primary" android:textSize="11sp" />
+                <TextView android:id="@+id/yellow_action_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/subtitle" android:textColor="@color/text_primary" android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -369,7 +370,7 @@
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_blue_line" />
                 <View android:layout_width="17dp" android:layout_height="17dp" android:background="@drawable/key_blue" />
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/display_short" android:textColor="@color/text_primary" android:textSize="11sp" />
+                <TextView android:id="@+id/blue_action_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/iptv_library_short" android:textColor="@color/text_primary" android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

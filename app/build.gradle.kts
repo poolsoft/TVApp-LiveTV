@@ -4,6 +4,14 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val buildNumber = rootProject.file(".build").readText().trim().toInt()
+val releaseKeystorePath = System.getenv("TVAPP_KEYSTORE_PATH")
+val releaseKeyAlias = System.getenv("TVAPP_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("TVAPP_KEY_PASSWORD")
+val releaseStorePassword = System.getenv("TVAPP_STORE_PASSWORD")
+val updateManifestUrl = System.getenv("TVAPP_UPDATE_MANIFEST_URL")
+    ?: "https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json"
+
 android {
     namespace = "com.tvapp.livetv"
     compileSdk = 35
@@ -12,12 +20,37 @@ android {
         applicationId = "com.tvapp.livetv"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = buildNumber
+        versionName = "0.1.$buildNumber"
+        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
     }
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+    }
+
+    signingConfigs {
+        if (
+            releaseKeystorePath != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null &&
+            releaseStorePassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = false
+        }
     }
 
     compileOptions {
@@ -27,6 +60,17 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+tasks.register("incrementBuild") {
+    group = "versioning"
+    description = "Increments the tracked .build version counter."
+    doLast {
+        val buildFile = rootProject.file(".build")
+        val next = buildFile.readText().trim().toInt() + 1
+        buildFile.writeText("$next\n")
+        println("TVApp build number: $next")
     }
 }
 

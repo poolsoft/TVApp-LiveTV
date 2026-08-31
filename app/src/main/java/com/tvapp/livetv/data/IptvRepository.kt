@@ -42,6 +42,18 @@ class IptvRepository(context: Context) {
     suspend fun sourceChannels(sourceId: Long): List<IptvChannelEntity> =
         dao.getChannelsForSource(sourceId)
 
+    suspend fun libraryChannels(sourceId: Long?): List<IptvChannelEntity> =
+        sourceId?.let { dao.getChannelsForSource(it) } ?: dao.getAllEnabledLibraryChannels()
+
+    suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
+
+    suspend fun libraryLiveChannels(sourceId: Long?, category: String?): List<LiveChannel> =
+        libraryChannels(sourceId)
+            .asSequence()
+            .filter { category == null || it.groupTitle?.trim() == category }
+            .map { it.toLiveChannel() }
+            .toList()
+
     suspend fun setSelectedChannels(sourceId: Long, sourceKeys: Set<String>) {
         database.withTransaction {
             dao.clearSelectedChannels(sourceId)
@@ -52,21 +64,24 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
-        LiveChannel(
-            id = stableLongId(channel.sourceKey),
-            sourceKey = channel.sourceKey,
-            inputId = "iptv:${channel.sourceId}",
-            displayNumber = (channel.originalIndex + 1).toString(),
-            displayName = channel.displayName,
-            uri = channel.streamUrl,
-            source = LiveChannel.Source.IPTV,
-            logoUrl = channel.logoUrl,
-            groupTitle = channel.groupTitle,
-            epgId = channel.tvgId,
-            userAgent = channel.userAgent,
-            referrer = channel.referrer,
-        )
+        channel.toLiveChannel()
     }
+
+    private fun IptvChannelEntity.toLiveChannel() =
+        LiveChannel(
+            id = stableLongId(sourceKey),
+            sourceKey = sourceKey,
+            inputId = "iptv:$sourceId",
+            displayNumber = (originalIndex + 1).toString(),
+            displayName = displayName,
+            uri = streamUrl,
+            source = LiveChannel.Source.IPTV,
+            logoUrl = logoUrl,
+            groupTitle = groupTitle,
+            epgId = tvgId,
+            userAgent = userAgent,
+            referrer = referrer,
+        )
 
     suspend fun importUrl(location: String): IptvImportResult {
         val normalized = location.trim()

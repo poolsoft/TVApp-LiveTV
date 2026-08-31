@@ -19,6 +19,11 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
+import android.widget.LinearLayout
+import android.widget.Spinner
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
@@ -29,6 +34,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tvapp.livetv.data.ChannelRepository
+import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.ProgramRepository
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ActivityMainBinding
@@ -68,7 +74,6 @@ class MainActivity : AppCompatActivity() {
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
         private const val LIST_FOCUS_TUNE_DELAY_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
-        private const val COMPACT_PANEL_HEIGHT_FRACTION = 0.88f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
         private const val INFO_HEIGHT_FRACTION = 0.26f
         private const val OVERLAY_GAP_FRACTION = 0.008f
@@ -89,10 +94,18 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_LIVE_CHECK_INTERVAL_MS = 12_000L
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
+        private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
+        private const val IPTV_LIBRARY_SOURCE_ID = "source-id"
+        private const val IPTV_LIBRARY_CONTENT_TYPE = "content-type"
+        private const val IPTV_LIBRARY_CATEGORY = "category"
     }
+
+    private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
+    private enum class IptvLibraryContentType { ALL, LIVE, VOD }
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: ChannelRepository
+    private lateinit var iptvRepository: IptvRepository
     private lateinit var programRepository: ProgramRepository
     private lateinit var playback: TifPlaybackController
     private lateinit var iptvPlayback: IptvPlaybackController
@@ -110,9 +123,14 @@ class MainActivity : AppCompatActivity() {
     private var channels: List<LiveChannel> = emptyList()
     private var currentPrograms: Map<Long, ProgramSummary> = emptyMap()
     private var currentChannel: LiveChannel? = null
+    private var channelPanelContent = ChannelPanelContent.NORMAL
+    private var iptvLibraryChannels: List<LiveChannel> = emptyList()
+    private var currentPlaybackUsesIptvLibrary = false
+    private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
     private var multiViewActive = false
     private val unlockedChannels = mutableSetOf<String>()
+    private val loggedRemoteKeyCodes = mutableSetOf<Int>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
     private var channelPanelExpanded = false
@@ -160,6 +178,14 @@ class MainActivity : AppCompatActivity() {
         )
         loadChannels(preserveCurrentPlayback = true)
     }
+    private val iptvSources = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        loadChannels(preserveCurrentPlayback = true)
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+            openSavedIptvLibrary()
+        }
+    }
     private val displaySettings = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
@@ -175,7 +201,6 @@ class MainActivity : AppCompatActivity() {
         channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
         if (sourceKey != null) hideChannelPanel()
     }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -184,6 +209,7 @@ class MainActivity : AppCompatActivity() {
         binding.tvView.keepScreenOn = true
 
         repository = ChannelRepository(this)
+        iptvRepository = IptvRepository(this)
         programRepository = ProgramRepository(this)
         playback = TifPlaybackController(binding.tvView)
         iptvPlayback = IptvPlaybackController(this, binding.iptvPlayerView)
@@ -200,10 +226,9 @@ class MainActivity : AppCompatActivity() {
         parentalControlStore = ParentalControlStore(this)
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
-        channelListFilterStore.load().also { savedFilter ->
-            sourceFilter = savedFilter.source
-            favoriteFilter = savedFilter.favoritesOnly
-        }
+        sourceFilter = ChannelSourceFilter.ALL
+        favoriteFilter = false
+        channelPanelContent = ChannelPanelContent.NORMAL
         debugLog = CrashReportStore(this)
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
         if (intent.getBooleanExtra(BootLaunchReceiver.EXTRA_STARTED_AFTER_BOOT, false)) {
@@ -437,19 +462,23 @@ class MainActivity : AppCompatActivity() {
         binding.statusMessage.setText(R.string.permission_denied_message)
     }
 
-    private fun selectChannel(channel: LiveChannel) {
+    private fun selectChannel(channel: LiveChannel) = selectChannel(channel, recordHistory = true)
+
+    private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
         if (parentalControlStore.isLocked(channel.sourceKey) && channel.sourceKey !in unlockedChannels) {
-            showLockedChannel(channel)
+            showLockedChannel(channel, recordHistory)
             return
         }
-        playSelectedChannel(channel)
+        playSelectedChannel(channel, recordHistory)
     }
 
-    private fun showLockedChannel(channel: LiveChannel) {
+    private fun showLockedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
         focusedTuneJob?.cancel()
         audioOnlyJob?.cancel()
         playback.stop()
         iptvPlayback.stop()
+        lockedChannelRecordsHistory = recordHistory
+        currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
         adapter.select(channel.sourceKey)
         binding.tvView.visibility = View.GONE
@@ -468,30 +497,33 @@ class MainActivity : AppCompatActivity() {
     private fun requestChannelPin(channel: LiveChannel) {
         ParentalPinDialog.verify(this, channel.displayName) {
             unlockedChannels.add(channel.sourceKey)
-            playSelectedChannel(channel)
+            playSelectedChannel(channel, lockedChannelRecordsHistory)
         }
     }
 
-    private fun playSelectedChannel(channel: LiveChannel) {
+    private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
         focusedTuneJob?.cancel()
         audioOnlyJob?.cancel()
+        currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
         currentIptvContentKind = IptvContentKind.UNKNOWN
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
         binding.iptvPlaybackControls.visibility = View.GONE
         binding.parentalLockPanel.visibility = View.GONE
-        playbackHistory.record(channel.sourceKey)
-        lifecycleScope.launch(Dispatchers.IO) {
-            runCatching {
-                homeRecentChannelsPublisher.publish(channels, playbackHistory.keys())
-            }.onFailure { error ->
-                debugLog.recordDebug(
-                    "HOME_RECENTS_FAILURE | ${error.javaClass.name}: ${error.message}",
-                )
+        if (recordHistory) {
+            playbackHistory.record(channel.sourceKey)
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching {
+                    homeRecentChannelsPublisher.publish(channels, playbackHistory.keys())
+                }.onFailure { error ->
+                    debugLog.recordDebug(
+                        "HOME_RECENTS_FAILURE | ${error.javaClass.name}: ${error.message}",
+                    )
+                }
             }
         }
         adapter.select(channel.sourceKey)
@@ -531,20 +563,21 @@ class MainActivity : AppCompatActivity() {
         binding.inputSummary.text = channel?.displayName.orEmpty()
         binding.statusMessage.text = detail
         statusRetryAction = channel?.let { failedChannel ->
-            { selectChannel(failedChannel) }
+            { selectChannel(failedChannel, recordHistory = !currentPlaybackUsesIptvLibrary) }
         }
         binding.retryButton.requestFocus()
     }
 
     private fun confirmListChannel(channel: LiveChannel) {
         focusedTuneJob?.cancel()
-        if (channel.sourceKey != currentChannel?.sourceKey) selectChannel(channel)
+        val recordHistory = channelPanelContent == ChannelPanelContent.NORMAL
+        if (channel.sourceKey != currentChannel?.sourceKey) selectChannel(channel, recordHistory)
         hideChannelPanel()
     }
 
     private fun zap(offset: Int) {
-        ChannelNavigator.adjacent(panelChannels(), currentChannel?.sourceKey, offset)
-            ?.let(::selectChannel)
+        ChannelNavigator.adjacent(playbackNavigationChannels(), currentChannel?.sourceKey, offset)
+            ?.let { selectChannel(it, recordHistory = shouldRecordNavigationHistory()) }
     }
 
     private fun appendChannelDigit(digit: Int) {
@@ -565,27 +598,52 @@ class MainActivity : AppCompatActivity() {
         numberInput = ""
         numberInputJob?.cancel()
         if (entered.isBlank()) return
-        ChannelNavigator.byNumber(panelChannels(), entered)?.let { channel ->
-            selectChannel(channel)
+        ChannelNavigator.byNumber(playbackNavigationChannels(), entered)?.let { channel ->
+            selectChannel(channel, recordHistory = shouldRecordNavigationHistory())
             if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
         } ?: run { binding.nowChannel.setText(R.string.channel_not_found) }
     }
 
     private fun openPreviousChannel() {
+        if (currentPlaybackUsesIptvLibrary) {
+            zap(-1)
+            return
+        }
         ChannelNavigator.previousDistinct(
-            panelChannels(),
+            playbackNavigationChannels(),
             playbackHistory.keys(),
             currentChannel?.sourceKey,
         )?.let(::selectChannel)
+    }
+
+    private fun playbackNavigationChannels(): List<LiveChannel> {
+        return if (
+            currentPlaybackUsesIptvLibrary &&
+            iptvLibraryChannels.any { it.sourceKey == currentChannel?.sourceKey }
+        ) iptvLibraryChannels else panelChannels()
+    }
+
+    private fun shouldRecordNavigationHistory(): Boolean = if (
+        binding.channelPanel.visibility == View.VISIBLE
+    ) {
+        channelPanelContent == ChannelPanelContent.NORMAL
+    } else {
+        !currentPlaybackUsesIptvLibrary
     }
 
     private fun scheduleFocusedTune(channel: LiveChannel) {
         focusedListSourceKey = channel.sourceKey
         loadFocusedProgram(channel)
         focusedTuneJob?.cancel()
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) return
         focusedTuneJob = lifecycleScope.launch {
             delay(LIST_FOCUS_TUNE_DELAY_MS)
-            if (binding.channelPanel.visibility == View.VISIBLE) selectChannel(channel)
+            if (binding.channelPanel.visibility == View.VISIBLE) {
+                selectChannel(
+                    channel,
+                    recordHistory = channelPanelContent == ChannelPanelContent.NORMAL,
+                )
+            }
         }
     }
 
@@ -1215,6 +1273,252 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun showIptvLibraryFilterDialog() {
+        focusedTuneJob?.cancel()
+        channelPanelJob?.cancel()
+        lifecycleScope.launch {
+            val (sources, allChannels) = withContext(Dispatchers.IO) {
+                iptvRepository.sources() to iptvRepository.libraryLiveChannels(null, null)
+            }
+            if (allChannels.isEmpty()) {
+                val emptyDialog = AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.iptv_library)
+                    .setMessage(R.string.iptv_library_empty)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .create()
+                emptyDialog.setOnDismissListener {
+                    if (binding.channelPanel.visibility == View.VISIBLE) {
+                        scheduleChannelPanelClose()
+                    }
+                }
+                emptyDialog.show()
+                return@launch
+            }
+
+            val preferences = getSharedPreferences(IPTV_LIBRARY_FILTER_PREFS, MODE_PRIVATE)
+            val savedSourceId = preferences.getLong(IPTV_LIBRARY_SOURCE_ID, -1L)
+                .takeUnless { it == -1L }
+            val savedType = runCatching {
+                IptvLibraryContentType.valueOf(
+                    preferences.getString(
+                        IPTV_LIBRARY_CONTENT_TYPE,
+                        IptvLibraryContentType.ALL.name,
+                    ).orEmpty(),
+                )
+            }.getOrDefault(IptvLibraryContentType.ALL)
+            val savedCategory = preferences.getString(IPTV_LIBRARY_CATEGORY, null)
+
+            val sourceIds = listOf<Long?>(null) + sources.map { it.source.id }
+            val sourceNames = listOf(getString(R.string.iptv_library_all_sources)) +
+                sources.map { it.source.name }
+            val contentTypes = IptvLibraryContentType.entries
+            val contentTypeNames = listOf(
+                getString(R.string.iptv_library_all_content),
+                getString(R.string.iptv_library_live),
+                getString(R.string.iptv_library_vod),
+            )
+            val container = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(24.dp, 8.dp, 24.dp, 4.dp)
+            }
+            fun labeledSpinner(label: Int): Spinner {
+                container.addView(TextView(this@MainActivity).apply {
+                    setText(label)
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    textSize = 13f
+                    setPadding(0, 12.dp, 0, 4.dp)
+                })
+                return Spinner(this@MainActivity).also(container::addView)
+            }
+            val sourceSpinner = labeledSpinner(R.string.iptv_library_sources)
+            val typeSpinner = labeledSpinner(R.string.iptv_library_content_type)
+            val categorySpinner = labeledSpinner(R.string.iptv_library_categories)
+            sourceSpinner.adapter = dialogSpinnerAdapter(sourceNames)
+            typeSpinner.adapter = dialogSpinnerAdapter(contentTypeNames)
+            sourceSpinner.setSelection(sourceIds.indexOf(savedSourceId).coerceAtLeast(0))
+            typeSpinner.setSelection(contentTypes.indexOf(savedType).coerceAtLeast(0))
+
+            var categories: List<String?> = emptyList()
+            fun refreshCategories(preferred: String? = null) {
+                val sourceId = sourceIds.getOrNull(sourceSpinner.selectedItemPosition)
+                val type = contentTypes.getOrElse(typeSpinner.selectedItemPosition) {
+                    IptvLibraryContentType.ALL
+                }
+                categories = listOf(null) + allChannels.asSequence()
+                    .filter { sourceId == null || it.iptvSourceId() == sourceId }
+                    .filter { type == IptvLibraryContentType.ALL || it.iptvContentType() == type }
+                    .mapNotNull { it.groupTitle?.trim()?.takeIf(String::isNotBlank) }
+                    .distinct()
+                    .sortedWith(String.CASE_INSENSITIVE_ORDER)
+                    .toList()
+                categorySpinner.adapter = dialogSpinnerAdapter(
+                    categories.map { it ?: getString(R.string.all_iptv_categories) },
+                )
+                categorySpinner.setSelection(categories.indexOf(preferred).coerceAtLeast(0))
+            }
+            val filterListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long,
+                ) = refreshCategories()
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
+            sourceSpinner.onItemSelectedListener = filterListener
+            typeSpinner.onItemSelectedListener = filterListener
+            refreshCategories(savedCategory)
+            categorySpinner.post { refreshCategories(savedCategory) }
+
+            val dialog = AlertDialog.Builder(this@MainActivity)
+                .setTitle(R.string.iptv_library_filter_title)
+                .setView(container)
+                .setPositiveButton(R.string.apply, null)
+                .setNeutralButton(R.string.main_channel_list, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                    val sourceId = sourceIds.getOrNull(sourceSpinner.selectedItemPosition)
+                    val type = contentTypes.getOrElse(typeSpinner.selectedItemPosition) {
+                        IptvLibraryContentType.ALL
+                    }
+                    val category = categories.getOrNull(categorySpinner.selectedItemPosition)
+                    preferences.edit()
+                        .putLong(IPTV_LIBRARY_SOURCE_ID, sourceId ?: -1L)
+                        .putString(IPTV_LIBRARY_CONTENT_TYPE, type.name)
+                        .putString(IPTV_LIBRARY_CATEGORY, category)
+                        .apply()
+                    applyIptvLibraryFilter(
+                        allChannels,
+                        sourceId,
+                        sourceNames[sourceSpinner.selectedItemPosition],
+                        type,
+                        category,
+                    )
+                    dialog.dismiss()
+                }
+                dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                    applyChannelFilter(
+                        showFavorites = false,
+                        source = ChannelSourceFilter.ALL,
+                    )
+                    dialog.dismiss()
+                }
+            }
+            dialog.setOnDismissListener {
+                if (binding.channelPanel.visibility == View.VISIBLE) scheduleChannelPanelClose()
+            }
+            dialog.show()
+        }
+    }
+
+    private fun openSavedIptvLibrary() {
+        focusedTuneJob?.cancel()
+        lifecycleScope.launch {
+            val (sources, allChannels) = withContext(Dispatchers.IO) {
+                iptvRepository.sources() to iptvRepository.libraryLiveChannels(null, null)
+            }
+            if (allChannels.isEmpty()) {
+                showIptvLibraryFilterDialog()
+                return@launch
+            }
+            val preferences = getSharedPreferences(IPTV_LIBRARY_FILTER_PREFS, MODE_PRIVATE)
+            val sourceId = preferences.getLong(IPTV_LIBRARY_SOURCE_ID, -1L)
+                .takeUnless { it == -1L }
+                ?.takeIf { saved -> sources.any { it.source.id == saved } }
+            val contentType = runCatching {
+                IptvLibraryContentType.valueOf(
+                    preferences.getString(
+                        IPTV_LIBRARY_CONTENT_TYPE,
+                        IptvLibraryContentType.ALL.name,
+                    ).orEmpty(),
+                )
+            }.getOrDefault(IptvLibraryContentType.ALL)
+            val category = preferences.getString(IPTV_LIBRARY_CATEGORY, null)
+            val sourceName = sources.firstOrNull { it.source.id == sourceId }?.source?.name
+                ?: getString(R.string.iptv_library_all_sources)
+            applyIptvLibraryFilter(
+                allChannels,
+                sourceId,
+                sourceName,
+                contentType,
+                category,
+            )
+        }
+    }
+
+    private fun openIptvEditor() {
+        focusedTuneJob?.cancel()
+        iptvSources.launch(Intent(this, IptvSourcesActivity::class.java))
+    }
+
+    private fun dialogSpinnerAdapter(items: List<String>) = ArrayAdapter(
+        this,
+        android.R.layout.simple_spinner_dropdown_item,
+        items,
+    )
+
+    private fun applyIptvLibraryFilter(
+        allChannels: List<LiveChannel>,
+        sourceId: Long?,
+        sourceName: String,
+        contentType: IptvLibraryContentType,
+        category: String?,
+    ) {
+        channelPanelContent = ChannelPanelContent.IPTV_LIBRARY
+        iptvLibraryChannels = allChannels.asSequence()
+            .filter { sourceId == null || it.iptvSourceId() == sourceId }
+            .filter {
+                contentType == IptvLibraryContentType.ALL || it.iptvContentType() == contentType
+            }
+            .filter { category == null || it.groupTitle?.trim() == category }
+            .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+            .toList()
+        binding.sourceFilterRow.visibility = View.GONE
+        binding.advancedFilterRow.visibility = View.GONE
+        updateChannelActionLabels()
+        binding.channelListTitle.text = listOfNotNull(
+            sourceName,
+            when (contentType) {
+                IptvLibraryContentType.ALL -> null
+                IptvLibraryContentType.LIVE -> getString(R.string.iptv_library_live_short)
+                IptvLibraryContentType.VOD -> getString(R.string.iptv_library_vod)
+            },
+            category,
+        ).joinToString(" · ")
+        adapter.submitList(iptvLibraryChannels)
+        adapter.submitPrograms(currentPrograms)
+        currentChannel?.let { adapter.select(it.sourceKey) }
+        updateChannelCount(iptvLibraryChannels.size)
+        if (binding.channelPanel.visibility != View.VISIBLE) {
+            showChannelPanel(expanded = false)
+        } else {
+            focusCurrentListChannel()
+            scheduleChannelPanelClose()
+        }
+    }
+
+    private fun LiveChannel.iptvSourceId(): Long? = inputId
+        .takeIf { it.startsWith("iptv:") }
+        ?.substringAfter("iptv:")
+        ?.toLongOrNull()
+
+    private fun LiveChannel.iptvContentType(): IptvLibraryContentType {
+        val value = "${uri.toString().lowercase()} ${groupTitle.orEmpty().lowercase()}"
+        val vodMarkers = listOf(
+            ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".webm",
+            "/movie/", "/movies/", "/series/", "/vod/", "vod", "film", "movie",
+            "cinema", "sinema", "dizi", "series", "sezon", "season", "episode", "bölüm",
+        )
+        return if (vodMarkers.any(value::contains)) {
+            IptvLibraryContentType.VOD
+        } else {
+            IptvLibraryContentType.LIVE
+        }
+    }
+
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).toInt()
 
@@ -1421,7 +1725,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun panelChannels(): List<LiveChannel> = channels.asSequence()
+    private fun panelChannels(): List<LiveChannel> {
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+            return iptvLibraryChannels
+        }
+        return channels.asSequence()
         .filter { channel ->
             when (sourceFilter) {
                 ChannelSourceFilter.ALL -> true
@@ -1432,12 +1740,14 @@ class MainActivity : AppCompatActivity() {
         .filter { channel -> !favoriteFilter || channel.favorite }
         .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
         .toList()
+    }
 
     private fun applyChannelFilter(
         showFavorites: Boolean = favoriteFilter,
         source: ChannelSourceFilter = sourceFilter,
         requestFocus: Boolean = true,
     ) {
+        channelPanelContent = ChannelPanelContent.NORMAL
         favoriteFilter = showFavorites
         sourceFilter = source
         channelListFilterStore.save(sourceFilter, favoriteFilter)
@@ -1445,6 +1755,9 @@ class MainActivity : AppCompatActivity() {
         binding.satelliteFilter.isSelected = sourceFilter == ChannelSourceFilter.SATELLITE
         binding.iptvFilter.isSelected = sourceFilter == ChannelSourceFilter.IPTV
         binding.favoriteFilter.isSelected = showFavorites
+        binding.sourceFilterRow.visibility = View.VISIBLE
+        binding.channelListTitle.setText(R.string.channel_list)
+        updateChannelActionLabels()
         val filtered = panelChannels()
         currentChannel = filtered.firstOrNull { it.sourceKey == currentChannel?.sourceKey }
             ?: currentChannel
@@ -1464,6 +1777,18 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun updateChannelActionLabels() {
+        val library = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
+        binding.redActionLabel.setText(R.string.edit_short)
+        binding.greenActionLabel.setText(R.string.empty_action)
+        binding.yellowActionLabel.setText(
+            if (library) R.string.select_list_short else R.string.empty_action,
+        )
+        binding.blueActionLabel.setText(
+            if (library) R.string.main_list_short else R.string.iptv_library_short,
+        )
+    }
+
     private fun toggleChannelPanel() {
         if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
         else showChannelPanel(expanded = false)
@@ -1472,7 +1797,12 @@ class MainActivity : AppCompatActivity() {
     private fun showChannelPanel(expanded: Boolean) {
         channelPanelExpanded = expanded
         binding.channelPanel.visibility = View.VISIBLE
-        binding.advancedFilterRow.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.sourceFilterRow.visibility = if (
+            channelPanelContent == ChannelPanelContent.NORMAL
+        ) View.VISIBLE else View.GONE
+        binding.advancedFilterRow.visibility = if (
+            expanded && channelPanelContent == ChannelPanelContent.NORMAL
+        ) View.VISIBLE else View.GONE
         binding.channelList.setPadding(
             (resources.displayMetrics.widthPixels * LIST_HORIZONTAL_PADDING_FRACTION).toInt(),
             0,
@@ -1526,7 +1856,7 @@ class MainActivity : AppCompatActivity() {
                 height = if (channelPanelExpanded) {
                     FrameLayout.LayoutParams.MATCH_PARENT
                 } else {
-                    (screenHeight * COMPACT_PANEL_HEIGHT_FRACTION).toInt()
+                    screenHeight - (verticalMargin * 2)
                 }
                 gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
                     Gravity.START
@@ -1619,6 +1949,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cycleSourceFilter(direction: Int) {
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) return
         val filters = listOf(
             ChannelSourceFilter.ALL,
             ChannelSourceFilter.SATELLITE,
@@ -1671,6 +2002,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            ::debugLog.isInitialized &&
+            loggedRemoteKeyCodes.add(event.keyCode)
+        ) {
+            debugLog.recordDebug(
+                "REMOTE_KEY | screen=main, name=${KeyEvent.keyCodeToString(event.keyCode)}, " +
+                    "code=${event.keyCode}, scan=${event.scanCode}, device=${event.deviceId}",
+            )
+        }
         if (binding.statusPanel.visibility == View.VISIBLE) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
@@ -1790,23 +2131,45 @@ class MainActivity : AppCompatActivity() {
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_PROG_RED -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    openChannelEditor()
+                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                        openIptvEditor()
+                    } else {
+                        openChannelEditor()
+                    }
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    showAudioTracks()
+                    Unit
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    showSubtitleTracks()
+                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                        showIptvLibraryFilterDialog()
+                    } else {
+                        Unit
+                    }
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
-                KeyEvent.KEYCODE_PROG_BLUE -> openDisplaySettings()
+                KeyEvent.KEYCODE_PROG_BLUE -> if (
+                    binding.channelPanel.visibility == View.VISIBLE
+                ) {
+                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                        applyChannelFilter(
+                            showFavorites = false,
+                            source = ChannelSourceFilter.ALL,
+                        )
+                    } else {
+                        openSavedIptvLibrary()
+                    }
+                } else {
+                    openDisplaySettings()
+                }
                 KeyEvent.KEYCODE_WINDOW -> enterTvPictureInPicture()
-                KeyEvent.KEYCODE_LANGUAGE_SWITCH -> showAudioTracks()
+                KeyEvent.KEYCODE_LANGUAGE_SWITCH,
+                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> showAudioTracks()
                 KeyEvent.KEYCODE_CAPTIONS -> showSubtitleTracks()
                 KeyEvent.KEYCODE_SETTINGS,
                 KeyEvent.KEYCODE_TV_CONTENTS_MENU -> openDisplaySettings()

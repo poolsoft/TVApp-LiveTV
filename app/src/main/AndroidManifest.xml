@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <permission
+        android:name="com.tvapp.livetv.permission.READ_IPTV_CHANNELS"
+        android:protectionLevel="signature" />
+
     <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
 
     <application
         android:name=".TvAppApplication"
+        android:localeConfig="@xml/locales_config"
         android:allowBackup="true"
         android:banner="@drawable/app_banner"
         android:icon="@drawable/ic_tv"
@@ -18,6 +24,24 @@
         android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.TVApp">
+
+        <provider
+            android:name=".integration.IptvChannelProvider"
+            android:authorities="com.tvapp.livetv.iptv"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            android:readPermission="com.tvapp.livetv.permission.READ_IPTV_CHANNELS"
+            android:writePermission="com.tvapp.livetv.permission.READ_IPTV_CHANNELS" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_file_paths" />
+        </provider>
 
         <receiver
             android:name=".BootLaunchReceiver"

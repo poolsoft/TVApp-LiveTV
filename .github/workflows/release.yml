@@ -1,0 +1,103 @@
+name: Build and release TVApp
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - ".build"
+      - "**/*.md"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tvapp-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Increment build number
+        id: version
+        shell: bash
+        run: |
+          BUILD=$(( $(tr -d '[:space:]' < .build) + 1 ))
+          printf '%s\n' "$BUILD" > .build
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=0.1.$BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: Restore release keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TVAPP_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "TVAPP_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tvapp-release.jks"
+
+      - name: Test and build signed APK
+        env:
+          TVAPP_KEYSTORE_PATH: ${{ runner.temp }}/tvapp-release.jks
+          TVAPP_KEY_ALIAS: ${{ secrets.TVAPP_KEY_ALIAS }}
+          TVAPP_KEY_PASSWORD: ${{ secrets.TVAPP_KEY_PASSWORD }}
+          TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
+        run: ./gradlew testDebugUnitTest assembleRelease
+
+      - name: Prepare release assets
+        id: assets
+        shell: bash
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TVApp.apk
+          SHA256=$(sha256sum TVApp.apk | cut -d' ' -f1)
+          PUBLISHED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          cat > version.json <<EOF
+          {
+            "versionCode": ${{ steps.version.outputs.build }},
+            "versionName": "${{ steps.version.outputs.version }}",
+            "build": ${{ steps.version.outputs.build }},
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp.apk",
+            "sha256": "$SHA256",
+            "publishedAt": "$PUBLISHED_AT",
+            "mandatory": false
+          }
+          EOF
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Save build number
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .build
+          git commit -m "chore: build ${{ steps.version.outputs.build }} [skip ci]"
+          git push
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          gh release create "$TAG" TVApp.apk version.json \
+            --target "$(git rev-parse HEAD)" \
+            --title "TVApp ${{ steps.version.outputs.version }}" \
+            --notes "Build ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }}" \
+            --latest

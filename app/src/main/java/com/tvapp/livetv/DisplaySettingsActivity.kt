@@ -1,29 +1,57 @@
 package com.tvapp.livetv
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.provider.Settings
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.preference.ListPreference
-import androidx.preference.Preference
-import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.PreferenceScreen
-import androidx.preference.SeekBarPreference
-import androidx.preference.SwitchPreferenceCompat
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.lifecycleScope
+import com.tvapp.livetv.settings.AppLanguage
+import com.tvapp.livetv.settings.AppLanguageStore
 import com.tvapp.livetv.settings.ChannelPanelSide
 import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
+import com.tvapp.livetv.update.AppUpdateManager
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class DisplaySettingsActivity : AppCompatActivity() {
+    private lateinit var content: LinearLayout
+    private lateinit var displayStore: DisplayPreferencesStore
+    private lateinit var sleepTimerStore: SleepTimerStore
+    private lateinit var languageStore: AppLanguageStore
+    private var current = DisplayPreferences()
     private var changed = false
+    private var pendingApkUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_display_settings)
+        configureWindow()
+        displayStore = DisplayPreferencesStore(this)
+        sleepTimerStore = SleepTimerStore(this)
+        languageStore = AppLanguageStore(this)
+        current = displayStore.load()
+        content = findViewById(R.id.settings_content)
+        buildSettings()
+        content.post { firstFocusableRow()?.requestFocus() }
+    }
+
+    private fun configureWindow() {
         val metrics = resources.displayMetrics
         window.setGravity(Gravity.END or Gravity.CENTER_VERTICAL)
         window.setLayout(
@@ -35,246 +63,320 @@ class DisplaySettingsActivity : AppCompatActivity() {
             dimAmount = 0f
         }
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-        if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.settings_host, DisplaySettingsFragment())
-                .commit()
+    }
+
+    private fun buildSettings() {
+        content.removeAllViews()
+        section(R.string.language_settings)
+        val languages = AppLanguage.entries
+        choice(
+            R.string.app_language,
+            languages.map { languageLabel(it) },
+            languages.indexOf(languageStore.load()).coerceAtLeast(0),
+        ) { index ->
+            val language = languages[index]
+            languageStore.save(language)
+            markChanged()
+            AppCompatDelegate.setApplicationLocales(
+                LocaleListCompat.forLanguageTags(language.languageTag),
+            )
+        }
+
+        section(R.string.info_bar_content)
+        choice(
+            R.string.info_bar_position,
+            listOf(getString(R.string.top), getString(R.string.bottom)),
+            if (current.infoBarPosition == InfoBarPosition.TOP) 0 else 1,
+        ) { index -> update { copy(infoBarPosition = InfoBarPosition.entries[index]) } }
+        toggle(R.string.show_current_program, current.showCurrentProgram) {
+            update { copy(showCurrentProgram = it) }
+        }
+        toggle(R.string.show_next_program, current.showNextProgram) {
+            update { copy(showNextProgram = it) }
+        }
+        number(R.string.info_bar_opacity, 30, 100, current.infoBarOpacityPercent, 5, ::percentLabel) {
+            update { copy(infoBarOpacityPercent = it) }
+        }
+        number(R.string.info_bar_duration, 0, 15, current.infoBarDurationSeconds, 1, ::durationLabel) {
+            update { copy(infoBarDurationSeconds = it) }
+        }
+
+        section(R.string.channel_list)
+        choice(
+            R.string.channel_panel_position,
+            listOf(getString(R.string.left), getString(R.string.right)),
+            if (current.channelPanelSide == ChannelPanelSide.LEFT) 0 else 1,
+        ) { index -> update { copy(channelPanelSide = ChannelPanelSide.entries[index]) } }
+        number(
+            R.string.channel_panel_opacity,
+            30,
+            100,
+            current.channelPanelOpacityPercent,
+            5,
+            ::percentLabel,
+        ) { update { copy(channelPanelOpacityPercent = it) } }
+        toggle(R.string.show_channel_logo, current.showChannelLogo) {
+            update { copy(showChannelLogo = it) }
+        }
+        toggle(R.string.show_channel_program, current.showChannelProgram) {
+            update { copy(showChannelProgram = it) }
+        }
+        toggle(R.string.show_channel_progress, current.showChannelProgress) {
+            update { copy(showChannelProgress = it) }
+        }
+        toggle(R.string.show_channel_source_badge, current.showChannelSourceBadge) {
+            update { copy(showChannelSourceBadge = it) }
+        }
+
+        section(R.string.playback_settings)
+        toggle(R.string.subtitles_default, current.subtitlesEnabled) {
+            update { copy(subtitlesEnabled = it) }
+        }
+        val timerValues = listOf(0, 15, 30, 60, 90, 120)
+        val remaining = sleepTimerStore.remainingMinutes()
+        val timerIndex = if (remaining <= 0) 0 else timerValues.indices.minByOrNull {
+            abs(timerValues[it] - remaining)
+        } ?: 0
+        choice(R.string.sleep_timer, timerValues.map(::timerLabel), timerIndex) { index ->
+            sleepTimerStore.schedule(timerValues[index])
+            markChanged()
+        }
+
+        section(R.string.startup_settings)
+        toggle(R.string.launch_tvapp_on_boot, current.launchOnBoot) {
+            update { copy(launchOnBoot = it) }
+        }
+
+        section(R.string.application_settings)
+        action(
+            R.string.check_for_updates,
+            getString(R.string.current_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+            ::checkForUpdates,
+        )
+    }
+
+    private fun section(titleRes: Int) {
+        content.addView(TextView(this).apply {
+            text = getString(titleRes)
+            setTextColor(getColor(R.color.accent))
+            textSize = 15f
+            setPadding(dp(18), dp(22), dp(18), dp(7))
+        })
+    }
+
+    private fun toggle(titleRes: Int, initial: Boolean, changed: (Boolean) -> Unit) {
+        var enabled = initial
+        val row = settingRow(titleRes)
+        fun render() {
+            row.value.text = getString(if (enabled) R.string.on else R.string.off)
+        }
+        row.root.setOnClickListener {
+            enabled = !enabled
+            render()
+            changed(enabled)
+        }
+        row.root.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                row.root.performClick()
+                true
+            } else false
+        }
+        render()
+    }
+
+    private fun choice(
+        titleRes: Int,
+        labels: List<String>,
+        initialIndex: Int,
+        changed: (Int) -> Unit,
+    ) {
+        var index = initialIndex.coerceIn(labels.indices)
+        val row = settingRow(titleRes)
+        fun select(direction: Int) {
+            index = (index + direction + labels.size) % labels.size
+            row.value.text = "<  ${labels[index]}  >"
+            changed(index)
+        }
+        row.root.setOnClickListener { select(1) }
+        row.root.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> true.also { select(-1) }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> true.also { select(1) }
+                else -> false
+            }
+        }
+        row.value.text = "<  ${labels[index]}  >"
+    }
+
+    private fun number(
+        titleRes: Int,
+        minimum: Int,
+        maximum: Int,
+        initial: Int,
+        step: Int,
+        label: (Int) -> String,
+        changed: (Int) -> Unit,
+    ) {
+        var number = initial.coerceIn(minimum, maximum)
+        val row = settingRow(titleRes)
+        fun adjust(direction: Int) {
+            number = (number + direction * step).coerceIn(minimum, maximum)
+            row.value.text = "<  ${label(number)}  >"
+            changed(number)
+        }
+        row.root.setOnClickListener { adjust(1) }
+        row.root.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> true.also { adjust(-1) }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> true.also { adjust(1) }
+                else -> false
+            }
+        }
+        row.value.text = "<  ${label(number)}  >"
+    }
+
+    private fun settingRow(titleRes: Int): SettingRow {
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(58),
+            ).apply { setMargins(dp(8), dp(2), dp(8), dp(2)) }
+            background = AppCompatResources.getDrawable(
+                this@DisplaySettingsActivity,
+                R.drawable.bg_settings_item,
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            isFocusable = true
+            isClickable = true
+            setPadding(dp(18), 0, dp(16), 0)
+        }
+        val title = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            text = getString(titleRes)
+            setTextColor(getColorStateList(R.color.settings_title_text))
+            textSize = 17f
+            maxLines = 2
+            isDuplicateParentStateEnabled = true
+        }
+        val value = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            gravity = Gravity.END
+            setTextColor(getColorStateList(R.color.settings_value_text))
+            textSize = 15f
+            isDuplicateParentStateEnabled = true
+        }
+        row.addView(title)
+        row.addView(value)
+        content.addView(row)
+        return SettingRow(row, value)
+    }
+
+    private fun action(titleRes: Int, initialValue: String, clicked: (SettingRow) -> Unit) {
+        val row = settingRow(titleRes)
+        row.value.text = initialValue
+        row.root.setOnClickListener { clicked(row) }
+    }
+
+    private fun checkForUpdates(row: SettingRow) {
+        if (!row.root.isEnabled) return
+        row.root.isEnabled = false
+        row.value.text = getString(R.string.update_checking)
+        lifecycleScope.launch {
+            runCatching {
+                val manager = AppUpdateManager(this@DisplaySettingsActivity)
+                val update = manager.check() ?: return@runCatching null
+                row.value.text = getString(R.string.update_downloading, update.versionName)
+                update to manager.download(update)
+            }.onSuccess { result ->
+                if (result == null) {
+                    row.value.text = getString(R.string.update_not_available)
+                } else {
+                    row.value.text = getString(R.string.update_installing, result.first.versionName)
+                    installUpdate(result.second)
+                }
+            }.onFailure { error ->
+                row.value.text = getString(
+                    R.string.update_failed,
+                    error.message ?: error.javaClass.simpleName,
+                )
+            }
+            row.root.isEnabled = true
         }
     }
 
-    fun markChanged() {
+    private fun installUpdate(apkUri: Uri) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            pendingApkUri = apkUri
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+            return
+        }
+        startActivity(AppUpdateManager(this).installerIntent(apkUri))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val uri = pendingApkUri ?: return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) {
+            pendingApkUri = null
+            startActivity(AppUpdateManager(this).installerIntent(uri))
+        }
+    }
+
+    private fun update(transform: DisplayPreferences.() -> DisplayPreferences) {
+        current = current.transform()
+        displayStore.save(current)
+        markChanged()
+    }
+
+    private fun markChanged() {
         changed = true
         setResult(Activity.RESULT_OK)
     }
+
+    private fun firstFocusableRow(): View? = (0 until content.childCount)
+        .map(content::getChildAt)
+        .firstOrNull(View::isFocusable)
+
+    private fun languageLabel(language: AppLanguage): String = when (language) {
+        AppLanguage.SYSTEM -> getString(R.string.system_language)
+        AppLanguage.TURKISH -> getString(R.string.turkish)
+        AppLanguage.ENGLISH -> getString(R.string.english)
+    }
+
+    private fun percentLabel(value: Int) = getString(R.string.percent_value, value)
+
+    private fun durationLabel(value: Int) = if (value == 0) {
+        getString(R.string.always_visible)
+    } else getString(R.string.seconds_value, value)
+
+    private fun timerLabel(value: Int) = if (value == 0) {
+        getString(R.string.off)
+    } else getString(R.string.minutes_value, value)
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     override fun finish() {
         if (changed) setResult(Activity.RESULT_OK)
         super.finish()
     }
 
-    private companion object {
-        const val OSD_WIDTH_FRACTION = 0.44f
-        const val OSD_HEIGHT_FRACTION = 0.92f
-        const val OSD_EDGE_GAP_FRACTION = 0.008f
-    }
-}
-
-class DisplaySettingsFragment : PreferenceFragmentCompat() {
-    private lateinit var store: DisplayPreferencesStore
-    private lateinit var sleepTimerStore: SleepTimerStore
-
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        store = DisplayPreferencesStore(requireContext())
-        sleepTimerStore = SleepTimerStore(requireContext())
-        preferenceScreen = buildScreen(store.load())
-    }
-
-    private fun buildScreen(current: DisplayPreferences): PreferenceScreen {
-        val context = requireContext()
-        return preferenceManager.createPreferenceScreen(context).apply {
-            addAttachedCategory(R.string.info_bar_content) {
-                addPreference(listPreference(
-                    KEY_INFO_POSITION,
-                    R.string.info_bar_position,
-                    arrayOf(getString(R.string.top), getString(R.string.bottom)),
-                    arrayOf(InfoBarPosition.TOP.name, InfoBarPosition.BOTTOM.name),
-                    current.infoBarPosition.name,
-                ) { update { copy(infoBarPosition = InfoBarPosition.valueOf(it)) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_CURRENT,
-                    R.string.show_current_program,
-                    current.showCurrentProgram,
-                ) { update { copy(showCurrentProgram = it) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_NEXT,
-                    R.string.show_next_program,
-                    current.showNextProgram,
-                ) { update { copy(showNextProgram = it) } })
-                addPreference(numberPreference(
-                    KEY_INFO_OPACITY,
-                    R.string.info_bar_opacity,
-                    30,
-                    100,
-                    current.infoBarOpacityPercent,
-                ) { update { copy(infoBarOpacityPercent = it) } })
-                addPreference(numberPreference(
-                    KEY_DURATION,
-                    R.string.info_bar_duration,
-                    0,
-                    15,
-                    current.infoBarDurationSeconds,
-                ) { update { copy(infoBarDurationSeconds = it) } })
-            }
-
-            addAttachedCategory(R.string.channel_list) {
-                addPreference(listPreference(
-                    KEY_PANEL_SIDE,
-                    R.string.channel_panel_position,
-                    arrayOf(getString(R.string.left), getString(R.string.right)),
-                    arrayOf(ChannelPanelSide.LEFT.name, ChannelPanelSide.RIGHT.name),
-                    current.channelPanelSide.name,
-                ) { update { copy(channelPanelSide = ChannelPanelSide.valueOf(it)) } })
-                addPreference(numberPreference(
-                    KEY_PANEL_OPACITY,
-                    R.string.channel_panel_opacity,
-                    30,
-                    100,
-                    current.channelPanelOpacityPercent,
-                ) { update { copy(channelPanelOpacityPercent = it) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_LOGO,
-                    R.string.show_channel_logo,
-                    current.showChannelLogo,
-                ) { update { copy(showChannelLogo = it) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_PROGRAM,
-                    R.string.show_channel_program,
-                    current.showChannelProgram,
-                ) { update { copy(showChannelProgram = it) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_PROGRESS,
-                    R.string.show_channel_progress,
-                    current.showChannelProgress,
-                ) { update { copy(showChannelProgress = it) } })
-                addPreference(booleanPreference(
-                    KEY_SHOW_SOURCE,
-                    R.string.show_channel_source_badge,
-                    current.showChannelSourceBadge,
-                ) { update { copy(showChannelSourceBadge = it) } })
-            }
-
-            addAttachedCategory(R.string.playback_settings) {
-                addPreference(booleanPreference(
-                    KEY_SUBTITLES,
-                    R.string.subtitles_default,
-                    current.subtitlesEnabled,
-                ) { update { copy(subtitlesEnabled = it) } })
-                addPreference(listPreference(
-                    KEY_SLEEP_TIMER,
-                    R.string.sleep_timer,
-                    arrayOf(
-                        getString(R.string.off),
-                        getString(R.string.minutes_value, 15),
-                        getString(R.string.minutes_value, 30),
-                        getString(R.string.minutes_value, 60),
-                        getString(R.string.minutes_value, 90),
-                        getString(R.string.minutes_value, 120),
-                    ),
-                    arrayOf("0", "15", "30", "60", "90", "120"),
-                    sleepTimerStore.remainingMinutes().let { remaining ->
-                        listOf(15, 30, 60, 90, 120).minByOrNull {
-                            kotlin.math.abs(it - remaining)
-                        }?.takeIf { remaining > 0 }?.toString() ?: "0"
-                    },
-                ) { minutes ->
-                    sleepTimerStore.schedule(minutes.toIntOrNull() ?: 0)
-                    (activity as? DisplaySettingsActivity)?.markChanged()
-                })
-            }
-
-            addAttachedCategory(R.string.startup_settings) {
-                addPreference(booleanPreference(
-                    KEY_LAUNCH_ON_BOOT,
-                    R.string.launch_tvapp_on_boot,
-                    current.launchOnBoot,
-                ) { update { copy(launchOnBoot = it) } })
-            }
-
-        }
-    }
-
-    private fun PreferenceScreen.addAttachedCategory(
-        titleRes: Int,
-        populate: PreferenceCategory.() -> Unit,
-    ) {
-        val category = category(titleRes)
-        addPreference(category)
-        category.populate()
-    }
-
-    private fun category(titleRes: Int) = PreferenceCategory(requireContext()).apply {
-        title = getString(titleRes)
-        isPersistent = false
-    }
-
-    private fun booleanPreference(
-        key: String,
-        titleRes: Int,
-        checked: Boolean,
-        changed: (Boolean) -> Unit,
-    ) = SwitchPreferenceCompat(requireContext()).apply {
-        this.key = key
-        title = getString(titleRes)
-        isChecked = checked
-        isPersistent = false
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, value ->
-            changed(value as Boolean)
-            true
-        }
-    }
-
-    private fun listPreference(
-        key: String,
-        titleRes: Int,
-        labels: Array<String>,
-        values: Array<String>,
-        selected: String,
-        changed: (String) -> Unit,
-    ) = ListPreference(requireContext()).apply {
-        this.key = key
-        title = getString(titleRes)
-        entries = labels
-        entryValues = values
-        value = selected
-        isPersistent = false
-        summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, value ->
-            changed(value as String)
-            true
-        }
-    }
-
-    private fun numberPreference(
-        key: String,
-        titleRes: Int,
-        minimum: Int,
-        maximum: Int,
-        current: Int,
-        changed: (Int) -> Unit,
-    ) = SeekBarPreference(requireContext()).apply {
-        this.key = key
-        title = getString(titleRes)
-        min = minimum
-        max = maximum
-        value = current
-        seekBarIncrement = 5
-        showSeekBarValue = true
-        isPersistent = false
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, value ->
-            changed(value as Int)
-            true
-        }
-    }
-
-    private fun update(transform: DisplayPreferences.() -> DisplayPreferences) {
-        store.save(store.load().transform())
-        (activity as? DisplaySettingsActivity)?.markChanged()
-    }
+    private data class SettingRow(val root: LinearLayout, val value: TextView)
 
     private companion object {
-        const val KEY_INFO_POSITION = "ui-info-position"
-        const val KEY_SHOW_CURRENT = "ui-show-current"
-        const val KEY_SHOW_NEXT = "ui-show-next"
-        const val KEY_INFO_OPACITY = "ui-info-opacity"
-        const val KEY_DURATION = "ui-info-duration"
-        const val KEY_PANEL_SIDE = "ui-panel-side"
-        const val KEY_PANEL_OPACITY = "ui-panel-opacity"
-        const val KEY_SHOW_LOGO = "ui-show-logo"
-        const val KEY_SHOW_PROGRAM = "ui-show-program"
-        const val KEY_SHOW_PROGRESS = "ui-show-progress"
-        const val KEY_SHOW_SOURCE = "ui-show-source"
-        const val KEY_SUBTITLES = "ui-subtitles"
-        const val KEY_SLEEP_TIMER = "playback-sleep-timer"
-        const val KEY_LAUNCH_ON_BOOT = "ui-launch-on-boot"
+        const val OSD_WIDTH_FRACTION = 0.40f
+        const val OSD_HEIGHT_FRACTION = 0.94f
+        const val OSD_EDGE_GAP_FRACTION = 0.012f
     }
 }

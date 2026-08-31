@@ -7,9 +7,24 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import androidx.room.Upsert
+import com.tvapp.livetv.integration.SharedIptvChannel
 
 @Dao
 interface IptvDao {
+    @Query(
+        "SELECT c.sourceKey AS sourceKey, " +
+            "COALESCE(u.customName, c.displayName) AS displayName, " +
+            "c.streamUrl AS streamUrl, c.logoUrl AS logoUrl, " +
+            "c.groupTitle AS groupTitle, c.tvgId AS epgId, " +
+            "c.userAgent AS userAgent, c.referrer AS referrer " +
+            "FROM iptv_channels c " +
+            "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
+            "LEFT JOIN user_channels u ON u.sourceKey = c.sourceKey " +
+            "WHERE s.enabled = 1 AND c.selected = 1 AND COALESCE(u.hidden, 0) = 0 " +
+            "ORDER BY COALESCE(u.sortOrder, 2147483647), s.name, c.originalIndex",
+    )
+    fun getSharedChannels(): List<SharedIptvChannel>
+
     @Query("SELECT * FROM iptv_sources ORDER BY name")
     suspend fun getSources(): List<IptvSourceEntity>
 
@@ -39,6 +54,16 @@ interface IptvDao {
 
     @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId ORDER BY originalIndex")
     suspend fun getChannelsForSource(sourceId: Long): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT c.* FROM iptv_channels c " +
+            "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
+            "WHERE s.enabled = 1 ORDER BY s.name, c.originalIndex",
+    )
+    suspend fun getAllEnabledLibraryChannels(): List<IptvChannelEntity>
+
+    @Query("SELECT * FROM iptv_channels WHERE sourceKey = :sourceKey LIMIT 1")
+    suspend fun getChannel(sourceKey: String): IptvChannelEntity?
 
     @Query(
         "SELECT c.* FROM iptv_channels c " +
