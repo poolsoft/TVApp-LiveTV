@@ -15,7 +15,12 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("sourceId"), Index("originalIndex"), Index("selected")],
+    indices = [
+        Index("sourceId"),
+        Index("originalIndex"),
+        Index("selected"),
+        Index(value = ["sourceId", "originalIndex"]),
+    ],
 )
 data class IptvChannelEntity(
     @PrimaryKey val sourceKey: String,

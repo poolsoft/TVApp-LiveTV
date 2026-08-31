@@ -38,6 +38,13 @@ class ChannelAdapter(
         diff.dispatchUpdatesTo(this)
     }
 
+    fun appendItems(items: List<LiveChannel>) {
+        if (items.isEmpty()) return
+        val start = channels.size
+        channels.addAll(items)
+        notifyItemRangeInserted(start, items.size)
+    }
+
     fun select(sourceKey: String) {
         val oldId = selectedId
         val channel = channels.firstOrNull { it.sourceKey == sourceKey } ?: return

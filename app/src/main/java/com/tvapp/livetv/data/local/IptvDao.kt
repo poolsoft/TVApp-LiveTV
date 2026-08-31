@@ -56,6 +56,26 @@ interface IptvDao {
     suspend fun getChannelsForSource(sourceId: Long): List<IptvChannelEntity>
 
     @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getChannelsPage(
+        sourceId: Long,
+        category: String?,
+        limit: Int,
+        offset: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT DISTINCT TRIM(groupTitle) FROM iptv_channels " +
+            "WHERE sourceId = :sourceId AND groupTitle IS NOT NULL " +
+            "AND TRIM(groupTitle) != '' ORDER BY TRIM(groupTitle) COLLATE NOCASE",
+    )
+    suspend fun getCategoriesForSource(sourceId: Long): List<String>
+
+    @Query(
         "SELECT c.* FROM iptv_channels c " +
             "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
             "WHERE s.enabled = 1 ORDER BY s.name, c.originalIndex",

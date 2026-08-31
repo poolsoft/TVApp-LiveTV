@@ -42,6 +42,17 @@ class IptvRepository(context: Context) {
     suspend fun sourceChannels(sourceId: Long): List<IptvChannelEntity> =
         dao.getChannelsForSource(sourceId)
 
+    suspend fun sourceCategories(sourceId: Long): List<String> =
+        dao.getCategoriesForSource(sourceId)
+
+    suspend fun libraryLiveChannelsPage(
+        sourceId: Long,
+        category: String?,
+        limit: Int,
+        offset: Int,
+    ): List<LiveChannel> = dao.getChannelsPage(sourceId, category, limit, offset)
+        .map { it.toLiveChannel() }
+
     suspend fun libraryChannels(sourceId: Long?): List<IptvChannelEntity> =
         sourceId?.let { dao.getChannelsForSource(it) } ?: dao.getAllEnabledLibraryChannels()
 
