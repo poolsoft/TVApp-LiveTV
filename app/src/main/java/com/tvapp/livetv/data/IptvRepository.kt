@@ -135,7 +135,8 @@ class IptvRepository(context: Context) {
             source = LiveChannel.Source.IPTV,
             logoUrl = logoUrl,
             groupTitle = groupTitle,
-            epgId = tvgId,
+            epgId = tvgId?.takeIf(String::isNotBlank)
+                ?: tvgName?.takeIf(String::isNotBlank),
             userAgent = userAgent,
             referrer = referrer,
             iptvContentType = contentType,

@@ -271,7 +271,7 @@ class AppBackupRepository(context: Context) {
             infoBarPosition = enumValue(requireString("infoBarPosition"), InfoBarPosition.TOP),
             showCurrentProgram = optBoolean("showCurrentProgram", true),
             showNextProgram = optBoolean("showNextProgram", true),
-            showChannelLogo = optBoolean("showChannelLogo", false),
+            showChannelLogo = optBoolean("showChannelLogo", true),
             showChannelProgram = optBoolean("showChannelProgram", true),
             showChannelProgress = optBoolean("showChannelProgress", true),
             showChannelSourceBadge = optBoolean("showChannelSourceBadge", false),

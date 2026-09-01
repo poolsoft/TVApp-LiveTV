@@ -5,10 +5,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import coil.dispose
 import com.tvapp.livetv.R
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ItemGuideChannelBinding
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.image.ChannelLogoLoader
 
 class ProgramGuideChannelAdapter(
     private val onFocused: (LiveChannel) -> Unit,
@@ -66,9 +68,14 @@ class ProgramGuideChannelAdapter(
                 (((System.currentTimeMillis() - it.startTimeMillis) * 100L) / duration)
                     .toInt().coerceIn(0, 100)
             } ?: 0
-            channelLogo.setImageResource(R.drawable.ic_tv)
-            runCatching { channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id)) }
-            if (channelLogo.drawable == null) channelLogo.setImageResource(R.drawable.ic_tv)
+            if (channel.source == LiveChannel.Source.IPTV) {
+                ChannelLogoLoader.load(channelLogo, channel.logoUrl, R.drawable.ic_tv)
+            } else {
+                channelLogo.dispose()
+                channelLogo.setImageResource(R.drawable.ic_tv)
+                runCatching { channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id)) }
+                if (channelLogo.drawable == null) channelLogo.setImageResource(R.drawable.ic_tv)
+            }
             root.isSelected = channel.sourceKey == selectedKey
             guideLockIcon.visibility = if (
                 channel.locked || channel.encrypted || isParentalLocked(channel)

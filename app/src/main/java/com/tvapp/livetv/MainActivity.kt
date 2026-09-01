@@ -101,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_LIBRARY_CATEGORY = "category"
         private const val IPTV_LIBRARY_PAGE_SIZE = 250
         private const val IPTV_LIBRARY_PREFETCH_DISTANCE = 24
+        private const val MULTIVIEW_TIF_RECOVERY_DELAY_MS = 350L
     }
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
@@ -321,6 +322,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.satelliteFilter.setOnClickListener {
             applyChannelFilter(source = ChannelSourceFilter.SATELLITE)
+        }
+        binding.radioFilter.setOnClickListener {
+            applyChannelFilter(source = ChannelSourceFilter.RADIO)
         }
         binding.iptvFilter.setOnClickListener {
             applyChannelFilter(source = ChannelSourceFilter.IPTV)
@@ -2239,6 +2243,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopMultiView() {
         if (!multiViewActive) return
+        val satellite = multiViewSatelliteChannel
         multiViewActive = false
         multiViewLongPressJob?.cancel()
         playback.setMuted(false)
@@ -2251,6 +2256,16 @@ class MainActivity : AppCompatActivity() {
         binding.multiViewRightFocus.visibility = View.GONE
         resizePlayer(binding.tvView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
         resizePlayer(binding.iptvPlayerView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
+        if (satellite != null) {
+            binding.tvView.postDelayed({
+                if (!multiViewActive && currentChannel?.sourceKey == satellite.sourceKey) {
+                    playback.stop()
+                    playback.play(satellite)
+                    playback.setMuted(false)
+                    debugLog.recordDebug("MULTIVIEW_TIF_AUDIO_RECOVERED | channel=${satellite.sourceKey}")
+                }
+            }, MULTIVIEW_TIF_RECOVERY_DELAY_MS)
+        }
         multiViewSatelliteChannel = null
         multiViewIptvChannel = null
         currentChannel?.let(::showInfoBarForChannel)
@@ -2366,7 +2381,9 @@ class MainActivity : AppCompatActivity() {
         .filter { channel ->
             when (sourceFilter) {
                 ChannelSourceFilter.ALL -> true
-                ChannelSourceFilter.SATELLITE -> channel.source == LiveChannel.Source.TIF
+                ChannelSourceFilter.SATELLITE ->
+                    channel.source == LiveChannel.Source.TIF && !channel.isRadioChannel()
+                ChannelSourceFilter.RADIO -> channel.isRadioChannel()
                 ChannelSourceFilter.IPTV -> channel.source == LiveChannel.Source.IPTV
             }
         }
@@ -2388,6 +2405,7 @@ class MainActivity : AppCompatActivity() {
         channelListFilterStore.save(sourceFilter, favoriteFilter)
         binding.allFilter.isSelected = sourceFilter == ChannelSourceFilter.ALL
         binding.satelliteFilter.isSelected = sourceFilter == ChannelSourceFilter.SATELLITE
+        binding.radioFilter.isSelected = sourceFilter == ChannelSourceFilter.RADIO
         binding.iptvFilter.isSelected = sourceFilter == ChannelSourceFilter.IPTV
         binding.favoriteFilter.isSelected = showFavorites
         binding.sourceFilterRow.visibility = View.GONE
@@ -2423,11 +2441,9 @@ class MainActivity : AppCompatActivity() {
                 R.string.iptv_pip
             },
         )
-        binding.yellowActionLabel.setText(
-            if (library) R.string.select_list_short else R.string.channel_source_short,
-        )
+        binding.yellowActionLabel.setText(R.string.channel_source_short)
         binding.blueActionLabel.setText(
-            R.string.empty_action,
+            if (library) R.string.filter_short else R.string.empty_action,
         )
     }
 
@@ -2437,6 +2453,8 @@ class MainActivity : AppCompatActivity() {
                 R.drawable.ic_iptv_library to R.string.iptv_library
             sourceFilter == ChannelSourceFilter.SATELLITE ->
                 R.drawable.ic_source_tif to R.string.satellite_channels
+            sourceFilter == ChannelSourceFilter.RADIO ->
+                R.drawable.ic_radio to R.string.radio_channels
             sourceFilter == ChannelSourceFilter.IPTV ->
                 R.drawable.ic_source_iptv to R.string.iptv_filter
             else -> R.drawable.ic_list to R.string.all_channels
@@ -2595,6 +2613,7 @@ class MainActivity : AppCompatActivity() {
             when {
                 favoriteFilter -> binding.favoriteFilter.requestFocus()
                 sourceFilter == ChannelSourceFilter.SATELLITE -> binding.satelliteFilter.requestFocus()
+                sourceFilter == ChannelSourceFilter.RADIO -> binding.radioFilter.requestFocus()
                 sourceFilter == ChannelSourceFilter.IPTV -> binding.iptvFilter.requestFocus()
                 else -> binding.allFilter.requestFocus()
             }
@@ -2620,6 +2639,10 @@ class MainActivity : AppCompatActivity() {
                 source = ChannelSourceFilter.SATELLITE,
             )
             sourceFilter == ChannelSourceFilter.SATELLITE -> applyChannelFilter(
+                showFavorites = false,
+                source = ChannelSourceFilter.RADIO,
+            )
+            sourceFilter == ChannelSourceFilter.RADIO -> applyChannelFilter(
                 showFavorites = false,
                 source = ChannelSourceFilter.IPTV,
             )
@@ -2936,7 +2959,9 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_PROG_BLUE -> if (
                     binding.channelPanel.visibility == View.VISIBLE
                 ) {
-                    Unit
+                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                        showIptvLibraryFilterDialog()
+                    }
                 } else {
                     openDisplaySettings()
                 }

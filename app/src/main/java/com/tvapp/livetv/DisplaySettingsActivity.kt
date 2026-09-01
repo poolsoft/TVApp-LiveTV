@@ -6,13 +6,18 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.Settings
+import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.content.res.AppCompatResources
@@ -25,6 +30,10 @@ import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
+import com.tvapp.livetv.settings.LogoCachePreferences
+import com.tvapp.livetv.settings.LogoCachePreferencesStore
+import com.tvapp.livetv.data.XmlTvRepository
+import com.tvapp.livetv.image.ChannelLogoLoader
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
@@ -38,9 +47,16 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private lateinit var displayStore: DisplayPreferencesStore
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var languageStore: AppLanguageStore
+    private lateinit var xmlTvRepository: XmlTvRepository
+    private lateinit var logoCacheStore: LogoCachePreferencesStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
+    private var logoCachePreferences = LogoCachePreferences()
+    private var xmlTvSettingRow: SettingRow? = null
+    private val openXmlTvFile = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { importXmlTv { xmlTvRepository.importDocument(it) } } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +65,9 @@ class DisplaySettingsActivity : AppCompatActivity() {
         displayStore = DisplayPreferencesStore(this)
         sleepTimerStore = SleepTimerStore(this)
         languageStore = AppLanguageStore(this)
+        xmlTvRepository = XmlTvRepository(this)
+        logoCacheStore = LogoCachePreferencesStore(this)
+        logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
         buildSettings()
@@ -122,6 +141,33 @@ class DisplaySettingsActivity : AppCompatActivity() {
         toggle(R.string.show_channel_logo, current.showChannelLogo) {
             update { copy(showChannelLogo = it) }
         }
+        toggle(R.string.logo_cache_enabled, logoCachePreferences.enabled) { enabled ->
+            logoCachePreferences = logoCachePreferences.copy(enabled = enabled)
+            logoCacheStore.save(logoCachePreferences)
+            ChannelLogoLoader.invalidate()
+            markChanged()
+        }
+        val logoCacheSizes = listOf(32, 64, 128, 256)
+        choice(
+            R.string.logo_cache_size,
+            logoCacheSizes.map { getString(R.string.megabytes_value, it) },
+            logoCacheSizes.indexOf(logoCachePreferences.maximumMegabytes).coerceAtLeast(0),
+        ) { index ->
+            logoCachePreferences = logoCachePreferences.copy(
+                maximumMegabytes = logoCacheSizes[index],
+            )
+            logoCacheStore.save(logoCachePreferences)
+            ChannelLogoLoader.invalidate()
+            markChanged()
+        }
+        action(
+            R.string.clear_logo_cache,
+            cacheSizeLabel(ChannelLogoLoader.cacheSizeBytes(this)),
+        ) { row ->
+            ChannelLogoLoader.clear(this)
+            row.value.text = cacheSizeLabel(0)
+            Toast.makeText(this, R.string.logo_cache_cleared, Toast.LENGTH_SHORT).show()
+        }
         toggle(R.string.show_channel_program, current.showChannelProgram) {
             update { copy(showChannelProgram = it) }
         }
@@ -164,6 +210,13 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
 
         section(R.string.application_settings)
+        action(
+            R.string.xmltv_alternative_epg,
+            xmlTvRepository.sourceLabel() ?: getString(R.string.not_configured_short),
+        ) { row ->
+            xmlTvSettingRow = row
+            showXmlTvManagement()
+        }
         action(
             R.string.iptv_input_name,
             getString(R.string.iptv_input_sync),
@@ -380,6 +433,75 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun showXmlTvManagement() {
+        val actions = arrayOf(
+            getString(R.string.xmltv_from_url),
+            getString(R.string.xmltv_from_file),
+            getString(R.string.xmltv_clear),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.xmltv_alternative_epg)
+            .setMessage(xmlTvRepository.sourceLabel() ?: getString(R.string.xmltv_not_configured))
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> showXmlTvUrlEditor()
+                    1 -> openXmlTvFile.launch(arrayOf("application/xml", "text/xml", "*/*"))
+                    2 -> {
+                        xmlTvRepository.clear()
+                        xmlTvSettingRow?.value?.setText(R.string.not_configured_short)
+                        Toast.makeText(this, R.string.xmltv_cleared, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showXmlTvUrlEditor() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setText(xmlTvRepository.sourceLabel()?.takeIf { it.startsWith("http") }.orEmpty())
+            setSingleLine()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.xmltv_from_url)
+            .setView(input)
+            .setPositiveButton(R.string.update) { _, _ ->
+                input.text.toString().trim().takeIf { it.startsWith("http") }?.let { url ->
+                    importXmlTv { xmlTvRepository.importUrl(url) }
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun importXmlTv(action: () -> Int) {
+        val row = xmlTvSettingRow
+        row?.root?.isEnabled = false
+        row?.value?.setText(R.string.xmltv_importing)
+        lifecycleScope.launch {
+            runCatching { withContext(Dispatchers.IO) { action() } }
+                .onSuccess { count ->
+                    row?.value?.text = xmlTvRepository.sourceLabel().orEmpty()
+                    Toast.makeText(
+                        this@DisplaySettingsActivity,
+                        getString(R.string.xmltv_import_complete, count),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                .onFailure { error ->
+                    row?.value?.text = xmlTvRepository.sourceLabel()
+                        ?: getString(R.string.not_configured_short)
+                    Toast.makeText(
+                        this@DisplaySettingsActivity,
+                        getString(R.string.xmltv_import_failed, error.message ?: error.javaClass.simpleName),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            row?.root?.isEnabled = true
+        }
+    }
+
     private fun installUpdate(apkUri: Uri) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
             pendingApkUri = apkUri
@@ -433,6 +555,11 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private fun timerLabel(value: Int) = if (value == 0) {
         getString(R.string.off)
     } else getString(R.string.minutes_value, value)
+
+    private fun cacheSizeLabel(bytes: Long): String = getString(
+        R.string.logo_cache_usage,
+        bytes / (1_024L * 1_024L),
+    )
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 

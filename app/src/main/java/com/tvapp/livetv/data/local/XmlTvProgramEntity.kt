@@ -18,6 +18,7 @@ data class XmlTvProgramEntity(
     val normalizedChannelId: String,
     val normalizedChannelName: String,
     val title: String,
+    val description: String,
     val startTimeMillis: Long,
     val endTimeMillis: Long,
 )

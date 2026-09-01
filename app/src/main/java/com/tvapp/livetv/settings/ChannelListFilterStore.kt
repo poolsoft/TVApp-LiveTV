@@ -2,7 +2,7 @@ package com.tvapp.livetv.settings
 
 import android.content.Context
 
-enum class ChannelSourceFilter { ALL, SATELLITE, IPTV }
+enum class ChannelSourceFilter { ALL, SATELLITE, RADIO, IPTV }
 
 data class ChannelListFilterPreferences(
     val source: ChannelSourceFilter = ChannelSourceFilter.ALL,

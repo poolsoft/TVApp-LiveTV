@@ -117,6 +117,7 @@
     <string name="iptv_vod_remote_hint">Play/Pause    Rewind/Fast forward 30 sec    Stop</string>
     <string name="home_recent_channels">Recently watched channels</string>
     <string name="home_watch_next_description">Live TV - Channel %1$s</string>
+    <string name="radio_channels">Radio channels</string>
     <string name="xmltv_alternative_epg">Alternative EPG (XMLTV)</string>
     <string name="xmltv_from_url">Add / update XMLTV URL</string>
     <string name="xmltv_from_file">Import XMLTV file</string>
@@ -125,6 +126,14 @@
     <string name="xmltv_importing">Reading XMLTV programs...</string>
     <string name="xmltv_import_complete">%1$d programs imported.</string>
     <string name="xmltv_cleared">Alternative EPG cleared.</string>
+    <string name="xmltv_import_failed">XMLTV import failed: %1$s</string>
+    <string name="not_configured_short">Not configured</string>
+    <string name="logo_cache_enabled">Channel logo cache</string>
+    <string name="logo_cache_size">Logo cache limit</string>
+    <string name="clear_logo_cache">Clear logo cache</string>
+    <string name="logo_cache_cleared">Logo cache cleared</string>
+    <string name="logo_cache_usage">%1$d MB used</string>
+    <string name="megabytes_value">%1$d MB</string>
     <string name="open_multi_view">Open this channel in Multi View</string>
     <string name="close_multi_view">Close Multi View</string>
     <string name="pip_not_supported">This device does not support Picture-in-Picture.</string>
@@ -252,6 +261,7 @@
     <string name="iptv_library_channel_count">%1$d items</string>
     <string name="iptv_library_short">IPTV</string>
     <string name="select_list_short">Select list</string>
+    <string name="filter_short">Filter</string>
     <string name="main_list_short">Main list</string>
     <string name="empty_action">Empty</string>
     <string name="iptv_library_filter_title">Show IPTV list</string>

@@ -62,12 +62,18 @@ class TifPlaybackController(private val tvView: TvView) {
     }
 
     fun setMuted(muted: Boolean) {
-        tvView.setStreamVolume(if (muted) 0f else 1f)
+        // Some MediaTek TIF implementations keep an exact zero volume on the
+        // hardware audio path after the TvView session is reset.
+        tvView.setStreamVolume(if (muted) SAFE_MUTED_VOLUME else 1f)
     }
 
     fun stop() {
         tracks = emptyList()
         tvView.setStreamVolume(1f)
         tvView.reset()
+    }
+
+    private companion object {
+        const val SAFE_MUTED_VOLUME = 0.001f
     }
 }

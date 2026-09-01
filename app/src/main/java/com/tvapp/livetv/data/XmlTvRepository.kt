@@ -88,7 +88,7 @@ class XmlTvRepository(context: Context) {
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
         return dao.programs(epgId.orEmpty(), name, start, end).map {
-            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis)
+            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
         }
     }
 
@@ -116,10 +116,14 @@ class XmlTvRepository(context: Context) {
                         val start = parseTime(parser.getAttributeValue(null, "start"))
                         val stop = parseTime(parser.getAttributeValue(null, "stop"))
                         var title = ""
+                        var description = ""
                         while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "programme")) {
                             parser.next()
-                            if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "title") {
-                                title = parser.nextText()
+                            if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                                when (parser.name) {
+                                    "title" -> title = parser.nextText()
+                                    "desc" -> description = parser.nextText()
+                                }
                             }
                         }
                         if (channelId.isNotBlank() && start > 0 && stop > start) {
@@ -130,6 +134,7 @@ class XmlTvRepository(context: Context) {
                                 normalizedChannelId = channelId.normalize(),
                                 normalizedChannelName = channelName.normalize(),
                                 title = title,
+                                description = description,
                                 startTimeMillis = start,
                                 endTimeMillis = stop,
                             )
@@ -166,6 +171,7 @@ class XmlTvRepository(context: Context) {
                         normalizedChannelId = channelId.normalize(),
                         normalizedChannelName = channelName.normalize(),
                         title = item.getString("title"),
+                        description = item.optString("description"),
                         startTimeMillis = item.getLong("start"),
                         endTimeMillis = item.getLong("end"),
                     )

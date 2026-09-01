@@ -8,6 +8,7 @@ data class ProgramSummary(
     val title: String,
     val startTimeMillis: Long,
     val endTimeMillis: Long,
+    val description: String = "",
 )
 
 data class NowNextPrograms(
@@ -37,6 +38,8 @@ class ProgramRepository(context: Context) {
             TvContract.Programs.COLUMN_TITLE,
             TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS,
             TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
+            TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            TvContract.Programs.COLUMN_LONG_DESCRIPTION,
         )
         val programs = contentResolver.query(
             TvContract.buildProgramsUriForChannel(
@@ -56,6 +59,12 @@ class ProgramRepository(context: Context) {
             val endIndex = cursor.getColumnIndexOrThrow(
                 TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
             )
+            val shortDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            )
+            val longDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_LONG_DESCRIPTION,
+            )
             buildList {
                 while (cursor.moveToNext() && size < MAX_PROGRAMS) {
                     add(
@@ -63,6 +72,10 @@ class ProgramRepository(context: Context) {
                             title = cursor.getString(titleIndex).orEmpty(),
                             startTimeMillis = cursor.getLong(startIndex),
                             endTimeMillis = cursor.getLong(endIndex),
+                            description = cursor.programDescription(
+                                longDescriptionIndex,
+                                shortDescriptionIndex,
+                            ),
                         ),
                     )
                 }
@@ -84,6 +97,8 @@ class ProgramRepository(context: Context) {
             TvContract.Programs.COLUMN_TITLE,
             TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS,
             TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
+            TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            TvContract.Programs.COLUMN_LONG_DESCRIPTION,
         )
         return contentResolver.query(
             TvContract.Programs.CONTENT_URI,
@@ -101,6 +116,12 @@ class ProgramRepository(context: Context) {
             val endIndex = cursor.getColumnIndexOrThrow(
                 TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
             )
+            val shortDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            )
+            val longDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_LONG_DESCRIPTION,
+            )
             buildMap {
                 while (cursor.moveToNext()) {
                     val channelId = cursor.getLong(channelIndex)
@@ -111,6 +132,10 @@ class ProgramRepository(context: Context) {
                             title = cursor.getString(titleIndex).orEmpty(),
                             startTimeMillis = cursor.getLong(startIndex),
                             endTimeMillis = cursor.getLong(endIndex),
+                            description = cursor.programDescription(
+                                longDescriptionIndex,
+                                shortDescriptionIndex,
+                            ),
                         ),
                     )
                 }
@@ -127,6 +152,8 @@ class ProgramRepository(context: Context) {
             TvContract.Programs.COLUMN_TITLE,
             TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS,
             TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
+            TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            TvContract.Programs.COLUMN_LONG_DESCRIPTION,
         )
         return contentResolver.query(
             TvContract.buildProgramsUriForChannel(
@@ -146,6 +173,12 @@ class ProgramRepository(context: Context) {
             val endIndex = cursor.getColumnIndexOrThrow(
                 TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
             )
+            val shortDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
+            )
+            val longDescriptionIndex = cursor.getColumnIndex(
+                TvContract.Programs.COLUMN_LONG_DESCRIPTION,
+            )
             buildList {
                 while (cursor.moveToNext()) {
                     add(
@@ -153,6 +186,10 @@ class ProgramRepository(context: Context) {
                             title = cursor.getString(titleIndex).orEmpty(),
                             startTimeMillis = cursor.getLong(startIndex),
                             endTimeMillis = cursor.getLong(endIndex),
+                            description = cursor.programDescription(
+                                longDescriptionIndex,
+                                shortDescriptionIndex,
+                            ),
                         ),
                     )
                 }
@@ -165,4 +202,13 @@ class ProgramRepository(context: Context) {
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
     }
+
+    private fun android.database.Cursor.programDescription(
+        longDescriptionIndex: Int,
+        shortDescriptionIndex: Int,
+    ): String = sequenceOf(longDescriptionIndex, shortDescriptionIndex)
+        .filter { it >= 0 && !isNull(it) }
+        .map { getString(it).orEmpty().trim() }
+        .firstOrNull { it.isNotBlank() }
+        .orEmpty()
 }

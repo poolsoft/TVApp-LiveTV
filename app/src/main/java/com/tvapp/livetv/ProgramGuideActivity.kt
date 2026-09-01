@@ -37,6 +37,8 @@ class ProgramGuideActivity : AppCompatActivity() {
     private var focusedChannel: LiveChannel? = null
     private var programs: List<ProgramSummary> = emptyList()
     private var focusJob: Job? = null
+    private var focusedChannelIndex = 0
+    private var focusedProgramIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +115,7 @@ class ProgramGuideActivity : AppCompatActivity() {
             }
             val preferredKey = intent.getStringExtra(EXTRA_CURRENT_SOURCE_KEY)
             val initial = loaded.firstOrNull { it.sourceKey == preferredKey } ?: loaded.first()
+            focusedChannelIndex = loaded.indexOf(initial).coerceAtLeast(0)
             channelAdapter.select(initial.sourceKey)
             loadPrograms(initial)
             focusChannel(initial.sourceKey)
@@ -121,6 +124,8 @@ class ProgramGuideActivity : AppCompatActivity() {
 
     private fun scheduleChannelPrograms(channel: LiveChannel) {
         focusedChannel = channel
+        focusedChannelIndex = channels.indexOfFirst { it.sourceKey == channel.sourceKey }
+            .coerceAtLeast(0)
         channelAdapter.select(channel.sourceKey)
         focusJob?.cancel()
         focusJob = lifecycleScope.launch {
@@ -151,16 +156,21 @@ class ProgramGuideActivity : AppCompatActivity() {
             if (loaded.isEmpty()) {
                 binding.detailTitle.setText(R.string.no_epg_data)
                 binding.detailTime.text = ""
+                binding.detailDescription.text = ""
+                binding.detailDescription.visibility = View.GONE
             } else {
                 val current = loaded.firstOrNull {
                     now in it.startTimeMillis until it.endTimeMillis
                 } ?: loaded.first()
+                focusedProgramIndex = loaded.indexOf(current).coerceAtLeast(0)
                 showProgramDetail(current)
             }
         }
     }
 
     private fun showProgramDetail(program: ProgramSummary) {
+        focusedProgramIndex = programs.indexOf(program).takeIf { it >= 0 }
+            ?: focusedProgramIndex
         binding.detailTitle.text = program.title.ifBlank { getString(R.string.untitled_program) }
         val format = SimpleDateFormat("HH:mm", Locale.getDefault())
         binding.detailTime.text = getString(
@@ -168,6 +178,12 @@ class ProgramGuideActivity : AppCompatActivity() {
             format.format(Date(program.startTimeMillis)),
             format.format(Date(program.endTimeMillis)),
         )
+        binding.detailDescription.text = program.description
+        binding.detailDescription.visibility = if (program.description.isBlank()) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
     }
 
     private fun openChannel(channel: LiveChannel) {
@@ -195,22 +211,33 @@ class ProgramGuideActivity : AppCompatActivity() {
     private fun moveRecyclerFocus(recyclerView: RecyclerView, offset: Int): Boolean {
         val count = recyclerView.adapter?.itemCount ?: 0
         if (count == 0) return false
-        val focusedView = recyclerView.findFocus()
-        val current = focusedView?.let { recyclerView.findContainingViewHolder(it) }
-            ?.bindingAdapterPosition
-            ?.takeIf { it != RecyclerView.NO_POSITION }
-            ?: 0
+        val current = if (recyclerView === binding.guideChannelList) {
+            focusedChannelIndex
+        } else {
+            focusedProgramIndex
+        }
         val target = (current + offset).coerceIn(0, count - 1)
+        if (recyclerView === binding.guideChannelList) {
+            focusedChannelIndex = target
+        } else {
+            focusedProgramIndex = target
+        }
         focusRecyclerPosition(recyclerView, target)
         return true
     }
 
     private fun focusRecyclerPosition(recyclerView: RecyclerView, position: Int) {
-        recyclerView.scrollToPosition(position)
+        (recyclerView.layoutManager as? LinearLayoutManager)
+            ?.scrollToPositionWithOffset(position, 0)
         recyclerView.postDelayed({
-            recyclerView.findViewHolderForAdapterPosition(position)
-                ?.itemView
-                ?.requestFocus()
+            val item = recyclerView.findViewHolderForAdapterPosition(position)?.itemView
+            if (item?.requestFocus() != true) {
+                recyclerView.postDelayed({
+                    recyclerView.findViewHolderForAdapterPosition(position)
+                        ?.itemView
+                        ?.requestFocus()
+                }, FOCUS_RETRY_DELAY_MS)
+            }
         }, FOCUS_AFTER_LAYOUT_DELAY_MS)
     }
 
@@ -230,7 +257,7 @@ class ProgramGuideActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> if (binding.guideChannelList.hasFocus() &&
                     programs.isNotEmpty()
                 ) {
-                    focusRecyclerPosition(binding.programList, 0)
+                    focusRecyclerPosition(binding.programList, focusedProgramIndex)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.programList.hasFocus()) {
@@ -267,6 +294,7 @@ class ProgramGuideActivity : AppCompatActivity() {
         private const val COLUMN_PADDING_FRACTION = 0.008f
         private const val CHANNEL_FOCUS_DELAY_MS = 250L
         private const val FOCUS_AFTER_LAYOUT_DELAY_MS = 100L
+        private const val FOCUS_RETRY_DELAY_MS = 80L
         private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
     }

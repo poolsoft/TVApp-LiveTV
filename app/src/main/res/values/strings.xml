@@ -117,6 +117,7 @@
     <string name="iptv_vod_remote_hint">⏯ Oynat/Duraklat    ⏪/⏩ 30 sn    ■ Durdur</string>
     <string name="home_recent_channels">Son izlenen kanallar</string>
     <string name="home_watch_next_description">Canlı TV · Kanal %1$s</string>
+    <string name="radio_channels">Radyo kanalları</string>
     <string name="xmltv_alternative_epg">Alternatif EPG (XMLTV)</string>
     <string name="xmltv_from_url">XMLTV URL ekle / güncelle</string>
     <string name="xmltv_from_file">XMLTV dosyasından içe aktar</string>
@@ -125,6 +126,14 @@
     <string name="xmltv_importing">XMLTV programları okunuyor…</string>
     <string name="xmltv_import_complete">%1$d program içe aktarıldı.</string>
     <string name="xmltv_cleared">Alternatif EPG temizlendi.</string>
+    <string name="xmltv_import_failed">XMLTV alınamadı: %1$s</string>
+    <string name="not_configured_short">Ayarlanmadı</string>
+    <string name="logo_cache_enabled">Kanal logosu önbelleği</string>
+    <string name="logo_cache_size">Logo önbelleği sınırı</string>
+    <string name="clear_logo_cache">Logo önbelleğini temizle</string>
+    <string name="logo_cache_cleared">Logo önbelleği temizlendi</string>
+    <string name="logo_cache_usage">%1$d MB kullanılıyor</string>
+    <string name="megabytes_value">%1$d MB</string>
     <string name="open_multi_view">Bu kanalı Multi View’da aç</string>
     <string name="close_multi_view">Multi View’u kapat</string>
     <string name="pip_not_supported">Bu cihaz Picture-in-Picture modunu desteklemiyor.</string>
@@ -252,6 +261,7 @@
     <string name="iptv_library_channel_count">%1$d içerik</string>
     <string name="iptv_library_short">IPTV</string>
     <string name="select_list_short">Liste seç</string>
+    <string name="filter_short">Filtre</string>
     <string name="main_list_short">Ana liste</string>
     <string name="empty_action">Boş</string>
     <string name="iptv_library_filter_title">IPTV listesini göster</string>
