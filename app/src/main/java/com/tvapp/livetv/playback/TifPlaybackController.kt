@@ -55,8 +55,13 @@ class TifPlaybackController(private val tvView: TvView) {
         tvView.selectTrack(TvTrackInfo.TYPE_SUBTITLE, trackId)
     }
 
+    fun setMuted(muted: Boolean) {
+        tvView.setStreamVolume(if (muted) 0f else 1f)
+    }
+
     fun stop() {
         tracks = emptyList()
+        tvView.setStreamVolume(1f)
         tvView.reset()
     }
 }

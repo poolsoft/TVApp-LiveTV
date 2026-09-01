@@ -8,7 +8,6 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
-import android.media.tv.TvInputManager
 import android.media.tv.TvTrackInfo
 import android.os.Bundle
 import android.graphics.Rect
@@ -88,7 +87,6 @@ class MainActivity : AppCompatActivity() {
         private const val LIST_HORIZONTAL_PADDING_FRACTION = 0.006f
         private const val EXPANDED_LIST_BOTTOM_PADDING_FRACTION = 0.11f
         private const val CLOCK_REFRESH_MS = 30_000L
-        private const val AUDIO_ONLY_CONFIRM_DELAY_MS = 3_000L
         private const val CHANNEL_PANEL_TIMEOUT_MS = 10_000L
         private const val INTERNAL_MINI_WIDTH_FRACTION = 0.38f
         private const val IPTV_CONTROLS_WIDTH_FRACTION = 0.68f
@@ -141,6 +139,10 @@ class MainActivity : AppCompatActivity() {
     private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
     private var multiViewActive = false
+    private var multiViewActiveSide = 0
+    private var multiViewSatelliteChannel: LiveChannel? = null
+    private var multiViewIptvChannel: LiveChannel? = null
+    private var multiViewLongPressJob: Job? = null
     private var iptvOverlayActive = false
     private var iptvGridActive = false
     private var gridActiveIndex = 0
@@ -160,7 +162,6 @@ class MainActivity : AppCompatActivity() {
     private var channelPanelExpanded = false
     private var numberInput = ""
     private var numberInputJob: Job? = null
-    private var audioOnlyJob: Job? = null
     private var focusedTuneJob: Job? = null
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
@@ -262,15 +263,12 @@ class MainActivity : AppCompatActivity() {
             debugLog.recordDebug("MAIN_STARTED_AFTER_BOOT")
         }
         playback.onTracksChanged = { applyPreferredTracks() }
-        playback.onVideoStateChanged = { available, reason ->
+        playback.onVideoStateChanged = { available, _ ->
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF) {
-                audioOnlyJob?.cancel()
                 when {
                     channel.isRadioChannel() -> updateAudioOnlyPanel(channel, true)
                     available -> updateAudioOnlyPanel(channel, false)
-                    reason == TvInputManager.VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY ->
-                        scheduleAudioOnlyPanel(channel, audioOnlyReason = true)
                     else -> updateAudioOnlyPanel(channel, false)
                 }
             }
@@ -512,7 +510,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLockedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
         focusedTuneJob?.cancel()
-        audioOnlyJob?.cancel()
         playback.stop()
         iptvPlayback.stop()
         lockedChannelRecordsHistory = recordHistory
@@ -546,7 +543,6 @@ class MainActivity : AppCompatActivity() {
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
         focusedTuneJob?.cancel()
-        audioOnlyJob?.cancel()
         currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
         updateChannelActionLabels()
@@ -985,15 +981,9 @@ class MainActivity : AppCompatActivity() {
         currentChannel?.let { channel ->
             val tracks = playback.allTracks()
             updateTechnicalBadges(channel, tracks)
-            val hasAudio = tracks.any { it.type == TvTrackInfo.TYPE_AUDIO }
-            val hasVideo = tracks.any { it.type == TvTrackInfo.TYPE_VIDEO }
             when {
                 channel.isRadioChannel() -> updateAudioOnlyPanel(channel, true)
-                hasVideo -> {
-                    audioOnlyJob?.cancel()
-                    updateAudioOnlyPanel(channel, false)
-                }
-                tracks.isNotEmpty() && hasAudio -> scheduleAudioOnlyPanel(channel)
+                else -> updateAudioOnlyPanel(channel, false)
             }
         }
         val preferredAudio = displayPreferences.preferredAudioLanguage
@@ -1110,21 +1100,6 @@ class MainActivity : AppCompatActivity() {
         binding.audioOnlyMessage.setText(
             if (radio) R.string.radio_broadcast else R.string.audio_only_program,
         )
-    }
-
-    private fun scheduleAudioOnlyPanel(
-        channel: LiveChannel,
-        audioOnlyReason: Boolean = false,
-    ) {
-        audioOnlyJob?.cancel()
-        audioOnlyJob = lifecycleScope.launch {
-            delay(AUDIO_ONLY_CONFIRM_DELAY_MS)
-            if (currentChannel?.sourceKey != channel.sourceKey) return@launch
-            val tracks = playback.allTracks()
-            val hasAudio = tracks.any { it.type == TvTrackInfo.TYPE_AUDIO }
-            val hasVideo = tracks.any { it.type == TvTrackInfo.TYPE_VIDEO }
-            updateAudioOnlyPanel(channel, (hasAudio || audioOnlyReason) && !hasVideo)
-        }
     }
 
     private fun displayLanguage(code: String): String = Locale.forLanguageTag(code)
@@ -1519,6 +1494,7 @@ class MainActivity : AppCompatActivity() {
         iptvLibraryChannels = emptyList()
         binding.sourceFilterRow.visibility = View.GONE
         binding.advancedFilterRow.visibility = View.GONE
+        updateChannelListModeIcon()
         updateChannelActionLabels()
         binding.channelListTitle.text = listOfNotNull(
             sourceName,
@@ -2071,44 +2047,141 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startMultiView(channel: LiveChannel) {
-        val primary = currentChannel ?: return
-        if (channel.sourceKey == primary.sourceKey) return
+        val playing = currentChannel ?: return
+        val satellite = listOf(playing, channel).firstOrNull {
+            it.source == LiveChannel.Source.TIF
+        }
+        val iptv = listOf(playing, channel).firstOrNull {
+            it.source == LiveChannel.Source.IPTV
+        }
+        if (satellite == null || iptv == null) {
+            Toast.makeText(this, R.string.multiview_requires_satellite_iptv, Toast.LENGTH_LONG).show()
+            return
+        }
         stopIptvOverlay()
+        if (iptvGridActive) stopIptvGrid(resumePrevious = true)
+        if (currentChannel?.sourceKey != satellite.sourceKey) {
+            playSelectedChannel(satellite, recordHistory = false)
+        }
         multiViewActive = true
         internalMiniPlayerActive = false
+        multiViewActiveSide = 0
+        multiViewSatelliteChannel = satellite
+        multiViewIptvChannel = iptv
         val screenWidth = resources.displayMetrics.widthPixels
         val halfWidth = screenWidth / 2
         resizePlayer(binding.tvView, halfWidth, Gravity.START)
-        resizePlayer(binding.iptvPlayerView, halfWidth, Gravity.START)
-        when (channel.source) {
-            LiveChannel.Source.TIF -> {
-                binding.secondaryIptvPlayerView.visibility = View.GONE
-                binding.secondaryTvView.visibility = View.VISIBLE
-                resizePlayer(binding.secondaryTvView, halfWidth, Gravity.END)
-                secondaryPlayback.play(channel)
-            }
-            LiveChannel.Source.IPTV -> {
-                binding.secondaryTvView.visibility = View.GONE
-                binding.secondaryIptvPlayerView.visibility = View.VISIBLE
-                resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
-                secondaryIptvPlayback.play(channel)
-                secondaryIptvPlayback.setMuted(true)
-            }
-        }
+        binding.iptvPlayerView.visibility = View.GONE
+        secondaryPlayback.stop()
+        binding.secondaryTvView.visibility = View.GONE
+        binding.secondaryIptvPlayerView.visibility = View.VISIBLE
+        resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
+        secondaryIptvPlayback.play(iptv)
+        resizeMultiViewFocusBorders(halfWidth)
+        updateMultiViewFocus()
         hideChannelPanel()
         showInfoBar()
-        debugLog.recordDebug("MULTIVIEW_START | primary=${primary.sourceKey}, secondary=${channel.sourceKey}")
+        debugLog.recordDebug(
+            "MULTIVIEW_START | satellite=${satellite.sourceKey}, iptv=${iptv.sourceKey}",
+        )
+    }
+
+    private fun updateMultiViewFocus() {
+        if (!multiViewActive) return
+        playback.setMuted(multiViewActiveSide != 0)
+        secondaryIptvPlayback.setMuted(multiViewActiveSide != 1)
+        binding.multiViewLeftFocus.visibility = if (multiViewActiveSide == 0) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        binding.multiViewRightFocus.visibility = if (multiViewActiveSide == 1) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        val focused = if (multiViewActiveSide == 0) {
+            multiViewSatelliteChannel
+        } else {
+            multiViewIptvChannel
+        }
+        focused?.let { channel ->
+            updateTechnicalBadges(
+                channel,
+                if (channel.source == LiveChannel.Source.TIF) playback.allTracks() else emptyList(),
+            )
+            showInfoBarForChannel(channel)
+        }
+        debugLog.recordDebug(
+            "MULTIVIEW_FOCUS | side=${if (multiViewActiveSide == 0) "satellite" else "iptv"}",
+        )
+    }
+
+    private fun resizeMultiViewFocusBorders(width: Int) {
+        listOf(
+            binding.multiViewLeftFocus to Gravity.START,
+            binding.multiViewRightFocus to Gravity.END,
+        ).forEach { (view, gravityValue) ->
+            view.layoutParams = (view.layoutParams as FrameLayout.LayoutParams).apply {
+                this.width = width
+                height = FrameLayout.LayoutParams.MATCH_PARENT
+                gravity = gravityValue
+            }
+        }
+    }
+
+    private fun zapMultiViewSatellite(offset: Int) {
+        val satelliteChannels = channels.filter { it.source == LiveChannel.Source.TIF }
+        val current = multiViewSatelliteChannel ?: return
+        ChannelNavigator.adjacent(satelliteChannels, current.sourceKey, offset)?.let { next ->
+            multiViewSatelliteChannel = next
+            playSelectedChannel(next, recordHistory = false)
+            val halfWidth = resources.displayMetrics.widthPixels / 2
+            resizePlayer(binding.tvView, halfWidth, Gravity.START)
+            updateMultiViewFocus()
+            debugLog.recordDebug("MULTIVIEW_SATELLITE_CHANGE | channel=${next.sourceKey}")
+        }
+    }
+
+    private fun showMultiViewIptvPicker() {
+        val choices = channels.asSequence()
+            .filter { it.source == LiveChannel.Source.IPTV }
+            .filter { it.iptvContentType != IptvLibraryContentType.VOD.name }
+            .distinctBy { it.sourceKey }
+            .toList()
+        if (choices.isEmpty()) {
+            Toast.makeText(this, R.string.iptv_pip_no_channels, Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.multiview_select_iptv)
+            .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
+                val selected = choices[which]
+                multiViewIptvChannel = selected
+                secondaryIptvPlayback.play(selected)
+                updateMultiViewFocus()
+                debugLog.recordDebug("MULTIVIEW_IPTV_CHANGE | channel=${selected.sourceKey}")
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     private fun stopMultiView() {
         if (!multiViewActive) return
         multiViewActive = false
+        multiViewLongPressJob?.cancel()
+        playback.setMuted(false)
         secondaryPlayback.stop()
         secondaryIptvPlayback.stop()
+        secondaryIptvPlayback.setMuted(false)
         binding.secondaryTvView.visibility = View.GONE
         binding.secondaryIptvPlayerView.visibility = View.GONE
+        binding.multiViewLeftFocus.visibility = View.GONE
+        binding.multiViewRightFocus.visibility = View.GONE
         resizePlayer(binding.tvView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
         resizePlayer(binding.iptvPlayerView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
+        multiViewSatelliteChannel = null
+        multiViewIptvChannel = null
         currentChannel?.let(::showInfoBarForChannel)
         debugLog.recordDebug("MULTIVIEW_STOP")
     }
@@ -2246,8 +2319,9 @@ class MainActivity : AppCompatActivity() {
         binding.satelliteFilter.isSelected = sourceFilter == ChannelSourceFilter.SATELLITE
         binding.iptvFilter.isSelected = sourceFilter == ChannelSourceFilter.IPTV
         binding.favoriteFilter.isSelected = showFavorites
-        binding.sourceFilterRow.visibility = View.VISIBLE
+        binding.sourceFilterRow.visibility = View.GONE
         binding.channelListTitle.setText(R.string.channel_list)
+        updateChannelListModeIcon()
         updateChannelActionLabels()
         val filtered = panelChannels()
         currentChannel = filtered.firstOrNull { it.sourceKey == currentChannel?.sourceKey }
@@ -2282,8 +2356,22 @@ class MainActivity : AppCompatActivity() {
             if (library) R.string.select_list_short else R.string.channel_source_short,
         )
         binding.blueActionLabel.setText(
-            if (library) R.string.main_list_short else R.string.iptv_library_short,
+            R.string.empty_action,
         )
+    }
+
+    private fun updateChannelListModeIcon() {
+        val (icon, description) = when {
+            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ->
+                R.drawable.ic_iptv_library to R.string.iptv_library
+            sourceFilter == ChannelSourceFilter.SATELLITE ->
+                R.drawable.ic_source_tif to R.string.satellite_channels
+            sourceFilter == ChannelSourceFilter.IPTV ->
+                R.drawable.ic_source_iptv to R.string.iptv_filter
+            else -> R.drawable.ic_list to R.string.all_channels
+        }
+        binding.channelListModeIcon.setImageResource(icon)
+        binding.channelListModeIcon.contentDescription = getString(description)
     }
 
     private fun toggleChannelPanel() {
@@ -2298,9 +2386,7 @@ class MainActivity : AppCompatActivity() {
         }
         channelPanelExpanded = expanded
         binding.channelPanel.visibility = View.VISIBLE
-        binding.sourceFilterRow.visibility = if (
-            channelPanelContent == ChannelPanelContent.NORMAL
-        ) View.VISIBLE else View.GONE
+        binding.sourceFilterRow.visibility = View.GONE
         binding.advancedFilterRow.visibility = if (
             expanded && channelPanelContent == ChannelPanelContent.NORMAL
         ) View.VISIBLE else View.GONE
@@ -2451,17 +2537,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun cycleSourceFilter(direction: Int) {
-        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) return
-        val filters = listOf(
-            ChannelSourceFilter.ALL,
-            ChannelSourceFilter.SATELLITE,
-            ChannelSourceFilter.IPTV,
-        )
-        val currentIndex = filters.indexOf(sourceFilter).coerceAtLeast(0)
-        val targetIndex = (currentIndex + direction + filters.size) % filters.size
+    private fun cycleChannelListMode() {
         focusedTuneJob?.cancel()
-        applyChannelFilter(source = filters[targetIndex])
+        when {
+            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> applyChannelFilter(
+                showFavorites = false,
+                source = ChannelSourceFilter.ALL,
+            )
+            sourceFilter == ChannelSourceFilter.ALL -> applyChannelFilter(
+                showFavorites = false,
+                source = ChannelSourceFilter.SATELLITE,
+            )
+            sourceFilter == ChannelSourceFilter.SATELLITE -> applyChannelFilter(
+                showFavorites = false,
+                source = ChannelSourceFilter.IPTV,
+            )
+            else -> openSavedIptvLibrary()
+        }
     }
 
     private fun pageChannelList(direction: Int) {
@@ -2579,6 +2671,49 @@ class MainActivity : AppCompatActivity() {
                     KeyEvent.KEYCODE_DPAD_UP,
                     KeyEvent.KEYCODE_DPAD_DOWN -> moveIptvGridFocus(event.keyCode)
                     }
+                }
+            }
+            return true
+        }
+        if (multiViewActive) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    multiViewLongPressJob?.cancel()
+                    multiViewActiveSide = 0
+                    updateMultiViewFocus()
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    multiViewLongPressJob?.cancel()
+                    multiViewActiveSide = 1
+                    updateMultiViewFocus()
+                }
+                KeyEvent.KEYCODE_CHANNEL_UP -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    multiViewLongPressJob?.cancel()
+                    zapMultiViewSatellite(1)
+                }
+                KeyEvent.KEYCODE_CHANNEL_DOWN -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    multiViewLongPressJob?.cancel()
+                    zapMultiViewSatellite(-1)
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    if (
+                        multiViewActiveSide == 1 &&
+                        event.action == KeyEvent.ACTION_DOWN &&
+                        event.repeatCount == 0
+                    ) {
+                        multiViewLongPressJob?.cancel()
+                        multiViewLongPressJob = lifecycleScope.launch {
+                            delay(ViewConfiguration.getLongPressTimeout().toLong())
+                            showMultiViewIptvPicker()
+                        }
+                    } else if (event.action == KeyEvent.ACTION_UP) {
+                        multiViewLongPressJob?.cancel()
+                    }
+                }
+                KeyEvent.KEYCODE_BACK -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    multiViewLongPressJob?.cancel()
+                    stopMultiView()
                 }
             }
             return true
@@ -2723,25 +2858,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-                        showIptvLibraryFilterDialog()
-                    } else {
-                        cycleSourceFilter(1)
-                    }
+                    cycleChannelListMode()
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_PROG_BLUE -> if (
                     binding.channelPanel.visibility == View.VISIBLE
                 ) {
-                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-                        applyChannelFilter(
-                            showFavorites = false,
-                            source = ChannelSourceFilter.ALL,
-                        )
-                    } else {
-                        openSavedIptvLibrary()
-                    }
+                    Unit
                 } else {
                     openDisplaySettings()
                 }
@@ -2783,7 +2907,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
         numberInputJob?.cancel()
-        audioOnlyJob?.cancel()
         focusedTuneJob?.cancel()
         infoBarJob?.cancel()
         channelPanelJob?.cancel()
