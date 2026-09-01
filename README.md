@@ -120,8 +120,19 @@ doğrulayamaz; desteklenmeyen donanımda ana yayın korunur.
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-.\gradlew.bat assembleDebug
+.\gradlew.bat assembleLocalDebug
 ```
+
+Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `play` varyantıdır. Play için imzalı
+Android App Bundle şu komutla hazırlanır:
+
+```powershell
+.\gradlew.bat bundlePlayRelease
+```
+
+`local`, mevcut `com.tvapp.livetv` paket kimliğini ve uygulama içi GitHub güncelleyicisini
+korur. `play`, `com.tvapp.livetv.play` paket kimliğiyle ayrı kurulur; harici APK güncelleme
+izni içermez ve Ayarlar ekranında yalnızca kurulu sürümü gösterir.
 
 Sürüm numarası kökteki `.build` dosyasından okunur. Geliştirme döneminde bu değer sabittir;
 yerel APK ile Action APK'sı aynı `versionCode` ve aynı imzayı kullanır. `.build` üretim sürüm

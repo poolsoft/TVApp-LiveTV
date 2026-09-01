@@ -189,8 +189,8 @@ birlikte tekrar doğrulanmalıdır.
 
 ## Google Play yayın öncesi kontrol listesi
 
-1. Play varyantından uygulama içi GitHub APK güncelleyicisini ve
-   `REQUEST_INSTALL_PACKAGES` iznini kaldırın. Güncellemeleri Google Play'e bırakın.
+1. `play` varyantını `bundlePlayRelease` ile üretin. Bu varyant uygulama içi GitHub APK
+   güncelleyicisini ve `REQUEST_INSTALL_PACKAGES` iznini içermez.
 2. Gizlilik politikası URL'sini ekleyin ve veri güvenliği yanıtlarını yayın APK'sıyla
    karşılaştırın.
 3. Uygulamanın içerik veya IPTV aboneliği sağlamadığını mağaza açıklamasında koruyun.
@@ -207,4 +207,3 @@ birlikte tekrar doğrulanmalıdır.
    `[DESTEK_EPOSTASI]`, `[WEB_SITESI]`, `[GIZLILIK_POLITIKASI_URL]`.
 10. Üretim sürümünde sürüm kodu politikasını etkinleştirin ve release anahtarını güvenli
     yedekleyin.
-

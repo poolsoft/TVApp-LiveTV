@@ -35,7 +35,21 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
-        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("local") {
+            dimension = "distribution"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
+        }
+        create("play") {
+            dimension = "distribution"
+            applicationIdSuffix = ".play"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+        }
     }
 
     buildFeatures {
@@ -104,14 +118,16 @@ ksp {
 
 val exportNamedDebugApk by tasks.registering {
     doLast {
-        val source = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk").get().asFile
+        val source = layout.buildDirectory.file(
+            "outputs/apk/local/debug/app-local-debug.apk",
+        ).get().asFile
         val destination = layout.buildDirectory.file("TVApp.apk").get().asFile
         source.copyTo(destination, overwrite = true)
     }
 }
 
 tasks.configureEach {
-    if (name == "assembleDebug") {
+    if (name == "assembleLocalDebug") {
         finalizedBy(exportNamedDebugApk)
     }
 }

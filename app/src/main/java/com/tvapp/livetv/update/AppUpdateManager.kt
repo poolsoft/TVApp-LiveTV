@@ -23,6 +23,7 @@ data class AppUpdate(
 
 class AppUpdateManager(private val context: Context) {
     suspend fun check(): AppUpdate? = withContext(Dispatchers.IO) {
+        check(BuildConfig.SELF_UPDATE_ENABLED) { "External updates are disabled for this build" }
         val json = readUrl(BuildConfig.UPDATE_MANIFEST_URL, MAX_MANIFEST_BYTES)
         val root = JSONObject(json)
         val update = AppUpdate(
@@ -40,6 +41,7 @@ class AppUpdateManager(private val context: Context) {
     }
 
     suspend fun download(update: AppUpdate): Uri = withContext(Dispatchers.IO) {
+        check(BuildConfig.SELF_UPDATE_ENABLED) { "External updates are disabled for this build" }
         require(update.apkUrl.startsWith("https://")) { "Only HTTPS update URLs are accepted" }
         val directory = File(context.filesDir, "updates").apply { mkdirs() }
         val target = File(directory, "TVApp-${update.versionCode}.apk")
@@ -59,9 +61,12 @@ class AppUpdateManager(private val context: Context) {
         FileProvider.getUriForFile(context, "${context.packageName}.updates", target)
     }
 
-    fun installerIntent(apkUri: Uri): Intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(apkUri, APK_MIME_TYPE)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    fun installerIntent(apkUri: Uri): Intent {
+        check(BuildConfig.SELF_UPDATE_ENABLED) { "External updates are disabled for this build" }
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, APK_MIME_TYPE)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     }
 
     private fun readUrl(url: String, maximumBytes: Int): String {

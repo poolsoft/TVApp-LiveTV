@@ -169,11 +169,16 @@ class DisplaySettingsActivity : AppCompatActivity() {
             getString(R.string.iptv_input_sync),
             ::syncIptvInput,
         )
-        action(
-            R.string.check_for_updates,
-            getString(R.string.current_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-            ::checkForUpdates,
+        val currentVersion = getString(
+            R.string.current_version,
+            BuildConfig.VERSION_NAME,
+            BuildConfig.VERSION_CODE,
         )
+        if (BuildConfig.SELF_UPDATE_ENABLED) {
+            action(R.string.check_for_updates, currentVersion, ::checkForUpdates)
+        } else {
+            info(R.string.version_label, currentVersion)
+        }
     }
 
     private fun section(titleRes: Int) {
@@ -309,6 +314,13 @@ class DisplaySettingsActivity : AppCompatActivity() {
         val row = settingRow(titleRes)
         row.value.text = initialValue
         row.root.setOnClickListener { clicked(row) }
+    }
+
+    private fun info(titleRes: Int, value: String) {
+        val row = settingRow(titleRes)
+        row.value.text = value
+        row.root.isFocusable = false
+        row.root.isClickable = false
     }
 
     private fun checkForUpdates(row: SettingRow) {
