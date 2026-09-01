@@ -126,6 +126,8 @@ class MainActivity : AppCompatActivity() {
     private var channels: List<LiveChannel> = emptyList()
     private var currentPrograms: Map<Long, ProgramSummary> = emptyMap()
     private var currentChannel: LiveChannel? = null
+    private var activePassthroughInputId: String? = null
+    private var resumeTifPlayback = false
     private var channelPanelContent = ChannelPanelContent.NORMAL
     private var iptvLibraryChannels: List<LiveChannel> = emptyList()
     private var iptvLibrarySourceId: Long? = null
@@ -543,6 +545,7 @@ class MainActivity : AppCompatActivity() {
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
         focusedTuneJob?.cancel()
+        activePassthroughInputId = null
         currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
         updateChannelActionLabels()
@@ -1170,6 +1173,74 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDisplaySettings() {
         displaySettings.launch(Intent(this, DisplaySettingsActivity::class.java))
+    }
+
+    private fun showPhysicalInputSelector() {
+        val inputs = repository.physicalInputs()
+        if (inputs.isEmpty()) {
+            Toast.makeText(this, R.string.no_physical_inputs, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = inputs.map { input ->
+            val name = input.loadLabel(this).toString().ifBlank { input.id.substringAfterLast('/') }
+            val type = when (input.type) {
+                TvInputInfo.TYPE_TUNER -> getString(R.string.input_type_tv)
+                TvInputInfo.TYPE_HDMI -> getString(R.string.input_type_hdmi)
+                TvInputInfo.TYPE_COMPOSITE -> getString(R.string.input_type_av)
+                TvInputInfo.TYPE_COMPONENT -> getString(R.string.input_type_component)
+                TvInputInfo.TYPE_DISPLAY_PORT -> getString(R.string.input_type_display_port)
+                else -> getString(R.string.input_type_external)
+            }
+            "$name  ·  $type"
+        }.toTypedArray()
+        val selected = inputs.indexOfFirst { input ->
+            input.id == activePassthroughInputId ||
+                (activePassthroughInputId == null && input.id == currentChannel?.inputId)
+        }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.physical_inputs)
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                dialog.dismiss()
+                selectPhysicalInput(inputs[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun selectPhysicalInput(input: TvInputInfo) {
+        hideChannelPanel()
+        binding.infoBar.visibility = View.GONE
+        debugLog.recordDebug("PHYSICAL_INPUT_SELECT | id=${input.id}, type=${input.type}")
+        if (!input.isPassthroughInput && input.type == TvInputInfo.TYPE_TUNER) {
+            val channel = currentChannel?.takeIf {
+                it.source == LiveChannel.Source.TIF && it.inputId == input.id
+            } ?: channels.firstOrNull {
+                it.source == LiveChannel.Source.TIF && it.inputId == input.id
+            }
+            if (channel == null) {
+                Toast.makeText(this, R.string.input_has_no_channels, Toast.LENGTH_SHORT).show()
+                return
+            }
+            playback.stop()
+            selectChannel(channel, recordHistory = false)
+            return
+        }
+        focusedTuneJob?.cancel()
+        iptvPlayback.stop()
+        playback.stop()
+        binding.iptvPlayerView.visibility = View.GONE
+        binding.audioOnlyPanel.visibility = View.GONE
+        binding.parentalLockPanel.visibility = View.GONE
+        binding.statusPanel.visibility = View.GONE
+        binding.tvView.visibility = View.VISIBLE
+        activePassthroughInputId = input.id
+        runCatching { playback.playPassthrough(input.id) }
+            .onFailure { error ->
+                debugLog.recordDebug(
+                    "PHYSICAL_INPUT_FAILURE | id=${input.id}, ${error.javaClass.name}: ${error.message}",
+                )
+                showPlaybackError(null, error.message ?: error.javaClass.simpleName)
+            }
     }
 
     private fun enterTvPictureInPicture() {
@@ -2845,7 +2916,7 @@ class MainActivity : AppCompatActivity() {
                         openChannelEditor()
                     }
                 } else {
-                    return super.dispatchKeyEvent(event)
+                    showPhysicalInputSelector()
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> {
                     if (
@@ -2875,6 +2946,7 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_CAPTIONS -> showSubtitleTracks()
                 KeyEvent.KEYCODE_SETTINGS,
                 KeyEvent.KEYCODE_TV_CONTENTS_MENU -> openDisplaySettings()
+                KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
                 KeyEvent.KEYCODE_GUIDE,
                 KeyEvent.KEYCODE_INFO -> openProgramGuide()
                 KeyEvent.KEYCODE_MENU -> toggleChannelPanel()
@@ -2898,6 +2970,35 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!resumeTifPlayback) return
+        resumeTifPlayback = false
+        val passthroughInputId = activePassthroughInputId
+        binding.tvView.postDelayed({
+            if (passthroughInputId != null) {
+                debugLog.recordDebug("TIF_SESSION_RESUME | passthrough=$passthroughInputId")
+                playback.playPassthrough(passthroughInputId)
+            } else {
+                currentChannel?.takeIf { it.source == LiveChannel.Source.TIF }?.let { channel ->
+                    debugLog.recordDebug("TIF_SESSION_RESUME | channel=${channel.sourceKey}")
+                    playback.play(channel)
+                }
+            }
+        }, 250L)
+    }
+
+    override fun onStop() {
+        if (!isChangingConfigurations &&
+            (activePassthroughInputId != null || currentChannel?.source == LiveChannel.Source.TIF)
+        ) {
+            resumeTifPlayback = true
+            debugLog.recordDebug("TIF_SESSION_RELEASE | background")
+            playback.stop()
+        }
+        super.onStop()
     }
 
     override fun onDestroy() {

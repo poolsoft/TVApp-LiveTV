@@ -19,6 +19,8 @@ class ChannelRepository(context: Context) {
 
     fun tunerInputs(): List<TvInputInfo> = tifRepository.tunerInputs()
 
+    fun physicalInputs(): List<TvInputInfo> = tifRepository.physicalInputs()
+
     fun tunerSetupIntent(): Intent? = tunerInputs()
         .firstNotNullOfOrNull { input -> input.createSetupIntent() }
 

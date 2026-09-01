@@ -59,6 +59,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - `INFO`: Program rehberini açar.
 - `AUDIO`: Yayındaki ses dilini/parçasını seçer.
 - `SUBT/CAPTIONS`: Altyazı parçasını seçer veya kapatır.
+- `INPUT/SOURCE`: DTV/ATV ve HDMI/AV gibi fiziksel TV girişlerini açar.
+- Ana yayın ekranında `Kırmızı`: Kumanda `INPUT/SOURCE` tuşunu uygulamaya iletmiyorsa TV girişlerini açar.
 - Kanal listesinde `Kırmızı`: Kanal düzenleyiciyi açar.
 - Normal kanal listesinde `Mavi`: Son kullanılan filtreyle tam IPTV listesini açar.
 - Tam IPTV listesinde `Kırmızı`: IPTV kaynak yönetimini açar.

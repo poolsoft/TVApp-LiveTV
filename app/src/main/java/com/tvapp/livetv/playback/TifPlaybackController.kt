@@ -1,6 +1,7 @@
 package com.tvapp.livetv.playback
 
 import android.media.tv.TvTrackInfo
+import android.media.tv.TvContract
 import android.media.tv.TvView
 import android.net.Uri
 import com.tvapp.livetv.model.LiveChannel
@@ -35,6 +36,11 @@ class TifPlaybackController(private val tvView: TvView) {
         require(channel.source == LiveChannel.Source.TIF)
         tracks = emptyList()
         tvView.tune(channel.inputId, Uri.parse(channel.uri))
+    }
+
+    fun playPassthrough(inputId: String) {
+        tracks = emptyList()
+        tvView.tune(inputId, TvContract.buildChannelUriForPassthroughInput(inputId))
     }
 
     fun audioTracks(): List<TvTrackInfo> = tracks.filter { it.type == TvTrackInfo.TYPE_AUDIO }

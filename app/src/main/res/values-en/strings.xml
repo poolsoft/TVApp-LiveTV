@@ -276,6 +276,15 @@
     <string name="iptv_source_name">Playlist name</string>
     <string name="iptv_source_name_required">Playlist name cannot be empty.</string>
     <string name="channel_source_short">Source</string>
+    <string name="physical_inputs">TV inputs</string>
+    <string name="no_physical_inputs">No physical TV input is available.</string>
+    <string name="input_has_no_channels">No available channel was found for this tuner input.</string>
+    <string name="input_type_tv">TV</string>
+    <string name="input_type_hdmi">HDMI</string>
+    <string name="input_type_av">AV</string>
+    <string name="input_type_component">Component</string>
+    <string name="input_type_display_port">DisplayPort</string>
+    <string name="input_type_external">External input</string>
     <string name="multiview_requires_satellite_iptv">Select one satellite and one IPTV channel for multiview.</string>
     <string name="multiview_select_iptv">Select multiview IPTV channel</string>
     <string name="iptv_grid_maximum">You can select up to 4 channels.</string>
