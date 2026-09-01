@@ -6,6 +6,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.View
+import android.text.InputType
+import android.widget.EditText
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,8 +62,15 @@ class IptvSourcesActivity : AppCompatActivity() {
             if (url.isBlank()) {
                 binding.importStatus.setText(R.string.iptv_url_required)
             } else {
-                runImport("IPTV_URL_IMPORT", url, openSelectionAfter = true) {
-                    repository.importUrl(url)
+                val defaultName = Uri.parse(url).lastPathSegment
+                    ?.substringBeforeLast('.')
+                    ?.takeIf(String::isNotBlank)
+                    ?: Uri.parse(url).host
+                    ?: "IPTV"
+                promptSourceName(defaultName) { name ->
+                    runImport("IPTV_URL_IMPORT", url, openSelectionAfter = true) {
+                        repository.importUrl(url, name)
+                    }
                 }
             }
         }
@@ -103,10 +112,38 @@ class IptvSourcesActivity : AppCompatActivity() {
     }
 
     private fun importDocument(uri: Uri) {
-        val name = documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
-        runImport("IPTV_FILE_IMPORT", uri.toString(), openSelectionAfter = true) {
-            repository.importDocument(uri, name)
+        val defaultName = documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
+        promptSourceName(defaultName) { name ->
+            runImport("IPTV_FILE_IMPORT", uri.toString(), openSelectionAfter = true) {
+                repository.importDocument(uri, name)
+            }
         }
+    }
+
+    private fun promptSourceName(defaultName: String, onConfirmed: (String) -> Unit) {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setText(defaultName)
+            selectAll()
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_source_name)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val name = input.text.toString().trim()
+                if (name.isBlank()) {
+                    input.error = getString(R.string.iptv_source_name_required)
+                } else {
+                    dialog.dismiss()
+                    onConfirmed(name)
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun showSourceActions(summary: IptvSourceSummary) {

@@ -131,6 +131,18 @@ class DisplaySettingsActivity : AppCompatActivity() {
         toggle(R.string.show_channel_source_badge, current.showChannelSourceBadge) {
             update { copy(showChannelSourceBadge = it) }
         }
+        toggle(R.string.channel_focus_auto_tune, current.channelFocusAutoTune) {
+            update { copy(channelFocusAutoTune = it) }
+        }
+        val focusDelays = listOf(500, 1_000, 1_500, 2_000, 3_000, 5_000)
+        val focusDelayIndex = focusDelays.indices.minByOrNull {
+            abs(focusDelays[it] - current.channelFocusTuneDelayMillis)
+        } ?: 2
+        choice(
+            R.string.channel_focus_tune_delay,
+            focusDelays.map(::millisecondsLabel),
+            focusDelayIndex,
+        ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
 
         section(R.string.playback_settings)
         toggle(R.string.subtitles_default, current.subtitlesEnabled) {
@@ -245,6 +257,12 @@ class DisplaySettingsActivity : AppCompatActivity() {
             }
         }
         row.value.text = "<  ${label(number)}  >"
+    }
+
+    private fun millisecondsLabel(value: Int): String = if (value % 1_000 == 0) {
+        getString(R.string.seconds_value, value / 1_000)
+    } else {
+        getString(R.string.milliseconds_value, value)
     }
 
     private fun settingRow(titleRes: Int): SettingRow {

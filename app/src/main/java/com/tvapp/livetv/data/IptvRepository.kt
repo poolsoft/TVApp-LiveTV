@@ -141,7 +141,7 @@ class IptvRepository(context: Context) {
             iptvContentType = contentType,
         )
 
-    suspend fun importUrl(location: String): IptvImportResult {
+    suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
         val normalized = location.trim()
         require(normalized.startsWith("http://") || normalized.startsWith("https://"))
         val connection = URL(normalized).openConnection() as HttpURLConnection
@@ -157,11 +157,12 @@ class IptvRepository(context: Context) {
             val compressed = connection.contentEncoding.equals("gzip", ignoreCase = true) ||
                 normalized.substringBefore('?').endsWith(".gz", ignoreCase = true)
             val input = if (compressed) GZIPInputStream(connection.inputStream) else connection.inputStream
-            val name = Uri.parse(normalized).lastPathSegment
+            val derivedName = Uri.parse(normalized).lastPathSegment
                 ?.substringBeforeLast('.')
                 ?.takeIf(String::isNotBlank)
                 ?: Uri.parse(normalized).host
                 ?: "IPTV"
+            val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: derivedName
             return input.use { importStream(normalized, KIND_URL, name, it) }
         } finally {
             connection.disconnect()
@@ -176,7 +177,7 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
-        KIND_URL -> importUrl(source.location)
+        KIND_URL -> importUrl(source.location, source.name)
         KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name)
         else -> error("Bilinmeyen IPTV kaynak türü: ${source.kind}")
     }

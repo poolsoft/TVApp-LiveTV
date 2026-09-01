@@ -146,6 +146,9 @@
     <string name="show_channel_program">Program title</string>
     <string name="show_channel_progress">Program progress</string>
     <string name="show_channel_source_badge">Source badge (TIF / IPTV)</string>
+    <string name="channel_focus_auto_tune">Auto-tune focused channel</string>
+    <string name="channel_focus_tune_delay">Auto-tune delay</string>
+    <string name="milliseconds_value">%1$d ms</string>
     <string name="channel_sources">Select channel sources</string>
     <string name="no_tuner_sources">No tuner sources available.</string>
     <string name="channel_panel_position">Channel list position</string>
@@ -265,6 +268,14 @@
     <string name="iptv_grid">Grid</string>
     <string name="iptv_grid_title">Select IPTV grid channels</string>
     <string name="iptv_grid_start">Open grid</string>
+    <string name="iptv_grid_start_green">Green · Open grid</string>
+    <string name="close_red">Red · Close</string>
+    <string name="grid_channel_actions">Grid channel</string>
+    <string name="grid_channel_change">Change</string>
+    <string name="grid_channel_close">Close</string>
+    <string name="iptv_source_name">Playlist name</string>
+    <string name="iptv_source_name_required">Playlist name cannot be empty.</string>
+    <string name="channel_source_short">Source</string>
     <string name="iptv_grid_maximum">You can select up to 4 channels.</string>
     <string name="iptv_grid_empty">Select at least one channel for the grid.</string>
     <string name="iptv_grid_no_channels">No live IPTV channels are available for the grid.</string>

@@ -146,6 +146,9 @@
     <string name="show_channel_program">Program adı</string>
     <string name="show_channel_progress">Program ilerleme çubuğu</string>
     <string name="show_channel_source_badge">Kaynak rozeti (TIF / IPTV)</string>
+    <string name="channel_focus_auto_tune">Kanal üzerinde durunca otomatik aç</string>
+    <string name="channel_focus_tune_delay">Otomatik kanal açma süresi</string>
+    <string name="milliseconds_value">%1$d ms</string>
     <string name="channel_sources">Kanal kaynaklarını seç</string>
     <string name="no_tuner_sources">Kullanılabilir tuner kaynağı bulunamadı.</string>
     <string name="channel_panel_position">Kanal listesi konumu</string>
@@ -265,6 +268,14 @@
     <string name="iptv_grid">Grid</string>
     <string name="iptv_grid_title">IPTV Grid kanallarını seç</string>
     <string name="iptv_grid_start">Grid’i aç</string>
+    <string name="iptv_grid_start_green">Yeşil · Grid’i aç</string>
+    <string name="close_red">Kırmızı · Kapat</string>
+    <string name="grid_channel_actions">Grid kanalı</string>
+    <string name="grid_channel_change">Değiştir</string>
+    <string name="grid_channel_close">Kapat</string>
+    <string name="iptv_source_name">Liste adı</string>
+    <string name="iptv_source_name_required">Liste adı boş olamaz.</string>
+    <string name="channel_source_short">Kaynak</string>
     <string name="iptv_grid_maximum">En fazla 4 kanal seçilebilir.</string>
     <string name="iptv_grid_empty">Grid için en az bir kanal seçin.</string>
     <string name="iptv_grid_no_channels">Grid için kullanılabilir canlı IPTV kanalı yok.</string>

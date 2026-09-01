@@ -1,6 +1,7 @@
 package com.tvapp.livetv.ui
 
 import android.media.tv.TvContract
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -114,7 +115,16 @@ class ChannelAdapter(
             channelNumber.layoutParams = channelNumber.layoutParams.apply {
                 width = (metrics.widthPixels * NUMBER_WIDTH_FRACTION).toInt()
             }
-            channelNumber.text = channel.displayNumber.ifBlank { "-" }
+            val displayNumber = channel.displayNumber.ifBlank { "-" }
+            channelNumber.text = displayNumber
+            channelNumber.setTextSize(
+                TypedValue.COMPLEX_UNIT_SP,
+                when (displayNumber.length) {
+                    in 0..3 -> 16f
+                    4 -> 13f
+                    else -> 11f
+                },
+            )
             channelName.text = channel.displayName
             channelQuality.visibility = View.GONE
             channelTypeIcon.setImageResource(

@@ -233,6 +233,8 @@ class AppBackupRepository(context: Context) {
             put("infoBarOpacityPercent", infoBarOpacityPercent)
             put("channelPanelOpacityPercent", channelPanelOpacityPercent)
             put("infoBarDurationSeconds", infoBarDurationSeconds); put("subtitlesEnabled", subtitlesEnabled)
+            put("channelFocusAutoTune", channelFocusAutoTune)
+            put("channelFocusTuneDelayMillis", channelFocusTuneDelayMillis)
             put("launchOnBoot", launchOnBoot); putNullable("preferredAudioLanguage", preferredAudioLanguage)
             putNullable("preferredSubtitleLanguage", preferredSubtitleLanguage)
         }
@@ -277,6 +279,9 @@ class AppBackupRepository(context: Context) {
             infoBarOpacityPercent = optInt("infoBarOpacityPercent", 90).coerceIn(30, 100),
             channelPanelOpacityPercent = optInt("channelPanelOpacityPercent", 90).coerceIn(30, 100),
             infoBarDurationSeconds = optInt("infoBarDurationSeconds", 6).coerceIn(0, 15),
+            channelFocusAutoTune = optBoolean("channelFocusAutoTune", true),
+            channelFocusTuneDelayMillis = optInt("channelFocusTuneDelayMillis", 1_500)
+                .coerceIn(500, 5_000),
             subtitlesEnabled = optBoolean("subtitlesEnabled", false),
             launchOnBoot = optBoolean("launchOnBoot", false),
             preferredAudioLanguage = nullableString("preferredAudioLanguage"),

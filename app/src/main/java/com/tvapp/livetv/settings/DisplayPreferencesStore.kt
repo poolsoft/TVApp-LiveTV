@@ -17,6 +17,8 @@ data class DisplayPreferences(
     val infoBarOpacityPercent: Int = 90,
     val channelPanelOpacityPercent: Int = 90,
     val infoBarDurationSeconds: Int = 6,
+    val channelFocusAutoTune: Boolean = true,
+    val channelFocusTuneDelayMillis: Int = 1_500,
     val subtitlesEnabled: Boolean = false,
     val launchOnBoot: Boolean = false,
     val preferredAudioLanguage: String? = null,
@@ -53,6 +55,11 @@ class DisplayPreferencesStore(context: Context) {
             preferences.getInt(KEY_LEGACY_OPACITY, 90),
         ).coerceIn(30, 100),
         infoBarDurationSeconds = preferences.getInt(KEY_DURATION, 6).coerceIn(0, 15),
+        channelFocusAutoTune = preferences.getBoolean(KEY_CHANNEL_FOCUS_AUTO_TUNE, true),
+        channelFocusTuneDelayMillis = preferences.getInt(
+            KEY_CHANNEL_FOCUS_TUNE_DELAY,
+            1_500,
+        ).coerceIn(500, 5_000),
         subtitlesEnabled = preferences.getBoolean(KEY_SUBTITLES_ENABLED, false),
         launchOnBoot = preferences.getBoolean(KEY_LAUNCH_ON_BOOT, false),
         preferredAudioLanguage = preferences.getString(KEY_AUDIO_LANGUAGE, null),
@@ -75,6 +82,11 @@ class DisplayPreferencesStore(context: Context) {
                 displayPreferences.channelPanelOpacityPercent.coerceIn(30, 100),
             )
             .putInt(KEY_DURATION, displayPreferences.infoBarDurationSeconds.coerceIn(0, 15))
+            .putBoolean(KEY_CHANNEL_FOCUS_AUTO_TUNE, displayPreferences.channelFocusAutoTune)
+            .putInt(
+                KEY_CHANNEL_FOCUS_TUNE_DELAY,
+                displayPreferences.channelFocusTuneDelayMillis.coerceIn(500, 5_000),
+            )
             .putBoolean(KEY_SUBTITLES_ENABLED, displayPreferences.subtitlesEnabled)
             .putBoolean(KEY_LAUNCH_ON_BOOT, displayPreferences.launchOnBoot)
             .putString(KEY_AUDIO_LANGUAGE, displayPreferences.preferredAudioLanguage)
@@ -110,6 +122,8 @@ class DisplayPreferencesStore(context: Context) {
         const val KEY_PANEL_OPACITY = "panel-opacity"
         const val KEY_LEGACY_OPACITY = "overlay-opacity"
         const val KEY_DURATION = "info-duration"
+        const val KEY_CHANNEL_FOCUS_AUTO_TUNE = "channel-focus-auto-tune"
+        const val KEY_CHANNEL_FOCUS_TUNE_DELAY = "channel-focus-tune-delay"
         const val KEY_SUBTITLES_ENABLED = "subtitles-enabled"
         const val KEY_LAUNCH_ON_BOOT = "launch-on-boot"
         const val KEY_AUDIO_LANGUAGE = "audio-language"

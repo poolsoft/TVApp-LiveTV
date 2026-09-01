@@ -17,6 +17,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.ArrayAdapter
@@ -73,9 +74,8 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
-        private const val MAX_CHANNEL_DIGITS = 4
+        private const val MAX_CHANNEL_DIGITS = 5
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
-        private const val LIST_FOCUS_TUNE_DELAY_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
         private const val INFO_HEIGHT_FRACTION = 0.26f
@@ -144,6 +144,9 @@ class MainActivity : AppCompatActivity() {
     private var iptvOverlayActive = false
     private var iptvGridActive = false
     private var gridActiveIndex = 0
+    private var gridFullscreenIndex: Int? = null
+    private var gridLongPressHandled = false
+    private var gridLongPressJob: Job? = null
     private var gridReturnChannel: LiveChannel? = null
     private var gridChannels: List<LiveChannel> = emptyList()
     private val gridSelectedKeys = mutableListOf<String>()
@@ -170,6 +173,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingEditorChannelKey: String? = null
     private var pendingHomeChannelKey: String? = null
     private var focusedListSourceKey: String? = null
+    private var focusedAutoTunePreviousChannel: LiveChannel? = null
+    private var focusedAutoTuneTargetKey: String? = null
     private var focusedProgramJob: Job? = null
     private var visibleProgramsJob: Job? = null
     private var sleepTimerJob: Job? = null
@@ -606,6 +611,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun confirmListChannel(channel: LiveChannel) {
         focusedTuneJob?.cancel()
+        focusedAutoTunePreviousChannel = null
+        focusedAutoTuneTargetKey = null
         val recordHistory = channelPanelContent == ChannelPanelContent.NORMAL
         if (channel.sourceKey != currentChannel?.sourceKey) selectChannel(channel, recordHistory)
         hideChannelPanel()
@@ -613,7 +620,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun zap(offset: Int) {
         ChannelNavigator.adjacent(playbackNavigationChannels(), currentChannel?.sourceKey, offset)
-            ?.let { selectChannel(it, recordHistory = shouldRecordNavigationHistory()) }
+            ?.let { channel ->
+                selectChannel(channel, recordHistory = shouldRecordNavigationHistory())
+                if (binding.channelPanel.visibility == View.VISIBLE) {
+                    binding.channelList.post(::focusCurrentListChannel)
+                }
+            }
     }
 
     private fun appendChannelDigit(digit: Int) {
@@ -675,10 +687,16 @@ class MainActivity : AppCompatActivity() {
         focusedListSourceKey = channel.sourceKey
         loadFocusedProgram(channel)
         focusedTuneJob?.cancel()
-        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) return
+        if (!displayPreferences.channelFocusAutoTune) return
         focusedTuneJob = lifecycleScope.launch {
-            delay(LIST_FOCUS_TUNE_DELAY_MS)
-            if (binding.channelPanel.visibility == View.VISIBLE) {
+            delay(displayPreferences.channelFocusTuneDelayMillis.toLong())
+            if (
+                binding.channelPanel.visibility == View.VISIBLE &&
+                focusedListSourceKey == channel.sourceKey
+            ) {
+                focusedAutoTunePreviousChannel = currentChannel
+                    ?.takeIf { it.sourceKey != channel.sourceKey }
+                focusedAutoTuneTargetKey = channel.sourceKey
                 selectChannel(
                     channel,
                     recordHistory = channelPanelContent == ChannelPanelContent.NORMAL,
@@ -1031,28 +1049,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             View.GONE
         }
-        val videoHeight = videoTrack?.videoHeight ?: 0
-        val aspect = if (width > 0 && videoHeight > 0) {
-            if (width * 9 >= videoHeight * 16 - 16 && width * 9 <= videoHeight * 16 + 16) {
-                "16:9"
-            } else {
-                "4:3"
-            }
-        } else {
-            null
-        }
-        binding.aspectBadge.text = aspect
-        binding.aspectBadge.visibility = if (aspect == null || radio) View.GONE else View.VISIBLE
-        val resolution = format
-            .substringAfter("VIDEO_FORMAT_", format)
-            .takeIf { it.any(Char::isDigit) }
-        binding.resolutionBadge.text = resolution
-        binding.resolutionBadge.visibility = if (resolution == null || radio) {
-            View.GONE
-        } else {
-            View.VISIBLE
-        }
-
         val audioTracks = tracks.filter { it.type == TvTrackInfo.TYPE_AUDIO }
         val subtitleTracks = tracks.filter { it.type == TvTrackInfo.TYPE_SUBTITLE }
         val trackMetadata = tracks.joinToString(" ") { track ->
@@ -1073,23 +1069,25 @@ class MainActivity : AppCompatActivity() {
             ?.let(::displayLanguage)
             ?: subtitleTracks.size.takeIf { it > 0 }?.toString()
         binding.subtitleBadge.visibility = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
+        val hasTeletext = listOf("teletext", "teletekst", "txt")
+            .any(trackMetadata::contains)
+        binding.txtBadge.visibility = if (hasTeletext) View.VISIBLE else View.GONE
 
         val activeSlots = booleanArrayOf(
             true,
             true,
             audioTracks.isNotEmpty(),
             subtitleTracks.isNotEmpty(),
-            aspect != null && !radio,
-            resolution != null && !radio,
-            channel.encrypted || channel.locked,
+            hasTeletext,
+            channel.encrypted || channel.locked ||
+                parentalControlStore.isLocked(channel.sourceKey),
         )
         val slots = listOf(
-            binding.techSlotQualityBadge,
             binding.techSlotSource,
+            binding.techSlotQualityBadge,
             binding.techSlotAudio,
             binding.techSlotSubtitle,
-            binding.techSlotAspect,
-            binding.techSlotResolution,
+            binding.techSlotTxt,
             binding.techSlotLock,
         )
         slots.forEachIndexed { index, slot ->
@@ -1783,7 +1781,8 @@ class MainActivity : AppCompatActivity() {
             choices[index].sourceKey in gridSelectedKeys ||
                 (gridSelectedKeys.isEmpty() && choices[index].sourceKey == currentChannel?.sourceKey)
         }
-        val dialog = AlertDialog.Builder(this)
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(this)
             .setTitle(R.string.iptv_grid_title)
             .setMultiChoiceItems(
                 choices.map { it.displayName }.toTypedArray(),
@@ -1796,20 +1795,31 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, R.string.iptv_grid_maximum, Toast.LENGTH_SHORT).show()
                 }
             }
-            .setPositiveButton(R.string.iptv_grid_start, null)
-            .setNegativeButton(R.string.close, null)
+            .setPositiveButton(R.string.iptv_grid_start_green, null)
+            .setNegativeButton(R.string.close_red, null)
             .create()
+        fun startSelectedGrid() {
+            val selected = choices.filterIndexed { index, _ -> checked[index] }.take(4)
+            if (selected.isEmpty()) {
+                Toast.makeText(this, R.string.iptv_grid_empty, Toast.LENGTH_SHORT).show()
+            } else {
+                gridSelectedKeys.clear()
+                gridSelectedKeys += selected.map { it.sourceKey }
+                dialog.dismiss()
+                startIptvGrid(selected)
+            }
+        }
         dialog.setOnShowListener {
             dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val selected = choices.filterIndexed { index, _ -> checked[index] }.take(4)
-                if (selected.isEmpty()) {
-                    Toast.makeText(this, R.string.iptv_grid_empty, Toast.LENGTH_SHORT).show()
-                } else {
-                    gridSelectedKeys.clear()
-                    gridSelectedKeys += selected.map { it.sourceKey }
-                    dialog.dismiss()
-                    startIptvGrid(selected)
-                }
+                startSelectedGrid()
+            }
+        }
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_PROG_GREEN -> true.also { startSelectedGrid() }
+                KeyEvent.KEYCODE_PROG_RED -> true.also { dialog.dismiss() }
+                else -> false
             }
         }
         dialog.show()
@@ -1822,6 +1832,7 @@ class MainActivity : AppCompatActivity() {
         gridReturnChannel = currentChannel
         gridChannels = selected.take(4)
         gridActiveIndex = 0
+        gridFullscreenIndex = null
         iptvGridActive = true
         playback.stop()
         iptvPlayback.stop()
@@ -1833,6 +1844,13 @@ class MainActivity : AppCompatActivity() {
         hideChannelPanel()
         binding.infoBar.visibility = View.GONE
         binding.iptvGrid.visibility = View.VISIBLE
+        renderIptvGrid()
+        debugLog.recordDebug(
+            "IPTV_GRID_START | channels=${gridChannels.joinToString { it.sourceKey }}",
+        )
+    }
+
+    private fun renderIptvGrid() {
         gridControllers.forEachIndexed { index, controller ->
             val channel = gridChannels.getOrNull(index)
             gridCells[index].visibility = if (channel == null) View.INVISIBLE else View.VISIBLE
@@ -1844,10 +1862,35 @@ class MainActivity : AppCompatActivity() {
                 controller.play(channel)
             }
         }
+        applyIptvGridLayout()
         updateIptvGridFocus()
-        debugLog.recordDebug(
-            "IPTV_GRID_START | channels=${gridChannels.joinToString { it.sourceKey }}",
-        )
+    }
+
+    private fun applyIptvGridLayout() {
+        gridCells.forEachIndexed { index, cell ->
+            val fullscreen = gridFullscreenIndex
+            cell.visibility = when {
+                index !in gridChannels.indices -> View.INVISIBLE
+                fullscreen == null || fullscreen == index -> View.VISIBLE
+                else -> View.GONE
+            }
+            cell.layoutParams = GridLayout.LayoutParams(
+                if (fullscreen == index) {
+                    GridLayout.spec(0, 2, 1f)
+                } else {
+                    GridLayout.spec(index / 2, 1, 1f)
+                },
+                if (fullscreen == index) {
+                    GridLayout.spec(0, 2, 1f)
+                } else {
+                    GridLayout.spec(index % 2, 1, 1f)
+                },
+            ).apply {
+                width = 0
+                height = 0
+                setMargins(3.dp, 3.dp, 3.dp, 3.dp)
+            }
+        }
     }
 
     private fun updateIptvGridFocus() {
@@ -1865,6 +1908,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun moveIptvGridFocus(keyCode: Int) {
+        if (gridFullscreenIndex != null) return
         val candidate = when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> if (gridActiveIndex % 2 == 1) gridActiveIndex - 1 else -1
             KeyEvent.KEYCODE_DPAD_RIGHT -> if (gridActiveIndex % 2 == 0) gridActiveIndex + 1 else -1
@@ -1882,6 +1926,8 @@ class MainActivity : AppCompatActivity() {
         if (!iptvGridActive) return
         val previous = gridReturnChannel
         iptvGridActive = false
+        gridLongPressJob?.cancel()
+        gridFullscreenIndex = null
         gridControllers.forEach(IptvPlaybackController::stop)
         binding.iptvGrid.visibility = View.GONE
         gridChannels = emptyList()
@@ -1890,13 +1936,81 @@ class MainActivity : AppCompatActivity() {
         debugLog.recordDebug("IPTV_GRID_STOP | resume=$resumePrevious")
     }
 
-    private fun openActiveGridChannel() {
+    private fun openActiveGridChannelFullscreen() {
+        if (gridChannels.getOrNull(gridActiveIndex) == null) return
+        gridFullscreenIndex = gridActiveIndex
+        applyIptvGridLayout()
+        updateIptvGridFocus()
+    }
+
+    private fun closeActiveGridChannel() {
+        val mutable = gridChannels.toMutableList()
+        if (gridActiveIndex !in mutable.indices) return
+        mutable.removeAt(gridActiveIndex)
+        if (mutable.isEmpty()) {
+            stopIptvGrid(resumePrevious = true)
+            return
+        }
+        gridChannels = mutable
+        gridSelectedKeys.clear()
+        gridSelectedKeys += mutable.map { it.sourceKey }
+        gridActiveIndex = gridActiveIndex.coerceAtMost(mutable.lastIndex)
+        gridFullscreenIndex = null
+        renderIptvGrid()
+    }
+
+    private fun showActiveGridChannelActions() {
         val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
-        stopIptvGrid(resumePrevious = false)
-        selectChannel(channel, recordHistory = false)
+        AlertDialog.Builder(this)
+            .setTitle(channel.displayName)
+            .setItems(
+                arrayOf(
+                    getString(R.string.grid_channel_change),
+                    getString(R.string.grid_channel_close),
+                ),
+            ) { _, which ->
+                if (which == 0) showGridChannelReplacementPicker() else closeActiveGridChannel()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showGridChannelReplacementPicker() {
+        val targetIndex = gridActiveIndex
+        val choices = availableLiveIptvChannels().filter { candidate ->
+            gridChannels.none { it.sourceKey == candidate.sourceKey }
+        }
+        if (choices.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.grid_channel_change)
+            .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
+                val replacement = choices[which]
+                gridChannels = gridChannels.toMutableList().apply {
+                    this[targetIndex] = replacement
+                }
+                gridSelectedKeys.clear()
+                gridSelectedKeys += gridChannels.map { it.sourceKey }
+                gridFullscreenIndex = null
+                renderIptvGrid()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     private fun showChannelManagement(channel: LiveChannel) {
+        focusedTuneJob?.cancel()
+        focusedListSourceKey = null
+        channelPanelJob?.cancel()
+        if (
+            focusedAutoTuneTargetKey == channel.sourceKey &&
+            currentChannel?.sourceKey == channel.sourceKey
+        ) {
+            focusedAutoTunePreviousChannel?.let { previous ->
+                playSelectedChannel(previous, recordHistory = false)
+            }
+        }
+        focusedAutoTunePreviousChannel = null
+        focusedAutoTuneTargetKey = null
         val actions = arrayOf(
             getString(if (channel.favorite) R.string.remove_favorite else R.string.add_favorite),
             getString(R.string.move_up),
@@ -2165,7 +2279,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
         binding.yellowActionLabel.setText(
-            if (library) R.string.select_list_short else R.string.empty_action,
+            if (library) R.string.select_list_short else R.string.channel_source_short,
         )
         binding.blueActionLabel.setText(
             if (library) R.string.main_list_short else R.string.iptv_library_short,
@@ -2178,6 +2292,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChannelPanel(expanded: Boolean) {
+        if (binding.channelPanel.visibility != View.VISIBLE) {
+            focusedAutoTunePreviousChannel = null
+            focusedAutoTuneTargetKey = null
+        }
         channelPanelExpanded = expanded
         binding.channelPanel.visibility = View.VISIBLE
         binding.sourceFilterRow.visibility = if (
@@ -2207,6 +2325,8 @@ class MainActivity : AppCompatActivity() {
     private fun hideChannelPanel() {
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
+        focusedAutoTunePreviousChannel = null
+        focusedAutoTuneTargetKey = null
         channelPanelExpanded = false
         binding.channelPanel.visibility = View.GONE
         binding.advancedFilterRow.visibility = View.GONE
@@ -2344,6 +2464,25 @@ class MainActivity : AppCompatActivity() {
         applyChannelFilter(source = filters[targetIndex])
     }
 
+    private fun pageChannelList(direction: Int) {
+        if (!binding.channelList.hasFocus() || adapter.itemCount == 0) return
+        val manager = binding.channelList.layoutManager as? LinearLayoutManager ?: return
+        val focusedItem = binding.channelList.findContainingItemView(currentFocus ?: return) ?: return
+        val currentIndex = binding.channelList.getChildAdapterPosition(focusedItem)
+            .takeIf { it >= 0 } ?: return
+        val first = manager.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val last = manager.findLastVisibleItemPosition().coerceAtLeast(first)
+        val pageSize = (last - first + 1).coerceAtLeast(1)
+        val targetIndex = (currentIndex + direction * pageSize).coerceIn(0, adapter.itemCount - 1)
+        focusedTuneJob?.cancel()
+        binding.channelList.scrollToPosition(targetIndex)
+        binding.channelList.post {
+            binding.channelList.findViewHolderForAdapterPosition(targetIndex)
+                ?.itemView
+                ?.requestFocus()
+        }
+    }
+
     private fun wrapChannelList(direction: Int): Boolean {
         if (!binding.channelList.hasFocus()) return false
         val visible = panelChannels()
@@ -2408,15 +2547,38 @@ class MainActivity : AppCompatActivity() {
             )
         }
         if (iptvGridActive) {
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                when (event.keyCode) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        gridLongPressHandled = false
+                        gridLongPressJob?.cancel()
+                        gridLongPressJob = lifecycleScope.launch {
+                            delay(ViewConfiguration.getLongPressTimeout().toLong())
+                            gridLongPressHandled = true
+                            showActiveGridChannelActions()
+                        }
+                    } else if (event.action == KeyEvent.ACTION_UP) {
+                        gridLongPressJob?.cancel()
+                        if (!gridLongPressHandled) openActiveGridChannelFullscreen()
+                    }
+                }
+                KeyEvent.KEYCODE_BACK -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    if (gridFullscreenIndex != null) {
+                        gridFullscreenIndex = null
+                        applyIptvGridLayout()
+                        updateIptvGridFocus()
+                    } else {
+                        stopIptvGrid(resumePrevious = true)
+                    }
+                }
+                else -> if (event.action == KeyEvent.ACTION_DOWN) {
+                    when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_LEFT,
                     KeyEvent.KEYCODE_DPAD_RIGHT,
                     KeyEvent.KEYCODE_DPAD_UP,
                     KeyEvent.KEYCODE_DPAD_DOWN -> moveIptvGridFocus(event.keyCode)
-                    KeyEvent.KEYCODE_DPAD_CENTER,
-                    KeyEvent.KEYCODE_ENTER -> openActiveGridChannel()
-                    KeyEvent.KEYCODE_BACK -> stopIptvGrid(resumePrevious = true)
+                    }
                 }
             }
             return true
@@ -2498,7 +2660,8 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_CHANNEL_UP -> zap(1)
                 KeyEvent.KEYCODE_CHANNEL_DOWN -> zap(-1)
                 KeyEvent.KEYCODE_LAST_CHANNEL -> openPreviousChannel()
-                KeyEvent.KEYCODE_DPAD_CENTER -> if (numberInput.isNotEmpty()) {
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> if (numberInput.isNotEmpty()) {
                     commitChannelNumber()
                 } else if (
                     binding.parentalLockPanel.visibility == View.VISIBLE &&
@@ -2508,6 +2671,7 @@ class MainActivity : AppCompatActivity() {
                 } else if (binding.channelPanel.visibility != View.VISIBLE) {
                     toggleChannelPanel()
                 } else {
+                    focusedTuneJob?.cancel()
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> if (binding.channelPanel.visibility != View.VISIBLE) {
@@ -2527,7 +2691,7 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.channelPanel.visibility != View.VISIBLE) {
                     openPreviousChannel()
                 } else if (binding.channelList.hasFocus()) {
-                    cycleSourceFilter(-1)
+                    pageChannelList(-1)
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
@@ -2535,7 +2699,7 @@ class MainActivity : AppCompatActivity() {
                     binding.channelPanel.visibility == View.VISIBLE &&
                     binding.channelList.hasFocus()
                 ) {
-                    cycleSourceFilter(1)
+                    pageChannelList(1)
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
@@ -2562,7 +2726,7 @@ class MainActivity : AppCompatActivity() {
                     if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
                         showIptvLibraryFilterDialog()
                     } else {
-                        Unit
+                        cycleSourceFilter(1)
                     }
                 } else {
                     return super.dispatchKeyEvent(event)

@@ -417,7 +417,7 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="@color/accent"
-                    android:textSize="15sp"
+                    android:textSize="19sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -553,6 +553,21 @@
             android:paddingHorizontal="10dp">
 
             <FrameLayout
+                android:id="@+id/tech_slot_source"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="20dp">
+
+                <ImageView
+                    android:id="@+id/source_badge_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:contentDescription="@string/channel_source"
+                    android:src="@drawable/ic_source_tif" />
+            </FrameLayout>
+
+            <FrameLayout
                 android:id="@+id/tech_slot_quality_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
@@ -578,21 +593,6 @@
                     android:textColor="@color/text_primary"
                     android:textSize="11sp"
                     android:visibility="gone" />
-            </FrameLayout>
-
-            <FrameLayout
-                android:id="@+id/tech_slot_source"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
-
-                <ImageView
-                    android:id="@+id/source_badge_icon"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_gravity="start|center_vertical"
-                    android:contentDescription="@string/channel_source"
-                    android:src="@drawable/ic_source_tif" />
             </FrameLayout>
 
             <FrameLayout
@@ -641,32 +641,17 @@
             </FrameLayout>
 
             <FrameLayout
-                android:id="@+id/tech_slot_aspect"
+                android:id="@+id/tech_slot_txt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_marginEnd="20dp">
                 <TextView
-                    android:id="@+id/aspect_badge"
+                    android:id="@+id/txt_badge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="start|center_vertical"
                     android:background="@drawable/bg_tech_badge"
-                    android:textColor="@color/text_primary"
-                    android:textSize="11sp"
-                    android:visibility="gone" />
-            </FrameLayout>
-
-            <FrameLayout
-                android:id="@+id/tech_slot_resolution"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
-                <TextView
-                    android:id="@+id/resolution_badge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="start|center_vertical"
-                    android:background="@drawable/bg_tech_badge"
+                    android:text="TXT"
                     android:textColor="@color/text_primary"
                     android:textSize="11sp"
                     android:visibility="gone" />
