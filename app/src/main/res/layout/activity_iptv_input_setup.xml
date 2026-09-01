@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#10151C"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="72dp"
+    android:paddingEnd="72dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/iptv_input_setup_title"
+        android:textColor="#F5F8FC"
+        android:textSize="34sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="720dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/iptv_input_setup_description"
+        android:textColor="#B9C6D4"
+        android:textSize="19sp" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="720dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:minHeight="32dp"
+        android:text="@string/iptv_input_waiting"
+        android:textColor="#5DD7E8"
+        android:textSize="18sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/sync"
+            android:layout_width="220dp"
+            android:layout_height="60dp"
+            android:focusable="true"
+            android:background="@drawable/bg_focusable"
+            android:textColor="#F5F8FC"
+            android:text="@string/iptv_input_sync" />
+
+        <Button
+            android:id="@+id/done"
+            android:layout_width="160dp"
+            android:layout_height="60dp"
+            android:layout_marginStart="16dp"
+            android:focusable="true"
+            android:background="@drawable/bg_focusable"
+            android:textColor="#F5F8FC"
+            android:text="@string/done" />
+    </LinearLayout>
+</LinearLayout>

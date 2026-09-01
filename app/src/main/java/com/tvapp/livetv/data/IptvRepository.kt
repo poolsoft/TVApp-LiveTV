@@ -1,14 +1,13 @@
 package com.tvapp.livetv.data
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.TVAppDatabase
-import com.tvapp.livetv.integration.TvAppInputContract
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.tifinput.IptvInputSyncScheduler
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
@@ -265,10 +264,7 @@ class IptvRepository(context: Context) {
     }
 
     private fun notifySharedChannelsChanged() {
-        appContext.contentResolver.notifyChange(TvAppInputContract.CHANNELS_URI, null)
-        appContext.sendBroadcast(
-            Intent(ACTION_IPTV_CHANNELS_CHANGED).setPackage(TVAPP_INPUT_PACKAGE),
-        )
+        IptvInputSyncScheduler.scheduleImmediate(appContext)
     }
 
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
@@ -295,8 +291,5 @@ class IptvRepository(context: Context) {
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
         private const val IMPORT_BATCH_SIZE = 500
-        private const val ACTION_IPTV_CHANNELS_CHANGED =
-            "com.tvapp.livetv.action.IPTV_CHANNELS_CHANGED"
-        private const val TVAPP_INPUT_PACKAGE = "com.tvapp.input"
     }
 }

@@ -1,6 +1,6 @@
-package com.tvapp.livetv.integration
+package com.tvapp.livetv.tifinput
 
-data class SharedIptvChannel(
+data class SharedIptvInputChannel(
     val sourceKey: String,
     val displayName: String,
     val streamUrl: String,

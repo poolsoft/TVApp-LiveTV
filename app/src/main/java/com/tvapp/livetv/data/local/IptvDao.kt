@@ -7,7 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import androidx.room.Upsert
-import com.tvapp.livetv.integration.SharedIptvChannel
+import com.tvapp.livetv.tifinput.SharedIptvInputChannel
 
 @Dao
 interface IptvDao {
@@ -23,7 +23,7 @@ interface IptvDao {
             "WHERE s.enabled = 1 AND c.selected = 1 AND COALESCE(u.hidden, 0) = 0 " +
             "ORDER BY COALESCE(u.sortOrder, 2147483647), s.name, c.originalIndex",
     )
-    fun getSharedChannels(): List<SharedIptvChannel>
+    fun getSharedChannels(): List<SharedIptvInputChannel>
 
     @Query("SELECT * FROM iptv_sources ORDER BY name")
     suspend fun getSources(): List<IptvSourceEntity>

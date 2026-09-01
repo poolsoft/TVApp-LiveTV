@@ -78,17 +78,20 @@ Bu proje sisteme yeni bir `TvInputService` ekleyen eski Google örneğinin kopya
 Var olan vendor tuner input'unu kullanan, DVB ve IPTV kaynaklarını ortak kanal modeli üzerinde
 birleştiren özel bir Live TV istemcisidir.
 
-## TVApp Input entegrasyonu
+## TVApp IPTV sistem girişi
 
-İsteğe bağlı kardeş `TVAppInput` projesi, TVApp'ta ana liste için seçilmiş IPTV kanallarını
-Android TIF'e yayımlar. TVApp, `com.tvapp.livetv.iptv` yetkili salt okunur sağlayıcıyı ve
-`com.tvapp.livetv.permission.READ_IPTV_CHANNELS` signature iznini sunar. Böylece binlerce ham
-IPTV kaydı yerine yalnızca kullanıcının seçtiği ve gizlemediği kanallar sistem girişine aktarılır.
-TVApp'ta IPTV seçimi, kaynak yenileme veya silme yapıldığında TVApp Input'a imzalı açık
-broadcast gönderilir ve eşitleme işi otomatik başlatılır; periyodik eşitleme yedek olarak kalır.
+TVApp, ana liste için seçilmiş IPTV kanallarını aynı APK içindeki `TVApp IPTV`
+`TvInputService` kaynağıyla Android TIF'e yayımlar. Binlerce ham IPTV kaydı yerine yalnızca
+kullanıcının seçtiği ve gizlemediği kanallar sistem kanal tablosuna aktarılır.
 
-İki APK aynı imzalama anahtarıyla üretilmelidir. Keystore, parola veya `keystore.properties`
-gibi özel imza verileri repoya eklenmemelidir.
+IPTV seçimi, kaynak yenileme veya silme sonrasında yerel eşitleme işi otomatik başlatılır;
+12 saatlik periyodik eşitleme yedek olarak kalır. Sistem girişinin kurulum ekranından elle
+eşitleme de yapılabilir.
+
+TVApp kendi TIF kaynağını vendor tuner olarak yeniden içeri almaz. Kaynak, servis component
+kimliğiyle filtrelenir; yayımlanan kanallar ayrıca `tvapp-iptv:` provider kimliği ve
+`owner=com.tvapp.livetv` metadata işareti taşır. Bu nedenle ortak listede yinelenen IPTV
+kanalları oluşmaz.
 
 ## Yol haritası
 

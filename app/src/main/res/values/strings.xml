@@ -222,6 +222,16 @@
     <string name="iptv_selection_page_count">%1$d seçili · %2$d / %3$d gösteriliyor</string>
     <string name="iptv_library_loaded_count">%1$d / %2$d içerik</string>
     <string name="iptv_selection_jump">%1$s. içeriğe git</string>
+    <string name="iptv_input_name">TVApp IPTV</string>
+    <string name="iptv_input_setup_title">TVApp IPTV sistem girişi</string>
+    <string name="iptv_input_setup_description">Ana kanal listesine seçtiğiniz IPTV kanallarını Android TV giriş sistemine yayımlar.</string>
+    <string name="iptv_input_waiting">Eşitleme bekleniyor.</string>
+    <string name="iptv_input_sync">Kanalları eşitle</string>
+    <string name="iptv_input_syncing">IPTV kanalları eşitleniyor…</string>
+    <string name="iptv_input_sync_complete">%1$d kanal eşitlendi, %2$d eski kanal kaldırıldı.</string>
+    <string name="iptv_input_sync_failed">Eşitleme başarısız: %1$s</string>
+    <string name="iptv_input_not_found">TVApp IPTV sistem girişi bulunamadı.</string>
+    <string name="done">Tamam</string>
     <string name="all_iptv_categories">Tüm kategoriler</string>
     <string name="clear_visible_iptv_selection">Görünenleri temizle</string>
     <string name="clear_iptv_selection">Kırmızı · Temizle</string>

@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <permission
-        android:name="com.tvapp.livetv.permission.READ_IPTV_CHANNELS"
-        android:protectionLevel="signature" />
-
     <uses-feature android:name="android.software.leanback" android:required="true" />
+    <uses-feature android:name="android.software.live_tv" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -24,14 +21,6 @@
         android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.TVApp">
-
-        <provider
-            android:name=".integration.IptvChannelProvider"
-            android:authorities="com.tvapp.livetv.iptv"
-            android:exported="true"
-            android:grantUriPermissions="false"
-            android:readPermission="com.tvapp.livetv.permission.READ_IPTV_CHANNELS"
-            android:writePermission="com.tvapp.livetv.permission.READ_IPTV_CHANNELS" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -65,6 +54,39 @@
             android:name=".data.XmlTvRefreshJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <service
+            android:name=".tifinput.IptvTvInputService"
+            android:exported="true"
+            android:label="@string/iptv_input_name"
+            android:permission="android.permission.BIND_TV_INPUT">
+            <intent-filter>
+                <action android:name="android.media.tv.TvInputService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.media.tv.input"
+                android:resource="@xml/iptv_tv_input" />
+        </service>
+
+        <service
+            android:name=".tifinput.IptvInputSyncJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name=".tifinput.IptvInputBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".tifinput.IptvInputSetupActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="true"
+            android:screenOrientation="landscape" />
 
         <activity
             android:name=".IptvSourcesActivity"

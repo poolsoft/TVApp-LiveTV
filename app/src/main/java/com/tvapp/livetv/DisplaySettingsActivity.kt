@@ -26,7 +26,11 @@ import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.update.AppUpdateManager
+import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
+import com.tvapp.livetv.tifinput.IptvInputResolver
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 class DisplaySettingsActivity : AppCompatActivity() {
@@ -148,6 +152,11 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
 
         section(R.string.application_settings)
+        action(
+            R.string.iptv_input_name,
+            getString(R.string.iptv_input_sync),
+            ::syncIptvInput,
+        )
         action(
             R.string.check_for_updates,
             getString(R.string.current_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
@@ -304,6 +313,36 @@ class DisplaySettingsActivity : AppCompatActivity() {
             }.onFailure { error ->
                 row.value.text = getString(
                     R.string.update_failed,
+                    error.message ?: error.javaClass.simpleName,
+                )
+            }
+            row.root.isEnabled = true
+        }
+    }
+
+    private fun syncIptvInput(row: SettingRow) {
+        if (!row.root.isEnabled) return
+        val inputId = IptvInputResolver.findInputId(this)
+        if (inputId == null) {
+            row.value.setText(R.string.iptv_input_not_found)
+            return
+        }
+        row.root.isEnabled = false
+        row.value.setText(R.string.iptv_input_syncing)
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    IptvInputChannelSyncRepository(this@DisplaySettingsActivity).sync(inputId)
+                }
+            }.onSuccess { result ->
+                row.value.text = getString(
+                    R.string.iptv_input_sync_complete,
+                    result.synced,
+                    result.removed,
+                )
+            }.onFailure { error ->
+                row.value.text = getString(
+                    R.string.iptv_input_sync_failed,
                     error.message ?: error.javaClass.simpleName,
                 )
             }

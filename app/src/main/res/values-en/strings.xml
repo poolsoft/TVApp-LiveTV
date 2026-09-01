@@ -222,6 +222,16 @@
     <string name="iptv_selection_page_count">%1$d selected · showing %2$d / %3$d</string>
     <string name="iptv_library_loaded_count">%1$d / %2$d items</string>
     <string name="iptv_selection_jump">Go to item %1$s</string>
+    <string name="iptv_input_name">TVApp IPTV</string>
+    <string name="iptv_input_setup_title">TVApp IPTV system input</string>
+    <string name="iptv_input_setup_description">Publishes IPTV channels selected for the main list to the Android TV input system.</string>
+    <string name="iptv_input_waiting">Waiting to sync.</string>
+    <string name="iptv_input_sync">Sync channels</string>
+    <string name="iptv_input_syncing">Syncing IPTV channels…</string>
+    <string name="iptv_input_sync_complete">Synced %1$d channels and removed %2$d old channels.</string>
+    <string name="iptv_input_sync_failed">Sync failed: %1$s</string>
+    <string name="iptv_input_not_found">TVApp IPTV system input was not found.</string>
+    <string name="done">Done</string>
     <string name="all_iptv_categories">All categories</string>
     <string name="clear_visible_iptv_selection">Clear visible selection</string>
     <string name="clear_iptv_selection">Red - Clear</string>

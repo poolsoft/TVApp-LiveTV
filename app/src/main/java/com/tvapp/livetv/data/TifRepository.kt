@@ -8,6 +8,8 @@ import android.media.tv.TvInputManager
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.settings.ChannelSourceFilterStore
+import com.tvapp.livetv.tifinput.IptvInputChannelMetadata
+import com.tvapp.livetv.tifinput.IptvInputResolver
 
 class TifRepository(context: Context) {
     private val appContext = context.applicationContext
@@ -18,7 +20,9 @@ class TifRepository(context: Context) {
     fun inputs(): List<TvInputInfo> = inputManager?.tvInputList.orEmpty()
 
     fun tunerInputs(): List<TvInputInfo> = inputs().filter { input ->
-        input.type == TvInputInfo.TYPE_TUNER && "/HW" in input.id
+        input.type == TvInputInfo.TYPE_TUNER &&
+            "/HW" in input.id &&
+            !IptvInputResolver.isOwnInput(input)
     }
 
     fun channels(
@@ -73,6 +77,7 @@ class TifRepository(context: Context) {
                     val streamId = cursor.getInt(streamIdIndex)
                     val serviceId = cursor.getInt(serviceIdIndex)
                     val providerId = cursor.getString(providerIdIndex).orEmpty()
+                    if (providerId.startsWith(IptvInputChannelMetadata.PROVIDER_ID_PREFIX)) continue
                     add(
                         LiveChannel(
                             id = id,
