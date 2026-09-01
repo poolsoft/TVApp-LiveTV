@@ -1,11 +1,14 @@
 package com.tvapp.livetv.data
 
 import android.content.Context
+import android.app.job.JobInfo
+import android.app.job.JobScheduler
+import android.content.ComponentName
 import android.net.Uri
 import android.util.Xml
+import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.model.LiveChannel
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -15,7 +18,8 @@ import java.util.Locale
 class XmlTvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("xmltv", Context.MODE_PRIVATE)
-    private val cacheFile = appContext.filesDir.resolve("xmltv-programs.json")
+    private val database = TVAppDatabase.getInstance(appContext)
+    private val dao = database.xmlTvDao()
 
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE, null)
 
@@ -24,7 +28,25 @@ class XmlTvRepository(context: Context) {
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
-        return connection.inputStream.use { importStream(it, url) }
+        connection.setRequestProperty("User-Agent", "TVApp/0.1 AndroidTV")
+        return try {
+            connection.connect()
+            check(connection.responseCode in 200..299) {
+                "HTTP ${connection.responseCode} ${connection.responseMessage}"
+            }
+            connection.inputStream.use { importStream(it, url) }.also {
+                scheduleUrlRefresh()
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    fun refreshSavedUrl(): Int {
+        val source = sourceLabel()?.takeIf {
+            it.startsWith("http://") || it.startsWith("https://")
+        } ?: return 0
+        return importUrl(source)
     }
 
     fun importDocument(uri: Uri): Int = appContext.contentResolver.openInputStream(uri)?.use {
@@ -33,7 +55,22 @@ class XmlTvRepository(context: Context) {
 
     fun clear() {
         preferences.edit().clear().apply()
-        cacheFile.delete()
+        database.runInTransaction { dao.clearPrograms() }
+        (appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler)
+            .cancel(REFRESH_JOB_ID)
+    }
+
+    private fun scheduleUrlRefresh() {
+        val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        scheduler.schedule(
+            JobInfo.Builder(
+                REFRESH_JOB_ID,
+                ComponentName(appContext, XmlTvRefreshJobService::class.java),
+            )
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setPeriodic(REFRESH_INTERVAL_MS)
+                .build(),
+        )
     }
 
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
@@ -46,21 +83,15 @@ class XmlTvRepository(context: Context) {
     fun programs(channel: LiveChannel, start: Long, end: Long): List<ProgramSummary> {
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
-        return readPrograms().asSequence()
-            .filter { program ->
-                program.end > start && program.start < end &&
-                    ((epgId != null && program.channelId.normalize() == epgId) ||
-                        program.channelName.normalize() == name || program.channelId.normalize() == name)
-            }
-            .sortedBy { it.start }
-            .map { ProgramSummary(it.title, it.start, it.end) }
-            .toList()
+        return dao.programs(epgId.orEmpty(), name, start, end).map {
+            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis)
+        }
     }
 
     private fun importStream(stream: InputStream, label: String): Int {
         val parser = Xml.newPullParser().apply { setInput(stream, null) }
         val channelNames = mutableMapOf<String, String>()
-        val programs = mutableListOf<XmlProgram>()
+        val programs = mutableListOf<XmlTvProgramEntity>()
         var event = parser.eventType
         while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
             if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
@@ -88,27 +119,29 @@ class XmlTvRepository(context: Context) {
                             }
                         }
                         if (channelId.isNotBlank() && start > 0 && stop > start) {
-                            programs += XmlProgram(channelId, channelNames[channelId] ?: channelId, title, start, stop)
+                            val channelName = channelNames[channelId] ?: channelId
+                            programs += XmlTvProgramEntity(
+                                channelId = channelId,
+                                channelName = channelName,
+                                normalizedChannelId = channelId.normalize(),
+                                normalizedChannelName = channelName.normalize(),
+                                title = title,
+                                startTimeMillis = start,
+                                endTimeMillis = stop,
+                            )
                         }
                     }
                 }
             }
             event = parser.next()
         }
-        val json = JSONArray().apply { programs.forEach { put(it.toJson()) } }
-        cacheFile.writeText(json.toString())
+        database.runInTransaction {
+            dao.clearPrograms()
+            programs.chunked(INSERT_BATCH_SIZE).forEach(dao::insertPrograms)
+        }
         preferences.edit().putString(KEY_SOURCE, label).putLong(KEY_UPDATED, System.currentTimeMillis()).apply()
         return programs.size
     }
-
-    private fun readPrograms(): List<XmlProgram> = runCatching {
-        val array = JSONArray(cacheFile.readText())
-        (0 until array.length()).map { index ->
-            array.getJSONObject(index).let {
-                XmlProgram(it.getString("id"), it.getString("name"), it.getString("title"), it.getLong("start"), it.getLong("end"))
-            }
-        }
-    }.getOrDefault(emptyList())
 
     private fun parseTime(value: String?): Long {
         val text = value.orEmpty().trim()
@@ -122,14 +155,11 @@ class XmlTvRepository(context: Context) {
         .replace(Regex("[^a-z0-9çğıöşü]+"), "")
         .removeSuffix("hd").removeSuffix("sd").removeSuffix("4k")
 
-    private data class XmlProgram(val channelId: String, val channelName: String, val title: String, val start: Long, val end: Long) {
-        fun toJson() = JSONObject().apply {
-            put("id", channelId); put("name", channelName); put("title", title); put("start", start); put("end", end)
-        }
-    }
-
     private companion object {
         const val KEY_SOURCE = "source"
         const val KEY_UPDATED = "updated"
+        const val INSERT_BATCH_SIZE = 1_000
+        const val REFRESH_JOB_ID = 0x545650
+        const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
     }
 }

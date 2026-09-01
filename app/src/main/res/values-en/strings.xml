@@ -217,6 +217,11 @@
     <string name="iptv_selection_count">%1$d / %2$d channels selected for main list - OK: Toggle - Green: Save</string>
     <string name="iptv_filtered_selection_count">%1$d / %2$d channels selected - %3$d in filter - OK: Toggle - Green: Save</string>
     <string name="iptv_category_filter">Category</string>
+    <string name="iptv_search_hint">Search channel or category</string>
+    <string name="selected_iptv_only">Selected</string>
+    <string name="iptv_selection_page_count">%1$d selected · showing %2$d / %3$d</string>
+    <string name="iptv_library_loaded_count">%1$d / %2$d items</string>
+    <string name="iptv_selection_jump">Go to item %1$s</string>
     <string name="all_iptv_categories">All categories</string>
     <string name="clear_visible_iptv_selection">Clear visible selection</string>
     <string name="clear_iptv_selection">Red - Clear</string>

@@ -35,7 +35,11 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Mavi tuşla tam IPTV görünümüne geçilir; kayıtlı kaynak, Canlı/VOD ve kategori filtresi uygulanır.
 - Tam IPTV görünümündeki gezinme ana izleme geçmişine yazılmaz ve kanal yalnızca `OK` ile açılır.
 - IPTV kaynak yönetimi, kategori filtresi, kanal önizleme ve Media3 oynatma desteği bulunur.
+- Büyük IPTV kaynakları ana kütüphanede 250, seçim yöneticisinde 200 öğelik Room sayfalarıyla yüklenir; binlerce kayıt aynı anda belleğe alınmaz.
+- Seçim yöneticisinde kategori, arama, yalnız seçilenler filtresi, 1-4 haneli doğrudan sıra erişimi ve ilk/son arasında dolaşım bulunur.
+- M3U içe aktarma 500 kayıtta bir veritabanına yazılır; Canlı/VOD türü içe aktarım sırasında sınıflandırılıp indekslenir.
 - Canlı yayınlarda canlı noktaya dönme; VOD içeriklerinde oynat/duraklat ve ileri/geri sarma kontrolleri vardır.
+- Geçici IPTV oynatma hataları 1, 2 ve 4 saniyelik aralıklarla otomatik yeniden denenir.
 
 ### Ekran ve sistem entegrasyonu
 
@@ -45,6 +49,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Cihaz destekliyorsa sistem PiP, desteklemiyorsa uygulama içi mini pencere kullanılabilir.
 - Google TV Home için son izlenen kanal satırı ve isteğe bağlı açılışta TVApp'i başlatma desteği vardır.
 - Yapılandırma, kanal düzeni ve IPTV seçimleri sürümlü yedek dosyasına aktarılıp geri alınabilir.
+- XMLTV programları kanal ve zaman alanlarına göre Room'da indekslenir; URL kaynakları ağ varken 12 saatte bir yenilenir.
 
 ## Kumanda kullanımı
 
@@ -79,6 +84,8 @@ birleştiren özel bir Live TV istemcisidir.
 Android TIF'e yayımlar. TVApp, `com.tvapp.livetv.iptv` yetkili salt okunur sağlayıcıyı ve
 `com.tvapp.livetv.permission.READ_IPTV_CHANNELS` signature iznini sunar. Böylece binlerce ham
 IPTV kaydı yerine yalnızca kullanıcının seçtiği ve gizlemediği kanallar sistem girişine aktarılır.
+TVApp'ta IPTV seçimi, kaynak yenileme veya silme yapıldığında TVApp Input'a imzalı açık
+broadcast gönderilir ve eşitleme işi otomatik başlatılır; periyodik eşitleme yedek olarak kalır.
 
 İki APK aynı imzalama anahtarıyla üretilmelidir. Keystore, parola veya `keystore.properties`
 gibi özel imza verileri repoya eklenmemelidir.
@@ -117,8 +124,8 @@ politikası belirlenene kadar elle veya Action tarafından artırılmaz.
 
 Yerel makinede `../.signing/TVApp-release.properties` bulunursa debug APK da release APK ile
 aynı anahtarla imzalanır. Böylece yerel derleme ve Action çıktısı aynı uygulamanın üzerine
-kurulabilir. Her push sabit `dev-latest` GitHub release'indeki `TVApp.apk` ve `version.json`
-dosyalarını yeniler.
+kurulabilir. Her push değişmeyen Android `versionCode` ile yeni bir `dev-r<run>` GitHub
+release'i üretir ve bu release'i `latest` olarak işaretler.
 
 Uygulama içi denetim, build numarası aynı fakat kurulu APK'nın SHA-256 özeti release APK'dan
 farklıysa son development release'ini aynı sürüm koduyla yeniden kurmayı önerir. Güncelleme
@@ -127,8 +134,9 @@ revizyonu `version.json` içinde ayrıca tutulur; Android sürüm koduna dönü�
 ## GitHub Actions ve uygulama içi güncelleme
 
 `.github/workflows/release.yml`, `main` dalındaki kod değişikliklerinde veya elle
-çalıştırıldığında testleri çalıştırır ve imzalı development APK üretir. `dev-latest` release'i
-yerinde güncellenir; yeni bir sürüm tag'i oluşturulmaz.
+çalıştırıldığında testleri çalıştırır ve imzalı development APK üretir. Her başarılı çalışma
+benzersiz `dev-r<run>` etiketi oluşturur; uygulama her zaman GitHub'ın son release'indeki
+dosyaları denetler.
 Release'e şu dosyalar eklenir:
 
 - `TVApp.apk`

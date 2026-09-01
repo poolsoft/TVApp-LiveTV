@@ -1,11 +1,13 @@
 package com.tvapp.livetv.data
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.integration.TvAppInputContract
 import com.tvapp.livetv.model.LiveChannel
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -45,13 +47,57 @@ class IptvRepository(context: Context) {
     suspend fun sourceCategories(sourceId: Long): List<String> =
         dao.getCategoriesForSource(sourceId)
 
+    suspend fun selectionPage(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<IptvChannelEntity> = dao.getSelectionPage(
+        sourceId,
+        category,
+        query,
+        selectedOnly,
+        limit,
+        offset,
+    )
+
+    suspend fun selectionCount(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+    ): Int = dao.selectionCount(sourceId, category, query, selectedOnly)
+
+    suspend fun selectedChannelCount(sourceId: Long): Int = dao.selectedChannelCount(sourceId)
+
+    suspend fun setChannelSelected(sourceKey: String, selected: Boolean) {
+        dao.setChannelSelected(sourceKey, selected)
+        notifySharedChannelsChanged()
+    }
+
+    suspend fun setChannelsSelected(sourceKeys: List<String>, selected: Boolean) {
+        sourceKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
+            if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, selected)
+        }
+        if (sourceKeys.isNotEmpty()) notifySharedChannelsChanged()
+    }
+
     suspend fun libraryLiveChannelsPage(
         sourceId: Long,
         category: String?,
+        contentType: String,
         limit: Int,
         offset: Int,
-    ): List<LiveChannel> = dao.getChannelsPage(sourceId, category, limit, offset)
+    ): List<LiveChannel> = dao.getLibraryPage(sourceId, category, contentType, limit, offset)
         .map { it.toLiveChannel() }
+
+    suspend fun libraryChannelCount(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+    ): Int = dao.libraryCount(sourceId, category, contentType)
 
     suspend fun libraryChannels(sourceId: Long?): List<IptvChannelEntity> =
         sourceId?.let { dao.getChannelsForSource(it) } ?: dao.getAllEnabledLibraryChannels()
@@ -72,6 +118,7 @@ class IptvRepository(context: Context) {
                 if (chunk.isNotEmpty()) dao.selectChannels(chunk)
             }
         }
+        notifySharedChannelsChanged()
     }
 
     suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
@@ -92,6 +139,7 @@ class IptvRepository(context: Context) {
             epgId = tvgId,
             userAgent = userAgent,
             referrer = referrer,
+            iptvContentType = contentType,
         )
 
     suspend fun importUrl(location: String): IptvImportResult {
@@ -136,6 +184,7 @@ class IptvRepository(context: Context) {
 
     suspend fun delete(source: IptvSourceEntity) {
         dao.deleteSource(source)
+        notifySharedChannelsChanged()
     }
 
     private suspend fun importStream(
@@ -144,10 +193,8 @@ class IptvRepository(context: Context) {
         name: String,
         input: InputStream,
     ): IptvImportResult {
-        val parsed = M3uParser.parse(InputStreamReader(input, Charsets.UTF_8))
-        require(parsed.isNotEmpty()) { "Listede oynatılabilir IPTV kanalı bulunamadı." }
         val now = System.currentTimeMillis()
-        return database.withTransaction {
+        val result = database.withTransaction {
             val existing = dao.getSourceByLocation(location)
             val sourceId = existing?.id ?: dao.insertSource(
                 IptvSourceEntity(name = name, location = location, kind = kind),
@@ -156,8 +203,7 @@ class IptvRepository(context: Context) {
             val selectedChannels = if (existing == null) {
                 emptyList()
             } else {
-                dao.getChannelsForSource(sourceId)
-                    .filter { it.selected }
+                dao.getSelectedChannelsForSource(sourceId)
             }
             val selectedKeys = selectedChannels.mapTo(mutableSetOf()) { it.sourceKey }
             val selectedTvgIds = selectedChannels.mapNotNullTo(mutableSetOf()) {
@@ -174,14 +220,16 @@ class IptvRepository(context: Context) {
             )).copy(name = name, kind = kind, enabled = true, lastUpdatedAt = now)
             dao.updateSource(source)
             dao.deleteChannelsForSource(sourceId)
-            dao.upsertChannels(parsed.mapIndexed { index, item ->
+            val batch = ArrayList<IptvChannelEntity>(IMPORT_BATCH_SIZE)
+            var channelCount = 0
+            fun entity(index: Int, item: ParsedIptvChannel): IptvChannelEntity {
                 val tvgId = item.tvgId?.trim()?.takeIf(String::isNotBlank)
                 val identity = tvgId?.let { "id:$it" } ?: listOf(
                     "name:${selectionName(item.name, item.groupTitle)}",
                     item.streamUrl.substringBefore('?'),
                 ).joinToString("|")
                 val sourceKey = "iptv:$sourceId:${sha256(identity).take(24)}"
-                IptvChannelEntity(
+                return IptvChannelEntity(
                     sourceKey = sourceKey,
                     sourceId = sourceId,
                     tvgId = item.tvgId,
@@ -193,14 +241,34 @@ class IptvRepository(context: Context) {
                     userAgent = item.userAgent,
                     referrer = item.referrer,
                     originalIndex = index,
+                    contentType = item.contentType,
                     selected = sourceKey in selectedKeys ||
                         tvgId != null && tvgId in selectedTvgIds ||
                         tvgId == null && selectionName(item.name, item.groupTitle) in selectedNames,
                     lastSeenAt = now,
                 )
-            })
-            IptvImportResult(sourceId, source.name, parsed.size)
+            }
+            for (item in M3uParser.sequence(InputStreamReader(input, Charsets.UTF_8))) {
+                batch += entity(channelCount, item)
+                channelCount++
+                if (batch.size >= IMPORT_BATCH_SIZE) {
+                    dao.upsertChannels(batch.toList())
+                    batch.clear()
+                }
+            }
+            if (batch.isNotEmpty()) dao.upsertChannels(batch)
+            require(channelCount > 0) { "Listede oynatılabilir IPTV kanalı bulunamadı." }
+            IptvImportResult(sourceId, source.name, channelCount)
         }
+        notifySharedChannelsChanged()
+        return result
+    }
+
+    private fun notifySharedChannelsChanged() {
+        appContext.contentResolver.notifyChange(TvAppInputContract.CHANNELS_URI, null)
+        appContext.sendBroadcast(
+            Intent(ACTION_IPTV_CHANNELS_CHANGED).setPackage(TVAPP_INPUT_PACKAGE),
+        )
     }
 
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
@@ -226,5 +294,9 @@ class IptvRepository(context: Context) {
         private const val READ_TIMEOUT_MS = 30_000
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
+        private const val IMPORT_BATCH_SIZE = 500
+        private const val ACTION_IPTV_CHANNELS_CHANGED =
+            "com.tvapp.livetv.action.IPTV_CHANNELS_CHANGED"
+        private const val TVAPP_INPUT_PACKAGE = "com.tvapp.input"
     }
 }

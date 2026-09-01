@@ -13,13 +13,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelGroupEntity::class,
         IptvSourceEntity::class,
         IptvChannelEntity::class,
+        XmlTvProgramEntity::class,
     ],
-    version = 4,
+    version = 6,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
     abstract fun channelDao(): ChannelDao
     abstract fun iptvDao(): IptvDao
+    abstract fun xmlTvDao(): XmlTvDao
 
     companion object {
         @Volatile
@@ -30,7 +32,13 @@ abstract class TVAppDatabase : RoomDatabase() {
                 context.applicationContext,
                 TVAppDatabase::class.java,
                 "tv-app.db",
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            ).addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+            )
                 .build()
                 .also { instance = it }
         }
@@ -87,6 +95,48 @@ abstract class TVAppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_originalIndex` " +
                         "ON `iptv_channels` (`sourceId`, `originalIndex`)",
+                )
+            }
+        }
+
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `iptv_channels` " +
+                        "ADD COLUMN `contentType` TEXT NOT NULL DEFAULT 'LIVE'",
+                )
+                db.execSQL(
+                    "UPDATE `iptv_channels` SET `contentType` = 'VOD' WHERE " +
+                        "LOWER(`streamUrl` || ' ' || COALESCE(`groupTitle`, '')) LIKE '%.mp4%' OR " +
+                        "LOWER(`streamUrl` || ' ' || COALESCE(`groupTitle`, '')) LIKE '%.mkv%' OR " +
+                        "LOWER(`streamUrl` || ' ' || COALESCE(`groupTitle`, '')) LIKE '%/movie/%' OR " +
+                        "LOWER(`streamUrl` || ' ' || COALESCE(`groupTitle`, '')) LIKE '%/series/%' OR " +
+                        "LOWER(`streamUrl` || ' ' || COALESCE(`groupTitle`, '')) LIKE '%/vod/%'",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_contentType_originalIndex` " +
+                        "ON `iptv_channels` (`sourceId`, `contentType`, `originalIndex`)",
+                )
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `xmltv_programs` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`channelId` TEXT NOT NULL, `channelName` TEXT NOT NULL, " +
+                        "`normalizedChannelId` TEXT NOT NULL, " +
+                        "`normalizedChannelName` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                        "`startTimeMillis` INTEGER NOT NULL, `endTimeMillis` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_normalizedChannelId_startTimeMillis_endTimeMillis` " +
+                        "ON `xmltv_programs` (`normalizedChannelId`, `startTimeMillis`, `endTimeMillis`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_normalizedChannelName_startTimeMillis_endTimeMillis` " +
+                        "ON `xmltv_programs` (`normalizedChannelName`, `startTimeMillis`, `endTimeMillis`)",
                 )
             }
         }

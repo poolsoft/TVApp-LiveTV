@@ -55,6 +55,9 @@ interface IptvDao {
     @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId ORDER BY originalIndex")
     suspend fun getChannelsForSource(sourceId: Long): List<IptvChannelEntity>
 
+    @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId AND selected = 1")
+    suspend fun getSelectedChannelsForSource(sourceId: Long): List<IptvChannelEntity>
+
     @Query(
         "SELECT * FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
@@ -67,6 +70,62 @@ interface IptvDao {
         limit: Int,
         offset: Int,
     ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getLibraryPage(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        limit: Int,
+        offset: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT COUNT(*) FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType)",
+    )
+    suspend fun libraryCount(sourceId: Long, category: String?, contentType: String): Int
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1) " +
+            "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getSelectionPage(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        limit: Int,
+        offset: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT COUNT(*) FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1)",
+    )
+    suspend fun selectionCount(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+    ): Int
 
     @Query(
         "SELECT DISTINCT TRIM(groupTitle) FROM iptv_channels " +
@@ -100,6 +159,12 @@ interface IptvDao {
 
     @Query("UPDATE iptv_channels SET selected = 1 WHERE sourceKey IN (:sourceKeys)")
     suspend fun selectChannels(sourceKeys: List<String>)
+
+    @Query("UPDATE iptv_channels SET selected = :selected WHERE sourceKey = :sourceKey")
+    suspend fun setChannelSelected(sourceKey: String, selected: Boolean)
+
+    @Query("UPDATE iptv_channels SET selected = :selected WHERE sourceKey IN (:sourceKeys)")
+    suspend fun setChannelsSelected(sourceKeys: List<String>, selected: Boolean)
 
     @Upsert
     suspend fun upsertChannels(channels: List<IptvChannelEntity>)

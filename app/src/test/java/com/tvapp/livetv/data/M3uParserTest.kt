@@ -22,6 +22,22 @@ class M3uParserTest {
         assertEquals("https://img/logo.png", channel.logoUrl)
         assertEquals("Ulusal, HD", channel.groupTitle)
         assertEquals("https://example.com/live/trt1.m3u8", channel.streamUrl)
+        assertEquals("LIVE", channel.contentType)
+    }
+
+    @Test
+    fun classifiesFiniteDurationAndVodPaths() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:5400 group-title="Filmler",Uzun Metraj
+            https://example.com/archive/item.ts
+            #EXTINF:-1,Dizi Bölümü
+            https://example.com/series/episode-1.m3u8
+        """.trimIndent()
+
+        val channels = M3uParser.parse(StringReader(playlist))
+
+        assertEquals(listOf("VOD", "VOD"), channels.map { it.contentType })
     }
 
     @Test
