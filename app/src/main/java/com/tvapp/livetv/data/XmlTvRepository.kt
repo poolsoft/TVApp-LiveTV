@@ -9,6 +9,7 @@ import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.model.LiveChannel
+import org.json.JSONArray
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -20,6 +21,7 @@ class XmlTvRepository(context: Context) {
     private val preferences = appContext.getSharedPreferences("xmltv", Context.MODE_PRIVATE)
     private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.xmlTvDao()
+    private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
 
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE, null)
 
@@ -56,6 +58,7 @@ class XmlTvRepository(context: Context) {
     fun clear() {
         preferences.edit().clear().apply()
         database.runInTransaction { dao.clearPrograms() }
+        legacyCacheFile.delete()
         (appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler)
             .cancel(REFRESH_JOB_ID)
     }
@@ -81,6 +84,7 @@ class XmlTvRepository(context: Context) {
     }
 
     fun programs(channel: LiveChannel, start: Long, end: Long): List<ProgramSummary> {
+        migrateLegacyCacheIfNeeded()
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
         return dao.programs(epgId.orEmpty(), name, start, end).map {
@@ -140,7 +144,40 @@ class XmlTvRepository(context: Context) {
             programs.chunked(INSERT_BATCH_SIZE).forEach(dao::insertPrograms)
         }
         preferences.edit().putString(KEY_SOURCE, label).putLong(KEY_UPDATED, System.currentTimeMillis()).apply()
+        legacyCacheFile.delete()
         return programs.size
+    }
+
+    private fun migrateLegacyCacheIfNeeded() {
+        if (!legacyCacheFile.exists()) return
+        if (dao.programCount() > 0) {
+            legacyCacheFile.delete()
+            return
+        }
+        val legacyPrograms = runCatching {
+            val array = JSONArray(legacyCacheFile.readText())
+            (0 until array.length()).map { index ->
+                array.getJSONObject(index).let { item ->
+                    val channelId = item.getString("id")
+                    val channelName = item.getString("name")
+                    XmlTvProgramEntity(
+                        channelId = channelId,
+                        channelName = channelName,
+                        normalizedChannelId = channelId.normalize(),
+                        normalizedChannelName = channelName.normalize(),
+                        title = item.getString("title"),
+                        startTimeMillis = item.getLong("start"),
+                        endTimeMillis = item.getLong("end"),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+        if (legacyPrograms.isNotEmpty()) {
+            database.runInTransaction {
+                legacyPrograms.chunked(INSERT_BATCH_SIZE).forEach(dao::insertPrograms)
+            }
+        }
+        legacyCacheFile.delete()
     }
 
     private fun parseTime(value: String?): Long {

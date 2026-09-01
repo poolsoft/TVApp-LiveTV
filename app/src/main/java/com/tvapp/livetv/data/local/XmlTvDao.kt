@@ -6,6 +6,9 @@ import androidx.room.Query
 
 @Dao
 interface XmlTvDao {
+    @Query("SELECT COUNT(*) FROM xmltv_programs")
+    fun programCount(): Int
+
     @Insert
     fun insertPrograms(programs: List<XmlTvProgramEntity>)
 
