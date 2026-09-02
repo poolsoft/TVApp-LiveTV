@@ -106,6 +106,11 @@ class IptvRepository(context: Context) {
 
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
 
+    suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> =
+        dao.getAlternativeChannels(sourceKey)
+            .distinctBy(IptvChannelEntity::streamUrl)
+            .map { it.toLiveChannel() }
+
     suspend fun libraryLiveChannels(sourceId: Long?, category: String?): List<LiveChannel> =
         libraryChannels(sourceId)
             .asSequence()

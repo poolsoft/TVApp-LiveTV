@@ -122,6 +122,15 @@
     <string name="iptv_action_audio">● Ses</string>
     <string name="iptv_action_subtitle">● Altyazı</string>
     <string name="iptv_action_external">● Dış oynatıcı</string>
+    <string name="iptv_action_video">● Görüntü</string>
+    <string name="iptv_video_options">Görüntü seçenekleri</string>
+    <string name="iptv_quality">Yayın kalitesi</string>
+    <string name="iptv_quality_auto">Otomatik</string>
+    <string name="iptv_aspect_ratio">Görüntü oranı</string>
+    <string name="iptv_aspect_fit">Ekrana sığdır</string>
+    <string name="iptv_aspect_fill">Ekranı doldur</string>
+    <string name="iptv_aspect_zoom">Yakınlaştır</string>
+    <string name="iptv_alternative_stream">Alternatif yayın deneniyor</string>
     <string name="iptv_resumed">Kaldığın yerden devam ediliyor</string>
     <string name="iptv_reconnecting">Yayın yeniden bağlanıyor</string>
     <string name="iptv_buffer_seconds">Buffer %1$d sn</string>
@@ -280,6 +289,7 @@
     <string name="iptv_library_live">Canlı yayınlar</string>
     <string name="iptv_library_live_short">Canlı</string>
     <string name="iptv_library_vod">VOD</string>
+    <string name="iptv_library_continue">İzlemeye devam et</string>
     <string name="iptv_library_empty">Önce bir IPTV listesi ekleyin.</string>
     <string name="main_channel_list">Ana liste</string>
     <string name="apply">Uygula</string>

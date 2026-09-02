@@ -145,6 +145,23 @@ interface IptvDao {
     suspend fun getChannel(sourceKey: String): IptvChannelEntity?
 
     @Query(
+        "SELECT candidate.* FROM iptv_channels candidate " +
+            "INNER JOIN iptv_channels active ON active.sourceKey = :sourceKey " +
+            "INNER JOIN iptv_sources candidateSource ON candidateSource.id = candidate.sourceId " +
+            "WHERE candidateSource.enabled = 1 AND candidate.sourceKey != active.sourceKey " +
+            "AND candidate.streamUrl != active.streamUrl " +
+            "AND candidate.contentType = active.contentType " +
+            "AND ((active.tvgId IS NOT NULL AND TRIM(active.tvgId) != '' " +
+            "AND candidate.tvgId = active.tvgId) " +
+            "OR (active.tvgName IS NOT NULL AND TRIM(active.tvgName) != '' " +
+            "AND candidate.tvgName = active.tvgName) " +
+            "OR candidate.displayName = active.displayName COLLATE NOCASE) " +
+            "ORDER BY CASE WHEN candidate.sourceId = active.sourceId THEN 0 ELSE 1 END, " +
+            "candidate.originalIndex LIMIT 8",
+    )
+    suspend fun getAlternativeChannels(sourceKey: String): List<IptvChannelEntity>
+
+    @Query(
         "SELECT c.* FROM iptv_channels c " +
             "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
             "WHERE s.enabled = 1 AND c.selected = 1 ORDER BY s.name, c.originalIndex",

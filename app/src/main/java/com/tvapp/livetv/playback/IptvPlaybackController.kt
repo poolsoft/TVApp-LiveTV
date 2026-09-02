@@ -33,6 +33,7 @@ class IptvPlaybackController(
     private var player: ExoPlayer? = null
     private var mediaSourceFactory: MediaSource.Factory? = null
     private var retryCount = 0
+    private var selectedVideoTrackId: String? = null
     private var released = false
     private var lastObservedPosition = C.TIME_UNSET
     private var lastProgressAt = SystemClock.elapsedRealtime()
@@ -52,6 +53,7 @@ class IptvPlaybackController(
         released = false
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
+        selectedVideoTrackId = null
         resetProgressObservation()
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -257,7 +259,27 @@ class IptvPlaybackController(
 
     fun subtitleTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_TEXT)
 
+    fun videoTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_VIDEO)
+
+    fun videoTrackOverrideId(): String? = selectedVideoTrackId
+
     fun selectAudioTrack(id: String): Boolean = selectTrack(C.TRACK_TYPE_AUDIO, id)
+
+    fun selectVideoTrack(id: String?): Boolean {
+        val current = player ?: return false
+        val builder = current.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+        if (id != null) {
+            val target = findTrack(C.TRACK_TYPE_VIDEO, id) ?: return false
+            builder.setOverrideForType(
+                TrackSelectionOverride(target.first.mediaTrackGroup, target.second),
+            )
+        }
+        current.trackSelectionParameters = builder.build()
+        selectedVideoTrackId = id
+        return true
+    }
 
     fun selectSubtitleTrack(id: String?): Boolean {
         val current = player ?: return false
@@ -309,6 +331,9 @@ class IptvPlaybackController(
                     label = format.label,
                     mimeType = format.sampleMimeType,
                     selected = group.isTrackSelected(trackIndex),
+                    width = format.width.takeIf { it > 0 },
+                    height = format.height.takeIf { it > 0 },
+                    bitrate = format.bitrate.takeIf { it > 0 },
                 )
             }
         }
@@ -386,6 +411,9 @@ data class IptvTrackOption(
     val label: String?,
     val mimeType: String?,
     val selected: Boolean,
+    val width: Int? = null,
+    val height: Int? = null,
+    val bitrate: Int? = null,
 )
 
 data class IptvTechnicalSnapshot(

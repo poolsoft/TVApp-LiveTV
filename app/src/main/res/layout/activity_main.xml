@@ -276,7 +276,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="@string/iptv_action_external"
+                android:text="@string/iptv_action_video"
                 android:textColor="@color/remote_blue"
                 android:textSize="12sp" />
         </LinearLayout>

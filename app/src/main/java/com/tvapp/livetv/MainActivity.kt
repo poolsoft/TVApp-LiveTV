@@ -36,6 +36,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.ProgramRepository
@@ -50,6 +51,8 @@ import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
 import com.tvapp.livetv.playback.IptvResumeStore
+import com.tvapp.livetv.playback.IptvAspectMode
+import com.tvapp.livetv.playback.IptvViewPreferencesStore
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.settings.ChannelPanelSide
@@ -110,7 +113,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
-    private enum class IptvLibraryContentType { ALL, LIVE, VOD }
+    private enum class IptvLibraryContentType { ALL, LIVE, VOD, CONTINUE }
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: ChannelRepository
@@ -126,6 +129,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var parentalControlStore: ParentalControlStore
     private lateinit var iptvResumeStore: IptvResumeStore
+    private lateinit var iptvViewPreferencesStore: IptvViewPreferencesStore
     private lateinit var homeRecentChannelsPublisher: HomeRecentChannelsPublisher
     private lateinit var debugLog: CrashReportStore
     private lateinit var adapter: ChannelAdapter
@@ -192,6 +196,9 @@ class MainActivity : AppCompatActivity() {
     private var iptvLiveHealthJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private var iptvManualTimeshift = false
+    private var iptvAlternativeStreams: List<LiveChannel> = emptyList()
+    private var iptvAlternativeIndex = 0
+    private var iptvAlternativeLoadKey: String? = null
     private val openExternalSubtitle = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -280,6 +287,8 @@ class MainActivity : AppCompatActivity() {
         sleepTimerStore = SleepTimerStore(this)
         parentalControlStore = ParentalControlStore(this)
         iptvResumeStore = IptvResumeStore(this)
+        iptvViewPreferencesStore = IptvViewPreferencesStore(this)
+        applyIptvAspectMode(iptvViewPreferencesStore.aspectMode())
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
         sourceFilter = ChannelSourceFilter.ALL
@@ -302,10 +311,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        iptvPlayback.onPlaybackError = { error ->
-            debugLog.recordDebug("IPTV_PLAYBACK_FAILURE | ${error.errorCodeName}: ${error.message}")
-            showPlaybackError(currentChannel, error.message ?: error.errorCodeName)
-        }
+        iptvPlayback.onPlaybackError = ::handleIptvPlaybackError
         iptvPlayback.onContentKindChanged = { kind ->
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
                 currentIptvContentKind = kind
@@ -626,6 +632,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         0L
                     }
+                    prepareIptvAlternatives(channel)
                     iptvPlayback.play(channel, resumePosition)
                     if (resumePosition > 0L) {
                         showIptvPlaybackControls(R.string.iptv_resumed)
@@ -637,6 +644,71 @@ class MainActivity : AppCompatActivity() {
                 debugLog.recordDebug("PLAYBACK_FAILURE | ${it.javaClass.name}: ${it.message}")
                 showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
             }
+    }
+
+    private fun prepareIptvAlternatives(channel: LiveChannel) {
+        iptvAlternativeLoadKey = channel.sourceKey
+        iptvAlternativeStreams = emptyList()
+        iptvAlternativeIndex = 0
+        lifecycleScope.launch {
+            val alternatives = withContext(Dispatchers.IO) {
+                iptvRepository.alternativeStreams(channel.sourceKey)
+            }
+            if (currentChannel?.sourceKey == channel.sourceKey) {
+                iptvAlternativeStreams = alternatives
+                debugLog.recordDebug(
+                    "IPTV_ALTERNATIVES_READY | key=${channel.sourceKey}, count=${alternatives.size}",
+                )
+            }
+        }
+    }
+
+    private fun handleIptvPlaybackError(error: androidx.media3.common.PlaybackException) {
+        val channel = currentChannel
+        debugLog.recordDebug("IPTV_PLAYBACK_FAILURE | ${error.errorCodeName}: ${error.message}")
+        if (channel?.source != LiveChannel.Source.IPTV) {
+            showPlaybackError(channel, error.message ?: error.errorCodeName)
+            return
+        }
+        lifecycleScope.launch {
+            val alternatives = if (iptvAlternativeLoadKey == channel.sourceKey &&
+                iptvAlternativeStreams.isNotEmpty()
+            ) {
+                iptvAlternativeStreams
+            } else {
+                withContext(Dispatchers.IO) {
+                    iptvRepository.alternativeStreams(channel.sourceKey)
+                }.also {
+                    iptvAlternativeLoadKey = channel.sourceKey
+                    iptvAlternativeStreams = it
+                    iptvAlternativeIndex = 0
+                }
+            }
+            if (currentChannel?.sourceKey != channel.sourceKey) return@launch
+            val alternative = alternatives.getOrNull(iptvAlternativeIndex++)
+            if (alternative == null) {
+                showPlaybackError(channel, error.message ?: error.errorCodeName)
+                return@launch
+            }
+            val snapshot = iptvPlayback.playbackSnapshot()
+            val startPosition = snapshot.positionMillis.takeIf {
+                channel.iptvContentType == "VOD"
+            } ?: 0L
+            debugLog.recordDebug(
+                "IPTV_ALTERNATIVE_PLAY | key=${channel.sourceKey}, " +
+                    "index=$iptvAlternativeIndex/${alternatives.size}",
+            )
+            showIptvPlaybackControls(R.string.iptv_alternative_stream)
+            iptvPlayback.play(
+                channel.copy(
+                    uri = alternative.uri,
+                    userAgent = alternative.userAgent,
+                    referrer = alternative.referrer,
+                    subtitleUrl = alternative.subtitleUrl,
+                ),
+                startPosition,
+            )
+        }
     }
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
@@ -1581,6 +1653,7 @@ class MainActivity : AppCompatActivity() {
                 getString(R.string.iptv_library_all_content),
                 getString(R.string.iptv_library_live),
                 getString(R.string.iptv_library_vod),
+                getString(R.string.iptv_library_continue),
             )
             val container = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -1640,6 +1713,21 @@ class MainActivity : AppCompatActivity() {
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             }
             sourceSpinner.onItemSelectedListener = sourceListener
+            typeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: AdapterView<*>?,
+                    view: View?,
+                    position: Int,
+                    id: Long,
+                ) {
+                    val categoryEnabled = contentTypes.getOrNull(position) !=
+                        IptvLibraryContentType.CONTINUE
+                    categorySpinner.isEnabled = categoryEnabled
+                    categorySpinner.alpha = if (categoryEnabled) 1f else 0.45f
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
             refreshCategories(savedCategory)
 
             val dialog = AlertDialog.Builder(this@MainActivity)
@@ -1657,7 +1745,11 @@ class MainActivity : AppCompatActivity() {
                     val type = contentTypes.getOrElse(typeSpinner.selectedItemPosition) {
                         IptvLibraryContentType.ALL
                     }
-                    val category = categories.getOrNull(categorySpinner.selectedItemPosition)
+                    val category = if (type == IptvLibraryContentType.CONTINUE) {
+                        null
+                    } else {
+                        categories.getOrNull(categorySpinner.selectedItemPosition)
+                    }
                     preferences.edit()
                         .putLong(IPTV_LIBRARY_SOURCE_ID, sourceId)
                         .putString(IPTV_LIBRARY_CONTENT_TYPE, type.name)
@@ -1764,6 +1856,7 @@ class MainActivity : AppCompatActivity() {
                 IptvLibraryContentType.ALL -> null
                 IptvLibraryContentType.LIVE -> getString(R.string.iptv_library_live_short)
                 IptvLibraryContentType.VOD -> getString(R.string.iptv_library_vod)
+                IptvLibraryContentType.CONTINUE -> getString(R.string.iptv_library_continue)
             },
             category,
         ).joinToString(" · ")
@@ -1771,6 +1864,32 @@ class MainActivity : AppCompatActivity() {
         adapter.submitPrograms(currentPrograms)
         updateIptvLibraryCount()
         lifecycleScope.launch {
+            if (contentType == IptvLibraryContentType.CONTINUE) {
+                val sourceInputId = "iptv:$sourceId"
+                val continued = withContext(Dispatchers.IO) {
+                    iptvResumeStore.entries().mapNotNull { entry ->
+                        iptvRepository.channel(entry.sourceKey)
+                    }.filter { channel ->
+                        channel.inputId == sourceInputId && channel.iptvContentType == "VOD"
+                    }
+                }.mapIndexed { index, channel ->
+                    channel.copy(displayNumber = (index + 1).toString())
+                }
+                if (
+                    channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
+                    iptvLibrarySourceId != sourceId ||
+                    iptvLibraryContentType != IptvLibraryContentType.CONTINUE
+                ) return@launch
+                iptvLibraryChannels = continued
+                iptvLibraryTotalCount = continued.size
+                iptvLibraryOffset = continued.size
+                iptvLibraryExhausted = true
+                adapter.submitList(continued)
+                currentChannel?.let { adapter.select(it.sourceKey) }
+                updateIptvLibraryCount()
+                focusCurrentListChannel()
+                return@launch
+            }
             iptvLibraryTotalCount = withContext(Dispatchers.IO) {
                 iptvRepository.libraryChannelCount(
                     sourceId,
@@ -1792,6 +1911,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadNextIptvLibraryPage() {
         if (
             channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
+            iptvLibraryContentType == IptvLibraryContentType.CONTINUE ||
             iptvLibraryExhausted ||
             iptvLibraryLoadJob?.isActive == true
         ) return
@@ -1861,6 +1981,12 @@ class MainActivity : AppCompatActivity() {
             binding.nowChannel.setText(R.string.channel_not_found)
             return
         }
+        if (iptvLibraryContentType == IptvLibraryContentType.CONTINUE) {
+            val channel = iptvLibraryChannels.getOrNull(index) ?: return
+            selectChannel(channel, recordHistory = false)
+            hideChannelPanel()
+            return
+        }
         lifecycleScope.launch {
             val channel = withContext(Dispatchers.IO) {
                 iptvRepository.libraryLiveChannelsPage(
@@ -1879,6 +2005,16 @@ class MainActivity : AppCompatActivity() {
     private fun showIptvLibraryBoundary(last: Boolean) {
         val sourceId = iptvLibrarySourceId ?: return
         if (iptvLibraryTotalCount == 0 || iptvLibraryLoadJob?.isActive == true) return
+        if (iptvLibraryContentType == IptvLibraryContentType.CONTINUE) {
+            val target = if (last) iptvLibraryChannels.lastIndex else 0
+            binding.channelList.scrollToPosition(target)
+            binding.channelList.post {
+                binding.channelList.findViewHolderForAdapterPosition(target)
+                    ?.itemView
+                    ?.requestFocus()
+            }
+            return
+        }
         iptvLibraryLoadJob = lifecycleScope.launch {
             val offset = if (last) {
                 ((iptvLibraryTotalCount - 1) / IPTV_LIBRARY_PAGE_SIZE) * IPTV_LIBRARY_PAGE_SIZE
@@ -2331,6 +2467,91 @@ class MainActivity : AppCompatActivity() {
         val preference = ExternalPlayerPreferencesStore(this).load()
         if (!ExternalPlayerLauncher.launch(this, channel, preference)) {
             Toast.makeText(this, R.string.external_player_not_found, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showIptvVideoOptions() {
+        val channel = currentChannel?.takeIf { it.source == LiveChannel.Source.IPTV } ?: return
+        val actions = arrayOf(
+            getString(R.string.iptv_quality),
+            getString(R.string.iptv_aspect_ratio),
+            getString(R.string.external_player),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_video_options)
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> showIptvVideoQuality()
+                    1 -> showIptvAspectRatio()
+                    2 -> openExternalPlayer(channel)
+                }
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showIptvVideoQuality() {
+        val tracks = iptvPlayback.videoTracks()
+        if (tracks.isEmpty()) {
+            showEditorError(R.string.tracks_not_available)
+            return
+        }
+        val labels = buildList {
+            add(getString(R.string.iptv_quality_auto))
+            addAll(tracks.map(::iptvVideoTrackLabel))
+        }.toTypedArray()
+        val selectedId = iptvPlayback.videoTrackOverrideId()
+        val selectedIndex = tracks.indexOfFirst { it.id == selectedId }
+            .takeIf { it >= 0 }
+            ?.plus(1)
+            ?: 0
+        AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_quality)
+            .setSingleChoiceItems(labels, selectedIndex) { dialog, which ->
+                iptvPlayback.selectVideoTrack(tracks.getOrNull(which - 1)?.id)
+                dialog.dismiss()
+                showIptvPlaybackControls(iptvPlaybackStateText())
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun iptvVideoTrackLabel(track: IptvTrackOption): String = buildList {
+        if (track.width != null && track.height != null) add("${track.width}×${track.height}")
+        track.bitrate?.let { bitrate ->
+            add(String.format(Locale.getDefault(), "%.1f Mbps", bitrate / 1_000_000f))
+        }
+        track.label?.takeIf(String::isNotBlank)?.let(::add)
+        if (isEmpty()) add(track.mimeType?.substringAfter('/') ?: track.id)
+    }.joinToString(" · ")
+
+    private fun showIptvAspectRatio() {
+        val modes = IptvAspectMode.entries
+        val labels = arrayOf(
+            getString(R.string.iptv_aspect_fit),
+            getString(R.string.iptv_aspect_fill),
+            getString(R.string.iptv_aspect_zoom),
+        )
+        val selected = modes.indexOf(iptvViewPreferencesStore.aspectMode()).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.iptv_aspect_ratio)
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                modes.getOrNull(which)?.let { mode ->
+                    iptvViewPreferencesStore.setAspectMode(mode)
+                    applyIptvAspectMode(mode)
+                }
+                dialog.dismiss()
+                showIptvPlaybackControls(iptvPlaybackStateText())
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun applyIptvAspectMode(mode: IptvAspectMode) {
+        binding.iptvPlayerView.resizeMode = when (mode) {
+            IptvAspectMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+            IptvAspectMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+            IptvAspectMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         }
     }
 
@@ -3144,7 +3365,7 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_PROG_BLUE -> {
-                    currentChannel?.let(::openExternalPlayer)
+                    showIptvVideoOptions()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {

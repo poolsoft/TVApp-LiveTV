@@ -280,6 +280,7 @@
     <string name="iptv_library_live">Live channels</string>
     <string name="iptv_library_live_short">Live</string>
     <string name="iptv_library_vod">VOD</string>
+    <string name="iptv_library_continue">Continue watching</string>
     <string name="iptv_library_empty">Add an IPTV list first.</string>
     <string name="main_channel_list">Main list</string>
     <string name="apply">Apply</string>
@@ -327,6 +328,15 @@
         <item quantity="other">%d seconds</item>
     </plurals>
     <string name="external_player">External player</string>
+    <string name="iptv_action_video">● Video</string>
+    <string name="iptv_video_options">Video options</string>
+    <string name="iptv_quality">Stream quality</string>
+    <string name="iptv_quality_auto">Automatic</string>
+    <string name="iptv_aspect_ratio">Aspect ratio</string>
+    <string name="iptv_aspect_fit">Fit to screen</string>
+    <string name="iptv_aspect_fill">Fill screen</string>
+    <string name="iptv_aspect_zoom">Zoom</string>
+    <string name="iptv_alternative_stream">Trying an alternative stream</string>
     <string name="external_player_system">System chooser</string>
     <string name="external_player_vlc">VLC</string>
     <string name="external_player_mx">MX Player</string>
