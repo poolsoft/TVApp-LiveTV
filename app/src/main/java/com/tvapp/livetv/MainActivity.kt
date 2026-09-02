@@ -49,6 +49,7 @@ import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
+import com.tvapp.livetv.playback.IptvResumeStore
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.settings.ChannelPanelSide
@@ -95,7 +96,8 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_CONTROLS_WIDTH_FRACTION = 0.68f
         private const val IPTV_CONTROLS_BOTTOM_MARGIN_FRACTION = 0.045f
         private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
-        private const val IPTV_LIVE_CHECK_INTERVAL_MS = 12_000L
+        private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
+        private const val IPTV_STALL_TIMEOUT_MS = 15_000L
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
@@ -123,6 +125,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var channelListFilterStore: ChannelListFilterStore
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var parentalControlStore: ParentalControlStore
+    private lateinit var iptvResumeStore: IptvResumeStore
     private lateinit var homeRecentChannelsPublisher: HomeRecentChannelsPublisher
     private lateinit var debugLog: CrashReportStore
     private lateinit var adapter: ChannelAdapter
@@ -188,6 +191,7 @@ class MainActivity : AppCompatActivity() {
     private var iptvControlsJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
+    private var iptvManualTimeshift = false
     private val openExternalSubtitle = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -275,6 +279,7 @@ class MainActivity : AppCompatActivity() {
         channelListFilterStore = ChannelListFilterStore(this)
         sleepTimerStore = SleepTimerStore(this)
         parentalControlStore = ParentalControlStore(this)
+        iptvResumeStore = IptvResumeStore(this)
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
         sourceFilter = ChannelSourceFilter.ALL
@@ -304,8 +309,7 @@ class MainActivity : AppCompatActivity() {
         iptvPlayback.onContentKindChanged = { kind ->
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
                 currentIptvContentKind = kind
-                if (kind == IptvContentKind.LIVE) startIptvLiveHealthMonitor()
-                else iptvLiveHealthJob?.cancel()
+                startIptvPlaybackMonitor(kind)
             }
         }
         iptvPlayback.onTracksChanged = {
@@ -569,6 +573,7 @@ class MainActivity : AppCompatActivity() {
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
         if (iptvOverlayActive) stopIptvOverlay()
         if (iptvGridActive) stopIptvGrid(resumePrevious = false)
+        saveCurrentIptvResumePosition()
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
@@ -578,6 +583,7 @@ class MainActivity : AppCompatActivity() {
         currentChannel = channel
         updateChannelActionLabels()
         currentIptvContentKind = IptvContentKind.UNKNOWN
+        iptvManualTimeshift = false
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
         binding.iptvPlaybackControls.visibility = View.GONE
@@ -615,7 +621,15 @@ class MainActivity : AppCompatActivity() {
                     playback.stop()
                     binding.tvView.visibility = View.GONE
                     binding.iptvPlayerView.visibility = View.VISIBLE
-                    iptvPlayback.play(channel)
+                    val resumePosition = if (channel.iptvContentType == "VOD") {
+                        iptvResumeStore.position(channel.sourceKey)
+                    } else {
+                        0L
+                    }
+                    iptvPlayback.play(channel, resumePosition)
+                    if (resumePosition > 0L) {
+                        showIptvPlaybackControls(R.string.iptv_resumed)
+                    }
                 }
             }
         }
@@ -878,17 +892,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startIptvLiveHealthMonitor() {
+    private fun startIptvPlaybackMonitor(kind: IptvContentKind) {
         iptvLiveHealthJob?.cancel()
         val sourceKey = currentChannel?.sourceKey ?: return
         iptvLiveHealthJob = lifecycleScope.launch {
             while (currentChannel?.sourceKey == sourceKey) {
-                delay(IPTV_LIVE_CHECK_INTERVAL_MS)
-                if (iptvPlayback.catchUpToLive(IPTV_MAX_LIVE_OFFSET_MS)) {
-                    debugLog.recordDebug("IPTV_LIVE_EDGE_CORRECTED | channel=$sourceKey")
+                delay(IPTV_PLAYBACK_CHECK_INTERVAL_MS)
+                when (kind) {
+                    IptvContentKind.LIVE -> {
+                        if (iptvPlayback.recoverIfStalled(IPTV_STALL_TIMEOUT_MS)) {
+                            debugLog.recordDebug("IPTV_STALL_RECOVERED | channel=$sourceKey")
+                            showIptvPlaybackControls(R.string.iptv_reconnecting)
+                        } else if (
+                            !iptvManualTimeshift &&
+                            iptvPlayback.catchUpToLive(IPTV_MAX_LIVE_OFFSET_MS)
+                        ) {
+                            debugLog.recordDebug("IPTV_LIVE_EDGE_CORRECTED | channel=$sourceKey")
+                        }
+                    }
+                    IptvContentKind.VOD -> saveCurrentIptvResumePosition()
+                    IptvContentKind.UNKNOWN -> Unit
                 }
             }
         }
+    }
+
+    private fun saveCurrentIptvResumePosition() {
+        val channel = currentChannel ?: return
+        if (channel.source != LiveChannel.Source.IPTV || currentIptvContentKind != IptvContentKind.VOD) {
+            return
+        }
+        val snapshot = iptvPlayback.playbackSnapshot()
+        iptvResumeStore.save(channel.sourceKey, snapshot.positionMillis, snapshot.durationMillis)
     }
 
     private fun handleIptvMediaKey(keyCode: Int) {
@@ -898,7 +933,10 @@ class MainActivity : AppCompatActivity() {
                     KeyEvent.KEYCODE_MEDIA_PLAY,
                     KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                    KeyEvent.KEYCODE_MEDIA_NEXT -> iptvPlayback.goLive()
+                    KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                        iptvManualTimeshift = false
+                        iptvPlayback.goLive()
+                    }
                     else -> return
                 }
                 showIptvPlaybackControls(R.string.iptv_returned_live)
@@ -937,6 +975,13 @@ class MainActivity : AppCompatActivity() {
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
+        binding.iptvControlRedAction.setText(
+            if (currentIptvContentKind == IptvContentKind.LIVE) {
+                R.string.iptv_action_live
+            } else {
+                R.string.iptv_action_restart
+            },
+        )
         val timeline = iptvPlayback.playbackSnapshot().let {
             it.kind == IptvContentKind.VOD || it.isSeekable
         }
@@ -947,14 +992,14 @@ class MainActivity : AppCompatActivity() {
         iptvControlsJob = lifecycleScope.launch {
             val startedAt = System.currentTimeMillis()
             while (System.currentTimeMillis() - startedAt < IPTV_CONTROL_TIMEOUT_MS) {
-                if (timeline) updateVodPlaybackControls()
+                updateIptvPlaybackControls()
                 delay(500L)
             }
             binding.iptvPlaybackControls.visibility = View.GONE
         }
     }
 
-    private fun updateVodPlaybackControls() {
+    private fun updateIptvPlaybackControls() {
         val state = iptvPlayback.playbackSnapshot()
         val duration = state.durationMillis.coerceAtLeast(1L)
         binding.iptvControlProgress.progress =
@@ -966,6 +1011,18 @@ class MainActivity : AppCompatActivity() {
             formatPlaybackTime(state.positionMillis),
             formatPlaybackTime(state.durationMillis),
         )
+        val technical = iptvPlayback.technicalSnapshot()
+        binding.iptvControlTechnical.text = buildList {
+            if (technical.width != null && technical.height != null) {
+                add("${technical.width}×${technical.height}")
+            }
+            technical.videoCodec?.takeIf(String::isNotBlank)?.let { add(it.uppercase(Locale.ROOT)) }
+            technical.audioCodec?.takeIf(String::isNotBlank)?.let { add(it.uppercase(Locale.ROOT)) }
+            technical.bitrate?.let {
+                add(String.format(Locale.getDefault(), "%.1f Mbps", it / 1_000_000f))
+            }
+            add(getString(R.string.iptv_buffer_seconds, technical.bufferedDurationMillis / 1_000L))
+        }.joinToString("  ·  ")
     }
 
     private fun formatPlaybackTime(milliseconds: Long): String {
@@ -3068,19 +3125,55 @@ class MainActivity : AppCompatActivity() {
             currentChannel?.source == LiveChannel.Source.IPTV
         ) {
             when (event.keyCode) {
+                KeyEvent.KEYCODE_PROG_RED -> {
+                    if (currentIptvContentKind == IptvContentKind.LIVE) {
+                        iptvManualTimeshift = false
+                        iptvPlayback.goLive()
+                    } else {
+                        iptvPlayback.restartVod()
+                    }
+                    showIptvPlaybackControls(iptvPlaybackStateText())
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_GREEN -> {
+                    showAudioTracks()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_YELLOW -> {
+                    showSubtitleTracks()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_BLUE -> {
+                    currentChannel?.let(::openExternalPlayer)
+                    return true
+                }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS)
+                    if (
+                        iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS) &&
+                        currentIptvContentKind == IptvContentKind.LIVE
+                    ) {
+                        iptvManualTimeshift = true
+                    }
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS)
+                    if (
+                        iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS) &&
+                        currentIptvContentKind == IptvContentKind.LIVE
+                    ) {
+                        iptvManualTimeshift = true
+                    }
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    if (currentIptvContentKind == IptvContentKind.LIVE) iptvPlayback.goLive()
-                    else iptvPlayback.togglePlayPause()
+                    if (currentIptvContentKind == IptvContentKind.LIVE) {
+                        iptvManualTimeshift = false
+                        iptvPlayback.goLive()
+                    } else {
+                        iptvPlayback.togglePlayPause()
+                    }
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
@@ -3102,7 +3195,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 IPTV_VOD_SEEK_STEP_MS
             }
-            iptvPlayback.seekBy(offset)
+            if (
+                iptvPlayback.seekBy(offset) &&
+                currentIptvContentKind == IptvContentKind.LIVE
+            ) {
+                iptvManualTimeshift = true
+            }
             showIptvPlaybackControls(iptvPlaybackStateText())
             return true
         }
@@ -3255,6 +3353,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        saveCurrentIptvResumePosition()
         if (!isChangingConfigurations &&
             (activePassthroughInputId != null || currentChannel?.source == LiveChannel.Source.TIF)
         ) {
@@ -3266,6 +3365,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        saveCurrentIptvResumePosition()
         if (::debugLog.isInitialized) {
             debugLog.recordDebug(
                 "MAIN_DESTROY | finishing=$isFinishing, config=$isChangingConfigurations",

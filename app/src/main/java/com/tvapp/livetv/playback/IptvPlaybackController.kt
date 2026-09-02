@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -33,6 +34,8 @@ class IptvPlaybackController(
     private var mediaSourceFactory: MediaSource.Factory? = null
     private var retryCount = 0
     private var released = false
+    private var lastObservedPosition = C.TIME_UNSET
+    private var lastProgressAt = SystemClock.elapsedRealtime()
     private val retryRunnable = Runnable {
         player?.let { current ->
             current.prepare()
@@ -44,11 +47,12 @@ class IptvPlaybackController(
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
 
-    fun play(channel: LiveChannel) {
+    fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
         released = false
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
+        resetProgressObservation()
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 MIN_BUFFER_MS,
@@ -113,7 +117,11 @@ class IptvPlaybackController(
         )
         mediaSourceFactory = sourceFactory
         val mediaSource = sourceFactory.createMediaSource(mediaItem)
-        exoPlayer.setMediaSource(mediaSource)
+        if (startPositionMillis > 0L) {
+            exoPlayer.setMediaSource(mediaSource, startPositionMillis)
+        } else {
+            exoPlayer.setMediaSource(mediaSource)
+        }
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -153,6 +161,13 @@ class IptvPlaybackController(
         }
     }
 
+    fun restartVod() {
+        player?.let { current ->
+            current.seekTo(0L)
+            current.play()
+        }
+    }
+
     fun seekBy(offsetMillis: Long): Boolean {
         val current = player ?: return false
         if (contentKind() != IptvContentKind.VOD && !current.isCurrentMediaItemSeekable) return false
@@ -177,6 +192,49 @@ class IptvPlaybackController(
         current.seekToDefaultPosition()
         current.play()
         return true
+    }
+
+    fun recoverIfStalled(maximumStallMillis: Long): Boolean {
+        val current = player ?: return false
+        val now = SystemClock.elapsedRealtime()
+        if (
+            !current.playWhenReady ||
+            current.playbackState == Player.STATE_IDLE ||
+            current.playbackState == Player.STATE_ENDED
+        ) {
+            lastObservedPosition = current.currentPosition
+            lastProgressAt = now
+            return false
+        }
+        val position = current.currentPosition
+        if (lastObservedPosition == C.TIME_UNSET || position - lastObservedPosition >= 500L) {
+            lastObservedPosition = position
+            lastProgressAt = now
+            return false
+        }
+        if (now - lastProgressAt < maximumStallMillis) return false
+        if (current.isCurrentMediaItemLive) current.seekToDefaultPosition()
+        else current.seekTo(position)
+        current.prepare()
+        current.play()
+        resetProgressObservation()
+        return true
+    }
+
+    fun technicalSnapshot(): IptvTechnicalSnapshot {
+        val current = player
+        val video = current?.videoFormat
+        val audio = current?.audioFormat
+        return IptvTechnicalSnapshot(
+            width = video?.width?.takeIf { it > 0 },
+            height = video?.height?.takeIf { it > 0 },
+            videoCodec = video?.codecs ?: video?.sampleMimeType?.substringAfter('/'),
+            audioCodec = audio?.codecs ?: audio?.sampleMimeType?.substringAfter('/'),
+            bitrate = video?.bitrate?.takeIf { it > 0 },
+            bufferedDurationMillis = current?.let {
+                (it.bufferedPosition - it.currentPosition).coerceAtLeast(0L)
+            } ?: 0L,
+        )
     }
 
     fun playbackSnapshot(): IptvPlaybackSnapshot {
@@ -286,6 +344,11 @@ class IptvPlaybackController(
         mediaSourceFactory = null
     }
 
+    private fun resetProgressObservation() {
+        lastObservedPosition = C.TIME_UNSET
+        lastProgressAt = SystemClock.elapsedRealtime()
+    }
+
     private companion object {
         const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         const val MAX_RETRY_COUNT = 3
@@ -323,4 +386,13 @@ data class IptvTrackOption(
     val label: String?,
     val mimeType: String?,
     val selected: Boolean,
+)
+
+data class IptvTechnicalSnapshot(
+    val width: Int?,
+    val height: Int?,
+    val videoCodec: String?,
+    val audioCodec: String?,
+    val bitrate: Int?,
+    val bufferedDurationMillis: Long,
 )

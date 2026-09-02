@@ -117,6 +117,14 @@
     <string name="iptv_vod_paused">Paused</string>
     <string name="iptv_vod_stopped">Stopped</string>
     <string name="iptv_vod_remote_hint">←/→ 30 sec    OK Play/Pause    BACK Close</string>
+    <string name="iptv_action_live">● Live</string>
+    <string name="iptv_action_restart">● Restart</string>
+    <string name="iptv_action_audio">● Audio</string>
+    <string name="iptv_action_subtitle">● Subtitles</string>
+    <string name="iptv_action_external">● External player</string>
+    <string name="iptv_resumed">Resuming where you left off</string>
+    <string name="iptv_reconnecting">Reconnecting stream</string>
+    <string name="iptv_buffer_seconds">Buffer %1$d sec</string>
     <string name="home_recent_channels">Recently watched channels</string>
     <string name="home_watch_next_description">Live TV - Channel %1$s</string>
     <string name="radio_channels">Radio channels</string>

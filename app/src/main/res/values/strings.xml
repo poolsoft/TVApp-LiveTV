@@ -117,6 +117,14 @@
     <string name="iptv_vod_paused">Duraklatıldı</string>
     <string name="iptv_vod_stopped">Durduruldu</string>
     <string name="iptv_vod_remote_hint">←/→ 30 sn    OK Oynat/Duraklat    BACK Kapat</string>
+    <string name="iptv_action_live">● Canlı</string>
+    <string name="iptv_action_restart">● Baştan oynat</string>
+    <string name="iptv_action_audio">● Ses</string>
+    <string name="iptv_action_subtitle">● Altyazı</string>
+    <string name="iptv_action_external">● Dış oynatıcı</string>
+    <string name="iptv_resumed">Kaldığın yerden devam ediliyor</string>
+    <string name="iptv_reconnecting">Yayın yeniden bağlanıyor</string>
+    <string name="iptv_buffer_seconds">Buffer %1$d sn</string>
     <string name="home_recent_channels">Son izlenen kanallar</string>
     <string name="home_watch_next_description">Canlı TV · Kanal %1$s</string>
     <string name="radio_channels">Radyo kanalları</string>
