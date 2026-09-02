@@ -1,18 +1,24 @@
 package com.tvapp.livetv.playback
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.C
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 
@@ -24,6 +30,7 @@ class IptvPlaybackController(
     private val appContext = context.applicationContext
     private val retryHandler = Handler(Looper.getMainLooper())
     private var player: ExoPlayer? = null
+    private var mediaSourceFactory: MediaSource.Factory? = null
     private var retryCount = 0
     private var released = false
     private val retryRunnable = Runnable {
@@ -35,6 +42,7 @@ class IptvPlaybackController(
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
     var onPlaybackReady: (() -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
+    var onTracksChanged: (() -> Unit)? = null
 
     fun play(channel: LiveChannel) {
         require(channel.source == LiveChannel.Source.IPTV)
@@ -72,6 +80,10 @@ class IptvPlaybackController(
                         onPlaybackError?.invoke(error)
                     }
                 }
+
+                override fun onTracksChanged(tracks: Tracks) {
+                    onTracksChanged?.invoke()
+                }
             })
             player = created
             playerView.player = created
@@ -82,11 +94,25 @@ class IptvPlaybackController(
         channel.referrer?.let { referrer ->
             dataSource.setDefaultRequestProperties(mapOf("Referer" to referrer))
         }
-        val mediaItem = MediaItem.Builder()
+        val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)
-            .build()
-        val mediaSource = DefaultMediaSourceFactory(dataSource).createMediaSource(mediaItem)
+        channel.subtitleUrl?.takeIf(String::isNotBlank)?.let { subtitleUrl ->
+            mediaItemBuilder.setSubtitleConfigurations(
+                listOf(
+                    MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitleUrl))
+                        .setMimeType(subtitleMimeType(subtitleUrl))
+                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                        .build(),
+                ),
+            )
+        }
+        val mediaItem = mediaItemBuilder.build()
+        val sourceFactory = DefaultMediaSourceFactory(
+            DefaultDataSource.Factory(appContext, dataSource),
+        )
+        mediaSourceFactory = sourceFactory
+        val mediaSource = sourceFactory.createMediaSource(mediaItem)
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
@@ -168,12 +194,95 @@ class IptvPlaybackController(
         player?.volume = if (muted) 0f else 1f
     }
 
+    fun audioTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_AUDIO)
+
+    fun subtitleTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_TEXT)
+
+    fun selectAudioTrack(id: String): Boolean = selectTrack(C.TRACK_TYPE_AUDIO, id)
+
+    fun selectSubtitleTrack(id: String?): Boolean {
+        val current = player ?: return false
+        val builder = current.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+        if (id == null) {
+            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            val target = findTrack(C.TRACK_TYPE_TEXT, id) ?: return false
+            builder
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(
+                    TrackSelectionOverride(target.first.mediaTrackGroup, target.second),
+                )
+        }
+        current.trackSelectionParameters = builder.build()
+        return true
+    }
+
+    fun addExternalSubtitle(uri: Uri, mimeType: String? = null): Boolean {
+        val current = player ?: return false
+        val currentItem = current.currentMediaItem ?: return false
+        val sourceFactory = mediaSourceFactory ?: return false
+        val position = current.currentPosition
+        val shouldPlay = current.playWhenReady
+        val subtitles = currentItem.localConfiguration?.subtitleConfigurations.orEmpty() +
+            MediaItem.SubtitleConfiguration.Builder(uri)
+                .setMimeType(mimeType ?: subtitleMimeType(uri.toString()))
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+        val updatedItem = currentItem.buildUpon()
+            .setSubtitleConfigurations(subtitles.distinctBy { it.uri })
+            .build()
+        current.setMediaSource(sourceFactory.createMediaSource(updatedItem), position)
+        current.prepare()
+        current.playWhenReady = shouldPlay
+        return true
+    }
+
+    private fun tracksOfType(type: Int): List<IptvTrackOption> {
+        val current = player ?: return emptyList()
+        return current.currentTracks.groups.flatMapIndexed { groupIndex, group ->
+            if (group.type != type) return@flatMapIndexed emptyList()
+            (0 until group.length).map { trackIndex ->
+                val format = group.getTrackFormat(trackIndex)
+                IptvTrackOption(
+                    id = "$groupIndex:$trackIndex",
+                    language = format.language,
+                    label = format.label,
+                    mimeType = format.sampleMimeType,
+                    selected = group.isTrackSelected(trackIndex),
+                )
+            }
+        }
+    }
+
+    private fun selectTrack(type: Int, id: String): Boolean {
+        val current = player ?: return false
+        val target = findTrack(type, id) ?: return false
+        current.trackSelectionParameters = current.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(type, false)
+            .clearOverridesOfType(type)
+            .setOverrideForType(TrackSelectionOverride(target.first.mediaTrackGroup, target.second))
+            .build()
+        return true
+    }
+
+    private fun findTrack(type: Int, id: String): Pair<Tracks.Group, Int>? {
+        val current = player ?: return null
+        val parts = id.split(':')
+        val groupIndex = parts.getOrNull(0)?.toIntOrNull() ?: return null
+        val trackIndex = parts.getOrNull(1)?.toIntOrNull() ?: return null
+        val group = current.currentTracks.groups.getOrNull(groupIndex) ?: return null
+        if (group.type != type || trackIndex !in 0 until group.length) return null
+        return group to trackIndex
+    }
+
     fun release() {
         released = true
         retryHandler.removeCallbacks(retryRunnable)
         playerView.player = null
         player?.release()
         player = null
+        mediaSourceFactory = null
     }
 
     private companion object {
@@ -184,6 +293,15 @@ class IptvPlaybackController(
         const val MAX_BUFFER_MS = 30_000
         const val BUFFER_FOR_PLAYBACK_MS = 700
         const val BUFFER_AFTER_REBUFFER_MS = 1_500
+
+        fun subtitleMimeType(url: String): String = when (
+            url.substringBefore('?').substringAfterLast('.', "").lowercase()
+        ) {
+            "vtt" -> MimeTypes.TEXT_VTT
+            "ttml", "xml" -> MimeTypes.APPLICATION_TTML
+            "ssa", "ass" -> MimeTypes.TEXT_SSA
+            else -> MimeTypes.APPLICATION_SUBRIP
+        }
     }
 }
 
@@ -195,4 +313,12 @@ data class IptvPlaybackSnapshot(
     val bufferedPositionMillis: Long,
     val isPlaying: Boolean,
     val kind: IptvContentKind,
+)
+
+data class IptvTrackOption(
+    val id: String,
+    val language: String?,
+    val label: String?,
+    val mimeType: String?,
+    val selected: Boolean,
 )

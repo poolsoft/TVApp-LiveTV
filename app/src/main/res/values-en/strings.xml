@@ -318,4 +318,13 @@
         <item quantity="one">%d second</item>
         <item quantity="other">%d seconds</item>
     </plurals>
+    <string name="external_player">External player</string>
+    <string name="external_player_system">System chooser</string>
+    <string name="external_player_vlc">VLC</string>
+    <string name="external_player_mx">MX Player</string>
+    <string name="open_external_player">Open in external player</string>
+    <string name="external_player_not_found">No compatible external player was found.</string>
+    <string name="add_external_subtitle">Choose external subtitles</string>
+    <string name="external_subtitle_added">External subtitles added.</string>
+    <string name="external_subtitle_failed">External subtitles could not be opened.</string>
 </resources>

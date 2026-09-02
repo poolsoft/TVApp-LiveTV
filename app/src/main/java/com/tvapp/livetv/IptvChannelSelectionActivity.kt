@@ -364,6 +364,7 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
             ?: tvgName?.takeIf(String::isNotBlank),
         userAgent = userAgent,
         referrer = referrer,
+        subtitleUrl = subtitleUrl,
         source = LiveChannel.Source.IPTV,
     )
 

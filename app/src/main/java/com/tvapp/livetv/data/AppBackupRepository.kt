@@ -221,7 +221,8 @@ class AppBackupRepository(context: Context) {
             put("sourceKey", sourceKey); putNullable("tvgId", tvgId); putNullable("tvgName", tvgName)
             put("displayName", displayName); put("streamUrl", streamUrl); putNullable("logoUrl", logoUrl)
             putNullable("groupTitle", groupTitle); putNullable("userAgent", userAgent)
-            putNullable("referrer", referrer); put("originalIndex", originalIndex)
+            putNullable("referrer", referrer); putNullable("subtitleUrl", subtitleUrl)
+            put("originalIndex", originalIndex)
             put("selected", selected); put("lastSeenAt", lastSeenAt)
         }
 
@@ -263,7 +264,8 @@ class AppBackupRepository(context: Context) {
             tvgName = nullableString("tvgName"), displayName = requireString("displayName"),
             streamUrl = requireString("streamUrl"), logoUrl = nullableString("logoUrl"),
             groupTitle = nullableString("groupTitle"), userAgent = nullableString("userAgent"),
-            referrer = nullableString("referrer"), originalIndex = requireInt("originalIndex"),
+            referrer = nullableString("referrer"), subtitleUrl = nullableString("subtitleUrl"),
+            originalIndex = requireInt("originalIndex"),
             selected = optBoolean("selected", false), lastSeenAt = optLong("lastSeenAt", 0L),
         )
 

@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         IptvChannelEntity::class,
         XmlTvProgramEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -39,6 +39,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_4_5,
                 MIGRATION_5_6,
                 MIGRATION_6_7,
+                MIGRATION_7_8,
             )
                 .build()
                 .also { instance = it }
@@ -147,6 +148,19 @@ abstract class TVAppDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `xmltv_programs` " +
                         "ADD COLUMN `description` TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `iptv_channels` ADD COLUMN `subtitleUrl` TEXT",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_contentType_groupTitle_originalIndex` " +
+                        "ON `iptv_channels` (`sourceId`, `contentType`, `groupTitle`, `originalIndex`)",
                 )
             }
         }

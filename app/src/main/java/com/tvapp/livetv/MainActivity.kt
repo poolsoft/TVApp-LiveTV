@@ -47,6 +47,8 @@ import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvContentKind
+import com.tvapp.livetv.playback.IptvTrackOption
+import com.tvapp.livetv.playback.ExternalPlayerLauncher
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.settings.ChannelPanelSide
@@ -57,6 +59,7 @@ import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
+import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
 import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
 import com.tvapp.livetv.ui.ParentalPinDialog
@@ -185,6 +188,24 @@ class MainActivity : AppCompatActivity() {
     private var iptvControlsJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
+    private val openExternalSubtitle = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null || currentChannel?.source != LiveChannel.Source.IPTV) return@registerForActivityResult
+        runCatching {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        if (iptvPlayback.addExternalSubtitle(uri, contentResolver.getType(uri))) {
+            displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = true)
+            displayPreferences = displayPreferencesStore.load()
+            Toast.makeText(this, R.string.external_subtitle_added, Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, R.string.external_subtitle_failed, Toast.LENGTH_LONG).show()
+        }
+    }
     private val tvListingsPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -286,6 +307,9 @@ class MainActivity : AppCompatActivity() {
                 if (kind == IptvContentKind.LIVE) startIptvLiveHealthMonitor()
                 else iptvLiveHealthJob?.cancel()
             }
+        }
+        iptvPlayback.onTracksChanged = {
+            if (currentChannel?.source == LiveChannel.Source.IPTV) applyPreferredIptvTracks()
         }
         adapter = ChannelAdapter(
             ::confirmListChannel,
@@ -1115,6 +1139,10 @@ class MainActivity : AppCompatActivity() {
         ?: code.uppercase(Locale.ROOT)
 
     private fun showAudioTracks() {
+        if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            showIptvAudioTracks()
+            return
+        }
         val tracks = playback.audioTracks()
         if (tracks.isEmpty()) {
             showEditorError(R.string.tracks_not_available)
@@ -1137,6 +1165,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSubtitleTracks() {
+        if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            showIptvSubtitleTracks()
+            return
+        }
         val tracks = playback.subtitleTracks()
         val selected = playback.selectedTrackId(TvTrackInfo.TYPE_SUBTITLE)
         val labels = buildList {
@@ -1173,6 +1205,100 @@ class MainActivity : AppCompatActivity() {
         } ?: getString(R.string.unknown_language)
         val description = track.description?.toString()?.takeIf(String::isNotBlank)
         return listOfNotNull(language, description).distinct().joinToString(" · ")
+    }
+
+    private fun showIptvAudioTracks() {
+        val tracks = iptvPlayback.audioTracks()
+        if (tracks.isEmpty()) {
+            showEditorError(R.string.tracks_not_available)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.audio_tracks)
+            .setSingleChoiceItems(
+                tracks.map(::iptvTrackLabel).toTypedArray(),
+                tracks.indexOfFirst(IptvTrackOption::selected),
+            ) { dialog, which ->
+                val track = tracks[which]
+                iptvPlayback.selectAudioTrack(track.id)
+                track.language?.let {
+                    displayPreferencesStore.updateTrackPreferences(audioLanguage = it)
+                }
+                displayPreferences = displayPreferencesStore.load()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showIptvSubtitleTracks() {
+        val tracks = iptvPlayback.subtitleTracks()
+        val labels = buildList {
+            add(getString(R.string.subtitles_off))
+            addAll(tracks.map(::iptvTrackLabel))
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.subtitle_tracks)
+            .setSingleChoiceItems(labels, tracks.indexOfFirst(IptvTrackOption::selected) + 1) {
+                    dialog, which ->
+                if (which == 0) {
+                    iptvPlayback.selectSubtitleTrack(null)
+                    displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = false)
+                } else {
+                    val track = tracks[which - 1]
+                    iptvPlayback.selectSubtitleTrack(track.id)
+                    displayPreferencesStore.updateTrackPreferences(
+                        subtitlesEnabled = true,
+                        subtitleLanguage = track.language,
+                    )
+                }
+                displayPreferences = displayPreferencesStore.load()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun applyPreferredIptvTracks() {
+        displayPreferences = displayPreferencesStore.load()
+        val audioTracks = iptvPlayback.audioTracks()
+        val subtitleTracks = iptvPlayback.subtitleTracks()
+        val preferredAudio = displayPreferences.preferredAudioLanguage
+        if (preferredAudio != null) {
+            audioTracks.firstOrNull {
+                !it.selected && it.language.equals(preferredAudio, ignoreCase = true)
+            }?.let { iptvPlayback.selectAudioTrack(it.id) }
+        }
+        if (!displayPreferences.subtitlesEnabled) {
+            if (subtitleTracks.any(IptvTrackOption::selected)) iptvPlayback.selectSubtitleTrack(null)
+        } else {
+            val preferred = subtitleTracks.firstOrNull {
+                it.language.equals(displayPreferences.preferredSubtitleLanguage, ignoreCase = true)
+            } ?: subtitleTracks.firstOrNull()
+            if (preferred != null && !preferred.selected) iptvPlayback.selectSubtitleTrack(preferred.id)
+        }
+        updateIptvTrackBadges(audioTracks, subtitleTracks)
+    }
+
+    private fun updateIptvTrackBadges(
+        audioTracks: List<IptvTrackOption>,
+        subtitleTracks: List<IptvTrackOption>,
+    ) {
+        binding.audioBadge.text = audioTracks.firstOrNull(IptvTrackOption::selected)?.language
+            ?.let(::displayLanguage) ?: audioTracks.size.takeIf { it > 0 }?.toString()
+        binding.audioBadge.visibility = if (audioTracks.isEmpty()) View.GONE else View.VISIBLE
+        binding.subtitleBadge.text = subtitleTracks.firstOrNull(IptvTrackOption::selected)?.language
+            ?.let(::displayLanguage) ?: subtitleTracks.size.takeIf { it > 0 }?.toString()
+        binding.subtitleBadge.visibility = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
+        binding.techSlotAudio.visibility = if (audioTracks.isEmpty()) View.GONE else View.VISIBLE
+        binding.techSlotSubtitle.visibility = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    private fun iptvTrackLabel(track: IptvTrackOption): String {
+        val language = track.language?.takeIf(String::isNotBlank)?.let(::displayLanguage)
+            ?: getString(R.string.unknown_language)
+        return listOfNotNull(language, track.label?.takeIf(String::isNotBlank))
+            .distinct().joinToString(" · ")
     }
 
     private fun openDisplaySettings() {
@@ -2093,6 +2219,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (channel.source == LiveChannel.Source.IPTV) {
+            action(getString(R.string.open_external_player)) { openExternalPlayer(channel) }
+            action(getString(R.string.add_external_subtitle)) {
+                openExternalSubtitle.launch(
+                    arrayOf(
+                        "application/x-subrip",
+                        "text/vtt",
+                        "text/plain",
+                        "application/ttml+xml",
+                    ),
+                )
+            }
             action(
                 getString(
                     if (inMainList) R.string.remove_from_channel_list
@@ -2127,6 +2264,13 @@ class MainActivity : AppCompatActivity() {
             .setItems(labels.toTypedArray()) { _, which -> handlers[which]() }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun openExternalPlayer(channel: LiveChannel) {
+        val preference = ExternalPlayerPreferencesStore(this).load()
+        if (!ExternalPlayerLauncher.launch(this, channel, preference)) {
+            Toast.makeText(this, R.string.external_player_not_found, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun updateChannelInPlace(

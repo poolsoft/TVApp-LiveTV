@@ -32,6 +32,8 @@ import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.LogoCachePreferences
 import com.tvapp.livetv.settings.LogoCachePreferencesStore
+import com.tvapp.livetv.settings.ExternalPlayerPreference
+import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.image.ChannelLogoLoader
 import com.tvapp.livetv.update.AppUpdateManager
@@ -49,6 +51,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private lateinit var languageStore: AppLanguageStore
     private lateinit var xmlTvRepository: XmlTvRepository
     private lateinit var logoCacheStore: LogoCachePreferencesStore
+    private lateinit var externalPlayerStore: ExternalPlayerPreferencesStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
@@ -67,6 +70,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
         languageStore = AppLanguageStore(this)
         xmlTvRepository = XmlTvRepository(this)
         logoCacheStore = LogoCachePreferencesStore(this)
+        externalPlayerStore = ExternalPlayerPreferencesStore(this)
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
@@ -191,6 +195,19 @@ class DisplaySettingsActivity : AppCompatActivity() {
         ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
 
         section(R.string.playback_settings)
+        val externalPlayers = ExternalPlayerPreference.entries
+        choice(
+            R.string.external_player,
+            listOf(
+                getString(R.string.external_player_system),
+                getString(R.string.external_player_vlc),
+                getString(R.string.external_player_mx),
+            ),
+            externalPlayers.indexOf(externalPlayerStore.load()).coerceAtLeast(0),
+        ) { index ->
+            externalPlayerStore.save(externalPlayers[index])
+            markChanged()
+        }
         toggle(R.string.subtitles_default, current.subtitlesEnabled) {
             update { copy(subtitlesEnabled = it) }
         }

@@ -142,6 +142,7 @@ class IptvRepository(context: Context) {
                 ?: tvgName?.takeIf(String::isNotBlank),
             userAgent = userAgent,
             referrer = referrer,
+            subtitleUrl = subtitleUrl,
             iptvContentType = contentType,
         )
 
@@ -244,6 +245,7 @@ class IptvRepository(context: Context) {
                     groupTitle = item.groupTitle,
                     userAgent = item.userAgent,
                     referrer = item.referrer,
+                    subtitleUrl = item.subtitleUrl,
                     originalIndex = index,
                     contentType = item.contentType,
                     selected = sourceKey in selectedKeys ||

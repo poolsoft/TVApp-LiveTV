@@ -318,4 +318,13 @@
         <item quantity="one">%d saniye</item>
         <item quantity="other">%d saniye</item>
     </plurals>
+    <string name="external_player">Harici oynatıcı</string>
+    <string name="external_player_system">Sistem seçicisi</string>
+    <string name="external_player_vlc">VLC</string>
+    <string name="external_player_mx">MX Player</string>
+    <string name="open_external_player">Harici oynatıcıda aç</string>
+    <string name="external_player_not_found">Uyumlu bir harici oynatıcı bulunamadı.</string>
+    <string name="add_external_subtitle">Harici altyazı seç</string>
+    <string name="external_subtitle_added">Harici altyazı eklendi.</string>
+    <string name="external_subtitle_failed">Harici altyazı açılamadı.</string>
 </resources>

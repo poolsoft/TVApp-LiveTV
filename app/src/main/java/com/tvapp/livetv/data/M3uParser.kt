@@ -13,6 +13,7 @@ data class ParsedIptvChannel(
     val groupTitle: String? = null,
     val userAgent: String? = null,
     val referrer: String? = null,
+    val subtitleUrl: String? = null,
     val contentType: String = "LIVE",
 )
 
@@ -41,6 +42,9 @@ object M3uParser {
                     line.startsWith("#EXTVLCOPT:http-referrer=", ignoreCase = true) -> {
                         pending = pending?.copy(referrer = line.substringAfter('=').trim())
                     }
+                    line.startsWith("#EXTVLCOPT:sub-file=", ignoreCase = true) -> {
+                        pending = pending?.copy(subtitleUrl = line.substringAfter('=').trim())
+                    }
                     line.isNotBlank() && !line.startsWith('#') -> {
                         val stream = parseStreamLocation(line)
                         val metadata = pending ?: PendingChannel(name = "Kanal ${parsedCount + 1}")
@@ -55,6 +59,7 @@ object M3uParser {
                             groupTitle = metadata.groupTitle.nullIfBlank(),
                             userAgent = stream.userAgent ?: metadata.userAgent.nullIfBlank(),
                             referrer = stream.referrer ?: metadata.referrer.nullIfBlank(),
+                            subtitleUrl = metadata.subtitleUrl.nullIfBlank(),
                             contentType = contentType(metadata.durationSeconds, stream.url, metadata.groupTitle),
                         )
                         if (channel.streamUrl.startsWith("http", ignoreCase = true)) {
@@ -135,6 +140,7 @@ object M3uParser {
         val groupTitle: String? = null,
         val userAgent: String? = null,
         val referrer: String? = null,
+        val subtitleUrl: String? = null,
         val durationSeconds: Long? = null,
     )
 

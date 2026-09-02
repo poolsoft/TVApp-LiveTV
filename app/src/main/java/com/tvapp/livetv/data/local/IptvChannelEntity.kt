@@ -21,6 +21,7 @@ import androidx.room.PrimaryKey
         Index("selected"),
         Index(value = ["sourceId", "originalIndex"]),
         Index(value = ["sourceId", "contentType", "originalIndex"]),
+        Index(value = ["sourceId", "contentType", "groupTitle", "originalIndex"]),
     ],
 )
 data class IptvChannelEntity(
@@ -34,6 +35,7 @@ data class IptvChannelEntity(
     val groupTitle: String?,
     val userAgent: String?,
     val referrer: String?,
+    val subtitleUrl: String? = null,
     val originalIndex: Int,
     val contentType: String = "LIVE",
     val selected: Boolean = false,

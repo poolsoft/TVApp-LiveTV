@@ -48,6 +48,7 @@ class M3uParserTest {
             #EXTGRP:Spor
             #EXTVLCOPT:http-user-agent=Playlist Agent
             #EXTVLCOPT:http-referrer=https://playlist.example/
+            #EXTVLCOPT:sub-file=https://example.com/subtitles/tr.vtt
             https://example.com/live.m3u8|User-Agent=Channel%20Agent&Referer=https%3A%2F%2Fchannel.example%2F
         """.trimIndent()
 
@@ -57,6 +58,7 @@ class M3uParserTest {
         assertEquals("Spor", channel.groupTitle)
         assertEquals("Channel Agent", channel.userAgent)
         assertEquals("https://channel.example/", channel.referrer)
+        assertEquals("https://example.com/subtitles/tr.vtt", channel.subtitleUrl)
     }
 
     @Test
