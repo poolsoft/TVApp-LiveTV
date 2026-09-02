@@ -116,7 +116,7 @@
     <string name="iptv_vod_playing">Oynatılıyor</string>
     <string name="iptv_vod_paused">Duraklatıldı</string>
     <string name="iptv_vod_stopped">Durduruldu</string>
-    <string name="iptv_vod_remote_hint">⏯ Oynat/Duraklat    ⏪/⏩ 30 sn    ■ Durdur</string>
+    <string name="iptv_vod_remote_hint">←/→ 30 sn    OK Oynat/Duraklat    BACK Kapat</string>
     <string name="home_recent_channels">Son izlenen kanallar</string>
     <string name="home_watch_next_description">Canlı TV · Kanal %1$s</string>
     <string name="radio_channels">Radyo kanalları</string>

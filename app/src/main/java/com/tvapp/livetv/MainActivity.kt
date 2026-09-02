@@ -937,15 +937,17 @@ class MainActivity : AppCompatActivity() {
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
-        val vod = currentIptvContentKind == IptvContentKind.VOD
-        binding.iptvControlProgress.visibility = if (vod) View.VISIBLE else View.GONE
-        binding.iptvControlPosition.visibility = if (vod) View.VISIBLE else View.GONE
-        binding.iptvControlHint.visibility = if (vod) View.VISIBLE else View.GONE
+        val timeline = iptvPlayback.playbackSnapshot().let {
+            it.kind == IptvContentKind.VOD || it.isSeekable
+        }
+        binding.iptvControlProgress.visibility = if (timeline) View.VISIBLE else View.GONE
+        binding.iptvControlPosition.visibility = if (timeline) View.VISIBLE else View.GONE
+        binding.iptvControlHint.visibility = if (timeline) View.VISIBLE else View.GONE
         iptvControlsJob?.cancel()
         iptvControlsJob = lifecycleScope.launch {
             val startedAt = System.currentTimeMillis()
             while (System.currentTimeMillis() - startedAt < IPTV_CONTROL_TIMEOUT_MS) {
-                if (vod) updateVodPlaybackControls()
+                if (timeline) updateVodPlaybackControls()
                 delay(500L)
             }
             binding.iptvPlaybackControls.visibility = View.GONE
@@ -957,6 +959,8 @@ class MainActivity : AppCompatActivity() {
         val duration = state.durationMillis.coerceAtLeast(1L)
         binding.iptvControlProgress.progress =
             ((state.positionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
+        binding.iptvControlProgress.secondaryProgress =
+            ((state.bufferedPositionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
         binding.iptvControlPosition.text = getString(
             R.string.program_time_format,
             formatPlaybackTime(state.positionMillis),
@@ -3061,36 +3065,23 @@ class MainActivity : AppCompatActivity() {
         if (
             event.action == KeyEvent.ACTION_DOWN &&
             binding.iptvPlaybackControls.visibility == View.VISIBLE &&
-            currentIptvContentKind == IptvContentKind.VOD
+            currentChannel?.source == LiveChannel.Source.IPTV
         ) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS)
-                    showIptvPlaybackControls(
-                        if (iptvPlayback.playbackSnapshot().isPlaying) {
-                            R.string.iptv_vod_playing
-                        } else R.string.iptv_vod_paused,
-                    )
+                    showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS)
-                    showIptvPlaybackControls(
-                        if (iptvPlayback.playbackSnapshot().isPlaying) {
-                            R.string.iptv_vod_playing
-                        } else R.string.iptv_vod_paused,
-                    )
+                    showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    iptvPlayback.togglePlayPause()
-                    showIptvPlaybackControls(
-                        if (iptvPlayback.playbackSnapshot().isPlaying) {
-                            R.string.iptv_vod_playing
-                        } else {
-                            R.string.iptv_vod_paused
-                        },
-                    )
+                    if (currentIptvContentKind == IptvContentKind.LIVE) iptvPlayback.goLive()
+                    else iptvPlayback.togglePlayPause()
+                    showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_BACK -> {
@@ -3099,6 +3090,21 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
             }
+        }
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            currentChannel?.source == LiveChannel.Source.IPTV &&
+            binding.channelPanel.visibility != View.VISIBLE &&
+            event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
+        ) {
+            val offset = if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                -IPTV_VOD_SEEK_STEP_MS
+            } else {
+                IPTV_VOD_SEEK_STEP_MS
+            }
+            iptvPlayback.seekBy(offset)
+            showIptvPlaybackControls(iptvPlaybackStateText())
+            return true
         }
         val isPictureInPictureKey = event.keyCode == KeyEvent.KEYCODE_WINDOW
         if (event.action != KeyEvent.ACTION_DOWN && isPictureInPictureKey) return true
@@ -3218,6 +3224,16 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun iptvPlaybackStateText(): Int = when (currentIptvContentKind) {
+        IptvContentKind.LIVE -> R.string.iptv_live_edge
+        IptvContentKind.VOD -> if (iptvPlayback.playbackSnapshot().isPlaying) {
+            R.string.iptv_vod_playing
+        } else {
+            R.string.iptv_vod_paused
+        }
+        IptvContentKind.UNKNOWN -> R.string.iptv_vod_playing
     }
 
     override fun onStart() {
