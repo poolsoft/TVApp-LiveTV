@@ -2062,12 +2062,55 @@ class MainActivity : AppCompatActivity() {
         }
         focusedAutoTunePreviousChannel = null
         focusedAutoTuneTargetKey = null
-        val actions = arrayOf(
-            getString(if (channel.favorite) R.string.remove_favorite else R.string.add_favorite),
-            getString(R.string.move_up),
-            getString(R.string.move_down),
-            getString(R.string.change_channel_number),
-            getString(R.string.change_channel_name),
+        lifecycleScope.launch {
+            val (favorite, inMainList) = withContext(Dispatchers.IO) {
+                repository.isFavorite(channel.sourceKey) to if (
+                    channel.source == LiveChannel.Source.IPTV
+                ) {
+                    iptvRepository.isChannelSelected(channel.sourceKey)
+                } else {
+                    true
+                }
+            }
+            showChannelManagementDialog(channel, favorite, inMainList)
+        }
+    }
+
+    private fun showChannelManagementDialog(
+        channel: LiveChannel,
+        favorite: Boolean,
+        inMainList: Boolean,
+    ) {
+        val labels = mutableListOf<String>()
+        val handlers = mutableListOf<() -> Unit>()
+        fun action(label: String, handler: () -> Unit) {
+            labels += label
+            handlers += handler
+        }
+        action(getString(if (favorite) R.string.remove_favorite else R.string.add_favorite)) {
+            updateChannelInPlace(channel, channel.copy(favorite = !favorite)) {
+                repository.setFavorite(channel, !favorite)
+            }
+        }
+        if (channel.source == LiveChannel.Source.IPTV) {
+            action(
+                getString(
+                    if (inMainList) R.string.remove_from_channel_list
+                    else R.string.add_to_channel_list,
+                ),
+            ) {
+                updateIptvMainListMembership(channel, !inMainList)
+            }
+        }
+        action(getString(R.string.move_up)) {
+            updateChannel { repository.moveChannel(channel.sourceKey, -1) }
+        }
+        action(getString(R.string.move_down)) {
+            updateChannel { repository.moveChannel(channel.sourceKey, 1) }
+        }
+        action(getString(R.string.change_channel_number)) { showChannelNumberEditor(channel) }
+        action(getString(R.string.change_channel_name)) { showChannelNameEditor(channel) }
+        action(
             getString(
                 if (parentalControlStore.isLocked(channel.sourceKey)) {
                     R.string.unlock_channel
@@ -2075,23 +2118,55 @@ class MainActivity : AppCompatActivity() {
                     R.string.lock_channel
                 },
             ),
+        ) { toggleChannelLock(channel) }
+        action(
             getString(if (multiViewActive) R.string.close_multi_view else R.string.open_multi_view),
-        )
+        ) { if (multiViewActive) stopMultiView() else startMultiView(channel) }
         AlertDialog.Builder(this)
             .setTitle(channel.displayName)
-            .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> updateChannel { repository.setFavorite(channel.sourceKey, !channel.favorite) }
-                    1 -> updateChannel { repository.moveChannel(channel.sourceKey, -1) }
-                    2 -> updateChannel { repository.moveChannel(channel.sourceKey, 1) }
-                    3 -> showChannelNumberEditor(channel)
-                    4 -> showChannelNameEditor(channel)
-                    5 -> toggleChannelLock(channel)
-                    6 -> if (multiViewActive) stopMultiView() else startMultiView(channel)
-                }
-            }
+            .setItems(labels.toTypedArray()) { _, which -> handlers[which]() }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun updateChannelInPlace(
+        original: LiveChannel,
+        updated: LiveChannel,
+        action: suspend () -> Unit,
+    ) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { action() }
+            channels = channels.map { if (it.sourceKey == original.sourceKey) updated else it }
+            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                iptvLibraryChannels = iptvLibraryChannels.map {
+                    if (it.sourceKey == original.sourceKey) updated.copy(displayNumber = it.displayNumber)
+                    else it
+                }
+                adapter.submitList(iptvLibraryChannels)
+                adapter.select(currentChannel?.sourceKey ?: updated.sourceKey)
+                focusListChannel(updated.sourceKey)
+            } else {
+                applyChannelFilter(requestFocus = true)
+            }
+        }
+    }
+
+    private fun updateIptvMainListMembership(channel: LiveChannel, selected: Boolean) {
+        lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                iptvRepository.setChannelSelected(channel.sourceKey, selected)
+                repository.channels().getOrDefault(channels)
+            }
+            channels = loaded
+            currentChannel = loaded.firstOrNull { it.sourceKey == currentChannel?.sourceKey }
+                ?: currentChannel
+            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                adapter.select(currentChannel?.sourceKey ?: channel.sourceKey)
+                focusListChannel(channel.sourceKey)
+            } else {
+                applyChannelFilter(requestFocus = true)
+            }
+        }
     }
 
     private fun toggleChannelLock(channel: LiveChannel) {
@@ -2608,6 +2683,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun focusCurrentListChannel() {
+        focusListChannel(currentChannel?.sourceKey)
+    }
+
+    private fun focusListChannel(sourceKey: String?) {
         val visibleChannels = panelChannels()
         if (visibleChannels.isEmpty()) {
             when {
@@ -2619,7 +2698,7 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        val index = visibleChannels.indexOfFirst { it.sourceKey == currentChannel?.sourceKey }
+        val index = visibleChannels.indexOfFirst { it.sourceKey == sourceKey }
             .takeIf { it >= 0 } ?: 0
         binding.channelList.scrollToPosition(index)
         binding.channelList.post {

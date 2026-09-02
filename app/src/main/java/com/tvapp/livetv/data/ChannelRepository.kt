@@ -83,6 +83,22 @@ class ChannelRepository(context: Context) {
     suspend fun setFavorite(sourceKey: String, favorite: Boolean) =
         channelDao.setFavorite(sourceKey, favorite)
 
+    suspend fun setFavorite(channel: LiveChannel, favorite: Boolean) = database.withTransaction {
+        val existing = channelDao.getChannel(channel.sourceKey)
+        val row = existing ?: UserChannelEntity(
+            sourceKey = channel.sourceKey,
+            sourceType = channel.source.name,
+            originalDisplayNumber = channel.displayNumber,
+            lastKnownName = channel.displayName,
+            sortOrder = (channelDao.maxSortOrder() ?: -1) + 1,
+            lastSeenAt = System.currentTimeMillis(),
+        )
+        channelDao.upsertChannels(listOf(row.copy(favorite = favorite)))
+    }
+
+    suspend fun isFavorite(sourceKey: String): Boolean =
+        channelDao.getChannel(sourceKey)?.favorite == true
+
     suspend fun setHidden(sourceKey: String, hidden: Boolean) =
         channelDao.setHidden(sourceKey, hidden)
 

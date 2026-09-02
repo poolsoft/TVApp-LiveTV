@@ -71,6 +71,9 @@ class IptvRepository(context: Context) {
 
     suspend fun selectedChannelCount(sourceId: Long): Int = dao.selectedChannelCount(sourceId)
 
+    suspend fun isChannelSelected(sourceKey: String): Boolean =
+        dao.getChannel(sourceKey)?.selected == true
+
     suspend fun setChannelSelected(sourceKey: String, selected: Boolean) {
         dao.setChannelSelected(sourceKey, selected)
         notifySharedChannelsChanged()

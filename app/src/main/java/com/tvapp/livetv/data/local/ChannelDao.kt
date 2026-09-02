@@ -15,6 +15,9 @@ interface ChannelDao {
     @Query("SELECT * FROM user_channels ORDER BY sortOrder")
     suspend fun getOrderedChannels(): List<UserChannelEntity>
 
+    @Query("SELECT * FROM user_channels WHERE sourceKey = :sourceKey LIMIT 1")
+    suspend fun getChannel(sourceKey: String): UserChannelEntity?
+
     @Query("SELECT MAX(sortOrder) FROM user_channels")
     suspend fun maxSortOrder(): Int?
 

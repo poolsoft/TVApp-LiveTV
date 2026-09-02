@@ -4,6 +4,8 @@
     <string name="live_tv">Live TV</string>
     <string name="channels">Channels</string>
     <string name="channel_list">Channel List</string>
+    <string name="add_to_channel_list">Add to channel list</string>
+    <string name="remove_from_channel_list">Remove from channel list</string>
     <string name="all_channels">All</string>
     <string name="satellite_channels">Satellite</string>
     <string name="iptv_filter">IPTV</string>

@@ -4,6 +4,8 @@
     <string name="live_tv">Canlı TV</string>
     <string name="channels">Kanallar</string>
     <string name="channel_list">Kanal Listesi</string>
+    <string name="add_to_channel_list">Kanal listesine ekle</string>
+    <string name="remove_from_channel_list">Kanal listesinden çıkar</string>
     <string name="all_channels">Tümü</string>
     <string name="satellite_channels">Uydu</string>
     <string name="iptv_filter">IPTV</string>
