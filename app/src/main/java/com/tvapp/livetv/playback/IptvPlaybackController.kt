@@ -186,6 +186,15 @@ class IptvPlaybackController(
         return true
     }
 
+    fun retry(): Boolean {
+        val current = player ?: return false
+        retryHandler.removeCallbacks(retryRunnable)
+        retryCount = 0
+        current.prepare()
+        current.playWhenReady = true
+        return true
+    }
+
     fun catchUpToLive(maximumOffsetMillis: Long): Boolean {
         val current = player ?: return false
         if (!current.isCurrentMediaItemLive) return false

@@ -18,6 +18,7 @@ data class LiveChannel(
     val referrer: String? = null,
     val subtitleUrl: String? = null,
     val iptvContentType: String? = null,
+    val inMainList: Boolean = false,
     val source: Source = Source.TIF,
     val favorite: Boolean = false,
     val hidden: Boolean = false,

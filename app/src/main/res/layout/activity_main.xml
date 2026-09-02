@@ -282,6 +282,22 @@
         </LinearLayout>
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/iptv_notice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="24dp"
+        android:background="@drawable/bg_status"
+        android:elevation="30dp"
+        android:focusable="false"
+        android:maxWidth="420dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="9dp"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/channel_panel"
         android:layout_width="480dp"

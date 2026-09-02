@@ -193,9 +193,11 @@ class MainActivity : AppCompatActivity() {
     private var visibleProgramsJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var iptvControlsJob: Job? = null
+    private var iptvNoticeJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private var iptvManualTimeshift = false
+    private var iptvPlaybackFailed = false
     private var iptvAlternativeStreams: List<LiveChannel> = emptyList()
     private var iptvAlternativeIndex = 0
     private var iptvAlternativeLoadKey: String? = null
@@ -312,6 +314,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
         iptvPlayback.onPlaybackError = ::handleIptvPlaybackError
+        iptvPlayback.onPlaybackReady = {
+            val recoveredFromFailure = iptvPlaybackFailed
+            iptvPlaybackFailed = false
+            if (recoveredFromFailure) {
+                iptvControlsJob?.cancel()
+                binding.iptvPlaybackControls.visibility = View.GONE
+            }
+            if (binding.statusPanel.visibility == View.VISIBLE &&
+                currentChannel?.source == LiveChannel.Source.IPTV
+            ) {
+                binding.statusPanel.visibility = View.GONE
+            }
+        }
         iptvPlayback.onContentKindChanged = { kind ->
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
                 currentIptvContentKind = kind
@@ -590,9 +605,12 @@ class MainActivity : AppCompatActivity() {
         updateChannelActionLabels()
         currentIptvContentKind = IptvContentKind.UNKNOWN
         iptvManualTimeshift = false
+        iptvPlaybackFailed = false
         iptvControlsJob?.cancel()
+        iptvNoticeJob?.cancel()
         iptvLiveHealthJob?.cancel()
         binding.iptvPlaybackControls.visibility = View.GONE
+        binding.iptvNotice.visibility = View.GONE
         binding.parentalLockPanel.visibility = View.GONE
         if (recordHistory) {
             playbackHistory.record(channel.sourceKey)
@@ -642,7 +660,11 @@ class MainActivity : AppCompatActivity() {
         }
             .onFailure {
                 debugLog.recordDebug("PLAYBACK_FAILURE | ${it.javaClass.name}: ${it.message}")
-                showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
+                if (channel.source == LiveChannel.Source.IPTV) {
+                    showIptvPlaybackFailure()
+                } else {
+                    showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
+                }
             }
     }
 
@@ -687,7 +709,7 @@ class MainActivity : AppCompatActivity() {
             if (currentChannel?.sourceKey != channel.sourceKey) return@launch
             val alternative = alternatives.getOrNull(iptvAlternativeIndex++)
             if (alternative == null) {
-                showPlaybackError(channel, error.message ?: error.errorCodeName)
+                showIptvPlaybackFailure()
                 return@launch
             }
             val snapshot = iptvPlayback.playbackSnapshot()
@@ -698,7 +720,7 @@ class MainActivity : AppCompatActivity() {
                 "IPTV_ALTERNATIVE_PLAY | key=${channel.sourceKey}, " +
                     "index=$iptvAlternativeIndex/${alternatives.size}",
             )
-            showIptvPlaybackControls(R.string.iptv_alternative_stream)
+            showIptvNotice(R.string.iptv_alternative_stream)
             iptvPlayback.play(
                 channel.copy(
                     uri = alternative.uri,
@@ -709,6 +731,12 @@ class MainActivity : AppCompatActivity() {
                 startPosition,
             )
         }
+    }
+
+    private fun showIptvPlaybackFailure() {
+        iptvPlaybackFailed = true
+        binding.statusPanel.visibility = View.GONE
+        showIptvPlaybackControls(R.string.iptv_stream_failed, autoHide = false)
     }
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
@@ -974,7 +1002,7 @@ class MainActivity : AppCompatActivity() {
                     IptvContentKind.LIVE -> {
                         if (iptvPlayback.recoverIfStalled(IPTV_STALL_TIMEOUT_MS)) {
                             debugLog.recordDebug("IPTV_STALL_RECOVERED | channel=$sourceKey")
-                            showIptvPlaybackControls(R.string.iptv_reconnecting)
+                            showIptvNotice(R.string.iptv_reconnecting)
                         } else if (
                             !iptvManualTimeshift &&
                             iptvPlayback.catchUpToLive(IPTV_MAX_LIVE_OFFSET_MS)
@@ -1043,24 +1071,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showIptvPlaybackControls(stateText: Int) {
+    private fun showIptvPlaybackControls(stateText: Int, autoHide: Boolean = true) {
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
         binding.iptvControlRedAction.setText(
-            if (currentIptvContentKind == IptvContentKind.LIVE) {
+            if (iptvPlaybackFailed) {
+                R.string.iptv_action_refresh
+            } else if (currentIptvContentKind == IptvContentKind.LIVE) {
                 R.string.iptv_action_live
             } else {
                 R.string.iptv_action_restart
             },
         )
         val timeline = iptvPlayback.playbackSnapshot().let {
-            it.kind == IptvContentKind.VOD || it.isSeekable
+            iptvPlaybackFailed || it.kind == IptvContentKind.VOD || it.isSeekable
         }
         binding.iptvControlProgress.visibility = if (timeline) View.VISIBLE else View.GONE
         binding.iptvControlPosition.visibility = if (timeline) View.VISIBLE else View.GONE
-        binding.iptvControlHint.visibility = if (timeline) View.VISIBLE else View.GONE
+        binding.iptvControlHint.visibility = if (timeline && !iptvPlaybackFailed) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
         iptvControlsJob?.cancel()
+        if (!autoHide) {
+            updateIptvPlaybackControls()
+            return
+        }
         iptvControlsJob = lifecycleScope.launch {
             val startedAt = System.currentTimeMillis()
             while (System.currentTimeMillis() - startedAt < IPTV_CONTROL_TIMEOUT_MS) {
@@ -1068,6 +1106,24 @@ class MainActivity : AppCompatActivity() {
                 delay(500L)
             }
             binding.iptvPlaybackControls.visibility = View.GONE
+        }
+    }
+
+    private fun showIptvNotice(message: Int) {
+        binding.iptvNotice.setText(message)
+        (binding.iptvNotice.layoutParams as FrameLayout.LayoutParams).apply {
+            gravity = Gravity.END or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
+                Gravity.BOTTOM
+            } else {
+                Gravity.TOP
+            }
+            binding.iptvNotice.layoutParams = this
+        }
+        binding.iptvNotice.visibility = View.VISIBLE
+        iptvNoticeJob?.cancel()
+        iptvNoticeJob = lifecycleScope.launch {
+            delay(2_500L)
+            binding.iptvNotice.visibility = View.GONE
         }
     }
 
@@ -1838,6 +1894,7 @@ class MainActivity : AppCompatActivity() {
         category: String?,
     ) {
         channelPanelContent = ChannelPanelContent.IPTV_LIBRARY
+        adapter.showIptvMembership(true)
         iptvLibraryLoadJob?.cancel()
         iptvLibrarySourceId = sourceId
         iptvLibraryContentType = contentType
@@ -2587,6 +2644,11 @@ class MainActivity : AppCompatActivity() {
             currentChannel = loaded.firstOrNull { it.sourceKey == currentChannel?.sourceKey }
                 ?: currentChannel
             if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                iptvLibraryChannels = iptvLibraryChannels.map { item ->
+                    if (item.sourceKey == channel.sourceKey) item.copy(inMainList = selected)
+                    else item
+                }
+                adapter.submitList(iptvLibraryChannels)
                 adapter.select(currentChannel?.sourceKey ?: channel.sourceKey)
                 focusListChannel(channel.sourceKey)
             } else {
@@ -2901,6 +2963,7 @@ class MainActivity : AppCompatActivity() {
         iptvLibraryLoadJob?.cancel()
         iptvLibraryExhausted = true
         channelPanelContent = ChannelPanelContent.NORMAL
+        adapter.showIptvMembership(false)
         favoriteFilter = showFavorites
         sourceFilter = source
         channelListFilterStore.save(sourceFilter, favoriteFilter)
@@ -3347,13 +3410,18 @@ class MainActivity : AppCompatActivity() {
         ) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_PROG_RED -> {
-                    if (currentIptvContentKind == IptvContentKind.LIVE) {
+                    if (iptvPlaybackFailed) {
+                        iptvPlayback.retry()
+                        binding.iptvControlState.setText(R.string.iptv_reconnecting)
+                    } else if (currentIptvContentKind == IptvContentKind.LIVE) {
                         iptvManualTimeshift = false
                         iptvPlayback.goLive()
                     } else {
                         iptvPlayback.restartVod()
                     }
-                    showIptvPlaybackControls(iptvPlaybackStateText())
+                    if (!iptvPlaybackFailed) {
+                        showIptvPlaybackControls(iptvPlaybackStateText())
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> {

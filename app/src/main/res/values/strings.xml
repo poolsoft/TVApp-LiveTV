@@ -131,6 +131,9 @@
     <string name="iptv_aspect_fill">Ekranı doldur</string>
     <string name="iptv_aspect_zoom">Yakınlaştır</string>
     <string name="iptv_alternative_stream">Alternatif yayın deneniyor</string>
+    <string name="iptv_stream_failed">Yayın durdu · Kırmızı: Yenile · Back: Kapat</string>
+    <string name="iptv_action_refresh">● Yenile</string>
+    <string name="in_main_channel_list">Ana kanal listesinde</string>
     <string name="iptv_resumed">Kaldığın yerden devam ediliyor</string>
     <string name="iptv_reconnecting">Yayın yeniden bağlanıyor</string>
     <string name="iptv_buffer_seconds">Buffer %1$d sn</string>

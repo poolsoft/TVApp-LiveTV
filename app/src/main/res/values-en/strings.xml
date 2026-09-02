@@ -337,6 +337,9 @@
     <string name="iptv_aspect_fill">Fill screen</string>
     <string name="iptv_aspect_zoom">Zoom</string>
     <string name="iptv_alternative_stream">Trying an alternative stream</string>
+    <string name="iptv_stream_failed">Stream stopped · Red: Retry · Back: Close</string>
+    <string name="iptv_action_refresh">● Retry</string>
+    <string name="in_main_channel_list">In main channel list</string>
     <string name="external_player_system">System chooser</string>
     <string name="external_player_vlc">VLC</string>
     <string name="external_player_mx">MX Player</string>

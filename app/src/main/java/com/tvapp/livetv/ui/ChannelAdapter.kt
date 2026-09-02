@@ -23,6 +23,7 @@ class ChannelAdapter(
     private val channels = mutableListOf<LiveChannel>()
     private var programs: Map<Long, ProgramSummary> = emptyMap()
     private var rowOptions = ChannelRowOptions()
+    private var showIptvMembership = false
     private var selectedId: Long? = null
 
     fun submitList(items: List<LiveChannel>) {
@@ -73,6 +74,12 @@ class ChannelAdapter(
 
     fun applyRowOptions(options: ChannelRowOptions) {
         rowOptions = options
+        notifyItemRangeChanged(0, itemCount)
+    }
+
+    fun showIptvMembership(show: Boolean) {
+        if (showIptvMembership == show) return
+        showIptvMembership = show
         notifyItemRangeChanged(0, itemCount)
     }
 
@@ -130,8 +137,19 @@ class ChannelAdapter(
             channelName.text = channel.displayName
             channelQuality.visibility = View.GONE
             channelTypeIcon.setImageResource(
-                if (channel.isRadioChannel()) R.drawable.ic_radio else R.drawable.ic_channel_tv,
+                when {
+                    channel.isRadioChannel() -> R.drawable.ic_radio
+                    channel.iptvContentType == "VOD" -> R.drawable.ic_vod
+                    else -> R.drawable.ic_channel_tv
+                },
             )
+            channelTypeIcon.contentDescription = root.context.getString(
+                if (channel.iptvContentType == "VOD") R.string.iptv_library_vod
+                else R.string.channel_type,
+            )
+            channelMainListMarker.visibility = if (
+                showIptvMembership && channel.source == LiveChannel.Source.IPTV && channel.inMainList
+            ) View.VISIBLE else View.GONE
             val locked = channel.encrypted || channel.locked || isParentalLocked(channel)
             channelEncryptedIcon.visibility = if (locked) View.VISIBLE else View.GONE
             channelEncryptedIcon.contentDescription = root.context.getString(

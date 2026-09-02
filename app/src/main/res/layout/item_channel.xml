@@ -70,6 +70,19 @@
                 android:layout_marginStart="5dp"
                 android:contentDescription="@string/channel_type" />
 
+            <TextView
+                android:id="@+id/channel_main_list_marker"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="@string/in_main_channel_list"
+                android:gravity="center"
+                android:text="•"
+                android:textColor="@color/accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <ImageView
                 android:id="@+id/channel_encrypted_icon"
                 android:layout_width="16dp"

@@ -149,6 +149,7 @@ class IptvRepository(context: Context) {
             referrer = referrer,
             subtitleUrl = subtitleUrl,
             iptvContentType = contentType,
+            inMainList = selected,
         )
 
     suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
