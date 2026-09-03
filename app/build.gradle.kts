@@ -43,12 +43,16 @@ android {
             dimension = "distribution"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
+            buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
+            buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
         }
-        create("play") {
+        create("paid") {
             dimension = "distribution"
             applicationIdSuffix = ".play"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+            buildConfigField("boolean", "STORE_BILLING_ENABLED", "true")
+            buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
         }
     }
 

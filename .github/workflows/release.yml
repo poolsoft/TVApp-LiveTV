@@ -61,7 +61,7 @@ jobs:
           TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew testLocalDebugUnitTest testPlayDebugUnitTest assembleLocalRelease bundlePlayRelease
+          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease bundlePaidRelease
 
       - name: Prepare release assets
         id: assets

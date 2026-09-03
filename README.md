@@ -124,16 +124,19 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat assembleLocalDebug
 ```
 
-Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `play` varyantıdır. Play için imzalı
+Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `paid` varyantıdır. Play için imzalı
 Android App Bundle şu komutla hazırlanır:
 
 ```powershell
-.\gradlew.bat bundlePlayRelease
+.\gradlew.bat bundlePaidRelease
 ```
 
 `local`, mevcut `com.tvapp.livetv` paket kimliğini ve uygulama içi GitHub güncelleyicisini
-korur. `play`, `com.tvapp.livetv.play` paket kimliğiyle ayrı kurulur; harici APK güncelleme
-izni içermez ve Ayarlar ekranında yalnızca kurulu sürümü gösterir.
+korur. `paid`, `com.tvapp.livetv.play` paket kimliğiyle ayrı kurulur; harici APK güncelleme
+izni içermez ve Ayarlar ekranında yalnızca kurulu sürümü gösterir. Paid varyantında
+`STORE_BILLING_ENABLED=true` tanımlıdır. Geliştirme tamamlanana kadar
+`IPTV_PRO_REQUIRED=false` olduğu için IPTV özellikleri kısıtlanmaz; satın alma entegrasyonu
+tamamlandığında yalnız mağaza varyantında etkinleştirilecektir.
 
 Sürüm numarası kökteki `.build` dosyasından okunur. Geliştirme döneminde bu değer sabittir;
 yerel APK ile Action APK'sı aynı `versionCode` ve aynı imzayı kullanır. `.build` üretim sürüm
