@@ -789,23 +789,25 @@
                     android:src="@drawable/ic_lock"
                     android:visibility="gone" />
             </FrameLayout>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/info_color_actions"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical|end"
+                android:maxLines="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="2dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
         </LinearLayout>
 
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/info_color_actions"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end|top"
-        android:background="#B8101720"
-        android:gravity="end|center_vertical"
-        android:maxLines="1"
-        android:paddingHorizontal="9dp"
-        android:paddingVertical="3dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="10sp"
-        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/status_panel"

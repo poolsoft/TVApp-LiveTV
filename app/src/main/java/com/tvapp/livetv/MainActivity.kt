@@ -90,8 +90,6 @@ class MainActivity : AppCompatActivity() {
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
         private const val INFO_HEIGHT_FRACTION = 0.205f
-        private const val INFO_ACTIONS_HEIGHT_FRACTION = 0.035f
-        private const val INFO_ACTIONS_GAP_FRACTION = 0.004f
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -3151,8 +3149,6 @@ class MainActivity : AppCompatActivity() {
         val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
         val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
         val infoHeight = (screenHeight * INFO_HEIGHT_FRACTION).toInt()
-        val infoActionsHeight = (screenHeight * INFO_ACTIONS_HEIGHT_FRACTION).toInt()
-        val infoActionsGap = (screenHeight * INFO_ACTIONS_GAP_FRACTION).toInt()
         val panelWidth = if (channelPanelExpanded) {
             (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
         } else {
@@ -3200,44 +3196,15 @@ class MainActivity : AppCompatActivity() {
                         0,
                         verticalMargin,
                         infoOuterMargin,
-                        if (displayPreferences.infoBarPosition == InfoBarPosition.BOTTOM) {
-                            verticalMargin + infoActionsHeight + infoActionsGap
-                        } else verticalMargin,
+                        verticalMargin,
                     )
                 } else {
                     setMargins(
                         infoOuterMargin,
                         verticalMargin,
                         0,
-                        if (displayPreferences.infoBarPosition == InfoBarPosition.BOTTOM) {
-                            verticalMargin + infoActionsHeight + infoActionsGap
-                        } else verticalMargin,
+                        verticalMargin,
                     )
-                }
-            }
-        binding.infoColorActions.layoutParams =
-            (binding.infoColorActions.layoutParams as FrameLayout.LayoutParams).apply {
-                width = binding.infoBar.layoutParams.width
-                height = infoActionsHeight
-                gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    Gravity.END
-                } else {
-                    Gravity.START
-                }) or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
-                    Gravity.TOP
-                } else {
-                    Gravity.BOTTOM
-                }
-                val left = if (displayPreferences.channelPanelSide == ChannelPanelSide.RIGHT) {
-                    infoOuterMargin
-                } else 0
-                val right = if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    infoOuterMargin
-                } else 0
-                if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
-                    setMargins(left, verticalMargin + infoHeight + infoActionsGap, right, 0)
-                } else {
-                    setMargins(left, 0, right, verticalMargin)
                 }
             }
         val infoHorizontalPadding = (screenWidth * INFO_HORIZONTAL_PADDING_FRACTION).toInt()
