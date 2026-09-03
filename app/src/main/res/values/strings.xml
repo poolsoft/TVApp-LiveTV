@@ -345,7 +345,8 @@
     <string name="input_type_component">Komponent</string>
     <string name="input_type_display_port">DisplayPort</string>
     <string name="input_type_external">Harici giriş</string>
-    <string name="multiview_requires_satellite_iptv">Multiview için bir uydu ve bir IPTV kanalı seçin.</string>
+    <string name="multiview_requires_satellite_iptv">Multiview için bir uydu ve bir IPTV kanalı veya iki IPTV kanalı seçin.</string>
+    <string name="multiview_requires_dual_tuner">İki uydu kanalını aynı anda izlemek için cihazda çift tuner gereklidir.</string>
     <string name="multiview_select_iptv">Multiview IPTV kanalını seç</string>
     <string name="iptv_grid_maximum">En fazla 4 kanal seçilebilir.</string>
     <string name="iptv_grid_empty">Grid için en az bir kanal seçin.</string>

@@ -333,7 +333,8 @@
     <string name="input_type_component">Component</string>
     <string name="input_type_display_port">DisplayPort</string>
     <string name="input_type_external">External input</string>
-    <string name="multiview_requires_satellite_iptv">Select one satellite and one IPTV channel for multiview.</string>
+    <string name="multiview_requires_satellite_iptv">Select one satellite and one IPTV channel, or two IPTV channels for multiview.</string>
+    <string name="multiview_requires_dual_tuner">Dual tuners are required to watch two satellite channels simultaneously.</string>
     <string name="multiview_select_iptv">Select multiview IPTV channel</string>
     <string name="iptv_grid_maximum">You can select up to 4 channels.</string>
     <string name="iptv_grid_empty">Select at least one channel for the grid.</string>

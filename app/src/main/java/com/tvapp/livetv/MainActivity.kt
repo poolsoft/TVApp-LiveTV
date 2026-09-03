@@ -158,8 +158,8 @@ class MainActivity : AppCompatActivity() {
     private var internalMiniPlayerActive = false
     private var multiViewActive = false
     private var multiViewActiveSide = 0
-    private var multiViewSatelliteChannel: LiveChannel? = null
-    private var multiViewIptvChannel: LiveChannel? = null
+    private var multiViewLeftChannel: LiveChannel? = null
+    private var multiViewRightChannel: LiveChannel? = null
     private var multiViewLongPressJob: Job? = null
     private var iptvOverlayActive = false
     private var iptvGridActive = false
@@ -2718,63 +2718,111 @@ class MainActivity : AppCompatActivity() {
 
     private fun startMultiView(channel: LiveChannel) {
         val playing = currentChannel ?: return
-        val satellite = listOf(playing, channel).firstOrNull {
-            it.source == LiveChannel.Source.TIF
+        if (playing.sourceKey == channel.sourceKey) {
+            Toast.makeText(this, R.string.multiview_select_iptv, Toast.LENGTH_SHORT).show()
+            return
         }
-        val iptv = listOf(playing, channel).firstOrNull {
-            it.source == LiveChannel.Source.IPTV
-        }
-        if (satellite == null || iptv == null) {
-            Toast.makeText(this, R.string.multiview_requires_satellite_iptv, Toast.LENGTH_LONG).show()
+        if (playing.source == LiveChannel.Source.TIF && channel.source == LiveChannel.Source.TIF) {
+            Toast.makeText(this, R.string.multiview_requires_dual_tuner, Toast.LENGTH_LONG).show()
             return
         }
         stopIptvOverlay()
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
-        if (currentChannel?.sourceKey != satellite.sourceKey) {
-            playSelectedChannel(satellite, recordHistory = false)
-        }
+
         multiViewActive = true
         internalMiniPlayerActive = false
         multiViewActiveSide = 0
-        multiViewSatelliteChannel = satellite
-        multiViewIptvChannel = iptv
+
+        val left: LiveChannel
+        val right: LiveChannel
+
+        if (playing.source == LiveChannel.Source.TIF && channel.source == LiveChannel.Source.IPTV) {
+            left = playing
+            right = channel
+        } else if (playing.source == LiveChannel.Source.IPTV && channel.source == LiveChannel.Source.TIF) {
+            left = channel
+            right = playing
+        } else {
+            left = playing
+            right = channel
+        }
+
+        multiViewLeftChannel = left
+        multiViewRightChannel = right
+
         val screenWidth = resources.displayMetrics.widthPixels
         val halfWidth = screenWidth / 2
-        resizePlayer(binding.tvView, halfWidth, Gravity.START)
-        binding.iptvPlayerView.visibility = View.GONE
-        secondaryPlayback.stop()
-        binding.secondaryTvView.visibility = View.GONE
-        binding.secondaryIptvPlayerView.visibility = View.VISIBLE
-        resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
-        secondaryIptvPlayback.play(iptv)
+
+        if (left.source == LiveChannel.Source.TIF) {
+            if (currentChannel?.sourceKey != left.sourceKey) {
+                playSelectedChannel(left, recordHistory = false)
+            }
+            resizePlayer(binding.tvView, halfWidth, Gravity.START)
+            binding.tvView.visibility = View.VISIBLE
+            binding.iptvPlayerView.visibility = View.GONE
+            iptvPlayback.stop()
+        } else {
+            binding.tvView.visibility = View.GONE
+            playback.stop()
+            binding.iptvPlayerView.visibility = View.VISIBLE
+            resizePlayer(binding.iptvPlayerView, halfWidth, Gravity.START)
+            iptvPlayback.play(left)
+        }
+
+        if (right.source == LiveChannel.Source.IPTV) {
+            secondaryPlayback.stop()
+            binding.secondaryTvView.visibility = View.GONE
+            binding.secondaryIptvPlayerView.visibility = View.VISIBLE
+            resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
+            secondaryIptvPlayback.play(right)
+        } else {
+            secondaryIptvPlayback.stop()
+            binding.secondaryIptvPlayerView.visibility = View.GONE
+            binding.secondaryTvView.visibility = View.VISIBLE
+            resizePlayer(binding.secondaryTvView, halfWidth, Gravity.END)
+            secondaryPlayback.play(right)
+        }
+
         resizeMultiViewFocusBorders(halfWidth)
         updateMultiViewFocus()
         hideChannelPanel()
         showInfoBar()
         debugLog.recordDebug(
-            "MULTIVIEW_START | satellite=${satellite.sourceKey}, iptv=${iptv.sourceKey}",
+            "MULTIVIEW_START | left=${left.sourceKey}, right=${right.sourceKey}",
         )
     }
 
     private fun updateMultiViewFocus() {
         if (!multiViewActive) return
-        playback.setMuted(multiViewActiveSide != 0)
-        secondaryIptvPlayback.setMuted(multiViewActiveSide != 1)
-        binding.multiViewLeftFocus.visibility = if (multiViewActiveSide == 0) {
-            View.VISIBLE
+        val left = multiViewLeftChannel
+        val right = multiViewRightChannel
+
+        if (multiViewActiveSide == 0) {
+            if (left?.source == LiveChannel.Source.TIF) {
+                playback.setMuted(false)
+                iptvPlayback.setMuted(true)
+            } else {
+                iptvPlayback.setMuted(false)
+                playback.setMuted(true)
+            }
+            secondaryIptvPlayback.setMuted(true)
+            secondaryPlayback.setMuted(true)
         } else {
-            View.GONE
+            playback.setMuted(true)
+            iptvPlayback.setMuted(true)
+            if (right?.source == LiveChannel.Source.IPTV) {
+                secondaryIptvPlayback.setMuted(false)
+                secondaryPlayback.setMuted(true)
+            } else {
+                secondaryPlayback.setMuted(false)
+                secondaryIptvPlayback.setMuted(true)
+            }
         }
-        binding.multiViewRightFocus.visibility = if (multiViewActiveSide == 1) {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
-        val focused = if (multiViewActiveSide == 0) {
-            multiViewSatelliteChannel
-        } else {
-            multiViewIptvChannel
-        }
+
+        binding.multiViewLeftFocus.visibility = if (multiViewActiveSide == 0) View.VISIBLE else View.GONE
+        binding.multiViewRightFocus.visibility = if (multiViewActiveSide == 1) View.VISIBLE else View.GONE
+
+        val focused = if (multiViewActiveSide == 0) left else right
         focused?.let { channel ->
             updateTechnicalBadges(
                 channel,
@@ -2783,7 +2831,7 @@ class MainActivity : AppCompatActivity() {
             showInfoBarForChannel(channel)
         }
         debugLog.recordDebug(
-            "MULTIVIEW_FOCUS | side=${if (multiViewActiveSide == 0) "satellite" else "iptv"}",
+            "MULTIVIEW_FOCUS | side=${if (multiViewActiveSide == 0) "left" else "right"}, channel=${focused?.sourceKey}",
         )
     }
 
@@ -2800,16 +2848,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun zapMultiViewSatellite(offset: Int) {
-        val satelliteChannels = channels.filter { it.source == LiveChannel.Source.TIF }
-        val current = multiViewSatelliteChannel ?: return
-        ChannelNavigator.adjacent(satelliteChannels, current.sourceKey, offset)?.let { next ->
-            multiViewSatelliteChannel = next
-            playSelectedChannel(next, recordHistory = false)
+    private fun zapMultiViewChannel(side: Int, offset: Int) {
+        val current = (if (side == 0) multiViewLeftChannel else multiViewRightChannel) ?: return
+        val channelPool = channels.filter {
+            it.source == current.source && (it.source != LiveChannel.Source.IPTV || it.iptvContentType != IptvLibraryContentType.VOD.name)
+        }
+        ChannelNavigator.adjacent(channelPool, current.sourceKey, offset)?.let { next ->
             val halfWidth = resources.displayMetrics.widthPixels / 2
-            resizePlayer(binding.tvView, halfWidth, Gravity.START)
+            if (side == 0) {
+                multiViewLeftChannel = next
+                if (next.source == LiveChannel.Source.TIF) {
+                    playSelectedChannel(next, recordHistory = false)
+                    resizePlayer(binding.tvView, halfWidth, Gravity.START)
+                } else {
+                    currentChannel = next
+                    binding.tvView.visibility = View.GONE
+                    binding.iptvPlayerView.visibility = View.VISIBLE
+                    resizePlayer(binding.iptvPlayerView, halfWidth, Gravity.START)
+                    iptvPlayback.play(next)
+                }
+            } else {
+                multiViewRightChannel = next
+                if (next.source == LiveChannel.Source.IPTV) {
+                    secondaryIptvPlayback.play(next)
+                    resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
+                } else {
+                    secondaryPlayback.play(next)
+                    resizePlayer(binding.secondaryTvView, halfWidth, Gravity.END)
+                }
+            }
             updateMultiViewFocus()
-            debugLog.recordDebug("MULTIVIEW_SATELLITE_CHANGE | channel=${next.sourceKey}")
+            debugLog.recordDebug("MULTIVIEW_ZAP | side=$side, channel=${next.sourceKey}")
         }
     }
 
@@ -2827,10 +2896,25 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.multiview_select_iptv)
             .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
                 val selected = choices[which]
-                multiViewIptvChannel = selected
-                secondaryIptvPlayback.play(selected)
+                val halfWidth = resources.displayMetrics.widthPixels / 2
+                if (multiViewActiveSide == 0) {
+                    multiViewLeftChannel = selected
+                    currentChannel = selected
+                    binding.tvView.visibility = View.GONE
+                    playback.stop()
+                    binding.iptvPlayerView.visibility = View.VISIBLE
+                    resizePlayer(binding.iptvPlayerView, halfWidth, Gravity.START)
+                    iptvPlayback.play(selected)
+                } else {
+                    multiViewRightChannel = selected
+                    binding.secondaryTvView.visibility = View.GONE
+                    secondaryPlayback.stop()
+                    binding.secondaryIptvPlayerView.visibility = View.VISIBLE
+                    resizePlayer(binding.secondaryIptvPlayerView, halfWidth, Gravity.END)
+                    secondaryIptvPlayback.play(selected)
+                }
                 updateMultiViewFocus()
-                debugLog.recordDebug("MULTIVIEW_IPTV_CHANGE | channel=${selected.sourceKey}")
+                debugLog.recordDebug("MULTIVIEW_IPTV_CHANGE | side=$multiViewActiveSide, channel=${selected.sourceKey}")
             }
             .setNegativeButton(R.string.close, null)
             .show()
@@ -2838,10 +2922,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopMultiView() {
         if (!multiViewActive) return
-        val satellite = multiViewSatelliteChannel
+        val activeChannel = (if (multiViewActiveSide == 0) multiViewLeftChannel else multiViewRightChannel) ?: currentChannel
         multiViewActive = false
         multiViewLongPressJob?.cancel()
         playback.setMuted(false)
+        iptvPlayback.setMuted(false)
         secondaryPlayback.stop()
         secondaryIptvPlayback.stop()
         secondaryIptvPlayback.setMuted(false)
@@ -2851,19 +2936,34 @@ class MainActivity : AppCompatActivity() {
         binding.multiViewRightFocus.visibility = View.GONE
         resizePlayer(binding.tvView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
         resizePlayer(binding.iptvPlayerView, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.FILL)
-        if (satellite != null) {
-            binding.tvView.postDelayed({
-                if (!multiViewActive && currentChannel?.sourceKey == satellite.sourceKey) {
-                    playback.stop()
-                    playback.play(satellite)
-                    playback.setMuted(false)
-                    debugLog.recordDebug("MULTIVIEW_TIF_AUDIO_RECOVERED | channel=${satellite.sourceKey}")
-                }
-            }, MULTIVIEW_TIF_RECOVERY_DELAY_MS)
+
+        if (activeChannel != null) {
+            if (activeChannel.source == LiveChannel.Source.TIF) {
+                binding.iptvPlayerView.visibility = View.GONE
+                binding.tvView.visibility = View.VISIBLE
+                iptvPlayback.stop()
+                binding.tvView.postDelayed({
+                    if (!multiViewActive) {
+                        playback.stop()
+                        playback.play(activeChannel)
+                        playback.setMuted(false)
+                        debugLog.recordDebug("MULTIVIEW_TIF_AUDIO_RECOVERED | channel=${activeChannel.sourceKey}")
+                    }
+                }, MULTIVIEW_TIF_RECOVERY_DELAY_MS)
+                currentChannel = activeChannel
+            } else {
+                binding.tvView.visibility = View.GONE
+                playback.stop()
+                binding.iptvPlayerView.visibility = View.VISIBLE
+                iptvPlayback.play(activeChannel)
+                iptvPlayback.setMuted(false)
+                currentChannel = activeChannel
+            }
+            showInfoBarForChannel(activeChannel)
         }
-        multiViewSatelliteChannel = null
-        multiViewIptvChannel = null
-        currentChannel?.let(::showInfoBarForChannel)
+
+        multiViewLeftChannel = null
+        multiViewRightChannel = null
         debugLog.recordDebug("MULTIVIEW_STOP")
     }
 
@@ -3455,18 +3555,19 @@ class MainActivity : AppCompatActivity() {
                     multiViewActiveSide = 1
                     updateMultiViewFocus()
                 }
+                KeyEvent.KEYCODE_DPAD_UP,
                 KeyEvent.KEYCODE_CHANNEL_UP -> if (event.action == KeyEvent.ACTION_DOWN) {
                     multiViewLongPressJob?.cancel()
-                    zapMultiViewSatellite(1)
+                    zapMultiViewChannel(multiViewActiveSide, 1)
                 }
+                KeyEvent.KEYCODE_DPAD_DOWN,
                 KeyEvent.KEYCODE_CHANNEL_DOWN -> if (event.action == KeyEvent.ACTION_DOWN) {
                     multiViewLongPressJob?.cancel()
-                    zapMultiViewSatellite(-1)
+                    zapMultiViewChannel(multiViewActiveSide, -1)
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER -> {
                     if (
-                        multiViewActiveSide == 1 &&
                         event.action == KeyEvent.ACTION_DOWN &&
                         event.repeatCount == 0
                     ) {
