@@ -106,6 +106,9 @@ still needs device verification.
   to last and last to first where that behavior is already established.
 - Long-press actions must cancel delayed auto-tune so merely opening a context menu never changes
   the channel.
+- Settings and Quick Settings keys (`KEYCODE_SETTINGS`, `KEYCODE_QUICK_SETTINGS`, `KEYCODE_TV_CONTENTS_MENU`):
+  Short press opens TVApp display settings; long press opens Google/Android TV system settings.
+  `KEYCODE_MENU` toggles the channel panel.
 
 ## TV UI Rules
 

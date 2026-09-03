@@ -169,6 +169,8 @@ class MainActivity : AppCompatActivity() {
     private var gridLongPressJob: Job? = null
     private var yellowLongPressJob: Job? = null
     private var yellowLongPressHandled = false
+    private var settingsLongPressJob: Job? = null
+    private var settingsLongPressHandled = false
     private var gridReturnChannel: LiveChannel? = null
     private var gridChannels: List<LiveChannel> = emptyList()
     private val gridSelectedKeys = mutableListOf<String>()
@@ -1513,6 +1515,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun openDisplaySettings() {
         displaySettings.launch(Intent(this, DisplaySettingsActivity::class.java))
+    }
+
+    private fun openSystemSettings() {
+        val intents = listOf(
+            Intent(android.provider.Settings.ACTION_SETTINGS),
+            Intent("android.settings.QUICK_SETTINGS"),
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                if (::debugLog.isInitialized) {
+                    debugLog.recordDebug("SYSTEM_SETTINGS_OPENED | action=${intent.action}")
+                }
+                return
+            } catch (e: Exception) {
+                if (::debugLog.isInitialized) {
+                    debugLog.recordDebug("SYSTEM_SETTINGS_FAIL | action=${intent.action}, err=${e.message}")
+                }
+            }
+        }
+        Toast.makeText(this, R.string.system_settings_unavailable, Toast.LENGTH_SHORT).show()
     }
 
     private fun showPhysicalInputSelector() {
@@ -3496,15 +3520,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (
-            event.action == KeyEvent.ACTION_DOWN &&
-            ::debugLog.isInitialized &&
-            loggedRemoteKeyCodes.add(event.keyCode)
-        ) {
+        if (event.action == KeyEvent.ACTION_DOWN && ::debugLog.isInitialized) {
             debugLog.recordDebug(
-                "REMOTE_KEY | screen=main, name=${KeyEvent.keyCodeToString(event.keyCode)}, " +
-                    "code=${event.keyCode}, scan=${event.scanCode}, device=${event.deviceId}",
+                "REMOTE_KEY | name=${KeyEvent.keyCodeToString(event.keyCode)}, " +
+                    "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",
             )
+        }
+        val isSettingsKey = event.keyCode in setOf(
+            KeyEvent.KEYCODE_SETTINGS,
+            KeyEvent.KEYCODE_TV_CONTENTS_MENU,
+            312, // KEYCODE_QUICK_SETTINGS fallback on some Android TV builds
+        )
+        if (isSettingsKey) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                settingsLongPressHandled = false
+                settingsLongPressJob?.cancel()
+                settingsLongPressJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    settingsLongPressHandled = true
+                    if (::debugLog.isInitialized) {
+                        debugLog.recordDebug(
+                            "SETTINGS_KEY | long_press -> openSystemSettings, code=${event.keyCode}, name=${KeyEvent.keyCodeToString(event.keyCode)}",
+                        )
+                    }
+                    openSystemSettings()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                settingsLongPressJob?.cancel()
+                if (!settingsLongPressHandled) {
+                    if (::debugLog.isInitialized) {
+                        debugLog.recordDebug(
+                            "SETTINGS_KEY | short_press -> openDisplaySettings, code=${event.keyCode}, name=${KeyEvent.keyCodeToString(event.keyCode)}",
+                        )
+                    }
+                    openDisplaySettings()
+                }
+                settingsLongPressHandled = false
+            }
+            return true
         }
         if (iptvGridActive) {
             when (event.keyCode) {
@@ -3809,8 +3862,6 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_LANGUAGE_SWITCH,
                 KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> showAudioTracks()
                 KeyEvent.KEYCODE_CAPTIONS -> showSubtitleTracks()
-                KeyEvent.KEYCODE_SETTINGS,
-                KeyEvent.KEYCODE_TV_CONTENTS_MENU -> openDisplaySettings()
                 KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
                 KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
                 KeyEvent.KEYCODE_INFO -> if (binding.infoBar.visibility == View.VISIBLE) {
@@ -3900,6 +3951,7 @@ class MainActivity : AppCompatActivity() {
         sleepTimerJob?.cancel()
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
+        settingsLongPressJob?.cancel()
         clockJob?.cancel()
         playback.stop()
         iptvPlayback.release()
