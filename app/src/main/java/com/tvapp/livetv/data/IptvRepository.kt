@@ -187,9 +187,57 @@ class IptvRepository(context: Context) {
         return decoded.use { importStream(uri.toString(), KIND_DOCUMENT, name, it) }
     }
 
+    suspend fun importXtream(
+        serverUrl: String,
+        username: String,
+        password: String,
+        name: String,
+    ): IptvImportResult {
+        require(username.isNotBlank() && password.isNotBlank()) {
+            "Xtream kullanıcı adı ve parola gereklidir."
+        }
+        val client = XtreamClient(serverUrl, username.trim(), password)
+        client.verifyAccount()
+        return importGenerated(
+            location = "xtream:${client.baseUrl}|${username.trim()}",
+            kind = KIND_XTREAM,
+            name = name,
+            serverUrl = client.baseUrl,
+            username = username.trim(),
+            password = password,
+        ) { client.channels() }
+    }
+
+    suspend fun importStalker(
+        portalUrl: String,
+        macAddress: String,
+        name: String,
+    ): IptvImportResult {
+        val normalizedMac = normalizeMac(macAddress)
+        val client = StalkerClient(portalUrl, normalizedMac)
+        return importGenerated(
+            location = "stalker:${client.endpoint}|$normalizedMac",
+            kind = KIND_STALKER,
+            name = name,
+            serverUrl = client.endpoint,
+            macAddress = normalizedMac,
+        ) { client.channels() }
+    }
+
     suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
         KIND_URL -> importUrl(source.location, source.name)
         KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name)
+        KIND_XTREAM -> importXtream(
+            checkNotNull(source.serverUrl),
+            checkNotNull(source.username),
+            checkNotNull(source.password),
+            source.name,
+        )
+        KIND_STALKER -> importStalker(
+            checkNotNull(source.serverUrl),
+            checkNotNull(source.macAddress),
+            source.name,
+        )
         else -> error("Bilinmeyen IPTV kaynak türü: ${source.kind}")
     }
 
@@ -203,12 +251,33 @@ class IptvRepository(context: Context) {
         kind: String,
         name: String,
         input: InputStream,
+    ): IptvImportResult = importGenerated(location, kind, name) {
+        M3uParser.sequence(InputStreamReader(input, Charsets.UTF_8)).asIterable()
+    }
+
+    private suspend fun importGenerated(
+        location: String,
+        kind: String,
+        name: String,
+        serverUrl: String? = null,
+        username: String? = null,
+        password: String? = null,
+        macAddress: String? = null,
+        produce: () -> Iterable<ParsedIptvChannel>,
     ): IptvImportResult {
         val now = System.currentTimeMillis()
         val result = database.withTransaction {
             val existing = dao.getSourceByLocation(location)
             val sourceId = existing?.id ?: dao.insertSource(
-                IptvSourceEntity(name = name, location = location, kind = kind),
+                IptvSourceEntity(
+                    name = name,
+                    location = location,
+                    kind = kind,
+                    serverUrl = serverUrl,
+                    username = username,
+                    password = password,
+                    macAddress = macAddress,
+                ),
             )
             check(sourceId > 0) { "IPTV kaynağı kaydedilemedi." }
             val selectedChannels = if (existing == null) {
@@ -228,7 +297,16 @@ class IptvRepository(context: Context) {
                 name = name,
                 location = location,
                 kind = kind,
-            )).copy(name = name, kind = kind, enabled = true, lastUpdatedAt = now)
+            )).copy(
+                name = name,
+                kind = kind,
+                enabled = true,
+                lastUpdatedAt = now,
+                serverUrl = serverUrl,
+                username = username,
+                password = password,
+                macAddress = macAddress,
+            )
             dao.updateSource(source)
             dao.deleteChannelsForSource(sourceId)
             val batch = ArrayList<IptvChannelEntity>(IMPORT_BATCH_SIZE)
@@ -260,7 +338,7 @@ class IptvRepository(context: Context) {
                     lastSeenAt = now,
                 )
             }
-            for (item in M3uParser.sequence(InputStreamReader(input, Charsets.UTF_8))) {
+            for (item in produce()) {
                 batch += entity(channelCount, item)
                 channelCount++
                 if (batch.size >= IMPORT_BATCH_SIZE) {
@@ -274,6 +352,14 @@ class IptvRepository(context: Context) {
         }
         notifySharedChannelsChanged()
         return result
+    }
+
+    private fun normalizeMac(value: String): String {
+        val hex = value.filter(Char::isLetterOrDigit).uppercase()
+        require(hex.length == 12 && hex.all { it.isDigit() || it in 'A'..'F' }) {
+            "Geçerli bir MAC adresi girin."
+        }
+        return hex.chunked(2).joinToString(":")
     }
 
     private fun notifySharedChannelsChanged() {
@@ -299,6 +385,8 @@ class IptvRepository(context: Context) {
     companion object {
         const val KIND_URL = "URL"
         const val KIND_DOCUMENT = "DOCUMENT"
+        const val KIND_XTREAM = "XTREAM"
+        const val KIND_STALKER = "STALKER"
         private const val CONNECTION_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"

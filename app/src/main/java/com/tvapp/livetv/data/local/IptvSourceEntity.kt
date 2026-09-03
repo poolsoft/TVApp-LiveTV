@@ -15,4 +15,8 @@ data class IptvSourceEntity(
     val kind: String,
     val enabled: Boolean = true,
     val lastUpdatedAt: Long = 0,
+    val serverUrl: String? = null,
+    val username: String? = null,
+    val password: String? = null,
+    val macAddress: String? = null,
 )

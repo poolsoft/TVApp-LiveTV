@@ -215,6 +215,8 @@ class AppBackupRepository(context: Context) {
         fun IptvSourceEntity.toJson() = JSONObject().apply {
             put("id", id); put("name", name); put("location", location); put("kind", kind)
             put("enabled", enabled); put("lastUpdatedAt", lastUpdatedAt)
+            putNullable("serverUrl", serverUrl); putNullable("username", username)
+            putNullable("password", password); putNullable("macAddress", macAddress)
         }
 
         fun IptvChannelEntity.toJson() = JSONObject().apply {
@@ -222,7 +224,7 @@ class AppBackupRepository(context: Context) {
             put("displayName", displayName); put("streamUrl", streamUrl); putNullable("logoUrl", logoUrl)
             putNullable("groupTitle", groupTitle); putNullable("userAgent", userAgent)
             putNullable("referrer", referrer); putNullable("subtitleUrl", subtitleUrl)
-            put("originalIndex", originalIndex)
+            put("originalIndex", originalIndex); put("contentType", contentType)
             put("selected", selected); put("lastSeenAt", lastSeenAt)
         }
 
@@ -257,6 +259,8 @@ class AppBackupRepository(context: Context) {
             id = requireLong("id"), name = requireString("name"), location = requireString("location"),
             kind = requireString("kind"), enabled = optBoolean("enabled", true),
             lastUpdatedAt = optLong("lastUpdatedAt", 0L),
+            serverUrl = nullableString("serverUrl"), username = nullableString("username"),
+            password = nullableString("password"), macAddress = nullableString("macAddress"),
         )
 
         fun JSONObject.toIptvChannel(sourceId: Long) = IptvChannelEntity(
@@ -266,6 +270,7 @@ class AppBackupRepository(context: Context) {
             groupTitle = nullableString("groupTitle"), userAgent = nullableString("userAgent"),
             referrer = nullableString("referrer"), subtitleUrl = nullableString("subtitleUrl"),
             originalIndex = requireInt("originalIndex"),
+            contentType = optString("contentType", "LIVE"),
             selected = optBoolean("selected", false), lastSeenAt = optLong("lastSeenAt", 0L),
         )
 

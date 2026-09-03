@@ -11,9 +11,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.tvapp.livetv.playback.IptvDataSourceFactory
 
 class IptvTvInputService : TvInputService() {
     override fun onCreateSession(inputId: String): Session = PlaybackSession(this)
@@ -32,13 +32,7 @@ class IptvTvInputService : TvInputService() {
                 return false
             }
             releasePlayer()
-            val headers = buildMap {
-                metadata.referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
-            }
-            val httpFactory = DefaultHttpDataSource.Factory()
-                .setAllowCrossProtocolRedirects(true)
-                .setUserAgent(metadata.userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
-                .setDefaultRequestProperties(headers)
+            val httpFactory = IptvDataSourceFactory.create(metadata.userAgent, metadata.referrer)
             player = ExoPlayer.Builder(appContext)
                 .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
                 .build()
@@ -99,9 +93,5 @@ class IptvTvInputService : TvInputService() {
                 if (!cursor.moveToFirst()) return@use null
                 IptvInputChannelMetadata.decode(cursor.getBlob(0))
             }
-
-        private companion object {
-            const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
-        }
     }
 }

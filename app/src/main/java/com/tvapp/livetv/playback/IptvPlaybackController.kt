@@ -14,7 +14,6 @@ import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -94,12 +93,7 @@ class IptvPlaybackController(
             player = created
             playerView.player = created
         }
-        val dataSource = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setUserAgent(channel.userAgent ?: DEFAULT_USER_AGENT)
-        channel.referrer?.let { referrer ->
-            dataSource.setDefaultRequestProperties(mapOf("Referer" to referrer))
-        }
+        val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer)
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)
@@ -384,7 +378,6 @@ class IptvPlaybackController(
     }
 
     private companion object {
-        const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
         const val MIN_BUFFER_MS = 1_500

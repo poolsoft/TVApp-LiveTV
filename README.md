@@ -31,6 +31,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 ### IPTV
 
 - M3U/M3U8 listeleri URL'den veya dosyadan eklenebilir, yenilenebilir ve silinebilir.
+- Xtream Codes hesaplarından canlı kanal ve film/VOD katalogları alınabilir.
+- Stalker Portal kaynakları MAC adresiyle eklenebilir; canlı bağlantı oynatma anında yenilenir.
 - Her IPTV kaynağından ana kanal listesine eklenecek kanallar ayrıca seçilebilir.
 - Mavi tuşla tam IPTV görünümüne geçilir; kayıtlı kaynak, Canlı/VOD ve kategori filtresi uygulanır.
 - Tam IPTV görünümündeki gezinme ana izleme geçmişine yazılmaz ve kanal yalnızca `OK` ile açılır.
