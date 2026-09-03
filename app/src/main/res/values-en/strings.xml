@@ -376,6 +376,7 @@
     <string name="external_subtitle_failed">External subtitles could not be opened.</string>
     <string name="choose_channel_source">Choose channel list</string>
     <string name="loading">Loading…</string>
+    <string name="settings_short">Settings</string>
     <string name="iptv_url_import_failed">Could not import. Check the address: %1$s</string>
     <string name="rename_iptv_source">Rename</string>
     <string name="iptv_source_renamed">The playlist was renamed.</string>

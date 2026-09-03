@@ -21,12 +21,13 @@ class TifRepository(context: Context) {
 
     fun physicalInputs(): List<TvInputInfo> = inputs().filter { input ->
         !IptvInputResolver.isOwnInput(input) &&
-            (input.isPassthroughInput || (input.type == TvInputInfo.TYPE_TUNER && "/HW" in input.id))
+            (input.isPassthroughInput || input.type == TvInputInfo.TYPE_TUNER)
     }
 
     fun tunerInputs(): List<TvInputInfo> = physicalInputs().filter { input ->
         input.type == TvInputInfo.TYPE_TUNER &&
-            !input.isPassthroughInput
+            !input.isPassthroughInput &&
+            "/HW" in input.id
     }
 
     fun channels(

@@ -376,6 +376,7 @@
     <string name="external_subtitle_failed">Harici altyazı açılamadı.</string>
     <string name="choose_channel_source">Kanal listesi seç</string>
     <string name="loading">Yükleniyor…</string>
+    <string name="settings_short">Ayarlar</string>
     <string name="iptv_url_import_failed">İçe aktarılamadı. Adresi kontrol edin: %1$s</string>
     <string name="rename_iptv_source">Yeniden adlandır</string>
     <string name="iptv_source_renamed">Liste adı değiştirildi.</string>

@@ -13,6 +13,9 @@ import android.os.Bundle
 import android.graphics.Rect
 import android.util.Rational
 import android.text.InputType
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -86,7 +89,9 @@ class MainActivity : AppCompatActivity() {
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
-        private const val INFO_HEIGHT_FRACTION = 0.235f
+        private const val INFO_HEIGHT_FRACTION = 0.205f
+        private const val INFO_ACTIONS_HEIGHT_FRACTION = 0.035f
+        private const val INFO_ACTIONS_GAP_FRACTION = 0.004f
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -991,7 +996,7 @@ class MainActivity : AppCompatActivity() {
             iptvControlsJob?.cancel()
             binding.iptvPlaybackControls.visibility = View.GONE
         }
-        binding.infoBar.visibility = View.VISIBLE
+        setInfoBarVisible(true)
         infoBarJob?.cancel()
         if (channelPanelExpanded) return
         val seconds = displayPreferences.infoBarDurationSeconds
@@ -999,7 +1004,7 @@ class MainActivity : AppCompatActivity() {
         infoBarJob = lifecycleScope.launch {
             delay(seconds * 1_000L)
             if (numberInput.isEmpty()) {
-                binding.infoBar.visibility = View.GONE
+                setInfoBarVisible(false)
             }
         }
     }
@@ -1089,7 +1094,7 @@ class MainActivity : AppCompatActivity() {
         channelPanelExpanded = false
         binding.channelPanel.visibility = View.GONE
         binding.advancedFilterRow.visibility = View.GONE
-        binding.infoBar.visibility = View.GONE
+        setInfoBarVisible(false)
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
@@ -1546,7 +1551,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectPhysicalInput(input: TvInputInfo) {
         hideChannelPanel()
-        binding.infoBar.visibility = View.GONE
+        setInfoBarVisible(false)
         debugLog.recordDebug("PHYSICAL_INPUT_SELECT | id=${input.id}, type=${input.type}")
         if (!input.isPassthroughInput && input.type == TvInputInfo.TYPE_TUNER) {
             val channel = currentChannel?.takeIf {
@@ -1648,7 +1653,7 @@ class MainActivity : AppCompatActivity() {
         numberInputJob?.cancel()
         numberInput = ""
         binding.channelPanel.visibility = View.GONE
-        binding.infoBar.visibility = View.GONE
+        setInfoBarVisible(false)
         binding.statusPanel.visibility = View.GONE
         binding.audioOnlyPanel.visibility = View.GONE
     }
@@ -1676,7 +1681,7 @@ class MainActivity : AppCompatActivity() {
     private fun openProgramGuide() {
         hideChannelPanel()
         infoBarJob?.cancel()
-        binding.infoBar.visibility = View.GONE
+        setInfoBarVisible(false)
         programGuide.launch(
             Intent(this, ProgramGuideActivity::class.java).putExtra(
                 ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY,
@@ -2302,7 +2307,7 @@ class MainActivity : AppCompatActivity() {
         binding.parentalLockPanel.visibility = View.GONE
         binding.statusPanel.visibility = View.GONE
         hideChannelPanel()
-        binding.infoBar.visibility = View.GONE
+        setInfoBarVisible(false)
         binding.iptvGrid.visibility = View.VISIBLE
         renderIptvGrid()
         debugLog.recordDebug(
@@ -3039,10 +3044,34 @@ class MainActivity : AppCompatActivity() {
         binding.greenActionLabel.setText(green)
         binding.yellowActionLabel.setText(yellow)
         binding.blueActionLabel.setText(blue)
-        binding.infoRedActionLabel.setText(red)
-        binding.infoGreenActionLabel.setText(green)
-        binding.infoYellowActionLabel.setText(yellow)
-        binding.infoBlueActionLabel.setText(blue)
+        updateInfoColorActions()
+    }
+
+    private fun updateInfoColorActions() {
+        val text = SpannableStringBuilder()
+        fun action(color: Int, label: Int) {
+            if (text.isNotEmpty()) text.append(",  ")
+            val start = text.length
+            text.append("●")
+            text.setSpan(
+                ForegroundColorSpan(ContextCompat.getColor(this, color)),
+                start,
+                text.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            text.append(" ").append(getString(label))
+        }
+        action(R.color.remote_green, R.string.iptv_grid)
+        action(R.color.remote_blue, R.string.settings_short)
+        binding.infoColorActions.text = text
+    }
+
+    private fun setInfoBarVisible(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        binding.infoBar.visibility = visibility
+        binding.infoColorActions.visibility = if (
+            visible && binding.channelPanel.visibility != View.VISIBLE
+        ) View.VISIBLE else View.GONE
     }
 
     private fun updateChannelListModeIcon() {
@@ -3121,6 +3150,9 @@ class MainActivity : AppCompatActivity() {
         val verticalMargin = (screenHeight * VERTICAL_MARGIN_FRACTION).toInt()
         val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
         val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
+        val infoHeight = (screenHeight * INFO_HEIGHT_FRACTION).toInt()
+        val infoActionsHeight = (screenHeight * INFO_ACTIONS_HEIGHT_FRACTION).toInt()
+        val infoActionsGap = (screenHeight * INFO_ACTIONS_GAP_FRACTION).toInt()
         val panelWidth = if (channelPanelExpanded) {
             (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
         } else {
@@ -3153,7 +3185,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     screenWidth - panelWidth - overlayGap - infoOuterMargin
                 }
-                height = (screenHeight * INFO_HEIGHT_FRACTION).toInt()
+                height = infoHeight
                 gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
                     Gravity.END
                 } else {
@@ -3164,9 +3196,48 @@ class MainActivity : AppCompatActivity() {
                     Gravity.BOTTOM
                 }
                 if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    setMargins(0, verticalMargin, infoOuterMargin, verticalMargin)
+                    setMargins(
+                        0,
+                        verticalMargin,
+                        infoOuterMargin,
+                        if (displayPreferences.infoBarPosition == InfoBarPosition.BOTTOM) {
+                            verticalMargin + infoActionsHeight + infoActionsGap
+                        } else verticalMargin,
+                    )
                 } else {
-                    setMargins(infoOuterMargin, verticalMargin, 0, verticalMargin)
+                    setMargins(
+                        infoOuterMargin,
+                        verticalMargin,
+                        0,
+                        if (displayPreferences.infoBarPosition == InfoBarPosition.BOTTOM) {
+                            verticalMargin + infoActionsHeight + infoActionsGap
+                        } else verticalMargin,
+                    )
+                }
+            }
+        binding.infoColorActions.layoutParams =
+            (binding.infoColorActions.layoutParams as FrameLayout.LayoutParams).apply {
+                width = binding.infoBar.layoutParams.width
+                height = infoActionsHeight
+                gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
+                    Gravity.END
+                } else {
+                    Gravity.START
+                }) or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
+                    Gravity.TOP
+                } else {
+                    Gravity.BOTTOM
+                }
+                val left = if (displayPreferences.channelPanelSide == ChannelPanelSide.RIGHT) {
+                    infoOuterMargin
+                } else 0
+                val right = if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
+                    infoOuterMargin
+                } else 0
+                if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
+                    setMargins(left, verticalMargin + infoHeight + infoActionsGap, right, 0)
+                } else {
+                    setMargins(left, 0, right, verticalMargin)
                 }
             }
         val infoHorizontalPadding = (screenWidth * INFO_HORIZONTAL_PADDING_FRACTION).toInt()
@@ -3351,7 +3422,7 @@ class MainActivity : AppCompatActivity() {
             binding.channelPanel.visibility == View.VISIBLE -> hideChannelPanel()
             binding.infoBar.visibility == View.VISIBLE -> {
                 infoBarJob?.cancel()
-                binding.infoBar.visibility = View.GONE
+                setInfoBarVisible(false)
             }
             else -> Unit
         }
@@ -3641,11 +3712,11 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         openChannelEditor()
                     }
-                } else {
-                    showPhysicalInputSelector()
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> {
-                    if (
+                    if (binding.channelPanel.visibility != View.VISIBLE) {
+                        showIptvGridPicker()
+                    } else if (
                         channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ||
                         currentChannel?.source == LiveChannel.Source.IPTV
                     ) {
@@ -3673,8 +3744,12 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_SETTINGS,
                 KeyEvent.KEYCODE_TV_CONTENTS_MENU -> openDisplaySettings()
                 KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
-                KeyEvent.KEYCODE_GUIDE,
-                KeyEvent.KEYCODE_INFO -> openProgramGuide()
+                KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
+                KeyEvent.KEYCODE_INFO -> if (binding.infoBar.visibility == View.VISIBLE) {
+                    openProgramGuide()
+                } else {
+                    currentChannel?.let(::showInfoBarForChannel) ?: showInfoBar()
+                }
                 KeyEvent.KEYCODE_MENU -> toggleChannelPanel()
                 else -> {
                     val digit = when (event.keyCode) {

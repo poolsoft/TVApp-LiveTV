@@ -791,55 +791,21 @@
             </FrameLayout>
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/info_color_actions"
-            android:layout_width="match_parent"
-            android:layout_height="25dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="10dp">
-
-            <TextView
-                android:id="@+id/info_red_action_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/edit_short"
-                android:textColor="@color/remote_red"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/info_green_action_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/iptv_pip"
-                android:textColor="@color/remote_green"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/info_yellow_action_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/channel_source_short"
-                android:textColor="@color/remote_yellow"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/info_blue_action_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/empty_action"
-                android:textColor="@color/remote_blue"
-                android:textSize="10sp" />
-        </LinearLayout>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/info_color_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
+        android:background="#B8101720"
+        android:gravity="end|center_vertical"
+        android:maxLines="1"
+        android:paddingHorizontal="9dp"
+        android:paddingVertical="3dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="10sp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/status_panel"
