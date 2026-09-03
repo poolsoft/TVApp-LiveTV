@@ -239,6 +239,17 @@
     <string name="source_type_m3u">M3U</string>
     <string name="source_type_xtream">Xtream</string>
     <string name="source_type_stalker">Stalker</string>
+    <string name="billing_test_scenarios">IPTV billing test scenarios</string>
+    <string name="billing_test_scenarios_summary">Simulate trial and purchase states</string>
+    <string name="iptv_trial_title">IPTV trial</string>
+    <string name="iptv_trial_message">You can try IPTV features free for 7 days.</string>
+    <string name="start_trial">Start 7-day trial</string>
+    <string name="purchase_pending_title">Payment pending</string>
+    <string name="purchase_pending_message">Payment has not completed yet. IPTV access will open after completion.</string>
+    <string name="iptv_pro_required_title">IPTV feature locked</string>
+    <string name="iptv_pro_required_message">The 7-day trial has ended. Purchase IPTV access to continue.</string>
+    <string name="purchase_iptv">Purchase IPTV</string>
+    <string name="billing_not_connected">Google Play billing will be enabled in the next stage.</string>
     <string name="saved_iptv_sources">Saved lists</string>
     <string name="iptv_url_required">Enter a valid list URL first.</string>
     <string name="iptv_importing">Reading IPTV source...</string>

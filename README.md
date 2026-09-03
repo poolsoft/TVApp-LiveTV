@@ -140,6 +140,12 @@ izni içermez ve Ayarlar ekranında yalnızca kurulu sürümü gösterir. Paid v
 `IPTV_PRO_REQUIRED=false` olduğu için IPTV özellikleri kısıtlanmaz; satın alma entegrasyonu
 tamamlandığında yalnız mağaza varyantında etkinleştirilecektir.
 
+Debug derlemelerinde `Ayarlar > IPTV ödeme test senaryoları` ekranı; ilk kurulum,
+aktif/dolmuş 7 günlük deneme, bekleyen ödeme, tamamlanan ödeme ve geri yüklenen
+satın alma durumlarını simüle eder. Bu Activity ve manifest kaydı release
+paketlerine dahil edilmez. Gerçek ödeme devreye alınırken yetki, Play purchase
+token'ının sunucuda doğrulanmasıyla verilecek; debug durumu üretimde okunmaz.
+
 Sürüm numarası kökteki `.build` dosyasından okunur. Geliştirme döneminde bu değer sabittir;
 yerel APK ile Action APK'sı aynı `versionCode` ve aynı imzayı kullanır. `.build` üretim sürüm
 politikası belirlenene kadar elle veya Action tarafından artırılmaz.

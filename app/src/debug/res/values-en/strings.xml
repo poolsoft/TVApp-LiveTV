@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_billing_title">IPTV billing scenarios</string>
+    <string name="debug_billing_warning">Debug builds only; this screen is excluded from release packages.</string>
+    <string name="debug_billing_state_unknown">Reading state</string>
+    <string name="debug_billing_state">State: %1$s · Access: %2$s · Remaining: %3$d hours</string>
+    <string name="debug_access_open">Open</string>
+    <string name="debug_access_locked">Locked</string>
+    <string name="debug_state_first_install">First installation</string>
+    <string name="debug_state_trial_active">7-day trial active</string>
+    <string name="debug_state_trial_expired">7-day trial expired</string>
+    <string name="debug_state_purchase_pending">Payment pending</string>
+    <string name="debug_state_purchase_completed">Payment just completed</string>
+    <string name="debug_state_purchase_restored">Purchase already owned / restored</string>
+    <string name="debug_state_normal">Disable simulation</string>
+    <string name="debug_test_access">Test access prompt</string>
+</resources>

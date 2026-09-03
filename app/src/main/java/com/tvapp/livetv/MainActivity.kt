@@ -64,6 +64,8 @@ import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
+import com.tvapp.livetv.billing.IptvAccessDialogs
+import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
 import com.tvapp.livetv.ui.ParentalPinDialog
@@ -592,6 +594,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
+        if (channel.source == LiveChannel.Source.IPTV && !hasIptvAccess {
+                playSelectedChannel(channel, recordHistory)
+            }
+        ) return
         if (iptvOverlayActive) stopIptvOverlay()
         if (iptvGridActive) stopIptvGrid(resumePrevious = false)
         saveCurrentIptvResumePosition()
@@ -1668,6 +1674,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showIptvLibraryFilterDialog() {
+        if (!hasIptvAccess(::showIptvLibraryFilterDialog)) return
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
         lifecycleScope.launch {
@@ -1835,6 +1842,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openSavedIptvLibrary() {
+        if (!hasIptvAccess(::openSavedIptvLibrary)) return
         focusedTuneJob?.cancel()
         lifecycleScope.launch {
             val sources = withContext(Dispatchers.IO) { iptvRepository.sources() }
@@ -1877,8 +1885,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openIptvEditor() {
+        if (!hasIptvAccess(::openIptvEditor)) return
         focusedTuneJob?.cancel()
         iptvSources.launch(Intent(this, IptvSourcesActivity::class.java))
+    }
+
+    private fun hasIptvAccess(onGranted: () -> Unit): Boolean {
+        if (IptvEntitlementManager(this).snapshot().accessGranted) return true
+        IptvAccessDialogs.requireAccess(this, onGranted)
+        return false
     }
 
     private fun dialogSpinnerAdapter(items: List<String>) = ArrayAdapter(
@@ -2170,6 +2185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startIptvOverlay(channel: LiveChannel) {
+        if (!hasIptvAccess { startIptvOverlay(channel) }) return
         if (currentChannel?.source != LiveChannel.Source.TIF) return
         if (multiViewActive) stopMultiView()
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
@@ -2257,6 +2273,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startIptvGrid(selected: List<LiveChannel>) {
+        if (!hasIptvAccess { startIptvGrid(selected) }) return
         if (selected.isEmpty()) return
         if (multiViewActive) stopMultiView()
         stopIptvOverlay()

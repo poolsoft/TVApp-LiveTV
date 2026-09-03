@@ -227,6 +227,16 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
 
         section(R.string.application_settings)
+        if (BuildConfig.DEBUG) {
+            action(
+                R.string.billing_test_scenarios,
+                getString(R.string.billing_test_scenarios_summary),
+            ) {
+                startActivity(
+                    Intent("com.tvapp.livetv.DEBUG_ENTITLEMENT").setPackage(packageName),
+                )
+            }
+        }
         action(
             R.string.xmltv_alternative_epg,
             xmlTvRepository.sourceLabel() ?: getString(R.string.not_configured_short),

@@ -23,6 +23,8 @@ import com.tvapp.livetv.settings.ChannelSourceFilterStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
 import com.tvapp.livetv.ui.ParentalPinDialog
+import com.tvapp.livetv.billing.IptvAccessDialogs
+import com.tvapp.livetv.billing.IptvEntitlementManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -652,7 +654,7 @@ class ChannelEditorActivity : AppCompatActivity() {
                 when (which) {
                     0 -> loadChannels(syncMessage = true)
                     1 -> showChannelSources()
-                    2 -> editIptvSources.launch(Intent(this, IptvSourcesActivity::class.java))
+                    2 -> openIptvSources()
                     3 -> showXmlTvManagement()
                     4 -> createBackupFile.launch(defaultBackupFileName())
                     5 -> openBackupFile.launch(arrayOf("application/json", "text/plain"))
@@ -660,6 +662,14 @@ class ChannelEditorActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun openIptvSources() {
+        if (IptvEntitlementManager(this).snapshot().accessGranted) {
+            editIptvSources.launch(Intent(this, IptvSourcesActivity::class.java))
+        } else {
+            IptvAccessDialogs.requireAccess(this, ::openIptvSources)
+        }
     }
 
     private fun showXmlTvManagement() {

@@ -251,6 +251,17 @@
     <string name="source_type_m3u">M3U</string>
     <string name="source_type_xtream">Xtream</string>
     <string name="source_type_stalker">Stalker</string>
+    <string name="billing_test_scenarios">IPTV ödeme test senaryoları</string>
+    <string name="billing_test_scenarios_summary">Deneme ve satın alma durumlarını simüle et</string>
+    <string name="iptv_trial_title">IPTV deneme sürümü</string>
+    <string name="iptv_trial_message">IPTV özelliklerini 7 gün boyunca ücretsiz deneyebilirsiniz.</string>
+    <string name="start_trial">7 günlük denemeyi başlat</string>
+    <string name="purchase_pending_title">Ödeme bekleniyor</string>
+    <string name="purchase_pending_message">Ödeme henüz tamamlanmadı. Tamamlandığında IPTV erişimi açılacak.</string>
+    <string name="iptv_pro_required_title">IPTV özelliği kilitli</string>
+    <string name="iptv_pro_required_message">7 günlük deneme sona erdi. IPTV özelliklerini kullanmaya devam etmek için satın alın.</string>
+    <string name="purchase_iptv">IPTV’yi satın al</string>
+    <string name="billing_not_connected">Google Play ödeme bağlantısı sonraki aşamada etkinleştirilecek.</string>
     <string name="saved_iptv_sources">Kayıtlı listeler</string>
     <string name="iptv_url_required">Önce geçerli bir liste adresi girin.</string>
     <string name="iptv_importing">IPTV kaynağı okunuyor…</string>

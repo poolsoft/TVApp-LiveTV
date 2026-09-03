@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="debug_billing_title">IPTV ödeme senaryoları</string>
+    <string name="debug_billing_warning">Yalnızca debug derlemesindedir; release paketine eklenmez.</string>
+    <string name="debug_billing_state_unknown">Durum okunuyor</string>
+    <string name="debug_billing_state">Durum: %1$s · Erişim: %2$s · Kalan: %3$d saat</string>
+    <string name="debug_access_open">Açık</string>
+    <string name="debug_access_locked">Kilitli</string>
+    <string name="debug_state_first_install">İlk kurulum</string>
+    <string name="debug_state_trial_active">7 günlük deneme aktif</string>
+    <string name="debug_state_trial_expired">7 günlük deneme doldu</string>
+    <string name="debug_state_purchase_pending">Ödeme bekliyor</string>
+    <string name="debug_state_purchase_completed">Ödeme yeni tamamlandı</string>
+    <string name="debug_state_purchase_restored">Satın alma zaten var / geri yüklendi</string>
+    <string name="debug_state_normal">Simülasyonu kapat</string>
+    <string name="debug_test_access">Erişim ekranını dene</string>
+</resources>

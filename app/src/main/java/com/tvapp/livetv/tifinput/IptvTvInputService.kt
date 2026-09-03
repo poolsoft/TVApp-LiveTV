@@ -14,6 +14,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.tvapp.livetv.playback.IptvDataSourceFactory
+import com.tvapp.livetv.billing.IptvEntitlementManager
 
 class IptvTvInputService : TvInputService() {
     override fun onCreateSession(inputId: String): Session = PlaybackSession(this)
@@ -27,6 +28,10 @@ class IptvTvInputService : TvInputService() {
 
         override fun onTune(channelUri: Uri): Boolean {
             notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING)
+            if (!IptvEntitlementManager(appContext).snapshot().accessGranted) {
+                notifyContentBlocked(android.media.tv.TvContentRating.UNRATED)
+                return false
+            }
             val metadata = loadMetadata(channelUri) ?: run {
                 notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
                 return false
