@@ -526,7 +526,7 @@
                 android:layout_weight="33"
                 android:gravity="center_vertical"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp">
+                android:paddingHorizontal="12dp">
 
                 <TextView
                     android:id="@+id/now_number"
@@ -535,7 +535,7 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="@color/accent"
-                    android:textSize="19sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -544,16 +544,16 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:layout_marginTop="3dp"
+                    android:layout_marginTop="1dp"
                     android:textColor="@color/text_primary"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <View
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
-                android:layout_marginVertical="13dp"
+                android:layout_marginVertical="9dp"
                 android:background="#526579" />
 
             <LinearLayout
@@ -562,7 +562,7 @@
                 android:layout_weight="51"
                 android:gravity="center_vertical"
                 android:orientation="vertical"
-                android:paddingHorizontal="20dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:id="@+id/current_program"
@@ -571,7 +571,7 @@
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp" />
+                    android:textSize="14sp" />
 
                 <LinearLayout
                     android:id="@+id/program_meta"
@@ -611,7 +611,7 @@
                     android:id="@+id/next_program"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:drawableStart="@drawable/ic_clock_small"
                     android:drawablePadding="7dp"
                     android:ellipsize="end"
@@ -623,7 +623,7 @@
             <View
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
-                android:layout_marginVertical="13dp"
+                android:layout_marginVertical="9dp"
                 android:background="#526579" />
 
             <LinearLayout
@@ -633,21 +633,21 @@
                 android:layout_weight="16"
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingHorizontal="14dp">
+                android:paddingHorizontal="10dp">
 
                 <TextView
                     android:id="@+id/clock_time"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/text_primary"
-                    android:textSize="24sp"
+                    android:textSize="21sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/clock_date"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
+                    android:layout_marginTop="2dp"
                     android:gravity="center"
                     android:maxLines="2"
                     android:textColor="@color/text_secondary"
@@ -665,7 +665,7 @@
         <LinearLayout
             android:id="@+id/technical_row"
             android:layout_width="match_parent"
-            android:layout_height="38dp"
+            android:layout_height="31dp"
             android:gravity="start|center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="10dp">
@@ -674,7 +674,7 @@
                 android:id="@+id/tech_slot_source"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
 
                 <ImageView
                     android:id="@+id/source_badge_icon"
@@ -689,7 +689,7 @@
                 android:id="@+id/tech_slot_quality_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
                 <TextView
                     android:id="@+id/quality_badge"
                     android:layout_width="wrap_content"
@@ -717,7 +717,7 @@
                 android:id="@+id/tech_slot_audio"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
                 <TextView
                     android:id="@+id/dolby_badge"
                     android:layout_width="wrap_content"
@@ -745,7 +745,7 @@
                 android:id="@+id/tech_slot_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
                 <TextView
                     android:id="@+id/subtitle_badge"
                     android:layout_width="wrap_content"
@@ -762,7 +762,7 @@
                 android:id="@+id/tech_slot_txt"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
                 <TextView
                     android:id="@+id/txt_badge"
                     android:layout_width="wrap_content"
@@ -779,7 +779,7 @@
                 android:id="@+id/tech_slot_lock"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="14dp">
                 <ImageView
                     android:id="@+id/lock_badge"
                     android:layout_width="20dp"
@@ -789,6 +789,55 @@
                     android:src="@drawable/ic_lock"
                     android:visibility="gone" />
             </FrameLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/info_color_actions"
+            android:layout_width="match_parent"
+            android:layout_height="25dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:id="@+id/info_red_action_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/edit_short"
+                android:textColor="@color/remote_red"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/info_green_action_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/iptv_pip"
+                android:textColor="@color/remote_green"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/info_yellow_action_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/channel_source_short"
+                android:textColor="@color/remote_yellow"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/info_blue_action_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/empty_action"
+                android:textColor="@color/remote_blue"
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 

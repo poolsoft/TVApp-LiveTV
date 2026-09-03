@@ -374,4 +374,17 @@
     <string name="add_external_subtitle">Harici altyazı seç</string>
     <string name="external_subtitle_added">Harici altyazı eklendi.</string>
     <string name="external_subtitle_failed">Harici altyazı açılamadı.</string>
+    <string name="choose_channel_source">Kanal listesi seç</string>
+    <string name="loading">Yükleniyor…</string>
+    <string name="iptv_url_import_failed">İçe aktarılamadı. Adresi kontrol edin: %1$s</string>
+    <string name="rename_iptv_source">Yeniden adlandır</string>
+    <string name="iptv_source_renamed">Liste adı değiştirildi.</string>
+    <string name="about">Hakkında</string>
+    <string name="user_guide">Kullanım kılavuzu</string>
+    <string name="open_page">Aç</string>
+    <string name="version_and_statistics">Sürüm, satın alma ve istatistikler</string>
+    <string name="access_active">Aktif</string>
+    <string name="access_inactive">Aktif değil</string>
+    <string name="about_content">TVApp\n\nSürüm: %1$s (%2$d)\nDağıtım: %3$s\n\nIPTV satın alma durumu: %4$s\nIPTV erişimi: %5$s\nKalan deneme: %6$d gün\n\nIPTV listesi: %7$d\nToplam IPTV içeriği: %8$d\nAna kanal listesine ekli: %9$d\n\nTVApp, Android TV Input Framework kaynaklarıyla uyumlu canlı TV ve IPTV deneyimi sunar.</string>
+    <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nCanlı yayında sol veya sağ tuş oynatma çubuğunu açar. Kırmızı canlıya döner veya yeniden dener. VOD içeriğinde sol ve sağ ileri/geri sarar, OK oynatır veya duraklatır. Yeşil ses, sarı altyazı, mavi görüntü seçeneklerini açar. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
 </resources>

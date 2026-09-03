@@ -249,6 +249,18 @@ class DisplaySettingsActivity : AppCompatActivity() {
             getString(R.string.iptv_input_sync),
             ::syncIptvInput,
         )
+        action(R.string.user_guide, getString(R.string.open_page)) {
+            startActivity(
+                Intent(this, InformationActivity::class.java)
+                    .putExtra(InformationActivity.EXTRA_PAGE, InformationActivity.PAGE_GUIDE),
+            )
+        }
+        action(R.string.about, getString(R.string.version_and_statistics)) {
+            startActivity(
+                Intent(this, InformationActivity::class.java)
+                    .putExtra(InformationActivity.EXTRA_PAGE, InformationActivity.PAGE_ABOUT),
+            )
+        }
         val currentVersion = getString(
             R.string.current_version,
             BuildConfig.VERSION_NAME,

@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
-        private const val INFO_HEIGHT_FRACTION = 0.26f
+        private const val INFO_HEIGHT_FRACTION = 0.235f
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -164,6 +164,8 @@ class MainActivity : AppCompatActivity() {
     private var gridFullscreenIndex: Int? = null
     private var gridLongPressHandled = false
     private var gridLongPressJob: Job? = null
+    private var yellowLongPressJob: Job? = null
+    private var yellowLongPressHandled = false
     private var gridReturnChannel: LiveChannel? = null
     private var gridChannels: List<LiveChannel> = emptyList()
     private val gridSelectedKeys = mutableListOf<String>()
@@ -985,6 +987,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showInfoBar() {
+        if (binding.iptvPlaybackControls.visibility == View.VISIBLE) {
+            iptvControlsJob?.cancel()
+            binding.iptvPlaybackControls.visibility = View.GONE
+        }
         binding.infoBar.visibility = View.VISIBLE
         infoBarJob?.cancel()
         if (channelPanelExpanded) return
@@ -1078,6 +1084,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showIptvPlaybackControls(stateText: Int, autoHide: Boolean = true) {
+        focusedTuneJob?.cancel()
+        channelPanelJob?.cancel()
+        channelPanelExpanded = false
+        binding.channelPanel.visibility = View.GONE
+        binding.advancedFilterRow.visibility = View.GONE
+        binding.infoBar.visibility = View.GONE
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
@@ -3014,18 +3026,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateChannelActionLabels() {
         val library = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
-        binding.redActionLabel.setText(R.string.edit_short)
-        binding.greenActionLabel.setText(
+        val red = R.string.edit_short
+        val green =
             if (library || currentChannel?.source == LiveChannel.Source.IPTV) {
                 R.string.iptv_grid
             } else {
                 R.string.iptv_pip
-            },
-        )
-        binding.yellowActionLabel.setText(R.string.channel_source_short)
-        binding.blueActionLabel.setText(
-            if (library) R.string.filter_short else R.string.empty_action,
-        )
+            }
+        val yellow = R.string.channel_source_short
+        val blue = if (library) R.string.filter_short else R.string.empty_action
+        binding.redActionLabel.setText(red)
+        binding.greenActionLabel.setText(green)
+        binding.yellowActionLabel.setText(yellow)
+        binding.blueActionLabel.setText(blue)
+        binding.infoRedActionLabel.setText(red)
+        binding.infoGreenActionLabel.setText(green)
+        binding.infoYellowActionLabel.setText(yellow)
+        binding.infoBlueActionLabel.setText(blue)
     }
 
     private fun updateChannelListModeIcon() {
@@ -3233,6 +3250,40 @@ class MainActivity : AppCompatActivity() {
             )
             else -> openSavedIptvLibrary()
         }
+    }
+
+    private fun showChannelListModeDialog() {
+        val labels = arrayOf(
+            getString(R.string.all_channels),
+            getString(R.string.satellite_channels),
+            getString(R.string.radio_channels),
+            getString(R.string.iptv_filter),
+            getString(R.string.iptv_library),
+        )
+        val checked = when {
+            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> 4
+            sourceFilter == ChannelSourceFilter.SATELLITE -> 1
+            sourceFilter == ChannelSourceFilter.RADIO -> 2
+            sourceFilter == ChannelSourceFilter.IPTV -> 3
+            else -> 0
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.choose_channel_source)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                focusedTuneJob?.cancel()
+                when (which) {
+                    0 -> applyChannelFilter(false, ChannelSourceFilter.ALL)
+                    1 -> applyChannelFilter(false, ChannelSourceFilter.SATELLITE)
+                    2 -> applyChannelFilter(false, ChannelSourceFilter.RADIO)
+                    3 -> applyChannelFilter(false, ChannelSourceFilter.IPTV)
+                    4 -> openSavedIptvLibrary()
+                }
+                dialog.dismiss()
+                if (binding.channelPanel.visibility != View.VISIBLE) showChannelPanel(false)
+                scheduleChannelPanelClose()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun pageChannelList(direction: Int) {
@@ -3510,6 +3561,25 @@ class MainActivity : AppCompatActivity() {
             showIptvPlaybackControls(iptvPlaybackStateText())
             return true
         }
+        if (
+            event.keyCode == KeyEvent.KEYCODE_PROG_YELLOW &&
+            binding.channelPanel.visibility == View.VISIBLE
+        ) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                yellowLongPressHandled = false
+                yellowLongPressJob?.cancel()
+                yellowLongPressJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    yellowLongPressHandled = true
+                    showChannelListModeDialog()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                yellowLongPressJob?.cancel()
+                if (!yellowLongPressHandled) cycleChannelListMode()
+                yellowLongPressHandled = false
+            }
+            return true
+        }
         val isPictureInPictureKey = event.keyCode == KeyEvent.KEYCODE_WINDOW
         if (event.action != KeyEvent.ACTION_DOWN && isPictureInPictureKey) return true
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -3584,9 +3654,7 @@ class MainActivity : AppCompatActivity() {
                         showIptvPipPicker()
                     }
                 }
-                KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    cycleChannelListMode()
-                } else {
+                KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility != View.VISIBLE) {
                     return super.dispatchKeyEvent(event)
                 }
                 KeyEvent.KEYCODE_PROG_BLUE -> if (

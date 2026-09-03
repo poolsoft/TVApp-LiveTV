@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -21,6 +22,7 @@ import com.tvapp.livetv.databinding.ActivityIptvSourcesBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class IptvSourcesActivity : AppCompatActivity() {
@@ -58,23 +60,7 @@ class IptvSourcesActivity : AppCompatActivity() {
         repository = IptvRepository(this)
         debugLog = CrashReportStore(this)
 
-        binding.importUrlButton.setOnClickListener {
-            val url = binding.urlInput.text.toString().trim()
-            if (url.isBlank()) {
-                binding.importStatus.setText(R.string.iptv_url_required)
-            } else {
-                val defaultName = Uri.parse(url).lastPathSegment
-                    ?.substringBeforeLast('.')
-                    ?.takeIf(String::isNotBlank)
-                    ?: Uri.parse(url).host
-                    ?: "IPTV"
-                promptSourceName(defaultName) { name ->
-                    runImport("IPTV_URL_IMPORT", url, openSelectionAfter = true) {
-                        repository.importUrl(url, name)
-                    }
-                }
-            }
-        }
+        binding.importUrlButton.setOnClickListener { showM3uUrlDialog() }
         binding.importFileButton.setOnClickListener {
             openPlaylist.launch(arrayOf("audio/x-mpegurl", "application/x-mpegurl", "text/*", "*/*"))
         }
@@ -111,7 +97,87 @@ class IptvSourcesActivity : AppCompatActivity() {
             true
         }
         loadSources()
-        binding.urlInput.requestFocus()
+        binding.importUrlButton.requestFocus()
+    }
+
+    private fun showM3uUrlDialog() {
+        val name = credentialField(R.string.source_name_hint)
+        val url = credentialField(R.string.iptv_url, InputType.TYPE_TEXT_VARIATION_URI)
+        val status = TextView(this).apply {
+            setTextColor(getColor(R.color.accent))
+            textSize = 13f
+            visibility = View.GONE
+        }
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+            addView(name)
+            addView(url)
+            addView(status, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = padding / 2 })
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.import_iptv_url)
+            .setView(content)
+            .setPositiveButton(R.string.import_action, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            val submit = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)
+            submit.setOnClickListener {
+                val enteredUrl = url.text.toString().trim()
+                val enteredName = name.text.toString().trim().ifBlank {
+                    Uri.parse(enteredUrl).lastPathSegment
+                        ?.substringBeforeLast('.')
+                        ?.takeIf(String::isNotBlank)
+                        ?: Uri.parse(enteredUrl).host.orEmpty()
+                }
+                when {
+                    enteredUrl.isBlank() -> url.error = getString(R.string.iptv_url_required)
+                    enteredName.isBlank() -> name.error = getString(R.string.iptv_source_name_required)
+                    else -> {
+                        submit.isEnabled = false
+                        status.visibility = View.VISIBLE
+                        status.setText(R.string.iptv_importing)
+                        debugLog.recordDebug("IPTV_URL_IMPORT START | $enteredUrl")
+                        lifecycleScope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching { repository.importUrl(enteredUrl, enteredName) }
+                            }
+                            result.onSuccess { imported ->
+                                debugLog.recordDebug(
+                                    "IPTV_URL_IMPORT SUCCESS | source=${imported.sourceId}, channels=${imported.channelCount}",
+                                )
+                                status.text = getString(
+                                    R.string.iptv_import_complete,
+                                    imported.channelCount,
+                                )
+                                binding.importStatus.text = status.text
+                                loadSources()
+                                setResult(RESULT_OK)
+                                delay(URL_SUCCESS_MESSAGE_MILLIS)
+                                dialog.dismiss()
+                                openChannelSelection(imported.sourceId, imported.sourceName)
+                            }.onFailure { error ->
+                                debugLog.recordDebug(
+                                    "IPTV_URL_IMPORT FAILURE | ${error.javaClass.name}: ${error.message}",
+                                )
+                                status.text = getString(
+                                    R.string.iptv_url_import_failed,
+                                    error.message ?: error.javaClass.simpleName,
+                                )
+                                submit.isEnabled = true
+                                url.requestFocus()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun importDocument(uri: Uri) {
@@ -222,6 +288,7 @@ class IptvSourcesActivity : AppCompatActivity() {
             if (summary.source.kind != IptvRepository.KIND_DOCUMENT) {
                 add(SourceAction.REFRESH to getString(R.string.refresh_iptv_source))
             }
+            add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
             add(SourceAction.DELETE to getString(R.string.delete))
         }
         AlertDialog.Builder(this)
@@ -242,11 +309,29 @@ class IptvSourcesActivity : AppCompatActivity() {
                     SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.location) {
                         repository.refresh(summary.source)
                     }
+                    SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
+                        renameSource(summary, name)
+                    }
                     SourceAction.DELETE -> confirmDeleteSource(summary)
                 }
             }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun renameSource(summary: IptvSourceSummary, name: String) {
+        setBusy(true)
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { repository.rename(summary.source, name) }
+            }
+            setBusy(false)
+            result.onSuccess {
+                setResult(RESULT_OK)
+                binding.importStatus.setText(R.string.iptv_source_renamed)
+                loadSources()
+            }.onFailure(::showError)
+        }
     }
 
     private fun deleteSource(summary: IptvSourceSummary) {
@@ -285,7 +370,6 @@ class IptvSourcesActivity : AppCompatActivity() {
                     R.string.iptv_import_complete,
                     imported.channelCount,
                 )
-                binding.urlInput.text?.clear()
                 loadSources()
                 setResult(RESULT_OK)
                 if (openSelectionAfter) {
@@ -376,5 +460,9 @@ class IptvSourcesActivity : AppCompatActivity() {
             .show()
     }
 
-    private enum class SourceAction { SELECT, REFRESH, DELETE }
+    private enum class SourceAction { SELECT, REFRESH, RENAME, DELETE }
+
+    private companion object {
+        const val URL_SUCCESS_MESSAGE_MILLIS = 900L
+    }
 }

@@ -70,17 +70,13 @@
                 android:layout_marginStart="5dp"
                 android:contentDescription="@string/channel_type" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/channel_main_list_marker"
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="@string/in_main_channel_list"
-                android:gravity="center"
-                android:text="•"
-                android:textColor="@color/accent"
-                android:textSize="16sp"
-                android:textStyle="bold"
+                android:src="@drawable/ic_playlist_added"
                 android:visibility="gone" />
 
             <ImageView

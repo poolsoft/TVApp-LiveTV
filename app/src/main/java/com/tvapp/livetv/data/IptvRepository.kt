@@ -27,6 +27,12 @@ data class IptvImportResult(
     val channelCount: Int,
 )
 
+data class IptvStatistics(
+    val sourceCount: Int,
+    val channelCount: Int,
+    val selectedChannelCount: Int,
+)
+
 class IptvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val database = TVAppDatabase.getInstance(appContext)
@@ -38,6 +44,22 @@ class IptvRepository(context: Context) {
             dao.channelCount(source.id),
             dao.selectedChannelCount(source.id),
         )
+    }
+
+    suspend fun statistics(): IptvStatistics {
+        val sources = sources()
+        return IptvStatistics(
+            sourceCount = sources.size,
+            channelCount = sources.sumOf(IptvSourceSummary::channelCount),
+            selectedChannelCount = sources.sumOf(IptvSourceSummary::selectedChannelCount),
+        )
+    }
+
+    suspend fun rename(source: IptvSourceEntity, name: String) {
+        val normalized = name.trim()
+        require(normalized.isNotBlank()) { "Liste adi bos olamaz." }
+        dao.updateSource(source.copy(name = normalized))
+        notifySharedChannelsChanged()
     }
 
     suspend fun sourceChannels(sourceId: Long): List<IptvChannelEntity> =

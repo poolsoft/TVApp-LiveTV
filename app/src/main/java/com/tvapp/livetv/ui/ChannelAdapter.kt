@@ -140,6 +140,7 @@ class ChannelAdapter(
                 when {
                     channel.isRadioChannel() -> R.drawable.ic_radio
                     channel.iptvContentType == "VOD" -> R.drawable.ic_vod
+                    channel.source == LiveChannel.Source.IPTV -> R.drawable.ic_live
                     else -> R.drawable.ic_channel_tv
                 },
             )
