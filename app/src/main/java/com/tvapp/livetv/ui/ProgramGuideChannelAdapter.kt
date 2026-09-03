@@ -80,7 +80,11 @@ class ProgramGuideChannelAdapter(
             guideLockIcon.visibility = if (
                 channel.locked || channel.encrypted || isParentalLocked(channel)
             ) View.VISIBLE else View.GONE
-            root.setOnFocusChangeListener { _, focused -> if (focused) onFocused(channel) }
+            root.setOnFocusChangeListener { _, focused ->
+                root.scaleX = if (focused) 1.02f else 1.0f
+                root.scaleY = if (focused) 1.02f else 1.0f
+                if (focused) onFocused(channel)
+            }
             root.setOnClickListener { onSelected(channel) }
         }
     }

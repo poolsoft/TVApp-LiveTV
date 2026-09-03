@@ -109,6 +109,8 @@ still needs device verification.
 - Settings and Quick Settings keys (`KEYCODE_SETTINGS`, `KEYCODE_QUICK_SETTINGS`, `KEYCODE_TV_CONTENTS_MENU`):
   Short press opens TVApp display settings; long press opens Google/Android TV system settings.
   `KEYCODE_MENU` toggles the channel panel.
+- In EPG: Navigation moves selection smoothly across items with standard scrolling, wrapping from first
+  to last. D-Pad Left/Right moves focus between channel list and program list.
 
 ## TV UI Rules
 

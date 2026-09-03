@@ -4,12 +4,17 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B3000000" />
+
     <LinearLayout
         android:id="@+id/guide_overlay"
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:background="#E8101519"
+        android:layout_gravity="center"
+        android:background="#F20A0E13"
         android:orientation="vertical">
 
         <LinearLayout
@@ -17,12 +22,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="14dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:letterSpacing="0.04"
                 android:text="@string/program_guide"
                 android:textColor="@color/text_primary"
                 android:textSize="22sp"
@@ -32,14 +40,15 @@
                 android:id="@+id/guide_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:fontFamily="sans-serif-medium"
+                android:textColor="@color/accent"
+                android:textSize="15sp" />
         </LinearLayout>
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#526579" />
+            android:background="#1E2A36" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -51,18 +60,20 @@
                 android:id="@+id/guide_channel_column"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="55"
-                android:background="#C9161B1F"
+                android:layout_weight="46"
+                android:background="#0A0E13"
                 android:orientation="vertical">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="8dp"
+                    android:letterSpacing="0.06"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
                     android:text="@string/channels"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/guide_channel_list"
@@ -70,20 +81,22 @@
                     android:layout_height="0dp"
                     android:layout_weight="1"
                     android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="true"
                     android:overScrollMode="never"
-                    android:paddingBottom="12dp" />
+                    android:paddingBottom="16dp" />
             </LinearLayout>
 
             <View
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
-                android:background="#526579" />
+                android:background="#1E2A36" />
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="45"
-                android:background="#E0181D21"
+                android:layout_weight="54"
+                android:background="#0E141B"
                 android:orientation="vertical">
 
                 <LinearLayout
@@ -91,15 +104,15 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingHorizontal="18dp"
+                    android:paddingVertical="12dp">
 
                     <TextView
                         android:id="@+id/selected_channel_number"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textColor="@color/accent"
-                        android:textSize="15sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -111,9 +124,14 @@
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="@color/text_primary"
-                        android:textSize="17sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1B2632" />
 
                 <FrameLayout
                     android:layout_width="match_parent"
@@ -125,8 +143,10 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="true"
                         android:overScrollMode="never"
-                        android:paddingBottom="12dp" />
+                        android:paddingBottom="16dp" />
 
                     <TextView
                         android:id="@+id/empty_programs"
@@ -134,7 +154,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
                         android:gravity="center"
-                        android:padding="20dp"
+                        android:padding="24dp"
                         android:text="@string/no_epg_data"
                         android:textColor="@color/text_secondary"
                         android:textSize="15sp"
@@ -145,10 +165,10 @@
                     android:id="@+id/program_detail"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="#F01A2229"
+                    android:background="#131B24"
                     android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="14dp">
 
                     <TextView
                         android:id="@+id/detail_title"
@@ -157,7 +177,7 @@
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="@color/text_primary"
-                        android:textSize="16sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -165,6 +185,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
+                        android:fontFamily="sans-serif-medium"
                         android:textColor="@color/accent"
                         android:textSize="13sp" />
 
@@ -174,9 +195,21 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
                         android:ellipsize="end"
+                        android:lineSpacingMultiplier="1.2"
                         android:maxLines="3"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/guide_control_hints"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="sans-serif"
+                        android:gravity="end"
+                        android:text="@string/guide_control_hints"
+                        android:textColor="#7A8B9C"
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

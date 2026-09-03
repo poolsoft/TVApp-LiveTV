@@ -1,31 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
-    android:layout_marginVertical="2dp"
-    android:background="@drawable/bg_channel"
+    android:layout_height="68dp"
+    android:layout_marginHorizontal="6dp"
+    android:layout_marginVertical="3dp"
+    android:background="@drawable/bg_guide_item"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="14dp">
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp">
 
     <ImageView
         android:id="@+id/channel_logo"
-        android:layout_width="42dp"
-        android:layout_height="30dp"
+        android:layout_width="44dp"
+        android:layout_height="32dp"
+        android:background="#0D1318"
         android:contentDescription="@null"
+        android:padding="2dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_tv" />
 
     <TextView
         android:id="@+id/channel_number"
-        android:layout_width="52dp"
+        android:layout_width="48dp"
         android:layout_height="wrap_content"
         android:gravity="end"
-        android:paddingEnd="12dp"
+        android:paddingEnd="10dp"
         android:textColor="@color/accent"
-        android:textSize="16sp"
+        android:textSize="15sp"
         android:textStyle="bold" />
 
     <LinearLayout
@@ -42,13 +46,14 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_primary"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/current_program"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_secondary"
@@ -58,17 +63,17 @@
             android:id="@+id/program_progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="2dp"
+            android:layout_height="3dp"
             android:layout_marginTop="4dp"
             android:max="100"
-            android:progressTint="@color/accent"
-            android:progressBackgroundTint="#526579" />
+            android:progressBackgroundTint="#2E3C4A"
+            android:progressTint="@color/accent" />
     </LinearLayout>
 
     <ImageView
         android:id="@+id/guide_lock_icon"
-        android:layout_width="18dp"
-        android:layout_height="18dp"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
         android:layout_marginStart="8dp"
         android:contentDescription="@string/locked_channel"
         android:src="@drawable/ic_lock"

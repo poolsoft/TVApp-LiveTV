@@ -173,11 +173,17 @@ class ProgramGuideActivity : AppCompatActivity() {
             ?: focusedProgramIndex
         binding.detailTitle.text = program.title.ifBlank { getString(R.string.untitled_program) }
         val format = SimpleDateFormat("HH:mm", Locale.getDefault())
-        binding.detailTime.text = getString(
-            R.string.program_time_format,
-            format.format(Date(program.startTimeMillis)),
-            format.format(Date(program.endTimeMillis)),
-        )
+        val startStr = format.format(Date(program.startTimeMillis))
+        val endStr = format.format(Date(program.endTimeMillis))
+        val durationMin = ((program.endTimeMillis - program.startTimeMillis) / 60_000L).coerceAtLeast(1L)
+        val now = System.currentTimeMillis()
+        val timeStr = if (now in program.startTimeMillis until program.endTimeMillis) {
+            val remainMin = ((program.endTimeMillis - now) / 60_000L).coerceAtLeast(1L)
+            "$startStr - $endStr ($durationMin dk · Bitmesine $remainMin dk)"
+        } else {
+            "$startStr - $endStr ($durationMin dk)"
+        }
+        binding.detailTime.text = timeStr
         binding.detailDescription.text = program.description
         binding.detailDescription.visibility = if (program.description.isBlank()) {
             View.GONE
@@ -216,7 +222,11 @@ class ProgramGuideActivity : AppCompatActivity() {
         } else {
             focusedProgramIndex
         }
-        val target = (current + offset).coerceIn(0, count - 1)
+        val target = when {
+            offset < 0 && current == 0 -> count - 1
+            offset > 0 && current == count - 1 -> 0
+            else -> (current + offset).coerceIn(0, count - 1)
+        }
         if (recyclerView === binding.guideChannelList) {
             focusedChannelIndex = target
         } else {
@@ -227,9 +237,10 @@ class ProgramGuideActivity : AppCompatActivity() {
     }
 
     private fun focusRecyclerPosition(recyclerView: RecyclerView, position: Int) {
-        (recyclerView.layoutManager as? LinearLayoutManager)
-            ?.scrollToPositionWithOffset(position, 0)
-        recyclerView.postDelayed({
+        val count = recyclerView.adapter?.itemCount ?: 0
+        if (position !in 0 until count) return
+        recyclerView.scrollToPosition(position)
+        recyclerView.post {
             val item = recyclerView.findViewHolderForAdapterPosition(position)?.itemView
             if (item?.requestFocus() != true) {
                 recyclerView.postDelayed({
@@ -238,7 +249,7 @@ class ProgramGuideActivity : AppCompatActivity() {
                         ?.requestFocus()
                 }, FOCUS_RETRY_DELAY_MS)
             }
-        }, FOCUS_AFTER_LAYOUT_DELAY_MS)
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -270,7 +281,8 @@ class ProgramGuideActivity : AppCompatActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_SETTINGS,
-                KeyEvent.KEYCODE_TV_CONTENTS_MENU -> {
+                KeyEvent.KEYCODE_TV_CONTENTS_MENU,
+                312 -> {
                     startActivity(Intent(this, DisplaySettingsActivity::class.java))
                     return true
                 }
@@ -287,14 +299,13 @@ class ProgramGuideActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_CURRENT_SOURCE_KEY = "current-source-key"
         const val EXTRA_SELECTED_SOURCE_KEY = "selected-source-key"
-        private const val HEADER_HEIGHT_FRACTION = 0.12f
-        private const val DETAIL_HEIGHT_FRACTION = 0.18f
-        private const val OVERLAY_WIDTH_FRACTION = 0.66f
-        private const val OUTER_HORIZONTAL_PADDING_FRACTION = 0.03f
+        private const val HEADER_HEIGHT_FRACTION = 0.11f
+        private const val DETAIL_HEIGHT_FRACTION = 0.22f
+        private const val OVERLAY_WIDTH_FRACTION = 0.84f
+        private const val OUTER_HORIZONTAL_PADDING_FRACTION = 0.025f
         private const val COLUMN_PADDING_FRACTION = 0.008f
         private const val CHANNEL_FOCUS_DELAY_MS = 250L
-        private const val FOCUS_AFTER_LAYOUT_DELAY_MS = 100L
-        private const val FOCUS_RETRY_DELAY_MS = 80L
+        private const val FOCUS_RETRY_DELAY_MS = 60L
         private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
     }

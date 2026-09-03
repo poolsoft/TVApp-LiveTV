@@ -37,6 +37,18 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * **Menü Tuşu Davranışı**:
   * Kumandadaki `KEYCODE_MENU` tuşu kanal listesini açıp kapatma görevinde (`toggleChannelPanel()`) korunmuştur.
 
+### 📅 Program Rehberi (EPG) Yenilenmesi ve Seçici Düzeltmesi
+* **Seçici Hareket Hatası Giderildi**:
+  * Kumanda aşağı/yukarı kaydırmalarında seçiciyi zorla listenin tepesine (offset 0) kilitleyen `scrollToPositionWithOffset` çağrısı kaldırıldı; Android TV standart doğal odak ve `scrollToPosition` mekanizmasına geçilerek seçicinin ekranda serbestçe ve akıcı biçimde hareket etmesi sağlandı.
+* **Modern Cam Efekti (Glassmorphism Dark Theme)**:
+  * EPG genişliği %66'dan %84'e çıkarılarak ferahlatıldı. Arka planda yayının hafifçe parıldadığı yarı saydam koyu degrade katman uygulandı.
+* **Şık Kanal ve Program Kartları (`bg_guide_item`)**:
+  * Yuvarlatılmış köşeli modern kart tasarımı, kanal logoları için koyu çerçeve, parlak neon odak efektleri ve hafif mikro-büyüme (`scaleX/scaleY 1.02`) animasyonu eklendi.
+* **Canlı Yayın Vurgusu ve Süre Gösterimi**:
+  * O an yayında olan programlar için parlak kırmızı "CANLI" rozeti ve detay panelinde süre ile birlikte *"Bitmesine X dk"* gösterimi eklendi.
+* **Kumanda İpuçları Çubuğu**:
+  * Detay panelinin altına `OK: İzle`, `▶: Programlar`, `◀: Kanallar`, `BACK: Kapat` kumanda kısayolları yerleştirildi.
+
 ---
 
 ## [Önceki Sürüm Temelleri]
