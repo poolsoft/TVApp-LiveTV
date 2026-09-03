@@ -119,6 +119,14 @@ still needs device verification.
   them. Respect the configured left/right panel side and top/bottom infobar side.
 - The infobar technical row order is source, quality, audio, subtitles, TXT, and lock. Do not show
   separators for missing items.
+- The infobar color action hints must be placed inside the infobar's technical_row, aligned to the far right
+  using a flexible spacer, while technical badges occupy the left slots. Do not place color action hints in an
+  external container or extra row below the infobar.
+- Multi-View supports both TIF + IPTV and IPTV + IPTV simultaneous playback. Dual TIF (satellite + satellite)
+  is restricted on single-tuner hardware to prevent driver conflicts.
+- In Multi-View: D-Pad Left/Right switches focus and un-mutes the active side while muting the other. CH+/CH-
+  and D-Pad Up/Down zap channels on the currently focused side only. Long OK opens the live IPTV channel picker
+  for the active side. Back exits Multi-View and resumes the focused channel in fullscreen.
 - IPTV catalog row icon order is membership-in-main-list first, then content type (Live/VOD), then
   encryption/lock state. Use fixed-size icon slots so optional icons do not cause visual jitter.
 - Avoid blinking caused by full adapter refreshes. Prefer stable IDs, DiffUtil payloads, and updates
@@ -133,5 +141,5 @@ still needs device verification.
   leave persistent crash/debug dialogs over playback.
 - Never log playlist credentials, access tokens, MAC portal secrets, PIN values, or full private
   URLs containing credentials.
-- Keep `README.md`, the in-app User Guide, and `MARKET_LISTING.md` synchronized when remote mappings,
-  supported source types, paid/free behavior, or major features change.
+- Keep `README.md`, `CHANGELOG.md`, the in-app User Guide, and `MARKET_LISTING.md` synchronized when remote mappings,
+  supported source types, paid/free behavior, or major features change. Record all notable changes in `CHANGELOG.md`.
