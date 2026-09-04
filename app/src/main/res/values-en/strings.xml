@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="tv_default_guide">System TV chooser: When TVApp appears, select it and choose Always to make it the default. This applies to standard TV launch requests supported by your device.</string>
     <string name="app_name">TV App</string>
     <string name="live_tv">Live TV</string>
     <string name="channels">Channels</string>

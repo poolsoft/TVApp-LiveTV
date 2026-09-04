@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="tv_default_guide">Sistem TV seçicisi: TVApp görünüyorsa seçip Her zaman ile varsayılan yapabilirsiniz. Bu seçenek cihazın standart TV açma istekleri için geçerlidir.</string>
     <string name="app_name">TV App</string>
     <string name="live_tv">Canlı TV</string>
     <string name="channels">Kanallar</string>

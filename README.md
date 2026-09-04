@@ -4,6 +4,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
 
+- Standart Android TV kanal açma seçicisinde TVApp seçilebilir. Cihaz destekliyorsa “Her zaman” ile bu isteklerin varsayılanı yapılabilir; üreticinin doğrudan paket açması kapsam dışındadır.
+
 - Cihazın vendor TIF girişlerini `TvInputManager` ile keşfetmek
 - `TvContract` kanal tablosunu okumak
 - Preview/öneri kanallarını ayırarak yalnızca donanım tuner kanallarını listelemek

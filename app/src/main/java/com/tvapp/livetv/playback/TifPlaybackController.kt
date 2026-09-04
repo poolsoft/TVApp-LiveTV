@@ -23,7 +23,21 @@ class TifPlaybackController(private val tvView: TvView) {
             }
 
             override fun onVideoAvailable(inputId: String) {
+                val currentTracks = listOf(
+                    TvTrackInfo.TYPE_VIDEO, TvTrackInfo.TYPE_AUDIO, TvTrackInfo.TYPE_SUBTITLE,
+                ).flatMap { tvView.getTracks(it).orEmpty() }
+                if (currentTracks.isNotEmpty()) onTracksChanged(inputId, currentTracks)
                 onVideoStateChanged?.invoke(true, null)
+            }
+
+            override fun onVideoSizeChanged(inputId: String, width: Int, height: Int) {
+                if (width <= 0 || height <= 0) return
+                val sizeTrack = TvTrackInfo.Builder(TvTrackInfo.TYPE_VIDEO, SIZE_TRACK_ID)
+                    .setVideoWidth(width)
+                    .setVideoHeight(height)
+                    .build()
+                tracks = tracks.filterNot { it.id == SIZE_TRACK_ID } + sizeTrack
+                onTracksChanged?.invoke(tracks)
             }
 
             override fun onVideoUnavailable(inputId: String, reason: Int) {
@@ -74,6 +88,7 @@ class TifPlaybackController(private val tvView: TvView) {
     }
 
     private companion object {
+        const val SIZE_TRACK_ID = "tvapp-reported-video-size"
         const val SAFE_MUTED_VOLUME = 0.001f
     }
 }

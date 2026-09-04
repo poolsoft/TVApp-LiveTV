@@ -198,6 +198,7 @@ class MainActivity : AppCompatActivity() {
     private var restoredInitialChannel = false
     private var pendingEditorChannelKey: String? = null
     private var pendingHomeChannelKey: String? = null
+    private var pendingTvChannelUri: String? = null
     private var focusedListSourceKey: String? = null
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
@@ -313,6 +314,7 @@ class MainActivity : AppCompatActivity() {
         applyIptvAspectMode(iptvViewPreferencesStore.aspectMode())
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
+        pendingTvChannelUri = requestedTvChannelUri(intent)
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
@@ -524,7 +526,11 @@ class MainActivity : AppCompatActivity() {
                     pendingEditorChannelKey = null
                     val requestedKey = pendingHomeChannelKey ?: editorChannelKey
                     pendingHomeChannelKey = null
-                    val editorChannel = requestedKey?.let { key ->
+                    val requestedTvUri = pendingTvChannelUri
+                    pendingTvChannelUri = null
+                    val editorChannel = loaded.firstOrNull {
+                        requestedTvUri != null && it.source == LiveChannel.Source.TIF && it.uri == requestedTvUri
+                    } ?: requestedKey?.let { key ->
                         panelChannels().firstOrNull { it.sourceKey == key }
                             ?: loaded.firstOrNull { it.sourceKey == key }
                     }
@@ -1345,7 +1351,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTechnicalBadges(channel: LiveChannel, tracks: List<TvTrackInfo>) {
-        val videoTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_VIDEO }
+        val videoTrack = tracks.filter { it.type == TvTrackInfo.TYPE_VIDEO }
+            .maxByOrNull { it.videoWidth.toLong() * it.videoHeight }
         val width = videoTrack?.videoWidth ?: 0
         val height = videoTrack?.videoHeight ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
@@ -4182,12 +4189,31 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val tvUri = requestedTvChannelUri(intent)
+        if (tvUri != null) {
+            channels.firstOrNull { it.source == LiveChannel.Source.TIF && it.uri == tvUri }
+                ?.let(::selectChannel) ?: run {
+                    pendingTvChannelUri = tvUri
+                    loadChannels(preserveCurrentPlayback = true)
+                }
+            return
+        }
         val sourceKey = intent.data?.getQueryParameter("sourceKey") ?: return
         channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
             ?: run {
                 pendingHomeChannelKey = sourceKey
                 loadChannels(preserveCurrentPlayback = true)
             }
+    }
+
+    private fun requestedTvChannelUri(intent: Intent): String? {
+        val uri = intent.data ?: return null
+        if (intent.action != Intent.ACTION_VIEW || uri.scheme != "content" ||
+            uri.authority != "android.media.tv") return null
+        val parts = uri.pathSegments
+        return uri.toString().takeIf {
+            parts.size == 2 && parts[0] == "channel" && parts[1].toLongOrNull() != null
+        }
     }
 
 }
