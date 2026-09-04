@@ -1,10 +1,15 @@
 package com.tvapp.livetv
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,6 +19,9 @@ import com.tvapp.livetv.data.ProgramRepository
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ActivityProgramGuideBinding
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.reminder.ProgramReminder
+import com.tvapp.livetv.reminder.ProgramReminderScheduler
+import com.tvapp.livetv.reminder.ProgramReminderStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.GuideProgramAdapter
 import com.tvapp.livetv.ui.ProgramGuideChannelAdapter
@@ -39,6 +47,24 @@ class ProgramGuideActivity : AppCompatActivity() {
     private var focusJob: Job? = null
     private var focusedChannelIndex = 0
     private var focusedProgramIndex = 0
+    private lateinit var reminderStore: ProgramReminderStore
+    private lateinit var reminderScheduler: ProgramReminderScheduler
+    private var pendingReminder: Pair<LiveChannel, ProgramSummary>? = null
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        val pending = pendingReminder
+        pendingReminder = null
+        when {
+            granted && pending != null -> scheduleReminder(pending.first, pending.second)
+            !granted -> Toast.makeText(
+                this,
+                R.string.reminder_needs_notification_permission,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,11 +74,17 @@ class ProgramGuideActivity : AppCompatActivity() {
         channelRepository = ChannelRepository(this)
         programRepository = ProgramRepository(this)
         parentalControlStore = ParentalControlStore(this)
+        reminderStore = ProgramReminderStore(this)
+        reminderScheduler = ProgramReminderScheduler(this)
         channelAdapter = ProgramGuideChannelAdapter(
             ::scheduleChannelPrograms,
             ::openChannel,
         ) { channel -> parentalControlStore.isLocked(channel.sourceKey) }
-        programAdapter = GuideProgramAdapter(::showProgramDetail, ::openProgram)
+        programAdapter = GuideProgramAdapter(
+            ::showProgramDetail,
+            ::openProgram,
+            ::toggleReminder,
+        )
         binding.guideChannelList.layoutManager = LinearLayoutManager(this)
         binding.guideChannelList.adapter = channelAdapter
         binding.programList.layoutManager = LinearLayoutManager(this)
@@ -148,7 +180,7 @@ class ProgramGuideActivity : AppCompatActivity() {
             }
             if (focusedChannel?.sourceKey != channel.sourceKey) return@launch
             programs = loaded
-            programAdapter.submitList(loaded)
+            programAdapter.submitList(loaded, remindedStartsFor(channel.sourceKey))
             binding.emptyPrograms.visibility = if (loaded.isEmpty()) View.VISIBLE else View.GONE
             if (loaded.isEmpty()) {
                 binding.detailTitle.setText(R.string.no_epg_data)
@@ -254,6 +286,63 @@ class ProgramGuideActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun toggleReminder(program: ProgramSummary) {
+        val channel = focusedChannel ?: return
+        val now = System.currentTimeMillis()
+        if (program.startTimeMillis <= now) {
+            Toast.makeText(this, R.string.reminder_past_program, Toast.LENGTH_LONG).show()
+            return
+        }
+        val existing = reminderStore.reminderFor(channel.sourceKey, program.startTimeMillis)
+        if (existing != null) {
+            reminderStore.remove(existing.id)
+            reminderScheduler.cancel(existing.id)
+            refreshReminderBadges()
+            Toast.makeText(this, R.string.reminder_removed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingReminder = channel to program
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
+        }
+        scheduleReminder(channel, program)
+    }
+
+    private fun scheduleReminder(channel: LiveChannel, program: ProgramSummary) {
+        val reminder = ProgramReminder.of(
+            sourceKey = channel.sourceKey,
+            channelName = channel.displayName,
+            programTitle = program.title,
+            startTimeMillis = program.startTimeMillis,
+        )
+        reminderStore.put(reminder)
+        reminderScheduler.schedule(reminder)
+        refreshReminderBadges()
+        val timeText = SimpleDateFormat("HH:mm", Locale.getDefault())
+            .format(Date(program.startTimeMillis))
+        Toast.makeText(
+            this,
+            getString(R.string.reminder_set_for_program, timeText),
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+
+    private fun refreshReminderBadges() {
+        val channel = focusedChannel ?: return
+        programAdapter.submitList(programs, remindedStartsFor(channel.sourceKey))
+    }
+
+    private fun remindedStartsFor(sourceKey: String): Set<Long> =
+        reminderStore.reminders()
+            .asSequence()
+            .filter { it.sourceKey == sourceKey }
+            .map { it.startTimeMillis }
+            .toSet()
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {

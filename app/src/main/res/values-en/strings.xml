@@ -396,7 +396,15 @@
     <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nOn live content, Left or Right opens playback controls. Red returns to live or retries. On VOD, Left and Right seek, and OK toggles play/pause. Green opens audio, Yellow subtitles and Blue video options. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
     <string name="system_settings_unavailable">System settings could not be opened.</string>
     <string name="verbose_remote_key_logging">Write remote keys to the debug log</string>
-    <string name="guide_control_hints">OK: Watch  ·  ▶: Programs  ·  ◀: Channels  ·  BACK: Close</string>
+    <string name="guide_control_hints">OK: Watch  ·  Hold OK: Reminder  ·  ▶: Programs  ·  ◀: Channels  ·  BACK: Close</string>
     <string name="program_time_duration">%1$s - %2$s (%3$d min)</string>
+    <string name="reminder_channel_name">Program reminders</string>
+    <string name="reminder_notification_title">%1$s is starting</string>
+    <string name="reminder_notification_text">%1$s starts now</string>
+    <string name="reminder_set_for_program">Reminder set: %1$s</string>
+    <string name="reminder_removed">Reminder removed</string>
+    <string name="reminder_past_program">A reminder cannot be set for a finished program</string>
+    <string name="reminder_needs_notification_permission">Reminders need the notification permission</string>
+    <string name="reminder_badge_description">A reminder is set for this program</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d min · %4$d min remaining)</string>
 </resources>

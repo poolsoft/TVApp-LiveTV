@@ -44,4 +44,13 @@
         android:textSize="11sp"
         android:textStyle="bold"
         android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/reminder_badge"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="6dp"
+        android:contentDescription="@string/reminder_badge_description"
+        android:src="@drawable/ic_clock_small"
+        android:visibility="gone" />
 </LinearLayout>

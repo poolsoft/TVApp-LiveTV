@@ -14,12 +14,15 @@ import java.util.Locale
 class GuideProgramAdapter(
     private val onFocused: (ProgramSummary) -> Unit,
     private val onSelected: (ProgramSummary) -> Unit,
+    private val onRemindToggle: ((ProgramSummary) -> Unit)? = null,
 ) : RecyclerView.Adapter<GuideProgramAdapter.ViewHolder>() {
     private val programs = mutableListOf<ProgramSummary>()
+    private var remindedStarts: Set<Long> = emptySet()
 
-    fun submitList(items: List<ProgramSummary>) {
+    fun submitList(items: List<ProgramSummary>, remindedStarts: Set<Long> = emptySet()) {
         programs.clear()
         programs.addAll(items)
+        this.remindedStarts = remindedStarts
         notifyDataSetChanged()
     }
 
@@ -57,12 +60,18 @@ class GuideProgramAdapter(
             } else {
                 View.GONE
             }
+            reminderBadge.visibility =
+                if (program.startTimeMillis in remindedStarts) View.VISIBLE else View.GONE
             root.setOnFocusChangeListener { _, focused ->
                 root.scaleX = if (focused) 1.02f else 1.0f
                 root.scaleY = if (focused) 1.02f else 1.0f
                 if (focused) onFocused(program)
             }
             root.setOnClickListener { onSelected(program) }
+            root.setOnLongClickListener {
+                onRemindToggle?.invoke(program)
+                onRemindToggle != null
+            }
         }
     }
 

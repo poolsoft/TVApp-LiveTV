@@ -396,7 +396,15 @@
     <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nCanlı yayında sol veya sağ tuş oynatma çubuğunu açar. Kırmızı canlıya döner veya yeniden dener. VOD içeriğinde sol ve sağ ileri/geri sarar, OK oynatır veya duraklatır. Yeşil ses, sarı altyazı, mavi görüntü seçeneklerini açar. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
     <string name="system_settings_unavailable">Sistem ayarları açılamadı.</string>
     <string name="verbose_remote_key_logging">Kumanda tuşlarını debug loguna yaz</string>
-    <string name="guide_control_hints">OK: İzle  ·  ▶: Programlar  ·  ◀: Kanallar  ·  BACK: Kapat</string>
+    <string name="guide_control_hints">OK: İzle  ·  Uzun OK: Hatırlatıcı  ·  ▶: Programlar  ·  ◀: Kanallar  ·  BACK: Kapat</string>
     <string name="program_time_duration">%1$s - %2$s (%3$d dk)</string>
+    <string name="reminder_channel_name">Program hatırlatıcıları</string>
+    <string name="reminder_notification_title">%1$s başlıyor</string>
+    <string name="reminder_notification_text">%1$s şimdi başlıyor</string>
+    <string name="reminder_set_for_program">Hatırlatıcı kuruldu: %1$s</string>
+    <string name="reminder_removed">Hatırlatıcı kaldırıldı</string>
+    <string name="reminder_past_program">Bitmiş program için hatırlatıcı kurulamaz</string>
+    <string name="reminder_needs_notification_permission">Hatırlatıcı için bildirim izni gerekli</string>
+    <string name="reminder_badge_description">Bu program için hatırlatıcı kurulu</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d dk · Bitmesine %4$d dk)</string>
 </resources>

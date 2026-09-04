@@ -26,6 +26,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Room veritabanında özel sıra, kanal numarası, ad, favori, gizleme, atlama ve kanal kilidi tercihlerini saklar.
 - TKGS veya vendor taramasından sonra TIF kanallarıyla yeniden eşitlenebilir.
 - Kanal listesi, infobar, EPG, ses ve altyazı seçimi kumandayla kullanılabilir.
+- EPG'de gelecek bir programa uzun OK ile hatırlatıcı kurulabilir; program başlayınca bildirim gösterilir ve bildirime basınca kanala geçilir. Hatırlatıcılar yeniden başlatmada korunur.
 - Son kanal, önceki kanal ve izleme geçmişi yerel olarak saklanır.
 
 ### IPTV
