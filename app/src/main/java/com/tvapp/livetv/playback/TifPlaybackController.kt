@@ -10,6 +10,7 @@ class TifPlaybackController(private val tvView: TvView) {
     private var tracks: List<TvTrackInfo> = emptyList()
     var onTracksChanged: ((List<TvTrackInfo>) -> Unit)? = null
     var onVideoStateChanged: ((available: Boolean, reason: Int?) -> Unit)? = null
+    var onVideoSizeChanged: ((width: Int, height: Int) -> Unit)? = null
 
     init {
         tvView.setCallback(object : TvView.TvInputCallback() {
@@ -32,6 +33,7 @@ class TifPlaybackController(private val tvView: TvView) {
 
             override fun onVideoSizeChanged(inputId: String, width: Int, height: Int) {
                 if (width <= 0 || height <= 0) return
+                onVideoSizeChanged?.invoke(width, height)
                 val sizeTrack = TvTrackInfo.Builder(TvTrackInfo.TYPE_VIDEO, SIZE_TRACK_ID)
                     .setVideoWidth(width)
                     .setVideoHeight(height)

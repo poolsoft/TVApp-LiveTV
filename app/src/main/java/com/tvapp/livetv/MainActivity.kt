@@ -324,7 +324,15 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(BootLaunchReceiver.EXTRA_STARTED_AFTER_BOOT, false)) {
             debugLog.recordDebug("MAIN_STARTED_AFTER_BOOT")
         }
-        playback.onTracksChanged = { applyPreferredTracks() }
+        playback.onTracksChanged = { tracks ->
+            logTifTracks(tracks)
+            applyPreferredTracks()
+        }
+        playback.onVideoSizeChanged = { width, height ->
+            debugLog.recordDebug(
+                "TIF_VIDEO_SIZE_RAW | channel=${currentChannel?.sourceKey}, width=$width, height=$height",
+            )
+        }
         playback.onVideoStateChanged = { available, _ ->
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF) {
@@ -683,6 +691,13 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             when (channel.source) {
                 LiveChannel.Source.TIF -> {
+                    debugLog.recordDebug(
+                        "TIF_CHANNEL_RAW | key=${channel.sourceKey}, inputId=${channel.inputId}, " +
+                            "uri=${channel.uri}, number=${channel.displayNumber}, " +
+                            "name=${channel.displayName}, videoFormat=${channel.videoFormat}, " +
+                            "serviceType=${channel.serviceType}, encrypted=${channel.encrypted}, " +
+                            "locked=${channel.locked}",
+                    )
                     binding.iptvBufferingContainer.visibility = View.GONE
                     iptvPlayback.stop()
                     binding.iptvPlayerView.visibility = View.GONE
@@ -1423,6 +1438,32 @@ class MainActivity : AppCompatActivity() {
         )
         slots.forEachIndexed { index, slot ->
             slot.visibility = if (activeSlots[index]) View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun logTifTracks(tracks: List<TvTrackInfo>) {
+        val channelKey = currentChannel?.sourceKey
+        if (tracks.isEmpty()) {
+            debugLog.recordDebug("TIF_TRACK_RAW | channel=$channelKey, tracks=empty")
+            return
+        }
+        tracks.forEachIndexed { index, track ->
+            val type = when (track.type) {
+                TvTrackInfo.TYPE_VIDEO -> "VIDEO"
+                TvTrackInfo.TYPE_AUDIO -> "AUDIO"
+                TvTrackInfo.TYPE_SUBTITLE -> "SUBTITLE"
+                else -> "UNKNOWN(${track.type})"
+            }
+            debugLog.recordDebug(
+                "TIF_TRACK_RAW | channel=$channelKey, index=$index, type=$type, id=${track.id}, " +
+                    "language=${track.language}, description=${track.description}, " +
+                    "videoWidth=${track.videoWidth}, videoHeight=${track.videoHeight}, " +
+                    "videoFrameRate=${track.videoFrameRate}, " +
+                    "videoPixelAspectRatio=${track.videoPixelAspectRatio}, " +
+                    "videoActiveFormatDescription=${track.videoActiveFormatDescription}, " +
+                    "audioChannelCount=${track.audioChannelCount}, " +
+                    "audioSampleRate=${track.audioSampleRate}, extra=${track.extra}",
+            )
         }
     }
 

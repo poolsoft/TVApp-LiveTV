@@ -9,6 +9,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ### Sistem TV seçicisi ve DTV video boyutu
 * Standart Android kanal açma isteklerinde TVApp artık uygulama seçicisine adaydır; kanal URI'si varsa mevcut kanal listesiyle eşleştirilir.
 * DTV kalite rozeti TIF video boyutu bildirimlerini de kullanır; video kullanılabilir olduğunda track bilgileri yeniden okunur.
+* DTV teknik veri uyuşmazlıklarını cihaz üzerinde incelemek için kanal, track ve video boyutunun ham TIF alanları debug günlüğüne yazılır.
 
 ### Yayın kalite rozetleri, XMLTV girişi ve renk tuşu ipuçları
 * DTV ve IPTV kalite rozetleri kanal adındaki `HD`, `UHD` veya `4K` metninden tahmin edilmiyor; oynatıcının gerçek video boyutu ve TIF `videoFormat` verisiyle SD/HD/FHD/4K olarak sınıflandırılıyor. Teknik veri henüz yoksa yanıltıcı rozet gösterilmiyor.
