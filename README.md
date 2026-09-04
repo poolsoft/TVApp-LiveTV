@@ -112,6 +112,7 @@ kanalları oluşmaz.
 - [x] Sistem PiP olmayan cihazlar için uygulama içi mini pencere fallback
 - [x] İkinci TIF oturumunu cihaz yeteneğine göre deneyen ve IPTV'yi destekleyen Multi View temeli
 - [x] URL/dosya kaynaklı XMLTV alternatif EPG ve `tvg-id`/kanal adı eşleştirme
+- [x] XMLTV olmayan Xtream kaynaklarında `get_short_epg` tabanlı şimdi/sonraki program bilgisi
 - [x] Google TV Home son izlenen kanallar önizleme kanalı
 - [x] Kalıcı uyku zamanlayıcısı ve PIN tabanlı kanal kilidi
 

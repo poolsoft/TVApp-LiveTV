@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.net.Uri
 import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.model.LiveChannel
 import org.json.JSONArray
@@ -21,6 +22,7 @@ class XmlTvRepository(context: Context) {
     private val preferences = appContext.getSharedPreferences("xmltv", Context.MODE_PRIVATE)
     private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.xmlTvDao()
+    private val xtreamEpgDao = database.xtreamEpgDao()
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
 
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE, null)
@@ -37,7 +39,7 @@ class XmlTvRepository(context: Context) {
                 "HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
             connection.inputStream.use { importStream(it, url) }.also {
-                scheduleUrlRefresh()
+                ensurePeriodicRefresh()
             }
         } finally {
             connection.disconnect()
@@ -63,7 +65,7 @@ class XmlTvRepository(context: Context) {
             .cancel(REFRESH_JOB_ID)
     }
 
-    private fun scheduleUrlRefresh() {
+    fun ensurePeriodicRefresh() {
         val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
         scheduler.schedule(
             JobInfo.Builder(
@@ -87,7 +89,13 @@ class XmlTvRepository(context: Context) {
         migrateLegacyCacheIfNeeded()
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
-        return dao.programs(epgId.orEmpty(), name, start, end).map {
+        val xmlTv = dao.programs(epgId.orEmpty(), name, start, end)
+        if (xmlTv.isNotEmpty()) {
+            return xmlTv.map {
+                ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
+            }
+        }
+        return xtreamEpgDao.programs(epgId.orEmpty(), name, start, end).map {
             ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
         }
     }
@@ -109,26 +117,127 @@ class XmlTvRepository(context: Context) {
             .flatMap { dao.currentPrograms(it, now) }
         val byId = programs.groupBy(XmlTvProgramEntity::normalizedChannelId)
         val byName = programs.groupBy(XmlTvProgramEntity::normalizedChannelName)
-        return buildMap {
-            channels.forEach { channel ->
-                val epgId = channel.epgId?.normalize()?.takeIf(String::isNotBlank)
-                val name = channel.displayName.normalize()
-                val match = epgId?.let(byId::get)?.firstOrNull()
-                    ?: byName[name]?.firstOrNull()
-                    ?: byId[name]?.firstOrNull()
-                match?.let {
-                    put(
-                        channel.sourceKey,
-                        ProgramSummary(
-                            it.title,
-                            it.startTimeMillis,
-                            it.endTimeMillis,
-                            it.description,
-                        ),
+        val result = mutableMapOf<String, ProgramSummary>()
+        channels.forEach { channel ->
+            val epgId = channel.epgId?.normalize()?.takeIf(String::isNotBlank)
+            val name = channel.displayName.normalize()
+            val match = epgId?.let(byId::get)?.firstOrNull()
+                ?: byName[name]?.firstOrNull()
+                ?: byId[name]?.firstOrNull()
+            match?.let {
+                result[channel.sourceKey] = ProgramSummary(
+                    it.title,
+                    it.startTimeMillis,
+                    it.endTimeMillis,
+                    it.description,
+                )
+            }
+        }
+        fillMissingFromXtreamEpg(result, channels, now)
+        return result
+    }
+
+    private fun fillMissingFromXtreamEpg(
+        result: MutableMap<String, ProgramSummary>,
+        channels: List<LiveChannel>,
+        now: Long,
+    ) {
+        val missing = channels.filter { it.sourceKey !in result }
+        if (missing.isEmpty()) return
+        val channelKeys = missing.flatMap { channel ->
+            listOfNotNull(
+                channel.epgId?.normalize()?.takeIf(String::isNotBlank),
+                channel.displayName.normalize().takeIf(String::isNotBlank),
+            )
+        }.distinct()
+        if (channelKeys.isEmpty()) return
+        val programs = channelKeys.chunked(CURRENT_PROGRAM_QUERY_CHUNK_SIZE)
+            .flatMap { xtreamEpgDao.currentPrograms(it, now) }
+        val byId = programs.groupBy(XtreamEpgProgramEntity::normalizedChannelId)
+        val byName = programs.groupBy(XtreamEpgProgramEntity::normalizedChannelName)
+        missing.forEach { channel ->
+            val epgId = channel.epgId?.normalize()?.takeIf(String::isNotBlank)
+            val name = channel.displayName.normalize()
+            val match = epgId?.let(byId::get)?.firstOrNull()
+                ?: byName[name]?.firstOrNull()
+                ?: byId[name]?.firstOrNull()
+            match?.let {
+                result[channel.sourceKey] = ProgramSummary(
+                    it.title,
+                    it.startTimeMillis,
+                    it.endTimeMillis,
+                    it.description,
+                )
+            }
+        }
+    }
+
+    suspend fun refreshXtreamShortEpg(force: Boolean = false): Int {
+        val now = System.currentTimeMillis()
+        if (!force && now - preferences.getLong(KEY_XTREAM_UPDATED, 0L) < XTREAM_MIN_INTERVAL_MS) {
+            return 0
+        }
+        val iptvDao = database.iptvDao()
+        val sources = iptvDao.getSources().filter { source ->
+            source.kind == IptvRepository.KIND_XTREAM && source.enabled &&
+                !source.serverUrl.isNullOrBlank() &&
+                !source.username.isNullOrBlank() &&
+                source.password != null
+        }
+        if (sources.isEmpty()) {
+            if (xtreamEpgDao.programCount() > 0) xtreamEpgDao.clearPrograms()
+            preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
+            return 0
+        }
+        val programs = ArrayList<XtreamEpgProgramEntity>()
+        var queriedChannels = 0
+        for (source in sources) {
+            val channels = iptvDao.getSelectedChannelsForSource(source.id)
+                .asSequence()
+                .filter { it.contentType.equals("LIVE", ignoreCase = true) }
+                .mapNotNull { channel ->
+                    XtreamClient.streamIdFromHttpUrl(channel.streamUrl)?.let { channel to it }
+                }
+                .take(MAX_XTREAM_EPG_CHANNELS_PER_SOURCE)
+                .toList()
+            if (channels.isEmpty()) continue
+            val client = XtreamClient(
+                source.serverUrl.orEmpty(),
+                source.username.orEmpty(),
+                source.password.orEmpty(),
+            )
+            for ((channel, streamId) in channels) {
+                val listings = try {
+                    client.shortEpg(streamId)
+                } catch (ignored: Exception) {
+                    emptyList()
+                }
+                queriedChannels++
+                if (listings.isEmpty()) continue
+                val channelId = channel.tvgId?.trim()?.takeIf(String::isNotBlank) ?: streamId
+                val channelName = channel.displayName.trim().ifBlank { channelId }
+                for (listing in listings) {
+                    programs += XtreamEpgProgramEntity(
+                        channelId = channelId,
+                        channelName = channelName,
+                        normalizedChannelId = channelId.normalize(),
+                        normalizedChannelName = channelName.normalize(),
+                        title = listing.title,
+                        description = listing.description,
+                        startTimeMillis = listing.startTimeMillis,
+                        endTimeMillis = listing.endTimeMillis,
                     )
                 }
             }
         }
+        database.runInTransaction {
+            xtreamEpgDao.clearPrograms()
+            programs.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
+        }
+        if (queriedChannels > 0) {
+            preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
+        }
+        return programs.size
     }
 
     private fun importStream(stream: InputStream, label: String): Int {
@@ -240,8 +349,11 @@ class XmlTvRepository(context: Context) {
     private companion object {
         const val KEY_SOURCE = "source"
         const val KEY_UPDATED = "updated"
+        const val KEY_XTREAM_UPDATED = "xtream_updated"
         const val INSERT_BATCH_SIZE = 1_000
         const val CURRENT_PROGRAM_QUERY_CHUNK_SIZE = 400
+        const val MAX_XTREAM_EPG_CHANNELS_PER_SOURCE = 250
+        const val XTREAM_MIN_INTERVAL_MS = 6 * 60 * 60 * 1_000L
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
     }

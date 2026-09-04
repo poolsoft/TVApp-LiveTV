@@ -37,6 +37,7 @@ class IptvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.iptvDao()
+    private val xmlTvRepository by lazy { XmlTvRepository(appContext) }
 
     suspend fun sources(): List<IptvSourceSummary> = dao.getSources().map { source ->
         IptvSourceSummary(
@@ -99,13 +100,17 @@ class IptvRepository(context: Context) {
     suspend fun setChannelSelected(sourceKey: String, selected: Boolean) {
         dao.setChannelSelected(sourceKey, selected)
         notifySharedChannelsChanged()
+        if (selected) refreshXtreamEpgSafely()
     }
 
     suspend fun setChannelsSelected(sourceKeys: List<String>, selected: Boolean) {
         sourceKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
             if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, selected)
         }
-        if (sourceKeys.isNotEmpty()) notifySharedChannelsChanged()
+        if (sourceKeys.isNotEmpty()) {
+            notifySharedChannelsChanged()
+            if (selected) refreshXtreamEpgSafely()
+        }
     }
 
     suspend fun libraryLiveChannelsPage(
@@ -148,6 +153,7 @@ class IptvRepository(context: Context) {
             }
         }
         notifySharedChannelsChanged()
+        if (sourceKeys.isNotEmpty()) refreshXtreamEpgSafely()
     }
 
     suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
@@ -220,7 +226,7 @@ class IptvRepository(context: Context) {
         }
         val client = XtreamClient(serverUrl, username.trim(), password)
         client.verifyAccount()
-        return importGenerated(
+        val result = importGenerated(
             location = "xtream:${client.baseUrl}|${username.trim()}",
             kind = KIND_XTREAM,
             name = name,
@@ -228,6 +234,13 @@ class IptvRepository(context: Context) {
             username = username.trim(),
             password = password,
         ) { client.channels() }
+        xmlTvRepository.ensurePeriodicRefresh()
+        refreshXtreamEpgSafely(force = true)
+        return result
+    }
+
+    private suspend fun refreshXtreamEpgSafely(force: Boolean = false) {
+        runCatching { xmlTvRepository.refreshXtreamShortEpg(force = force) }
     }
 
     suspend fun importStalker(

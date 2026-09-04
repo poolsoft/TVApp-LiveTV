@@ -14,14 +14,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         IptvSourceEntity::class,
         IptvChannelEntity::class,
         XmlTvProgramEntity::class,
+        XtreamEpgProgramEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
     abstract fun channelDao(): ChannelDao
     abstract fun iptvDao(): IptvDao
     abstract fun xmlTvDao(): XmlTvDao
+    abstract fun xtreamEpgDao(): XtreamEpgDao
 
     companion object {
         @Volatile
@@ -41,6 +43,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_6_7,
                 MIGRATION_7_8,
                 MIGRATION_8_9,
+                MIGRATION_9_10,
             )
                 .build()
                 .also { instance = it }
@@ -172,6 +175,32 @@ abstract class TVAppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `iptv_sources` ADD COLUMN `username` TEXT")
                 db.execSQL("ALTER TABLE `iptv_sources` ADD COLUMN `password` TEXT")
                 db.execSQL("ALTER TABLE `iptv_sources` ADD COLUMN `macAddress` TEXT")
+            }
+        }
+
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `xtream_epg_programs` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`channelId` TEXT NOT NULL, `channelName` TEXT NOT NULL, " +
+                        "`normalizedChannelId` TEXT NOT NULL, " +
+                        "`normalizedChannelName` TEXT NOT NULL, `title` TEXT NOT NULL, " +
+                        "`description` TEXT NOT NULL, " +
+                        "`startTimeMillis` INTEGER NOT NULL, `endTimeMillis` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_xtream_epg_programs_normalizedChannelId_startTimeMillis_endTimeMillis` " +
+                        "ON `xtream_epg_programs` " +
+                        "(`normalizedChannelId`, `startTimeMillis`, `endTimeMillis`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_xtream_epg_programs_normalizedChannelName_startTimeMillis_endTimeMillis` " +
+                        "ON `xtream_epg_programs` " +
+                        "(`normalizedChannelName`, `startTimeMillis`, `endTimeMillis`)",
+                )
             }
         }
     }
