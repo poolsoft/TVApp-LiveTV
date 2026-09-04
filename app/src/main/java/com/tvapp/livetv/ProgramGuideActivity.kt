@@ -60,8 +60,10 @@ class ProgramGuideActivity : AppCompatActivity() {
         applyPercentageGeometry()
         binding.guideDate.text = SimpleDateFormat(
             "EEEE, d MMMM",
-            Locale("tr"),
-        ).format(Date()).replaceFirstChar { it.uppercase(Locale("tr")) }
+            resources.configuration.locales[0],
+        ).format(Date()).replaceFirstChar {
+            it.uppercase(resources.configuration.locales[0])
+        }
         loadChannels()
     }
 
@@ -174,9 +176,15 @@ class ProgramGuideActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val timeStr = if (now in program.startTimeMillis until program.endTimeMillis) {
             val remainMin = ((program.endTimeMillis - now) / 60_000L).coerceAtLeast(1L)
-            "$startStr - $endStr ($durationMin dk · Bitmesine $remainMin dk)"
+            getString(
+                R.string.program_time_duration_remaining,
+                startStr,
+                endStr,
+                durationMin,
+                remainMin,
+            )
         } else {
-            "$startStr - $endStr ($durationMin dk)"
+            getString(R.string.program_time_duration, startStr, endStr, durationMin)
         }
         binding.detailTime.text = timeStr
         binding.detailDescription.text = program.description

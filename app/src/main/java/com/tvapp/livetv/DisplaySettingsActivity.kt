@@ -228,6 +228,9 @@ class DisplaySettingsActivity : AppCompatActivity() {
 
         section(R.string.application_settings)
         if (BuildConfig.DEBUG) {
+            toggle(R.string.verbose_remote_key_logging, current.verboseRemoteKeyLogging) {
+                update { copy(verboseRemoteKeyLogging = it) }
+            }
             action(
                 R.string.billing_test_scenarios,
                 getString(R.string.billing_test_scenarios_summary),

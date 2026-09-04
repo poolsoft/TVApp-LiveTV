@@ -27,4 +27,14 @@ interface XmlTvDao {
         start: Long,
         end: Long,
     ): List<XmlTvProgramEntity>
+
+    @Query(
+        "SELECT * FROM xmltv_programs WHERE startTimeMillis <= :now AND endTimeMillis > :now " +
+            "AND (normalizedChannelId IN (:channelKeys) OR normalizedChannelName IN (:channelKeys)) " +
+            "ORDER BY startTimeMillis",
+    )
+    fun currentPrograms(
+        channelKeys: List<String>,
+        now: Long,
+    ): List<XmlTvProgramEntity>
 }

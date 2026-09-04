@@ -92,6 +92,45 @@ class XmlTvRepository(context: Context) {
         }
     }
 
+    fun currentPrograms(
+        channels: List<LiveChannel>,
+        now: Long = System.currentTimeMillis(),
+    ): Map<String, ProgramSummary> {
+        if (channels.isEmpty()) return emptyMap()
+        migrateLegacyCacheIfNeeded()
+        val channelKeys = channels.flatMap { channel ->
+            listOfNotNull(
+                channel.epgId?.normalize()?.takeIf(String::isNotBlank),
+                channel.displayName.normalize().takeIf(String::isNotBlank),
+            )
+        }.distinct()
+        if (channelKeys.isEmpty()) return emptyMap()
+        val programs = channelKeys.chunked(CURRENT_PROGRAM_QUERY_CHUNK_SIZE)
+            .flatMap { dao.currentPrograms(it, now) }
+        val byId = programs.groupBy(XmlTvProgramEntity::normalizedChannelId)
+        val byName = programs.groupBy(XmlTvProgramEntity::normalizedChannelName)
+        return buildMap {
+            channels.forEach { channel ->
+                val epgId = channel.epgId?.normalize()?.takeIf(String::isNotBlank)
+                val name = channel.displayName.normalize()
+                val match = epgId?.let(byId::get)?.firstOrNull()
+                    ?: byName[name]?.firstOrNull()
+                    ?: byId[name]?.firstOrNull()
+                match?.let {
+                    put(
+                        channel.sourceKey,
+                        ProgramSummary(
+                            it.title,
+                            it.startTimeMillis,
+                            it.endTimeMillis,
+                            it.description,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     private fun importStream(stream: InputStream, label: String): Int {
         val parser = Xml.newPullParser().apply { setInput(stream, null) }
         val channelNames = mutableMapOf<String, String>()
@@ -202,6 +241,7 @@ class XmlTvRepository(context: Context) {
         const val KEY_SOURCE = "source"
         const val KEY_UPDATED = "updated"
         const val INSERT_BATCH_SIZE = 1_000
+        const val CURRENT_PROGRAM_QUERY_CHUNK_SIZE = 400
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
     }

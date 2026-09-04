@@ -395,5 +395,8 @@
     <string name="about_content">TVApp\n\nVersion: %1$s (%2$d)\nDistribution: %3$s\n\nIPTV purchase state: %4$s\nIPTV access: %5$s\nTrial remaining: %6$d days\n\nIPTV sources: %7$d\nTotal IPTV items: %8$d\nAdded to the main channel list: %9$d\n\nTVApp provides a live TV and IPTV experience compatible with Android TV Input Framework sources.</string>
     <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nOn live content, Left or Right opens playback controls. Red returns to live or retries. On VOD, Left and Right seek, and OK toggles play/pause. Green opens audio, Yellow subtitles and Blue video options. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
     <string name="system_settings_unavailable">System settings could not be opened.</string>
+    <string name="verbose_remote_key_logging">Write remote keys to the debug log</string>
     <string name="guide_control_hints">OK: Watch  ·  ▶: Programs  ·  ◀: Channels  ·  BACK: Close</string>
+    <string name="program_time_duration">%1$s - %2$s (%3$d min)</string>
+    <string name="program_time_duration_remaining">%1$s - %2$s (%3$d min · %4$d min remaining)</string>
 </resources>

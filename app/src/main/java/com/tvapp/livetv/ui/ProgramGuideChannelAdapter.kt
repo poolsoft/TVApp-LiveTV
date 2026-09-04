@@ -18,10 +18,10 @@ class ProgramGuideChannelAdapter(
     private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ProgramGuideChannelAdapter.ViewHolder>() {
     private val channels = mutableListOf<LiveChannel>()
-    private var currentPrograms: Map<Long, ProgramSummary> = emptyMap()
+    private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
     private var selectedKey: String? = null
 
-    fun submitList(items: List<LiveChannel>, programs: Map<Long, ProgramSummary>) {
+    fun submitList(items: List<LiveChannel>, programs: Map<String, ProgramSummary>) {
         channels.clear()
         channels.addAll(items)
         currentPrograms = programs
@@ -29,8 +29,13 @@ class ProgramGuideChannelAdapter(
     }
 
     fun select(sourceKey: String) {
+        if (selectedKey == sourceKey) return
+        val previous = positionOf(selectedKey)
         selectedKey = sourceKey
-        notifyDataSetChanged()
+        if (previous >= 0) notifyItemChanged(previous, PAYLOAD_SELECTION)
+        positionOf(sourceKey).takeIf { it >= 0 }?.let {
+            notifyItemChanged(it, PAYLOAD_SELECTION)
+        }
     }
 
     fun positionOf(sourceKey: String?): Int = channels.indexOfFirst { it.sourceKey == sourceKey }
@@ -41,6 +46,14 @@ class ProgramGuideChannelAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         holder.bind(channels[position])
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (PAYLOAD_SELECTION in payloads) {
+            holder.bindSelection(channels[position])
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
     }
 
     override fun getItemCount(): Int = channels.size
@@ -59,9 +72,7 @@ class ProgramGuideChannelAdapter(
             }
             channelNumber.text = channel.displayNumber
             channelName.text = channel.displayName
-            val program = currentPrograms[channel.id].takeIf {
-                channel.source == LiveChannel.Source.TIF
-            }
+            val program = currentPrograms[channel.sourceKey]
             currentProgram.text = program?.title ?: root.context.getString(R.string.no_program_information)
             programProgress.progress = program?.let {
                 val duration = (it.endTimeMillis - it.startTimeMillis).coerceAtLeast(1L)
@@ -76,7 +87,7 @@ class ProgramGuideChannelAdapter(
                 runCatching { channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id)) }
                 if (channelLogo.drawable == null) channelLogo.setImageResource(R.drawable.ic_tv)
             }
-            root.isSelected = channel.sourceKey == selectedKey
+            bindSelection(channel)
             guideLockIcon.visibility = if (
                 channel.locked || channel.encrypted || isParentalLocked(channel)
             ) View.VISIBLE else View.GONE
@@ -87,6 +98,10 @@ class ProgramGuideChannelAdapter(
             }
             root.setOnClickListener { onSelected(channel) }
         }
+
+        fun bindSelection(channel: LiveChannel) {
+            binding.root.isSelected = channel.sourceKey == selectedKey
+        }
     }
 
     private companion object {
@@ -94,5 +109,6 @@ class ProgramGuideChannelAdapter(
         const val LOGO_WIDTH_FRACTION = 0.62f
         const val LOGO_HEIGHT_FRACTION = 0.46f
         const val NUMBER_WIDTH_FRACTION = 0.78f
+        const val PAYLOAD_SELECTION = "selection"
     }
 }

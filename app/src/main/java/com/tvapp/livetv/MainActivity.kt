@@ -50,6 +50,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
+import com.tvapp.livetv.playback.IptvPlaybackProfile
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
@@ -140,7 +141,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ChannelAdapter
     private var displayPreferences = DisplayPreferences()
     private var channels: List<LiveChannel> = emptyList()
-    private var currentPrograms: Map<Long, ProgramSummary> = emptyMap()
+    private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
     private var currentChannel: LiveChannel? = null
     private var activePassthroughInputId: String? = null
     private var resumeTifPlayback = false
@@ -178,7 +179,6 @@ class MainActivity : AppCompatActivity() {
     private val gridLabels = mutableListOf<TextView>()
     private val gridControllers = mutableListOf<IptvPlaybackController>()
     private val unlockedChannels = mutableSetOf<String>()
-    private val loggedRemoteKeyCodes = mutableSetOf<Int>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
     private var channelPanelExpanded = false
@@ -287,11 +287,17 @@ class MainActivity : AppCompatActivity() {
         playback = TifPlaybackController(binding.tvView)
         iptvPlayback = IptvPlaybackController(this, binding.iptvPlayerView)
         secondaryPlayback = TifPlaybackController(binding.secondaryTvView)
-        secondaryIptvPlayback = IptvPlaybackController(this, binding.secondaryIptvPlayerView)
+        secondaryIptvPlayback = IptvPlaybackController(
+            this,
+            binding.secondaryIptvPlayerView,
+            IptvPlaybackProfile.SECONDARY,
+        )
         secondaryIptvPlayback.onPlaybackError = { error ->
             debugLog.recordDebug("MULTIVIEW_IPTV_FAILURE | ${error.errorCodeName}: ${error.message}")
             if (iptvOverlayActive) stopIptvOverlay() else stopMultiView()
         }
+        secondaryIptvPlayback.onPlaybackReady = ::updateFocusedMultiViewIptvBadges
+        secondaryIptvPlayback.onTracksChanged = ::updateFocusedMultiViewIptvBadges
         playbackHistory = PlaybackHistoryStore(this)
         displayPreferencesStore = DisplayPreferencesStore(this)
         channelListFilterStore = ChannelListFilterStore(this)
@@ -881,7 +887,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadFocusedProgram(channel: LiveChannel) {
-        if (currentPrograms[channel.id] != null) return
+        if (currentPrograms[channel.sourceKey] != null) return
         focusedProgramJob?.cancel()
         focusedProgramJob = lifecycleScope.launch {
             delay(180L)
@@ -889,7 +895,7 @@ class MainActivity : AppCompatActivity() {
                 runCatching { programRepository.nowAndNext(channel).current }.getOrNull()
             }
             if (focusedListSourceKey != channel.sourceKey || current == null) return@launch
-            currentPrograms = currentPrograms + (channel.id to current)
+            currentPrograms = currentPrograms + (channel.sourceKey to current)
             adapter.submitPrograms(currentPrograms)
         }
     }
@@ -901,7 +907,9 @@ class MainActivity : AppCompatActivity() {
         val last = layoutManager.findLastVisibleItemPosition().takeIf { it >= first } ?: return
         val visibleChannels = panelChannels()
         val missing = (first..last).mapNotNull { position ->
-            visibleChannels.getOrNull(position)?.takeIf { channel -> currentPrograms[channel.id] == null }
+            visibleChannels.getOrNull(position)?.takeIf { channel ->
+                currentPrograms[channel.sourceKey] == null
+            }
         }
         if (missing.isEmpty()) return
         visibleProgramsJob?.cancel()
@@ -910,7 +918,7 @@ class MainActivity : AppCompatActivity() {
                 missing.mapNotNull { channel ->
                     runCatching { programRepository.nowAndNext(channel).current }
                         .getOrNull()
-                        ?.let { current -> channel.id to current }
+                        ?.let { current -> channel.sourceKey to current }
                 }.toMap()
             }
             if (programs.isNotEmpty()) {
@@ -953,7 +961,7 @@ class MainActivity : AppCompatActivity() {
                 )
             }.getOrNull() ?: return@launch
             programs.current?.let { current ->
-                currentPrograms = currentPrograms + (channel.id to current)
+                currentPrograms = currentPrograms + (channel.sourceKey to current)
                 adapter.submitPrograms(currentPrograms)
             }
             debugLog.recordDebug(
@@ -1349,9 +1357,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateTechnicalBadgesForIptv(channel: LiveChannel) {
+    private fun updateTechnicalBadgesForIptv(
+        channel: LiveChannel,
+        controller: IptvPlaybackController = iptvPlayback,
+    ) {
         if (channel.source != LiveChannel.Source.IPTV) return
-        val info = iptvPlayback.currentTechnicalInfo()
+        val info = controller.currentTechnicalInfo()
         val width = info.width ?: 0
         val height = info.height ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
@@ -2270,7 +2281,11 @@ class MainActivity : AppCompatActivity() {
             binding.iptvGrid.addView(cell)
             gridCells += cell
             gridLabels += label
-            gridControllers += IptvPlaybackController(this, playerView).apply {
+            gridControllers += IptvPlaybackController(
+                this,
+                playerView,
+                IptvPlaybackProfile.GRID,
+            ).apply {
                 onPlaybackError = { error ->
                     debugLog.recordDebug(
                         "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}: ${error.message}",
@@ -2978,15 +2993,29 @@ class MainActivity : AppCompatActivity() {
 
         val focused = if (multiViewActiveSide == 0) left else right
         focused?.let { channel ->
-            updateTechnicalBadges(
-                channel,
-                if (channel.source == LiveChannel.Source.TIF) playback.allTracks() else emptyList(),
-            )
+            when (channel.source) {
+                LiveChannel.Source.IPTV -> updateTechnicalBadgesForIptv(
+                    channel,
+                    if (multiViewActiveSide == 0) iptvPlayback else secondaryIptvPlayback,
+                )
+                LiveChannel.Source.TIF -> updateTechnicalBadges(
+                    channel,
+                    if (multiViewActiveSide == 0) playback.allTracks()
+                    else secondaryPlayback.allTracks(),
+                )
+            }
             showInfoBarForChannel(channel)
         }
         debugLog.recordDebug(
             "MULTIVIEW_FOCUS | side=${if (multiViewActiveSide == 0) "left" else "right"}, channel=${focused?.sourceKey}",
         )
+    }
+
+    private fun updateFocusedMultiViewIptvBadges() {
+        if (!multiViewActive || multiViewActiveSide != 1) return
+        multiViewRightChannel
+            ?.takeIf { it.source == LiveChannel.Source.IPTV }
+            ?.let { updateTechnicalBadgesForIptv(it, secondaryIptvPlayback) }
     }
 
     private fun resizeMultiViewFocusBorders(width: Int) {
@@ -3650,7 +3679,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && ::debugLog.isInitialized) {
+        if (
+            BuildConfig.DEBUG &&
+            displayPreferences.verboseRemoteKeyLogging &&
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.repeatCount == 0 &&
+            ::debugLog.isInitialized
+        ) {
             debugLog.recordDebug(
                 "REMOTE_KEY | name=${KeyEvent.keyCodeToString(event.keyCode)}, " +
                     "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",

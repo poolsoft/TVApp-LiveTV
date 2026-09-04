@@ -30,6 +30,7 @@ import java.util.Locale
 class IptvPlaybackController(
     context: Context,
     private val playerView: PlayerView,
+    private val profile: IptvPlaybackProfile = IptvPlaybackProfile.PRIMARY,
 ) {
     private val appContext = context.applicationContext
     private val retryHandler = Handler(Looper.getMainLooper())
@@ -83,6 +84,10 @@ class IptvPlaybackController(
             .setTrackSelector(selector)
             .setLoadControl(loadControl)
             .build().also { created ->
+            created.trackSelectionParameters = created.trackSelectionParameters.buildUpon()
+                .setMaxVideoSize(profile.maximumWidth, profile.maximumHeight)
+                .setMaxVideoBitrate(profile.maximumBitrate)
+                .build()
             created.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
@@ -471,6 +476,16 @@ class IptvPlaybackController(
 }
 
 enum class IptvContentKind { LIVE, VOD, UNKNOWN }
+
+enum class IptvPlaybackProfile(
+    val maximumWidth: Int,
+    val maximumHeight: Int,
+    val maximumBitrate: Int,
+) {
+    PRIMARY(Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE),
+    SECONDARY(1_280, 720, 3_000_000),
+    GRID(960, 540, 1_500_000),
+}
 
 data class IptvPlaybackSnapshot(
     val positionMillis: Long,

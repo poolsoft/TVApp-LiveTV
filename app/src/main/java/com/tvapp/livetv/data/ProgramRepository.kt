@@ -146,20 +146,22 @@ class ProgramRepository(context: Context) {
     fun currentProgramsForChannels(
         channels: List<LiveChannel>,
         now: Long = System.currentTimeMillis(),
-    ): Map<Long, ProgramSummary> {
+    ): Map<String, ProgramSummary> {
         if (channels.isEmpty()) return emptyMap()
         val tifIds = channels.asSequence()
             .filter { it.source == LiveChannel.Source.TIF }
             .map { it.id }
             .toSet()
-        val resultMap = currentPrograms(tifIds, now).toMutableMap()
-        val iptvChannels = channels.filter { it.source == LiveChannel.Source.IPTV }
-        for (channel in iptvChannels) {
-            val prog = xmlTvRepository.nowAndNext(channel, now).current
-            if (prog != null) {
-                resultMap[channel.id] = prog
+        val tifPrograms = currentPrograms(tifIds, now)
+        val resultMap = channels.asSequence()
+            .filter { it.source == LiveChannel.Source.TIF }
+            .mapNotNull { channel ->
+                tifPrograms[channel.id]?.let { channel.sourceKey to it }
             }
-        }
+            .toMap()
+            .toMutableMap()
+        val missingChannels = channels.filterNot { it.sourceKey in resultMap }
+        resultMap.putAll(xmlTvRepository.currentPrograms(missingChannels, now))
         return resultMap
     }
 

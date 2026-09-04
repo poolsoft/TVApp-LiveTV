@@ -21,7 +21,7 @@ class ChannelAdapter(
     private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
     private val channels = mutableListOf<LiveChannel>()
-    private var programs: Map<Long, ProgramSummary> = emptyMap()
+    private var programs: Map<String, ProgramSummary> = emptyMap()
     private var rowOptions = ChannelRowOptions()
     private var showIptvMembership = false
     private var selectedId: Long? = null
@@ -62,11 +62,11 @@ class ChannelAdapter(
         if (newIndex >= 0) notifyItemChanged(newIndex, PAYLOAD_SELECTION)
     }
 
-    fun submitPrograms(items: Map<Long, ProgramSummary>) {
+    fun submitPrograms(items: Map<String, ProgramSummary>) {
         val previous = programs
         programs = items
         channels.forEachIndexed { index, channel ->
-            if (previous[channel.id] != items[channel.id]) {
+            if (previous[channel.sourceKey] != items[channel.sourceKey]) {
                 notifyItemChanged(index, PAYLOAD_PROGRAM)
             }
         }
@@ -90,7 +90,7 @@ class ChannelAdapter(
 
     override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
         val channel = channels[position]
-        holder.bind(channel, programs[channel.id])
+        holder.bind(channel, programs[channel.sourceKey])
     }
 
     override fun onBindViewHolder(
@@ -103,7 +103,7 @@ class ChannelAdapter(
             return
         }
         val channel = channels[position]
-        if (PAYLOAD_PROGRAM in payloads) holder.bindProgram(channel, programs[channel.id])
+        if (PAYLOAD_PROGRAM in payloads) holder.bindProgram(channel, programs[channel.sourceKey])
         if (PAYLOAD_SELECTION in payloads) holder.bindSelection(channel)
     }
 

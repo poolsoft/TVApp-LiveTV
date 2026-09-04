@@ -21,6 +21,7 @@ data class DisplayPreferences(
     val channelFocusTuneDelayMillis: Int = 1_500,
     val subtitlesEnabled: Boolean = false,
     val launchOnBoot: Boolean = false,
+    val verboseRemoteKeyLogging: Boolean = false,
     val preferredAudioLanguage: String? = null,
     val preferredSubtitleLanguage: String? = null,
 )
@@ -62,6 +63,7 @@ class DisplayPreferencesStore(context: Context) {
         ).coerceIn(500, 5_000),
         subtitlesEnabled = preferences.getBoolean(KEY_SUBTITLES_ENABLED, false),
         launchOnBoot = preferences.getBoolean(KEY_LAUNCH_ON_BOOT, false),
+        verboseRemoteKeyLogging = preferences.getBoolean(KEY_VERBOSE_REMOTE_KEY_LOGGING, false),
         preferredAudioLanguage = preferences.getString(KEY_AUDIO_LANGUAGE, null),
         preferredSubtitleLanguage = preferences.getString(KEY_SUBTITLE_LANGUAGE, null),
     )
@@ -89,6 +91,10 @@ class DisplayPreferencesStore(context: Context) {
             )
             .putBoolean(KEY_SUBTITLES_ENABLED, displayPreferences.subtitlesEnabled)
             .putBoolean(KEY_LAUNCH_ON_BOOT, displayPreferences.launchOnBoot)
+            .putBoolean(
+                KEY_VERBOSE_REMOTE_KEY_LOGGING,
+                displayPreferences.verboseRemoteKeyLogging,
+            )
             .putString(KEY_AUDIO_LANGUAGE, displayPreferences.preferredAudioLanguage)
             .putString(KEY_SUBTITLE_LANGUAGE, displayPreferences.preferredSubtitleLanguage)
             .apply()
@@ -126,6 +132,7 @@ class DisplayPreferencesStore(context: Context) {
         const val KEY_CHANNEL_FOCUS_TUNE_DELAY = "channel-focus-tune-delay"
         const val KEY_SUBTITLES_ENABLED = "subtitles-enabled"
         const val KEY_LAUNCH_ON_BOOT = "launch-on-boot"
+        const val KEY_VERBOSE_REMOTE_KEY_LOGGING = "verbose-remote-key-logging"
         const val KEY_AUDIO_LANGUAGE = "audio-language"
         const val KEY_SUBTITLE_LANGUAGE = "subtitle-language"
     }

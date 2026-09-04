@@ -96,11 +96,6 @@ class IptvSourcesActivity : AppCompatActivity() {
                 selectedSourcePosition = -1
             }
         }
-        binding.sourceList.setOnItemLongClickListener { _, _, position, _ ->
-            selectedSourcePosition = position
-            showSourceActions(sources[position])
-            true
-        }
         loadSources()
         binding.importUrlButton.requestFocus()
     }
