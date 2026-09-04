@@ -61,6 +61,8 @@ import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.settings.ChannelPanelSide
 import com.tvapp.livetv.settings.ChannelListFilterStore
+import com.tvapp.livetv.settings.ChannelTrackPreferenceStore
+import com.tvapp.livetv.settings.resolveTrackPreferences
 import com.tvapp.livetv.settings.ChannelSourceFilter
 import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
@@ -132,6 +134,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var secondaryIptvPlayback: IptvPlaybackController
     private lateinit var playbackHistory: PlaybackHistoryStore
     private lateinit var displayPreferencesStore: DisplayPreferencesStore
+    private lateinit var channelTrackPreferenceStore: ChannelTrackPreferenceStore
     private lateinit var channelListFilterStore: ChannelListFilterStore
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var parentalControlStore: ParentalControlStore
@@ -302,6 +305,7 @@ class MainActivity : AppCompatActivity() {
         secondaryIptvPlayback.onTracksChanged = ::updateFocusedMultiViewIptvBadges
         playbackHistory = PlaybackHistoryStore(this)
         displayPreferencesStore = DisplayPreferencesStore(this)
+        channelTrackPreferenceStore = ChannelTrackPreferenceStore(this)
         channelListFilterStore = ChannelListFilterStore(this)
         sleepTimerStore = SleepTimerStore(this)
         parentalControlStore = ParentalControlStore(this)
@@ -1295,21 +1299,49 @@ class MainActivity : AppCompatActivity() {
                 else -> updateAudioOnlyPanel(channel, false)
             }
         }
-        val preferredAudio = displayPreferences.preferredAudioLanguage
+        val resolved = resolveCurrentTrackPreferences()
+        val preferredAudio = resolved.audioLanguage
         if (preferredAudio != null) {
             audio.firstOrNull { it.language.equals(preferredAudio, ignoreCase = true) }
                 ?.let { playback.selectAudio(it.id) }
         }
 
-        if (!displayPreferences.subtitlesEnabled) {
+        if (!resolved.subtitlesEnabled) {
             playback.selectSubtitle(null)
             return
         }
-        val preferredSubtitle = displayPreferences.preferredSubtitleLanguage
+        val preferredSubtitle = resolved.subtitleLanguage
         val track = subtitles.firstOrNull {
             it.language.equals(preferredSubtitle, ignoreCase = true)
         } ?: subtitles.firstOrNull()
         playback.selectSubtitle(track?.id)
+    }
+
+    private fun resolveCurrentTrackPreferences() = resolveTrackPreferences(
+        channel = currentChannel?.sourceKey?.let(channelTrackPreferenceStore::load),
+        globalAudioLanguage = displayPreferences.preferredAudioLanguage,
+        globalSubtitlesEnabled = displayPreferences.subtitlesEnabled,
+        globalSubtitleLanguage = displayPreferences.preferredSubtitleLanguage,
+    )
+
+    private fun rememberChannelAudioLanguage(language: String?) {
+        val key = currentChannel?.sourceKey ?: return
+        language ?: return
+        channelTrackPreferenceStore.save(key) { it.copy(audioLanguage = language) }
+    }
+
+    private fun rememberChannelSubtitle(language: String?) {
+        val key = currentChannel?.sourceKey ?: return
+        channelTrackPreferenceStore.save(key) {
+            it.copy(subtitlesEnabled = true, subtitleLanguage = language)
+        }
+    }
+
+    private fun rememberChannelSubtitlesOff() {
+        val key = currentChannel?.sourceKey ?: return
+        channelTrackPreferenceStore.save(key) {
+            it.copy(subtitlesEnabled = false, subtitleLanguage = null)
+        }
     }
 
     private fun updateTechnicalBadges(channel: LiveChannel, tracks: List<TvTrackInfo>) {
@@ -1507,6 +1539,7 @@ class MainActivity : AppCompatActivity() {
                 val track = tracks[which]
                 playback.selectAudio(track.id)
                 track.language?.let { displayPreferencesStore.updateTrackPreferences(audioLanguage = it) }
+                rememberChannelAudioLanguage(track.language)
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.close, null)
@@ -1531,6 +1564,7 @@ class MainActivity : AppCompatActivity() {
                 if (which == 0) {
                     playback.selectSubtitle(null)
                     displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = false)
+                    rememberChannelSubtitlesOff()
                 } else {
                     val track = tracks[which - 1]
                     playback.selectSubtitle(track.id)
@@ -1538,6 +1572,7 @@ class MainActivity : AppCompatActivity() {
                         subtitlesEnabled = true,
                         subtitleLanguage = track.language,
                     )
+                    rememberChannelSubtitle(track.language)
                 }
                 displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
@@ -1573,6 +1608,7 @@ class MainActivity : AppCompatActivity() {
                 track.language?.let {
                     displayPreferencesStore.updateTrackPreferences(audioLanguage = it)
                 }
+                rememberChannelAudioLanguage(track.language)
                 displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
             }
@@ -1593,6 +1629,7 @@ class MainActivity : AppCompatActivity() {
                 if (which == 0) {
                     iptvPlayback.selectSubtitleTrack(null)
                     displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = false)
+                    rememberChannelSubtitlesOff()
                 } else {
                     val track = tracks[which - 1]
                     iptvPlayback.selectSubtitleTrack(track.id)
@@ -1600,6 +1637,7 @@ class MainActivity : AppCompatActivity() {
                         subtitlesEnabled = true,
                         subtitleLanguage = track.language,
                     )
+                    rememberChannelSubtitle(track.language)
                 }
                 displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
@@ -1612,17 +1650,18 @@ class MainActivity : AppCompatActivity() {
         displayPreferences = displayPreferencesStore.load()
         val audioTracks = iptvPlayback.audioTracks()
         val subtitleTracks = iptvPlayback.subtitleTracks()
-        val preferredAudio = displayPreferences.preferredAudioLanguage
+        val resolved = resolveCurrentTrackPreferences()
+        val preferredAudio = resolved.audioLanguage
         if (preferredAudio != null) {
             audioTracks.firstOrNull {
                 !it.selected && it.language.equals(preferredAudio, ignoreCase = true)
             }?.let { iptvPlayback.selectAudioTrack(it.id) }
         }
-        if (!displayPreferences.subtitlesEnabled) {
+        if (!resolved.subtitlesEnabled) {
             if (subtitleTracks.any(IptvTrackOption::selected)) iptvPlayback.selectSubtitleTrack(null)
         } else {
             val preferred = subtitleTracks.firstOrNull {
-                it.language.equals(displayPreferences.preferredSubtitleLanguage, ignoreCase = true)
+                it.language.equals(resolved.subtitleLanguage, ignoreCase = true)
             } ?: subtitleTracks.firstOrNull()
             if (preferred != null && !preferred.selected) iptvPlayback.selectSubtitleTrack(preferred.id)
         }
