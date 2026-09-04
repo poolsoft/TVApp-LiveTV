@@ -301,7 +301,7 @@ class ProgramGuideActivity : AppCompatActivity() {
         const val EXTRA_SELECTED_SOURCE_KEY = "selected-source-key"
         private const val HEADER_HEIGHT_FRACTION = 0.11f
         private const val DETAIL_HEIGHT_FRACTION = 0.22f
-        private const val OVERLAY_WIDTH_FRACTION = 0.84f
+        private const val OVERLAY_WIDTH_FRACTION = 0.68f
         private const val OUTER_HORIZONTAL_PADDING_FRACTION = 0.025f
         private const val COLUMN_PADDING_FRACTION = 0.008f
         private const val CHANNEL_FOCUS_DELAY_MS = 250L

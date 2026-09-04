@@ -328,6 +328,8 @@
     <string name="iptv_grid">Grid</string>
     <string name="iptv_grid_title">IPTV Grid kanallarını seç</string>
     <string name="iptv_grid_start">Grid’i aç</string>
+    <string name="iptv_grid_action">IPTV Grid (Çoklu Ekran)</string>
+    <string name="iptv_grid_stop_action">IPTV Grid’i Kapat</string>
     <string name="iptv_grid_start_green">Yeşil · Grid’i aç</string>
     <string name="close_red">Kırmızı · Kapat</string>
     <string name="grid_channel_actions">Grid kanalı</string>

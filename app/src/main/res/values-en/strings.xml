@@ -316,6 +316,8 @@
     <string name="iptv_grid">Grid</string>
     <string name="iptv_grid_title">Select IPTV grid channels</string>
     <string name="iptv_grid_start">Open grid</string>
+    <string name="iptv_grid_action">IPTV Grid (Multi-Screen)</string>
+    <string name="iptv_grid_stop_action">Close IPTV Grid</string>
     <string name="iptv_grid_start_green">Green · Open grid</string>
     <string name="close_red">Red · Close</string>
     <string name="grid_channel_actions">Grid channel</string>

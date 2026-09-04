@@ -5,7 +5,9 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.KeyEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.text.InputType
 import android.widget.EditText
 import android.widget.AdapterView
@@ -21,6 +23,7 @@ import com.tvapp.livetv.data.IptvSourceSummary
 import com.tvapp.livetv.databinding.ActivityIptvSourcesBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -31,6 +34,8 @@ class IptvSourcesActivity : AppCompatActivity() {
     private lateinit var debugLog: CrashReportStore
     private var sources: List<IptvSourceSummary> = emptyList()
     private var selectedSourcePosition = -1
+    private var sourceListLongPressHandled = false
+    private var sourceListLongPressJob: Job? = null
 
     private val selectChannels = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -461,6 +466,39 @@ class IptvSourcesActivity : AppCompatActivity() {
     }
 
     private enum class SourceAction { SELECT, REFRESH, RENAME, DELETE }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (binding.sourceList.hasFocus()) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        sourceListLongPressHandled = false
+                        sourceListLongPressJob?.cancel()
+                        sourceListLongPressJob = lifecycleScope.launch {
+                            delay(ViewConfiguration.getLongPressTimeout().toLong())
+                            sourceListLongPressHandled = true
+                            val pos = selectedSourcePosition.takeIf { it in sources.indices }
+                                ?: binding.sourceList.selectedItemPosition.takeIf { it in sources.indices }
+                            pos?.let { showSourceActions(sources[it]) }
+                        }
+                    } else if (event.action == KeyEvent.ACTION_UP) {
+                        sourceListLongPressJob?.cancel()
+                        if (sourceListLongPressHandled) {
+                            sourceListLongPressHandled = false
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onDestroy() {
+        sourceListLongPressJob?.cancel()
+        super.onDestroy()
+    }
 
     private companion object {
         const val URL_SUCCESS_MESSAGE_MILLIS = 900L

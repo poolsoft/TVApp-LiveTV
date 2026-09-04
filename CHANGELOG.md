@@ -37,13 +37,34 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * **Menü Tuşu Davranışı**:
   * Kumandadaki `KEYCODE_MENU` tuşu kanal listesini açıp kapatma görevinde (`toggleChannelPanel()`) korunmuştur.
 
-### 📅 Program Rehberi (EPG) Yenilenmesi ve Seçici Düzeltmesi
-* **Seçici Hareket Hatası Giderildi**:
-  * Kumanda aşağı/yukarı kaydırmalarında seçiciyi zorla listenin tepesine (offset 0) kilitleyen `scrollToPositionWithOffset` çağrısı kaldırıldı; Android TV standart doğal odak ve `scrollToPosition` mekanizmasına geçilerek seçicinin ekranda serbestçe ve akıcı biçimde hareket etmesi sağlandı.
-* **Modern Cam Efekti (Glassmorphism Dark Theme)**:
-  * EPG genişliği %66'dan %84'e çıkarılarak ferahlatıldı. Arka planda yayının hafifçe parıldadığı yarı saydam koyu degrade katman uygulandı.
-* **Şık Kanal ve Program Kartları (`bg_guide_item`)**:
-  * Yuvarlatılmış köşeli modern kart tasarımı, kanal logoları için koyu çerçeve, parlak neon odak efektleri ve hafif mikro-büyüme (`scaleX/scaleY 1.02`) animasyonu eklendi.
+### 📅 Program Rehberi (EPG) Sola Yaslı Cam Tasarımı ve Seçici Düzeltmesi
+* **Sola Yaslı Şık Cam Panel (%68 Genişlik)**:
+  * EPG ekranını tamamen karartan siyah katman kaldırıldı. Ekranın sağ tarafındaki %32'lik alan tamamen şeffaf bırakılarak canlı TV yayınının kesintisiz izlenmesi sağlandı.
+  * Sol panel için yarı saydam koyu cam efekti (`bg_guide_overlay` - %83 opaklık) ve ince cam ayırıcı bordürler uygulandı.
+  * İç sütunların katı siyah zeminleri temizlenerek cam panel bütünlüğü sağlandı, gereksiz XML çoğaltılması önlendi.
+* **Akıcı Liste ve Seçici Hareketi**:
+  * Seçiciyi en üst satırda kilitleyen offset sorunu giderildi; `scrollToPosition` ile kumanda hareketlerine anında ve pürüzsüz yanıt veren doğal liste akışı sağlandı.
+* **Modern Cam Kartlar (`bg_guide_item`)**:
+  * Odaksız durumlarda hafif parıltılı cam çerçeve, odak durumunda ise parlak belirgin vurgu çizgisi eklendi.
+
+### 🎛️ IPTV Grid Kanal Seçimi ve Kumanda Gezintisi
+* **Renksiz Kumandalar İçin Kanal Yönetim Menüsü Erişimi**:
+  * Kumandasında renkli tuş bulunmayan kullanıcılar için kanal listesinde kanal üzerinde `OK` tuşuna basılı tutulduğunda açılan Kanal Yönetim Menüsüne *"IPTV Grid (Çoklu Ekran)"* / *"IPTV Grid’i Kapat"* seçeneği eklendi.
+* **Sağ/Sol Ok ile Sekme (Tab) Benzeri Gezinti**:
+  * Grid kanal seçim diyaloğunda liste üzerindeyken `SAĞ OK` tuşuna basıldığında doğrudan *"Grid’i aç"* butonuna odaklanılır; butonlardayken `SOL OK` tuşuna basıldığında listeye geri dönülür.
+* **Anlaşılır Buton Etiketleri**:
+  * Renksiz kumandaları yanıltmamak adına buton metinleri doğrudan *"Grid’i aç"* ve *"Kapat"* olarak düzenlendi, renkli kumandası olanlar için yeşil/kırmızı kısayollar korunmaya devam etti.
+
+### 📋 Kayıtlı IPTV Listeleri Yönetim Menüsü (`IptvSourcesActivity`)
+* **Kumanda OK Uzun Basış Desteği**:
+  * Kayıtlı IPTV listelerindeyken TV kumandasında `OK` (`DPAD_CENTER` / `ENTER`) tuşuna uzun basıldığında Liste İşlemleri menüsü açılır hale getirildi (`dispatchKeyEvent` eklendi).
+* **Tam Yönetim Desteği**:
+  * Kullanıcı kumandasından tek bir uzun basışla:
+    * **Kanalları Seç**: Listeye ait kanal seçim ekranını açma,
+    * **Listeyi Güncelle**: Kaynağı yeniden indirip yenileme (Refresh),
+    * **Yeniden Adlandır**: Liste adını değiştirme (Rename),
+    * **Sil**: Onay penceresiyle listeyi ve kanallarını temizleme (Delete)
+    işlemlerini kumandadan kolayca yönetebilir.
 * **Canlı Yayın Vurgusu ve Süre Gösterimi**:
   * O an yayında olan programlar için parlak kırmızı "CANLI" rozeti ve detay panelinde süre ile birlikte *"Bitmesine X dk"* gösterimi eklendi.
 * **Kumanda İpuçları Çubuğu**:

@@ -2281,8 +2281,8 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, R.string.iptv_grid_maximum, Toast.LENGTH_SHORT).show()
                 }
             }
-            .setPositiveButton(R.string.iptv_grid_start_green, null)
-            .setNegativeButton(R.string.close_red, null)
+            .setPositiveButton(R.string.iptv_grid_start, null)
+            .setNegativeButton(R.string.close, null)
             .create()
         fun startSelectedGrid() {
             val selected = choices.filterIndexed { index, _ -> checked[index] }.take(4)
@@ -2296,15 +2296,50 @@ class MainActivity : AppCompatActivity() {
             }
         }
         dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+            val positiveBtn = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+            val negativeBtn = dialog.getButton(DialogInterface.BUTTON_NEGATIVE)
+            positiveBtn.setOnClickListener {
                 startSelectedGrid()
             }
+            positiveBtn.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    dialog.listView.requestFocus()
+                    true
+                } else false
+            }
+            negativeBtn.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    dialog.listView.requestFocus()
+                    true
+                } else false
+            }
+        }
+        dialog.listView.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                dialog.getButton(DialogInterface.BUTTON_POSITIVE).requestFocus()
+                true
+            } else false
         }
         dialog.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
                 KeyEvent.KEYCODE_PROG_GREEN -> true.also { startSelectedGrid() }
                 KeyEvent.KEYCODE_PROG_RED -> true.also { dialog.dismiss() }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val current = dialog.currentFocus
+                    if (current == dialog.listView || dialog.listView.hasFocus()) {
+                        dialog.getButton(DialogInterface.BUTTON_POSITIVE).requestFocus()
+                        true
+                    } else false
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    val positiveBtn = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                    val negativeBtn = dialog.getButton(DialogInterface.BUTTON_NEGATIVE)
+                    if (positiveBtn.hasFocus() || negativeBtn.hasFocus()) {
+                        dialog.listView.requestFocus()
+                        true
+                    } else false
+                }
                 else -> false
             }
         }
@@ -2569,6 +2604,9 @@ class MainActivity : AppCompatActivity() {
         action(
             getString(if (multiViewActive) R.string.close_multi_view else R.string.open_multi_view),
         ) { if (multiViewActive) stopMultiView() else startMultiView(channel) }
+        action(
+            getString(if (iptvGridActive) R.string.iptv_grid_stop_action else R.string.iptv_grid_action),
+        ) { if (iptvGridActive) stopIptvGrid(resumePrevious = true) else showIptvGridPicker() }
         AlertDialog.Builder(this)
             .setTitle(channel.displayName)
             .setItems(labels.toTypedArray()) { _, which -> handlers[which]() }

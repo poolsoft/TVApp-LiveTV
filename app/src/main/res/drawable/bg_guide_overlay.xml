@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Cam efekti icin yari saydam koyu zemin (%83 opaklik) -->
+    <solid android:color="#D40D131A" />
+    <stroke
+        android:width="1dp"
+        android:color="#263E52" />
+</shape>
