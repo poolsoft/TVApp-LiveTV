@@ -12,4 +12,5 @@
     <color name="remote_green">#26D97F</color>
     <color name="remote_yellow">#FFD43B</color>
     <color name="remote_blue">#2693FF</color>
+    <color name="system_info_row">#282F3945</color>
 </resources>

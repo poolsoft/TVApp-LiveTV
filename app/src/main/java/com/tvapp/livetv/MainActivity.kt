@@ -22,6 +22,7 @@ import android.widget.EditText
 import android.widget.ArrayAdapter
 import android.widget.AdapterView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -198,7 +199,6 @@ class MainActivity : AppCompatActivity() {
     private var restoredInitialChannel = false
     private var pendingEditorChannelKey: String? = null
     private var pendingHomeChannelKey: String? = null
-    private var pendingTvChannelUri: String? = null
     private var focusedListSourceKey: String? = null
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
@@ -314,7 +314,6 @@ class MainActivity : AppCompatActivity() {
         applyIptvAspectMode(iptvViewPreferencesStore.aspectMode())
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
-        pendingTvChannelUri = requestedTvChannelUri(intent)
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
@@ -534,11 +533,7 @@ class MainActivity : AppCompatActivity() {
                     pendingEditorChannelKey = null
                     val requestedKey = pendingHomeChannelKey ?: editorChannelKey
                     pendingHomeChannelKey = null
-                    val requestedTvUri = pendingTvChannelUri
-                    pendingTvChannelUri = null
-                    val editorChannel = loaded.firstOrNull {
-                        requestedTvUri != null && it.source == LiveChannel.Source.TIF && it.uri == requestedTvUri
-                    } ?: requestedKey?.let { key ->
+                    val editorChannel = requestedKey?.let { key ->
                         panelChannels().firstOrNull { it.sourceKey == key }
                             ?: loaded.firstOrNull { it.sourceKey == key }
                     }
@@ -2797,6 +2792,7 @@ class MainActivity : AppCompatActivity() {
                 },
             ),
         ) { toggleChannelLock(channel) }
+        action(getString(R.string.system_information)) { showChannelSystemInformation(channel) }
         action(
             getString(if (multiViewActive) R.string.close_multi_view else R.string.open_multi_view),
         ) { if (multiViewActive) stopMultiView() else startMultiView(channel) }
@@ -2809,6 +2805,113 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton(R.string.close, null)
             .show()
     }
+
+    private fun showChannelSystemInformation(channel: LiveChannel) {
+        val tracks = if (
+            channel.source == LiveChannel.Source.TIF && channel.sourceKey == currentChannel?.sourceKey
+        ) playback.allTracks() else emptyList()
+        val videoTrack = tracks.filter { it.type == TvTrackInfo.TYPE_VIDEO }
+            .maxByOrNull { it.videoWidth.toLong() * it.videoHeight }
+        val quality = VideoQuality.label(
+            videoTrack?.videoWidth ?: 0,
+            videoTrack?.videoHeight ?: 0,
+            channel.videoFormat.orEmpty().uppercase(Locale.ROOT),
+        ) ?: getString(R.string.unknown_value)
+        val rows = buildList {
+            add(getString(R.string.system_info_source) to channel.source.name)
+            add(getString(R.string.system_info_channel_id) to channel.id.toString())
+            add(getString(R.string.system_info_source_key) to channel.sourceKey)
+            add(getString(R.string.system_info_input_id) to channel.inputId)
+            add(getString(R.string.system_info_channel_uri) to channel.uri)
+            add(getString(R.string.system_info_channel_number) to channel.displayNumber)
+            add(getString(R.string.system_info_channel_name) to channel.displayName)
+            add(getString(R.string.system_info_service_type) to channel.serviceType.orUnknown())
+            add(getString(R.string.system_info_video_format) to channel.videoFormat.orUnknown())
+            add(getString(R.string.system_info_quality) to quality)
+            add(getString(R.string.system_info_encrypted) to yesNo(channel.encrypted))
+            add(getString(R.string.system_info_locked) to yesNo(channel.locked))
+            if (tracks.isEmpty()) {
+                add(
+                    getString(R.string.system_info_tracks) to getString(
+                        if (channel.sourceKey == currentChannel?.sourceKey) {
+                            R.string.system_info_tracks_not_reported
+                        } else {
+                            R.string.system_info_tracks_current_only
+                        },
+                    ),
+                )
+            } else {
+                tracks.forEachIndexed { index, track ->
+                    val prefix = getString(R.string.system_info_track_index, index + 1)
+                    add("$prefix ${getString(R.string.system_info_track_type)}" to trackTypeLabel(track))
+                    add("$prefix ID" to track.id)
+                    add("$prefix ${getString(R.string.system_info_language)}" to track.language.orUnknown())
+                    add("$prefix ${getString(R.string.system_info_description)}" to track.description?.toString().orUnknown())
+                    if (track.type == TvTrackInfo.TYPE_VIDEO) {
+                        add("$prefix ${getString(R.string.system_info_resolution)}" to "${track.videoWidth} × ${track.videoHeight}")
+                        add("$prefix FPS" to track.videoFrameRate.toString())
+                        add("$prefix ${getString(R.string.system_info_pixel_ratio)}" to track.videoPixelAspectRatio.toString())
+                        add("$prefix AFD" to track.videoActiveFormatDescription.toString())
+                    }
+                    if (track.type == TvTrackInfo.TYPE_AUDIO) {
+                        add("$prefix ${getString(R.string.system_info_audio_channels)}" to track.audioChannelCount.toString())
+                        add("$prefix ${getString(R.string.system_info_sample_rate)}" to track.audioSampleRate.toString())
+                    }
+                    add("$prefix Extra" to track.extra?.toString().orUnknown())
+                }
+            }
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+            rows.forEachIndexed { index, (key, value) -> addSystemInformationRow(key, value, index) }
+        }
+        val scroll = ScrollView(this).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            addView(content)
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(getString(R.string.system_information_channel, channel.displayName))
+            .setView(scroll)
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.setOnShowListener { scroll.requestFocus() }
+        dialog.show()
+    }
+
+    private fun LinearLayout.addSystemInformationRow(key: String, value: String, index: Int) {
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            if (index % 2 == 0) setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.system_info_row))
+            addView(TextView(this@MainActivity).apply {
+                text = key
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+                textSize = 13f
+                setPadding(0, 0, dp(12), 0)
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.36f))
+            addView(TextView(this@MainActivity).apply {
+                text = value
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                textSize = 13f
+                setTextIsSelectable(true)
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.64f))
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun trackTypeLabel(track: TvTrackInfo): String = when (track.type) {
+        TvTrackInfo.TYPE_VIDEO -> getString(R.string.system_info_video)
+        TvTrackInfo.TYPE_AUDIO -> getString(R.string.system_info_audio)
+        TvTrackInfo.TYPE_SUBTITLE -> getString(R.string.system_info_subtitle)
+        else -> getString(R.string.unknown_value)
+    }
+
+    private fun String?.orUnknown(): String = this?.takeIf(String::isNotBlank)
+        ?: getString(R.string.unknown_value)
+
+    private fun yesNo(value: Boolean): String = getString(if (value) R.string.yes else R.string.no)
 
     private fun openExternalPlayer(channel: LiveChannel) {
         val preference = ExternalPlayerPreferencesStore(this).load()
@@ -4230,31 +4333,12 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val tvUri = requestedTvChannelUri(intent)
-        if (tvUri != null) {
-            channels.firstOrNull { it.source == LiveChannel.Source.TIF && it.uri == tvUri }
-                ?.let(::selectChannel) ?: run {
-                    pendingTvChannelUri = tvUri
-                    loadChannels(preserveCurrentPlayback = true)
-                }
-            return
-        }
         val sourceKey = intent.data?.getQueryParameter("sourceKey") ?: return
         channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
             ?: run {
                 pendingHomeChannelKey = sourceKey
                 loadChannels(preserveCurrentPlayback = true)
             }
-    }
-
-    private fun requestedTvChannelUri(intent: Intent): String? {
-        val uri = intent.data ?: return null
-        if (intent.action != Intent.ACTION_VIEW || uri.scheme != "content" ||
-            uri.authority != "android.media.tv") return null
-        val parts = uri.pathSegments
-        return uri.toString().takeIf {
-            parts.size == 2 && parts[0] == "channel" && parts[1].toLongOrNull() != null
-        }
     }
 
 }

@@ -6,8 +6,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Kanal sistem bilgileri
+* Kanal listesindeki uzun OK menüsüne kanal/TIF alanlarını ve canlı track verilerini key/value biçiminde gösteren kaydırılabilir Sistem bilgileri paneli eklendi.
+
 ### Sistem TV seçicisi ve DTV video boyutu
-* Standart Android kanal açma isteklerinde TVApp artık uygulama seçicisine adaydır; kanal URI'si varsa mevcut kanal listesiyle eşleştirilir.
 * DTV kalite rozeti TIF video boyutu bildirimlerini de kullanır; video kullanılabilir olduğunda track bilgileri yeniden okunur.
 * DTV teknik veri uyuşmazlıklarını cihaz üzerinde incelemek için kanal, track ve video boyutunun ham TIF alanları debug günlüğüne yazılır.
 

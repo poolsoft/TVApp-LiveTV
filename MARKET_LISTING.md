@@ -5,8 +5,6 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 ## Türkçe
 
-Sistem entegrasyonu: Standart TV kanal açma isteklerinde TVApp seçilebilir; kullanılabilirlik cihaz yazılımına bağlıdır.
-
 ### Uygulama adı
 
 `TVApp: Canlı TV ve IPTV`

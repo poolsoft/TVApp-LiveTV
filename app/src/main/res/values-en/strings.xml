@@ -1,6 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tv_default_guide">System TV chooser: When TVApp appears, select it and choose Always to make it the default. This applies to standard TV launch requests supported by your device.</string>
+    <string name="system_information">System information</string>
+    <string name="system_information_channel">System information · %1$s</string>
+    <string name="system_info_source">Source</string>
+    <string name="system_info_channel_id">Channel ID</string>
+    <string name="system_info_source_key">Source key</string>
+    <string name="system_info_input_id">TIF input ID</string>
+    <string name="system_info_channel_uri">Channel URI</string>
+    <string name="system_info_channel_number">Channel number</string>
+    <string name="system_info_channel_name">Channel name</string>
+    <string name="system_info_service_type">Service type</string>
+    <string name="system_info_video_format">TIF video format</string>
+    <string name="system_info_quality">Calculated quality</string>
+    <string name="system_info_encrypted">Encrypted</string>
+    <string name="system_info_locked">Locked</string>
+    <string name="system_info_tracks">Live track information</string>
+    <string name="system_info_tracks_not_reported">TIF did not report tracks for this channel.</string>
+    <string name="system_info_tracks_current_only">Available only for the channel currently playing.</string>
+    <string name="system_info_track_index">Track %1$d</string>
+    <string name="system_info_track_type">Type</string>
+    <string name="system_info_language">Language</string>
+    <string name="system_info_description">Description</string>
+    <string name="system_info_resolution">Resolution</string>
+    <string name="system_info_pixel_ratio">Pixel ratio</string>
+    <string name="system_info_audio_channels">Audio channels</string>
+    <string name="system_info_sample_rate">Sample rate</string>
+    <string name="system_info_video">Video</string>
+    <string name="system_info_audio">Audio</string>
+    <string name="system_info_subtitle">Subtitle</string>
+    <string name="unknown_value">Unknown</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
     <string name="app_name">TV App</string>
     <string name="live_tv">Live TV</string>
     <string name="channels">Channels</string>

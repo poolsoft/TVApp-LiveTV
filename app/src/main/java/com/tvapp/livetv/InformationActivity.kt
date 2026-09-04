@@ -26,7 +26,7 @@ class InformationActivity : AppCompatActivity() {
 
         if (intent.getStringExtra(EXTRA_PAGE) == PAGE_GUIDE) {
             title.setText(R.string.user_guide)
-            body.text = getString(R.string.user_guide_content) + "\n\n" + getString(R.string.tv_default_guide)
+            body.setText(R.string.user_guide_content)
         } else {
             title.setText(R.string.about)
             body.setText(R.string.loading)

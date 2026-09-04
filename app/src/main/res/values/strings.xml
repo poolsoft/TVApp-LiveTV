@@ -1,6 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tv_default_guide">Sistem TV seçicisi: TVApp görünüyorsa seçip Her zaman ile varsayılan yapabilirsiniz. Bu seçenek cihazın standart TV açma istekleri için geçerlidir.</string>
+    <string name="system_information">Sistem bilgileri</string>
+    <string name="system_information_channel">Sistem bilgileri · %1$s</string>
+    <string name="system_info_source">Kaynak</string>
+    <string name="system_info_channel_id">Kanal kimliği</string>
+    <string name="system_info_source_key">Kaynak anahtarı</string>
+    <string name="system_info_input_id">TIF giriş kimliği</string>
+    <string name="system_info_channel_uri">Kanal URI</string>
+    <string name="system_info_channel_number">Kanal numarası</string>
+    <string name="system_info_channel_name">Kanal adı</string>
+    <string name="system_info_service_type">Servis türü</string>
+    <string name="system_info_video_format">TIF video biçimi</string>
+    <string name="system_info_quality">Hesaplanan kalite</string>
+    <string name="system_info_encrypted">Şifreli</string>
+    <string name="system_info_locked">Kilitli</string>
+    <string name="system_info_tracks">Canlı track bilgileri</string>
+    <string name="system_info_tracks_not_reported">TIF bu kanal için track bildirmedi.</string>
+    <string name="system_info_tracks_current_only">Yalnız o anda oynayan kanal için alınabilir.</string>
+    <string name="system_info_track_index">Track %1$d</string>
+    <string name="system_info_track_type">Tür</string>
+    <string name="system_info_language">Dil</string>
+    <string name="system_info_description">Açıklama</string>
+    <string name="system_info_resolution">Çözünürlük</string>
+    <string name="system_info_pixel_ratio">Piksel oranı</string>
+    <string name="system_info_audio_channels">Ses kanalı</string>
+    <string name="system_info_sample_rate">Örnekleme hızı</string>
+    <string name="system_info_video">Video</string>
+    <string name="system_info_audio">Ses</string>
+    <string name="system_info_subtitle">Altyazı</string>
+    <string name="unknown_value">Bilinmiyor</string>
+    <string name="yes">Evet</string>
+    <string name="no">Hayır</string>
     <string name="app_name">TV App</string>
     <string name="live_tv">Canlı TV</string>
     <string name="channels">Kanallar</string>
