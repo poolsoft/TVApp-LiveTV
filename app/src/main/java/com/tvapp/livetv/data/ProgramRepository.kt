@@ -143,6 +143,26 @@ class ProgramRepository(context: Context) {
         }.orEmpty()
     }
 
+    fun currentProgramsForChannels(
+        channels: List<LiveChannel>,
+        now: Long = System.currentTimeMillis(),
+    ): Map<Long, ProgramSummary> {
+        if (channels.isEmpty()) return emptyMap()
+        val tifIds = channels.asSequence()
+            .filter { it.source == LiveChannel.Source.TIF }
+            .map { it.id }
+            .toSet()
+        val resultMap = currentPrograms(tifIds, now).toMutableMap()
+        val iptvChannels = channels.filter { it.source == LiveChannel.Source.IPTV }
+        for (channel in iptvChannels) {
+            val prog = xmlTvRepository.nowAndNext(channel, now).current
+            if (prog != null) {
+                resultMap[channel.id] = prog
+            }
+        }
+        return resultMap
+    }
+
     fun programsForChannel(
         channelId: Long,
         startTimeMillis: Long,

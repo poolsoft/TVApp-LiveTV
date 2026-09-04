@@ -322,10 +322,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        iptvPlayback.onPlaybackError = ::handleIptvPlaybackError
+        iptvPlayback.onPlaybackError = { error ->
+            binding.iptvBufferingContainer.visibility = View.GONE
+            handleIptvPlaybackError(error)
+        }
         iptvPlayback.onPlaybackReady = {
             val recoveredFromFailure = iptvPlaybackFailed
             iptvPlaybackFailed = false
+            binding.iptvBufferingContainer.visibility = View.GONE
             if (recoveredFromFailure) {
                 iptvControlsJob?.cancel()
                 binding.iptvPlaybackControls.visibility = View.GONE
@@ -335,6 +339,15 @@ class MainActivity : AppCompatActivity() {
             ) {
                 binding.statusPanel.visibility = View.GONE
             }
+            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+                currentChannel?.let(::updateTechnicalBadgesForIptv)
+            }
+        }
+        iptvPlayback.onBuffering = { isBuffering ->
+            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+                binding.iptvBufferingText.setText(R.string.iptv_buffering)
+                binding.iptvBufferingContainer.visibility = if (isBuffering) View.VISIBLE else View.GONE
+            }
         }
         iptvPlayback.onContentKindChanged = { kind ->
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
@@ -343,7 +356,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         iptvPlayback.onTracksChanged = {
-            if (currentChannel?.source == LiveChannel.Source.IPTV) applyPreferredIptvTracks()
+            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+                applyPreferredIptvTracks()
+                currentChannel?.let(::updateTechnicalBadgesForIptv)
+            }
         }
         adapter = ChannelAdapter(
             ::confirmListChannel,
@@ -649,6 +665,7 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             when (channel.source) {
                 LiveChannel.Source.TIF -> {
+                    binding.iptvBufferingContainer.visibility = View.GONE
                     iptvPlayback.stop()
                     binding.iptvPlayerView.visibility = View.GONE
                     binding.tvView.visibility = View.VISIBLE
@@ -658,12 +675,15 @@ class MainActivity : AppCompatActivity() {
                     playback.stop()
                     binding.tvView.visibility = View.GONE
                     binding.iptvPlayerView.visibility = View.VISIBLE
+                    binding.iptvBufferingText.setText(R.string.iptv_connecting)
+                    binding.iptvBufferingContainer.visibility = View.VISIBLE
                     val resumePosition = if (channel.iptvContentType == "VOD") {
                         iptvResumeStore.position(channel.sourceKey)
                     } else {
                         0L
                     }
                     prepareIptvAlternatives(channel)
+                    updateTechnicalBadgesForIptv(channel)
                     iptvPlayback.play(channel, resumePosition)
                     if (resumePosition > 0L) {
                         showIptvPlaybackControls(R.string.iptv_resumed)
@@ -672,6 +692,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
             .onFailure {
+                binding.iptvBufferingContainer.visibility = View.GONE
                 debugLog.recordDebug("PLAYBACK_FAILURE | ${it.javaClass.name}: ${it.message}")
                 if (channel.source == LiveChannel.Source.IPTV) {
                     showIptvPlaybackFailure()
@@ -904,7 +925,7 @@ class MainActivity : AppCompatActivity() {
         channelProgramsJob = lifecycleScope.launch {
             val loadedPrograms = withContext(Dispatchers.IO) {
                 runCatching {
-                    programRepository.currentPrograms(loaded.mapTo(mutableSetOf()) { it.id })
+                    programRepository.currentProgramsForChannels(loaded)
                 }.getOrDefault(emptyMap())
             }
             currentPrograms = currentPrograms + loadedPrograms
@@ -1314,6 +1335,69 @@ class MainActivity : AppCompatActivity() {
             hasTeletext,
             channel.encrypted || channel.locked ||
                 parentalControlStore.isLocked(channel.sourceKey),
+        )
+        val slots = listOf(
+            binding.techSlotSource,
+            binding.techSlotQualityBadge,
+            binding.techSlotAudio,
+            binding.techSlotSubtitle,
+            binding.techSlotTxt,
+            binding.techSlotLock,
+        )
+        slots.forEachIndexed { index, slot ->
+            slot.visibility = if (activeSlots[index]) View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun updateTechnicalBadgesForIptv(channel: LiveChannel) {
+        if (channel.source != LiveChannel.Source.IPTV) return
+        val info = iptvPlayback.currentTechnicalInfo()
+        val width = info.width ?: 0
+        val height = info.height ?: 0
+        val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
+        val channelName = channel.displayName.uppercase(Locale.ROOT)
+        val radio = channel.isRadioChannel()
+        val quality = when {
+            radio -> null
+            width >= 3_840 || height >= 2_160 || "2160" in format || "4320" in format ||
+                "4K" in channelName || "UHD" in channelName -> "4K"
+            width >= 1_920 || height >= 1_080 || "1080" in format -> "FHD"
+            width >= 1_280 || height >= 720 || "720" in format ||
+                "HD" in channelName -> "HD"
+            width > 0 || height > 0 -> "SD"
+            "HD" in channelName -> "HD"
+            else -> "SD"
+        }
+        binding.qualityBadge.visibility = View.GONE
+        binding.radioBadge.visibility = View.GONE
+        if (radio) {
+            binding.radioBadge.visibility = View.VISIBLE
+        } else {
+            binding.qualityBadge.text = quality
+            binding.qualityBadge.visibility = View.VISIBLE
+        }
+        binding.sourceBadgeIcon.setImageResource(R.drawable.ic_source_iptv)
+        binding.lockBadge.visibility = if (
+            channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey)
+        ) View.VISIBLE else View.GONE
+
+        binding.dolbyBadge.visibility = if (info.hasDolby) View.VISIBLE else View.GONE
+        val audioLang = info.audioLanguage?.let(::displayLanguage)
+        binding.audioBadge.text = audioLang ?: if (info.hasAudio) "1" else null
+        binding.audioBadge.visibility = if (!info.hasAudio || info.hasDolby) View.GONE else View.VISIBLE
+
+        val subLang = info.subtitleLanguage?.let(::displayLanguage)
+        binding.subtitleBadge.text = subLang ?: if (info.hasSubtitles) "1" else null
+        binding.subtitleBadge.visibility = if (info.hasSubtitles) View.VISIBLE else View.GONE
+        binding.txtBadge.visibility = View.GONE
+
+        val activeSlots = booleanArrayOf(
+            true,
+            true,
+            info.hasAudio,
+            info.hasSubtitles,
+            false,
+            channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey),
         )
         val slots = listOf(
             binding.techSlotSource,
@@ -3898,8 +3982,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 KeyEvent.KEYCODE_WINDOW -> enterTvPictureInPicture()
                 KeyEvent.KEYCODE_LANGUAGE_SWITCH,
-                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> showAudioTracks()
-                KeyEvent.KEYCODE_CAPTIONS -> showSubtitleTracks()
+                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+                KeyEvent.KEYCODE_TV_AUDIO_DESCRIPTION -> showAudioTracks()
+                KeyEvent.KEYCODE_CAPTIONS,
+                175 -> showSubtitleTracks()
                 KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
                 KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
                 KeyEvent.KEYCODE_INFO -> if (binding.infoBar.visibility == View.VISIBLE) {

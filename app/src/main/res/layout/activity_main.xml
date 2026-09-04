@@ -299,6 +299,37 @@
         android:visibility="gone" />
 
     <LinearLayout
+        android:id="@+id/iptv_buffering_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_status"
+        android:elevation="32dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="12dp"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/iptv_buffering_spinner"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:indeterminateTint="@color/accent" />
+
+        <TextView
+            android:id="@+id/iptv_buffering_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/iptv_connecting"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/channel_panel"
         android:layout_width="480dp"
         android:layout_height="match_parent"

@@ -21,6 +21,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
+import java.util.Locale
 
 @OptIn(UnstableApi::class)
 class IptvPlaybackController(
@@ -44,6 +45,7 @@ class IptvPlaybackController(
     }
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
     var onPlaybackReady: (() -> Unit)? = null
+    var onBuffering: ((Boolean) -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
 
@@ -67,11 +69,20 @@ class IptvPlaybackController(
             .build().also { created ->
             created.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        retryHandler.removeCallbacks(retryRunnable)
-                        retryCount = 0
-                        onPlaybackReady?.invoke()
-                        onContentKindChanged?.invoke(contentKind())
+                    when (playbackState) {
+                        Player.STATE_BUFFERING -> {
+                            onBuffering?.invoke(true)
+                        }
+                        Player.STATE_READY -> {
+                            retryHandler.removeCallbacks(retryRunnable)
+                            retryCount = 0
+                            onBuffering?.invoke(false)
+                            onPlaybackReady?.invoke()
+                            onContentKindChanged?.invoke(contentKind())
+                        }
+                        Player.STATE_ENDED, Player.STATE_IDLE -> {
+                            onBuffering?.invoke(false)
+                        }
                     }
                 }
 
@@ -125,6 +136,7 @@ class IptvPlaybackController(
     fun stop() {
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
+        onBuffering?.invoke(false)
         player?.stop()
         player?.clearMediaItems()
     }
@@ -366,10 +378,46 @@ class IptvPlaybackController(
     fun release() {
         released = true
         retryHandler.removeCallbacks(retryRunnable)
+        onBuffering?.invoke(false)
         playerView.player = null
         player?.release()
         player = null
         mediaSourceFactory = null
+    }
+
+    fun currentTechnicalInfo(): IptvTechnicalSnapshot {
+        val p = player ?: return IptvTechnicalSnapshot()
+        val videoFormat = p.videoFormat
+        val videoWidth = videoFormat?.width?.takeIf { it > 0 } ?: p.videoSize.width.takeIf { it > 0 }
+        val videoHeight = videoFormat?.height?.takeIf { it > 0 } ?: p.videoSize.height.takeIf { it > 0 }
+        val audioList = audioTracks()
+        val subList = subtitleTracks()
+        val allTrackFormats = p.currentTracks.groups.flatMap { group ->
+            (0 until group.length).map { group.getTrackFormat(it) }
+        }
+        val hasDolby = allTrackFormats.any { fmt ->
+            val mime = (fmt.sampleMimeType ?: "").lowercase(Locale.ROOT)
+            val code = (fmt.codecs ?: "").lowercase(Locale.ROOT)
+            mime.contains("ac3") || mime.contains("eac3") || mime.contains("dolby") ||
+                code.contains("ac-3") || code.contains("ec-3")
+        }
+        val firstAudioLang = audioList.firstOrNull { it.selected }?.language
+            ?: audioList.firstOrNull()?.language
+        val firstSubLang = subList.firstOrNull { it.selected }?.language
+            ?: subList.firstOrNull()?.language
+        return IptvTechnicalSnapshot(
+            width = videoWidth,
+            height = videoHeight,
+            videoCodec = videoFormat?.sampleMimeType,
+            audioCodec = if (hasDolby) "dolby" else null,
+            bitrate = videoFormat?.bitrate?.takeIf { it > 0 },
+            bufferedDurationMillis = p.totalBufferedDuration,
+            hasAudio = audioList.isNotEmpty(),
+            hasSubtitles = subList.isNotEmpty(),
+            audioLanguage = firstAudioLang,
+            subtitleLanguage = firstSubLang,
+            hasDolby = hasDolby,
+        )
     }
 
     private fun resetProgressObservation() {
@@ -382,8 +430,8 @@ class IptvPlaybackController(
         const val RETRY_BASE_DELAY_MS = 1_000L
         const val MIN_BUFFER_MS = 1_500
         const val MAX_BUFFER_MS = 30_000
-        const val BUFFER_FOR_PLAYBACK_MS = 700
-        const val BUFFER_AFTER_REBUFFER_MS = 1_500
+        const val BUFFER_FOR_PLAYBACK_MS = 500
+        const val BUFFER_AFTER_REBUFFER_MS = 1_000
 
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
@@ -419,10 +467,15 @@ data class IptvTrackOption(
 )
 
 data class IptvTechnicalSnapshot(
-    val width: Int?,
-    val height: Int?,
-    val videoCodec: String?,
-    val audioCodec: String?,
-    val bitrate: Int?,
-    val bufferedDurationMillis: Long,
+    val width: Int? = null,
+    val height: Int? = null,
+    val videoCodec: String? = null,
+    val audioCodec: String? = null,
+    val bitrate: Int? = null,
+    val bufferedDurationMillis: Long = 0L,
+    val hasAudio: Boolean = false,
+    val hasSubtitles: Boolean = false,
+    val audioLanguage: String? = null,
+    val subtitleLanguage: String? = null,
+    val hasDolby: Boolean = false,
 )

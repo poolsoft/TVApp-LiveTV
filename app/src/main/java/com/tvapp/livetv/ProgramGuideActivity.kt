@@ -99,12 +99,7 @@ class ProgramGuideActivity : AppCompatActivity() {
             channels = loaded
             val currentPrograms = withContext(Dispatchers.IO) {
                 runCatching {
-                    programRepository.currentPrograms(
-                        loaded.asSequence()
-                            .filter { it.source == LiveChannel.Source.TIF }
-                            .map { it.id }
-                            .toSet(),
-                    )
+                    programRepository.currentProgramsForChannels(loaded)
                 }.getOrDefault(emptyMap())
             }
             channelAdapter.submitList(loaded, currentPrograms)
