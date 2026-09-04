@@ -13,9 +13,6 @@ import android.os.Bundle
 import android.graphics.Rect
 import android.util.Rational
 import android.text.InputType
-import android.text.SpannableStringBuilder
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -76,6 +73,7 @@ import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
 import com.tvapp.livetv.ui.ParentalPinDialog
+import com.tvapp.livetv.ui.VideoQuality
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1349,22 +1347,15 @@ class MainActivity : AppCompatActivity() {
     private fun updateTechnicalBadges(channel: LiveChannel, tracks: List<TvTrackInfo>) {
         val videoTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_VIDEO }
         val width = videoTrack?.videoWidth ?: 0
+        val height = videoTrack?.videoHeight ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
-        val channelName = channel.displayName.uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = when {
-            radio -> null
-            width >= 3_840 || "2160" in format || "4320" in format ||
-                "4K" in channelName || "UHD" in channelName -> "4K"
-            width >= 1_280 || "720" in format || "1080" in format ||
-                "HD" in channelName -> "HD"
-            else -> "SD"
-        }
+        val quality = if (radio) null else VideoQuality.label(width, height, format)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
             binding.radioBadge.visibility = View.VISIBLE
-        } else {
+        } else if (quality != null) {
             binding.qualityBadge.text = quality
             binding.qualityBadge.visibility = View.VISIBLE
         }
@@ -1408,7 +1399,7 @@ class MainActivity : AppCompatActivity() {
 
         val activeSlots = booleanArrayOf(
             true,
-            true,
+            radio || quality != null,
             audioTracks.isNotEmpty(),
             subtitleTracks.isNotEmpty(),
             hasTeletext,
@@ -1437,24 +1428,13 @@ class MainActivity : AppCompatActivity() {
         val width = info.width ?: 0
         val height = info.height ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
-        val channelName = channel.displayName.uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = when {
-            radio -> null
-            width >= 3_840 || height >= 2_160 || "2160" in format || "4320" in format ||
-                "4K" in channelName || "UHD" in channelName -> "4K"
-            width >= 1_920 || height >= 1_080 || "1080" in format -> "FHD"
-            width >= 1_280 || height >= 720 || "720" in format ||
-                "HD" in channelName -> "HD"
-            width > 0 || height > 0 -> "SD"
-            "HD" in channelName -> "HD"
-            else -> "SD"
-        }
+        val quality = if (radio) null else VideoQuality.label(width, height, format)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
             binding.radioBadge.visibility = View.VISIBLE
-        } else {
+        } else if (quality != null || info.isAdaptive) {
             val qualityText = if (info.isAdaptive) {
                 if (quality != null) "$quality · ABR" else "ABR"
             } else {
@@ -1480,7 +1460,7 @@ class MainActivity : AppCompatActivity() {
 
         val activeSlots = booleanArrayOf(
             true,
-            true,
+            radio || quality != null || info.isAdaptive,
             info.hasAudio,
             info.hasSubtitles,
             false,
@@ -3390,23 +3370,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateInfoColorActions() {
-        val text = SpannableStringBuilder()
+        binding.infoColorActions.removeAllViews()
         fun action(color: Int, label: Int) {
-            if (text.isNotEmpty()) text.append(",  ")
-            val start = text.length
-            text.append("●")
-            text.setSpan(
-                ForegroundColorSpan(ContextCompat.getColor(this, color)),
-                start,
-                text.length,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
-            text.append(" ").append(getString(label))
+            if (binding.infoColorActions.childCount > 0) {
+                binding.infoColorActions.addView(TextView(this).apply {
+                    text = ","
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    textSize = 11f
+                    setPadding(dp(7), 0, dp(7), 0)
+                })
+            }
+            binding.infoColorActions.addView(View(this).apply {
+                background = ContextCompat.getDrawable(this@MainActivity, colorKeyDrawable(color))
+            }, LinearLayout.LayoutParams(dp(17), dp(17)))
+            binding.infoColorActions.addView(TextView(this).apply {
+                setText(label)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                textSize = 11f
+                setPadding(dp(5), 0, 0, 0)
+            })
         }
         action(R.color.remote_green, R.string.iptv_grid)
         action(R.color.remote_blue, R.string.settings_short)
-        binding.infoColorActions.text = text
     }
+
+    private fun colorKeyDrawable(color: Int): Int = when (color) {
+        R.color.remote_red -> R.drawable.key_red
+        R.color.remote_green -> R.drawable.key_green
+        R.color.remote_yellow -> R.drawable.key_yellow
+        else -> R.drawable.key_blue
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun setInfoBarVisible(visible: Boolean) {
         val visibility = if (visible) View.VISIBLE else View.GONE

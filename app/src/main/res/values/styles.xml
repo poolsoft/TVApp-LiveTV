@@ -38,6 +38,16 @@
         <item name="android:colorAccent">@color/accent</item>
     </style>
 
+    <style name="Theme.TVApp.Dialog" parent="ThemeOverlay.AppCompat.Dialog.Alert">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@drawable/bg_status</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="colorControlNormal">@color/text_secondary</item>
+        <item name="colorControlActivated">@color/accent</item>
+    </style>
+
     <style name="SettingsSectionTitle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

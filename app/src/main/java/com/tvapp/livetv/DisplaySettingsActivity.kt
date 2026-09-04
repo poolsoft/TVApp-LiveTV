@@ -481,7 +481,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
             getString(R.string.xmltv_from_file),
             getString(R.string.xmltv_clear),
         )
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.xmltv_alternative_epg)
             .setMessage(xmlTvRepository.sourceLabel() ?: getString(R.string.xmltv_not_configured))
             .setItems(actions) { _, which ->
@@ -503,18 +503,45 @@ class DisplaySettingsActivity : AppCompatActivity() {
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setText(xmlTvRepository.sourceLabel()?.takeIf { it.startsWith("http") }.orEmpty())
+            hint = getString(R.string.xmltv_url_hint)
             setSingleLine()
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            setBackgroundResource(R.drawable.bg_focusable)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
         }
-        AlertDialog.Builder(this)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(
+                input,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.xmltv_from_url)
-            .setView(input)
-            .setPositiveButton(R.string.update) { _, _ ->
-                input.text.toString().trim().takeIf { it.startsWith("http") }?.let { url ->
+            .setView(container)
+            .setPositiveButton(R.string.update, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString().trim()
+                val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+                if (scheme == "http" || scheme == "https") {
+                    dialog.dismiss()
                     importXmlTv { xmlTvRepository.importUrl(url) }
+                } else {
+                    input.error = getString(R.string.xmltv_url_invalid)
+                    input.requestFocus()
                 }
             }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+            input.requestFocus()
+        }
+        dialog.show()
     }
 
     private fun importXmlTv(action: () -> Int) {

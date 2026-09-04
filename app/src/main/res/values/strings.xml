@@ -117,12 +117,12 @@
     <string name="iptv_vod_paused">Duraklatıldı</string>
     <string name="iptv_vod_stopped">Durduruldu</string>
     <string name="iptv_vod_remote_hint">←/→ 30 sn    OK Oynat/Duraklat    BACK Kapat</string>
-    <string name="iptv_action_live">● Canlı</string>
-    <string name="iptv_action_restart">● Baştan oynat</string>
-    <string name="iptv_action_audio">● Ses</string>
-    <string name="iptv_action_subtitle">● Altyazı</string>
-    <string name="iptv_action_external">● Dış oynatıcı</string>
-    <string name="iptv_action_video">● Görüntü</string>
+    <string name="iptv_action_live">Canlı</string>
+    <string name="iptv_action_restart">Baştan oynat</string>
+    <string name="iptv_action_audio">Ses</string>
+    <string name="iptv_action_subtitle">Altyazı</string>
+    <string name="iptv_action_external">Dış oynatıcı</string>
+    <string name="iptv_action_video">Görüntü</string>
     <string name="iptv_video_options">Görüntü seçenekleri</string>
     <string name="iptv_quality">Yayın kalitesi</string>
     <string name="iptv_quality_action">Yayın kalitesi (Çözünürlük)</string>
@@ -133,7 +133,7 @@
     <string name="iptv_aspect_zoom">Yakınlaştır</string>
     <string name="iptv_alternative_stream">Alternatif yayın deneniyor</string>
     <string name="iptv_stream_failed">Yayın durdu · Kırmızı: Yenile · Back: Kapat</string>
-    <string name="iptv_action_refresh">● Yenile</string>
+    <string name="iptv_action_refresh">Yenile</string>
     <string name="in_main_channel_list">Ana kanal listesinde</string>
     <string name="iptv_resumed">Kaldığın yerden devam ediliyor</string>
     <string name="iptv_reconnecting">Yayın yeniden bağlanıyor</string>
@@ -150,6 +150,8 @@
     <string name="xmltv_import_complete">%1$d program içe aktarıldı.</string>
     <string name="xmltv_cleared">Alternatif EPG temizlendi.</string>
     <string name="xmltv_import_failed">XMLTV alınamadı: %1$s</string>
+    <string name="xmltv_url_hint">https://ornek.com/epg.xml veya epg.xml.gz</string>
+    <string name="xmltv_url_invalid">Geçerli bir HTTP veya HTTPS adresi girin.</string>
     <string name="not_configured_short">Ayarlanmadı</string>
     <string name="logo_cache_enabled">Kanal logosu önbelleği</string>
     <string name="logo_cache_size">Logo önbelleği sınırı</string>
