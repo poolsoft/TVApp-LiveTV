@@ -362,7 +362,8 @@
     <string name="iptv_action_video">● Video</string>
     <string name="iptv_video_options">Video options</string>
     <string name="iptv_quality">Stream quality</string>
-    <string name="iptv_quality_auto">Automatic</string>
+    <string name="iptv_quality_action">Stream quality (Resolution)</string>
+    <string name="iptv_quality_auto">Automatic (Speed-adaptive)</string>
     <string name="iptv_aspect_ratio">Aspect ratio</string>
     <string name="iptv_aspect_fit">Fit to screen</string>
     <string name="iptv_aspect_fill">Fill screen</string>

@@ -19,6 +19,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import java.util.Locale
@@ -30,6 +33,8 @@ class IptvPlaybackController(
 ) {
     private val appContext = context.applicationContext
     private val retryHandler = Handler(Looper.getMainLooper())
+    private val bandwidthMeter = DefaultBandwidthMeter.Builder(appContext).build()
+    private var trackSelector: DefaultTrackSelector? = null
     private var player: ExoPlayer? = null
     private var mediaSourceFactory: MediaSource.Factory? = null
     private var retryCount = 0
@@ -64,7 +69,18 @@ class IptvPlaybackController(
                 BUFFER_AFTER_REBUFFER_MS,
             )
             .build()
+        val trackSelectionFactory = AdaptiveTrackSelection.Factory(
+            ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
+            ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
+            ADAPTIVE_MIN_DURATION_TO_RETAIN_MS,
+            ADAPTIVE_BANDWIDTH_FRACTION,
+        )
+        val selector = trackSelector ?: DefaultTrackSelector(appContext, trackSelectionFactory).also {
+            trackSelector = it
+        }
         val exoPlayer = player ?: ExoPlayer.Builder(appContext)
+            .setBandwidthMeter(bandwidthMeter)
+            .setTrackSelector(selector)
             .setLoadControl(loadControl)
             .build().also { created ->
             created.addListener(object : Player.Listener {
@@ -120,7 +136,7 @@ class IptvPlaybackController(
         }
         val mediaItem = mediaItemBuilder.build()
         val sourceFactory = DefaultMediaSourceFactory(
-            DefaultDataSource.Factory(appContext, dataSource),
+            DefaultDataSource.Factory(appContext, dataSource).setTransferListener(bandwidthMeter),
         )
         mediaSourceFactory = sourceFactory
         val mediaSource = sourceFactory.createMediaSource(mediaItem)
@@ -382,6 +398,7 @@ class IptvPlaybackController(
         playerView.player = null
         player?.release()
         player = null
+        trackSelector = null
         mediaSourceFactory = null
     }
 
@@ -390,6 +407,9 @@ class IptvPlaybackController(
         val videoFormat = p.videoFormat
         val videoWidth = videoFormat?.width?.takeIf { it > 0 } ?: p.videoSize.width.takeIf { it > 0 }
         val videoHeight = videoFormat?.height?.takeIf { it > 0 } ?: p.videoSize.height.takeIf { it > 0 }
+        val videoList = videoTracks()
+        val isAdaptive = videoList.size > 1 && selectedVideoTrackId == null
+        val estimatedBw = bandwidthMeter.bitrateEstimate.takeIf { it > 0 }
         val audioList = audioTracks()
         val subList = subtitleTracks()
         val allTrackFormats = p.currentTracks.groups.flatMap { group ->
@@ -417,6 +437,8 @@ class IptvPlaybackController(
             audioLanguage = firstAudioLang,
             subtitleLanguage = firstSubLang,
             hasDolby = hasDolby,
+            isAdaptive = isAdaptive,
+            estimatedBandwidthBps = estimatedBw,
         )
     }
 
@@ -428,10 +450,14 @@ class IptvPlaybackController(
     private companion object {
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
-        const val MIN_BUFFER_MS = 1_500
+        const val MIN_BUFFER_MS = 4_000
         const val MAX_BUFFER_MS = 30_000
         const val BUFFER_FOR_PLAYBACK_MS = 500
-        const val BUFFER_AFTER_REBUFFER_MS = 1_000
+        const val BUFFER_AFTER_REBUFFER_MS = 2_500
+        const val ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 2_500
+        const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
+        const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
+        const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
 
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
@@ -478,4 +504,6 @@ data class IptvTechnicalSnapshot(
     val audioLanguage: String? = null,
     val subtitleLanguage: String? = null,
     val hasDolby: Boolean = false,
+    val isAdaptive: Boolean = false,
+    val estimatedBandwidthBps: Long? = null,
 )

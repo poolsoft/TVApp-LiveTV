@@ -1373,7 +1373,12 @@ class MainActivity : AppCompatActivity() {
         if (radio) {
             binding.radioBadge.visibility = View.VISIBLE
         } else {
-            binding.qualityBadge.text = quality
+            val qualityText = if (info.isAdaptive) {
+                if (quality != null) "$quality · ABR" else "ABR"
+            } else {
+                quality
+            }
+            binding.qualityBadge.text = qualityText
             binding.qualityBadge.visibility = View.VISIBLE
         }
         binding.sourceBadgeIcon.setImageResource(R.drawable.ic_source_iptv)
@@ -2648,6 +2653,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (channel.source == LiveChannel.Source.IPTV) {
+            if (channel.sourceKey == currentChannel?.sourceKey) {
+                action(getString(R.string.iptv_quality_action)) { showIptvVideoQuality() }
+            }
             action(getString(R.string.open_external_player)) { openExternalPlayer(channel) }
             action(getString(R.string.add_external_subtitle)) {
                 openExternalSubtitle.launch(

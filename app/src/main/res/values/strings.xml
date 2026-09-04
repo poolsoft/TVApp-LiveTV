@@ -125,7 +125,8 @@
     <string name="iptv_action_video">● Görüntü</string>
     <string name="iptv_video_options">Görüntü seçenekleri</string>
     <string name="iptv_quality">Yayın kalitesi</string>
-    <string name="iptv_quality_auto">Otomatik</string>
+    <string name="iptv_quality_action">Yayın kalitesi (Çözünürlük)</string>
+    <string name="iptv_quality_auto">Otomatik (Hıza göre adaptif)</string>
     <string name="iptv_aspect_ratio">Görüntü oranı</string>
     <string name="iptv_aspect_fit">Ekrana sığdır</string>
     <string name="iptv_aspect_fill">Ekranı doldur</string>
