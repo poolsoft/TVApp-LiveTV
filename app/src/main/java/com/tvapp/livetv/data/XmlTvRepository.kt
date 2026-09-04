@@ -5,6 +5,7 @@ import android.app.job.JobInfo
 import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.net.Uri
+import android.os.PersistableBundle
 import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
@@ -78,6 +79,25 @@ class XmlTvRepository(context: Context) {
         )
     }
 
+    fun requestXtreamRefresh(force: Boolean = false) {
+        val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        val pendingForce = scheduler.getPendingJob(XTREAM_REFRESH_JOB_ID)
+            ?.extras
+            ?.getBoolean(EXTRA_FORCE_REFRESH, false) == true
+        scheduler.schedule(
+            JobInfo.Builder(
+                XTREAM_REFRESH_JOB_ID,
+                ComponentName(appContext, XmlTvRefreshJobService::class.java),
+            )
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setMinimumLatency(XTREAM_REFRESH_DELAY_MS)
+                .setExtras(PersistableBundle().apply {
+                    putBoolean(EXTRA_FORCE_REFRESH, force || pendingForce)
+                })
+                .build(),
+        )
+    }
+
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
         val programs = programs(channel, now - 6 * 60 * 60_000L, now + 72 * 60 * 60_000L)
         val current = programs.firstOrNull { now in it.startTimeMillis until it.endTimeMillis }
@@ -89,15 +109,13 @@ class XmlTvRepository(context: Context) {
         migrateLegacyCacheIfNeeded()
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
-        val xmlTv = dao.programs(epgId.orEmpty(), name, start, end)
-        if (xmlTv.isNotEmpty()) {
-            return xmlTv.map {
-                ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
-            }
-        }
-        return xtreamEpgDao.programs(epgId.orEmpty(), name, start, end).map {
+        val xmlTv = dao.programs(epgId.orEmpty(), name, start, end).map {
             ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
         }
+        val xtream = xtreamEpgDao.programs(epgId.orEmpty(), name, start, end).map {
+            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
+        }
+        return mergeProgramSources(xmlTv, xtream)
     }
 
     fun currentPrograms(
@@ -191,6 +209,8 @@ class XmlTvRepository(context: Context) {
         }
         val programs = ArrayList<XtreamEpgProgramEntity>()
         var queriedChannels = 0
+        var successfulQueries = 0
+        val failedChannels = linkedSetOf<Pair<String, String>>()
         for (source in sources) {
             val channels = iptvDao.getSelectedChannelsForSource(source.id)
                 .asSequence()
@@ -207,15 +227,16 @@ class XmlTvRepository(context: Context) {
                 source.password.orEmpty(),
             )
             for ((channel, streamId) in channels) {
+                val channelId = channel.tvgId?.trim()?.takeIf(String::isNotBlank) ?: streamId
+                val channelName = channel.displayName.trim().ifBlank { channelId }
                 val listings = try {
-                    client.shortEpg(streamId)
+                    client.shortEpg(streamId).also { successfulQueries++ }
                 } catch (ignored: Exception) {
+                    failedChannels += channelId.normalize() to channelName.normalize()
                     emptyList()
                 }
                 queriedChannels++
                 if (listings.isEmpty()) continue
-                val channelId = channel.tvgId?.trim()?.takeIf(String::isNotBlank) ?: streamId
-                val channelName = channel.displayName.trim().ifBlank { channelId }
                 for (listing in listings) {
                     programs += XtreamEpgProgramEntity(
                         channelId = channelId,
@@ -230,14 +251,31 @@ class XmlTvRepository(context: Context) {
                 }
             }
         }
+        failedChannels.forEach { (channelId, channelName) ->
+            programs += xtreamEpgDao.programs(
+                channelId,
+                channelName,
+                Long.MIN_VALUE,
+                Long.MAX_VALUE,
+            )
+        }
+        val distinctPrograms = programs.distinctBy {
+            listOf(
+                it.normalizedChannelId,
+                it.normalizedChannelName,
+                it.startTimeMillis,
+                it.endTimeMillis,
+                it.title,
+            )
+        }
         database.runInTransaction {
             xtreamEpgDao.clearPrograms()
-            programs.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
+            distinctPrograms.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
         }
-        if (queriedChannels > 0) {
+        if (queriedChannels > 0 && successfulQueries == queriedChannels) {
             preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
         }
-        return programs.size
+        return distinctPrograms.size
     }
 
     private fun importStream(stream: InputStream, label: String): Int {
@@ -346,7 +384,9 @@ class XmlTvRepository(context: Context) {
         .replace(Regex("[^a-z0-9çğıöşü]+"), "")
         .removeSuffix("hd").removeSuffix("sd").removeSuffix("4k")
 
-    private companion object {
+    companion object {
+        internal const val XTREAM_REFRESH_JOB_ID = 0x545651
+        internal const val EXTRA_FORCE_REFRESH = "force-xtream-refresh"
         const val KEY_SOURCE = "source"
         const val KEY_UPDATED = "updated"
         const val KEY_XTREAM_UPDATED = "xtream_updated"
@@ -356,5 +396,16 @@ class XmlTvRepository(context: Context) {
         const val XTREAM_MIN_INTERVAL_MS = 6 * 60 * 60 * 1_000L
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
+        private const val XTREAM_REFRESH_DELAY_MS = 1_000L
     }
 }
+
+internal fun mergeProgramSources(
+    primary: List<ProgramSummary>,
+    fallback: List<ProgramSummary>,
+): List<ProgramSummary> = (primary + fallback.filter { candidate ->
+    primary.none { preferred ->
+        candidate.startTimeMillis < preferred.endTimeMillis &&
+            candidate.endTimeMillis > preferred.startTimeMillis
+    }
+}).sortedBy(ProgramSummary::startTimeMillis)

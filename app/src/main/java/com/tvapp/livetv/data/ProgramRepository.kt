@@ -16,6 +16,15 @@ data class NowNextPrograms(
     val next: ProgramSummary?,
 )
 
+internal fun replaceCurrentPrograms(
+    existing: Map<String, ProgramSummary>,
+    refreshedChannels: Collection<LiveChannel>,
+    fresh: Map<String, ProgramSummary>,
+): Map<String, ProgramSummary> {
+    val refreshedKeys = refreshedChannels.asSequence().map(LiveChannel::sourceKey).toSet()
+    return existing.filterKeys { it !in refreshedKeys } + fresh.filterValues { it.title.isNotBlank() }
+}
+
 class ProgramRepository(context: Context) {
     private val contentResolver = context.applicationContext.contentResolver
     private val xmlTvRepository = XmlTvRepository(context)
@@ -23,14 +32,19 @@ class ProgramRepository(context: Context) {
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
         else NowNextPrograms(null, null)
-        return if (tif.current != null || tif.next != null) tif else xmlTvRepository.nowAndNext(channel, now)
+        val fallback = xmlTvRepository.nowAndNext(channel, now)
+        return NowNextPrograms(
+            current = tif.current ?: fallback.current,
+            next = tif.next ?: fallback.next,
+        )
     }
 
     fun programsForChannel(channel: LiveChannel, startTimeMillis: Long, endTimeMillis: Long): List<ProgramSummary> {
         val tif = if (channel.source == LiveChannel.Source.TIF) {
             programsForChannel(channel.id, startTimeMillis, endTimeMillis)
         } else emptyList()
-        return tif.ifEmpty { xmlTvRepository.programs(channel, startTimeMillis, endTimeMillis) }
+        val fallback = xmlTvRepository.programs(channel, startTimeMillis, endTimeMillis)
+        return mergeProgramSources(tif, fallback)
     }
 
     fun nowAndNext(channelId: Long, now: Long = System.currentTimeMillis()): NowNextPrograms {

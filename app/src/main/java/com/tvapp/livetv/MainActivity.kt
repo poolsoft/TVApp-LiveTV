@@ -44,6 +44,7 @@ import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.ProgramRepository
 import com.tvapp.livetv.data.ProgramSummary
+import com.tvapp.livetv.data.replaceCurrentPrograms
 import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
@@ -894,15 +895,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadFocusedProgram(channel: LiveChannel) {
-        if (currentPrograms[channel.sourceKey] != null) return
+        val now = System.currentTimeMillis()
+        if (currentPrograms[channel.sourceKey]?.let { now in it.startTimeMillis until it.endTimeMillis } == true) {
+            return
+        }
         focusedProgramJob?.cancel()
         focusedProgramJob = lifecycleScope.launch {
             delay(180L)
-            val current = withContext(Dispatchers.IO) {
-                runCatching { programRepository.nowAndNext(channel).current }.getOrNull()
+            val result = withContext(Dispatchers.IO) {
+                runCatching { programRepository.nowAndNext(channel).current }
             }
-            if (focusedListSourceKey != channel.sourceKey || current == null) return@launch
-            currentPrograms = currentPrograms + (channel.sourceKey to current)
+            if (focusedListSourceKey != channel.sourceKey || result.isFailure) return@launch
+            val current = result.getOrNull()
+            currentPrograms = replaceCurrentPrograms(
+                currentPrograms,
+                listOf(channel),
+                current?.let { mapOf(channel.sourceKey to it) }.orEmpty(),
+            )
             adapter.submitPrograms(currentPrograms)
         }
     }
@@ -913,37 +922,34 @@ class MainActivity : AppCompatActivity() {
         val first = layoutManager.findFirstVisibleItemPosition().takeIf { it >= 0 } ?: return
         val last = layoutManager.findLastVisibleItemPosition().takeIf { it >= first } ?: return
         val visibleChannels = panelChannels()
+        val now = System.currentTimeMillis()
         val missing = (first..last).mapNotNull { position ->
             visibleChannels.getOrNull(position)?.takeIf { channel ->
-                currentPrograms[channel.sourceKey] == null
+                currentPrograms[channel.sourceKey]?.let {
+                    now in it.startTimeMillis until it.endTimeMillis
+                } != true
             }
         }
         if (missing.isEmpty()) return
         visibleProgramsJob?.cancel()
         visibleProgramsJob = lifecycleScope.launch {
-            val programs = withContext(Dispatchers.IO) {
-                missing.mapNotNull { channel ->
-                    runCatching { programRepository.nowAndNext(channel).current }
-                        .getOrNull()
-                        ?.let { current -> channel.sourceKey to current }
-                }.toMap()
+            val result = withContext(Dispatchers.IO) {
+                runCatching { programRepository.currentProgramsForChannels(missing) }
             }
-            if (programs.isNotEmpty()) {
-                currentPrograms = currentPrograms + programs
-                adapter.submitPrograms(currentPrograms)
-            }
+            val programs = result.getOrNull() ?: return@launch
+            currentPrograms = replaceCurrentPrograms(currentPrograms, missing, programs)
+            adapter.submitPrograms(currentPrograms)
         }
     }
 
     private fun loadChannelPrograms(loaded: List<LiveChannel>) {
         channelProgramsJob?.cancel()
         channelProgramsJob = lifecycleScope.launch {
-            val loadedPrograms = withContext(Dispatchers.IO) {
-                runCatching {
-                    programRepository.currentProgramsForChannels(loaded)
-                }.getOrDefault(emptyMap())
+            val result = withContext(Dispatchers.IO) {
+                runCatching { programRepository.currentProgramsForChannels(loaded) }
             }
-            currentPrograms = currentPrograms + loadedPrograms
+            val loadedPrograms = result.getOrNull() ?: return@launch
+            currentPrograms = replaceCurrentPrograms(currentPrograms, loaded, loadedPrograms)
             adapter.submitPrograms(currentPrograms)
         }
     }
@@ -961,21 +967,14 @@ class MainActivity : AppCompatActivity() {
     private suspend fun refreshCurrentPrograms() {
         val list = channels
         if (list.isEmpty()) return
-        val fresh = withContext(Dispatchers.IO) {
-            runCatching {
-                programRepository.currentProgramsForChannels(list)
-            }.getOrDefault(emptyMap())
+        val result = withContext(Dispatchers.IO) {
+            runCatching { programRepository.currentProgramsForChannels(list) }
         }
-        if (fresh.isEmpty()) return
-        currentPrograms = currentPrograms + fresh
+        val fresh = result.getOrNull() ?: return
+        currentPrograms = replaceCurrentPrograms(currentPrograms, list, fresh)
         adapter.submitPrograms(currentPrograms)
         val selected = currentChannel ?: return
-        val current = fresh[selected.sourceKey] ?: return
-        if (binding.infoBar.visibility == View.VISIBLE ||
-            binding.channelPanel.visibility == View.VISIBLE
-        ) {
-            updateCurrentProgramUi(current)
-        }
+        loadPrograms(selected, clearExisting = false)
     }
 
     private fun loadPrograms(channel: LiveChannel, clearExisting: Boolean = true) {
@@ -997,15 +996,18 @@ class MainActivity : AppCompatActivity() {
                         "${error.javaClass.name}: ${error.message}",
                 )
             }.getOrNull() ?: return@launch
-            programs.current?.let { current ->
-                currentPrograms = currentPrograms + (channel.sourceKey to current)
-                adapter.submitPrograms(currentPrograms)
-            }
+            val current = programs.current?.takeIf { it.title.isNotBlank() }
+            currentPrograms = replaceCurrentPrograms(
+                currentPrograms,
+                listOf(channel),
+                current?.let { mapOf(channel.sourceKey to it) }.orEmpty(),
+            )
+            adapter.submitPrograms(currentPrograms)
             debugLog.recordDebug(
                 "EPG_QUERY_RESULT | channel=${channel.id}, " +
                     "current=${programs.current?.title}, next=${programs.next?.title}",
             )
-            if (programs.current == null && programs.next == null) {
+            if (current == null) {
                 binding.currentProgram.setText(R.string.no_program_information)
                 binding.currentProgram.visibility = if (displayPreferences.showCurrentProgram) {
                     View.VISIBLE
@@ -1014,11 +1016,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 binding.programMeta.visibility = View.GONE
                 binding.infoProgress.visibility = View.GONE
-                binding.nextProgram.visibility = View.GONE
             }
-            programs.current?.takeIf { it.title.isNotBlank() }?.let { current ->
-                updateCurrentProgramUi(current)
-            }
+            current?.let(::updateCurrentProgramUi)
             programs.next?.takeIf { it.title.isNotBlank() }?.let { next ->
                 val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                 binding.nextProgram.text = getString(
@@ -1032,6 +1031,9 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     View.GONE
                 }
+            }
+            if (programs.next == null || programs.next.title.isBlank()) {
+                binding.nextProgram.visibility = View.GONE
             }
         }
     }
@@ -1538,7 +1540,6 @@ class MainActivity : AppCompatActivity() {
             ) { dialog, which ->
                 val track = tracks[which]
                 playback.selectAudio(track.id)
-                track.language?.let { displayPreferencesStore.updateTrackPreferences(audioLanguage = it) }
                 rememberChannelAudioLanguage(track.language)
                 dialog.dismiss()
             }
@@ -1563,18 +1564,12 @@ class MainActivity : AppCompatActivity() {
                     dialog, which ->
                 if (which == 0) {
                     playback.selectSubtitle(null)
-                    displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = false)
                     rememberChannelSubtitlesOff()
                 } else {
                     val track = tracks[which - 1]
                     playback.selectSubtitle(track.id)
-                    displayPreferencesStore.updateTrackPreferences(
-                        subtitlesEnabled = true,
-                        subtitleLanguage = track.language,
-                    )
                     rememberChannelSubtitle(track.language)
                 }
-                displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.close, null)
@@ -1605,11 +1600,7 @@ class MainActivity : AppCompatActivity() {
             ) { dialog, which ->
                 val track = tracks[which]
                 iptvPlayback.selectAudioTrack(track.id)
-                track.language?.let {
-                    displayPreferencesStore.updateTrackPreferences(audioLanguage = it)
-                }
                 rememberChannelAudioLanguage(track.language)
-                displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.close, null)
@@ -1628,18 +1619,12 @@ class MainActivity : AppCompatActivity() {
                     dialog, which ->
                 if (which == 0) {
                     iptvPlayback.selectSubtitleTrack(null)
-                    displayPreferencesStore.updateTrackPreferences(subtitlesEnabled = false)
                     rememberChannelSubtitlesOff()
                 } else {
                     val track = tracks[which - 1]
                     iptvPlayback.selectSubtitleTrack(track.id)
-                    displayPreferencesStore.updateTrackPreferences(
-                        subtitlesEnabled = true,
-                        subtitleLanguage = track.language,
-                    )
                     rememberChannelSubtitle(track.language)
                 }
-                displayPreferences = displayPreferencesStore.load()
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.close, null)
@@ -3587,16 +3572,10 @@ class MainActivity : AppCompatActivity() {
         clockJob = lifecycleScope.launch {
             val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
             val dateFormat = SimpleDateFormat("EEE, d MMMM yyyy", Locale("tr"))
-            var refreshPrograms = false
             while (true) {
                 val now = Date()
                 binding.clockTime.text = timeFormat.format(now)
                 binding.clockDate.text = dateFormat.format(now).uppercase(Locale("tr"))
-                if (refreshPrograms && channels.isNotEmpty()) {
-                    loadChannelPrograms(channels)
-                    currentChannel?.let { loadPrograms(it, clearExisting = false) }
-                }
-                refreshPrograms = !refreshPrograms
                 delay(CLOCK_REFRESH_MS)
             }
         }

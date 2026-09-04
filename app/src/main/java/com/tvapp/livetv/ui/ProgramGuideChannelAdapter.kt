@@ -28,6 +28,16 @@ class ProgramGuideChannelAdapter(
         notifyDataSetChanged()
     }
 
+    fun submitPrograms(programs: Map<String, ProgramSummary>) {
+        val previous = currentPrograms
+        currentPrograms = programs
+        channels.forEachIndexed { index, channel ->
+            if (previous[channel.sourceKey] != programs[channel.sourceKey]) {
+                notifyItemChanged(index, PAYLOAD_PROGRAM)
+            }
+        }
+    }
+
     fun select(sourceKey: String) {
         if (selectedKey == sourceKey) return
         val previous = positionOf(selectedKey)
@@ -49,11 +59,13 @@ class ProgramGuideChannelAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: MutableList<Any>) {
-        if (PAYLOAD_SELECTION in payloads) {
-            holder.bindSelection(channels[position])
-        } else {
+        if (payloads.isEmpty()) {
             super.onBindViewHolder(holder, position, payloads)
+            return
         }
+        val channel = channels[position]
+        if (PAYLOAD_PROGRAM in payloads) holder.bindProgram(channel)
+        if (PAYLOAD_SELECTION in payloads) holder.bindSelection(channel)
     }
 
     override fun getItemCount(): Int = channels.size
@@ -72,13 +84,7 @@ class ProgramGuideChannelAdapter(
             }
             channelNumber.text = channel.displayNumber
             channelName.text = channel.displayName
-            val program = currentPrograms[channel.sourceKey]
-            currentProgram.text = program?.title ?: root.context.getString(R.string.no_program_information)
-            programProgress.progress = program?.let {
-                val duration = (it.endTimeMillis - it.startTimeMillis).coerceAtLeast(1L)
-                (((System.currentTimeMillis() - it.startTimeMillis) * 100L) / duration)
-                    .toInt().coerceIn(0, 100)
-            } ?: 0
+            bindProgram(channel)
             if (channel.source == LiveChannel.Source.IPTV) {
                 ChannelLogoLoader.load(channelLogo, channel.logoUrl, R.drawable.ic_tv)
             } else {
@@ -102,6 +108,17 @@ class ProgramGuideChannelAdapter(
         fun bindSelection(channel: LiveChannel) {
             binding.root.isSelected = channel.sourceKey == selectedKey
         }
+
+        fun bindProgram(channel: LiveChannel) = with(binding) {
+            val program = currentPrograms[channel.sourceKey]
+            currentProgram.text = program?.title
+                ?: root.context.getString(R.string.no_program_information)
+            programProgress.progress = program?.let {
+                val duration = (it.endTimeMillis - it.startTimeMillis).coerceAtLeast(1L)
+                (((System.currentTimeMillis() - it.startTimeMillis) * 100L) / duration)
+                    .toInt().coerceIn(0, 100)
+            } ?: 0
+        }
     }
 
     private companion object {
@@ -110,5 +127,6 @@ class ProgramGuideChannelAdapter(
         const val LOGO_HEIGHT_FRACTION = 0.46f
         const val NUMBER_WIDTH_FRACTION = 0.78f
         const val PAYLOAD_SELECTION = "selection"
+        const val PAYLOAD_PROGRAM = "program"
     }
 }

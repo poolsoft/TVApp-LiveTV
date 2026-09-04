@@ -100,7 +100,7 @@ class IptvRepository(context: Context) {
     suspend fun setChannelSelected(sourceKey: String, selected: Boolean) {
         dao.setChannelSelected(sourceKey, selected)
         notifySharedChannelsChanged()
-        if (selected) refreshXtreamEpgSafely()
+        if (selected) xmlTvRepository.requestXtreamRefresh(force = true)
     }
 
     suspend fun setChannelsSelected(sourceKeys: List<String>, selected: Boolean) {
@@ -109,7 +109,7 @@ class IptvRepository(context: Context) {
         }
         if (sourceKeys.isNotEmpty()) {
             notifySharedChannelsChanged()
-            if (selected) refreshXtreamEpgSafely()
+            if (selected) xmlTvRepository.requestXtreamRefresh(force = true)
         }
     }
 
@@ -153,7 +153,7 @@ class IptvRepository(context: Context) {
             }
         }
         notifySharedChannelsChanged()
-        if (sourceKeys.isNotEmpty()) refreshXtreamEpgSafely()
+        if (sourceKeys.isNotEmpty()) xmlTvRepository.requestXtreamRefresh(force = true)
     }
 
     suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
@@ -235,12 +235,8 @@ class IptvRepository(context: Context) {
             password = password,
         ) { client.channels() }
         xmlTvRepository.ensurePeriodicRefresh()
-        refreshXtreamEpgSafely(force = true)
+        xmlTvRepository.requestXtreamRefresh(force = true)
         return result
-    }
-
-    private suspend fun refreshXtreamEpgSafely(force: Boolean = false) {
-        runCatching { xmlTvRepository.refreshXtreamShortEpg(force = force) }
     }
 
     suspend fun importStalker(

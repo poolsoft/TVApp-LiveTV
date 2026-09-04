@@ -367,16 +367,12 @@ class ProgramGuideActivity : AppCompatActivity() {
 
     private fun refreshCurrentPrograms() {
         if (channels.isEmpty()) return
-        focusJob?.cancel()
-        focusJob = lifecycleScope.launch {
-            val fresh = withContext(Dispatchers.IO) {
-                runCatching {
-                    programRepository.currentProgramsForChannels(channels)
-                }.getOrDefault(emptyMap())
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { programRepository.currentProgramsForChannels(channels) }
             }
-            if (fresh.isEmpty()) return@launch
-            currentPrograms = fresh
-            channelAdapter.submitList(channels, currentPrograms)
+            currentPrograms = result.getOrNull() ?: return@launch
+            channelAdapter.submitPrograms(currentPrograms)
         }
     }
 
