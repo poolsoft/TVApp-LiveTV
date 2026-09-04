@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
         private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
         private const val IPTV_STALL_TIMEOUT_MS = 15_000L
+        private const val EPG_REFRESH_INTERVAL_MS = 15_000L
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
@@ -200,6 +201,7 @@ class MainActivity : AppCompatActivity() {
     private var focusedAutoTuneTargetKey: String? = null
     private var focusedProgramJob: Job? = null
     private var visibleProgramsJob: Job? = null
+    private var epgRefreshJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var iptvControlsJob: Job? = null
     private var iptvNoticeJob: Job? = null
@@ -513,6 +515,7 @@ class MainActivity : AppCompatActivity() {
                         ?: playingChannel.takeIf { preserveCurrentPlayback }
                     applyChannelFilter(requestFocus = false)
                     loadChannelPrograms(loaded)
+                    startEpgRefresh()
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null
@@ -941,6 +944,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun startEpgRefresh() {
+        epgRefreshJob?.cancel()
+        epgRefreshJob = lifecycleScope.launch {
+            while (true) {
+                delay(EPG_REFRESH_INTERVAL_MS)
+                refreshCurrentPrograms()
+            }
+        }
+    }
+
+    private suspend fun refreshCurrentPrograms() {
+        val list = channels
+        if (list.isEmpty()) return
+        val fresh = withContext(Dispatchers.IO) {
+            runCatching {
+                programRepository.currentProgramsForChannels(list)
+            }.getOrDefault(emptyMap())
+        }
+        if (fresh.isEmpty()) return
+        currentPrograms = currentPrograms + fresh
+        adapter.submitPrograms(currentPrograms)
+        val selected = currentChannel ?: return
+        val current = fresh[selected.sourceKey] ?: return
+        if (binding.infoBar.visibility == View.VISIBLE ||
+            binding.channelPanel.visibility == View.VISIBLE
+        ) {
+            updateCurrentProgramUi(current)
+        }
+    }
+
     private fun loadPrograms(channel: LiveChannel, clearExisting: Boolean = true) {
         programJob?.cancel()
         if (clearExisting) {
@@ -980,28 +1013,7 @@ class MainActivity : AppCompatActivity() {
                 binding.nextProgram.visibility = View.GONE
             }
             programs.current?.takeIf { it.title.isNotBlank() }?.let { current ->
-                val title = current.title
-                binding.currentProgram.text = title
-                binding.currentProgram.visibility = if (displayPreferences.showCurrentProgram) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-                binding.programTime.text = getString(
-                    R.string.program_time_format,
-                    timeFormat.format(Date(current.startTimeMillis)),
-                    timeFormat.format(Date(current.endTimeMillis)),
-                )
-                val now = System.currentTimeMillis()
-                val duration = (current.endTimeMillis - current.startTimeMillis).coerceAtLeast(1L)
-                val progress = (((now - current.startTimeMillis) * 100L / duration)
-                    .coerceIn(0L, 100L)).toInt()
-                binding.infoProgress.progress = progress
-                binding.programRemaining.text = getString(R.string.percent_value, progress)
-                val showDetails = displayPreferences.showCurrentProgram
-                binding.programMeta.visibility = if (showDetails) View.VISIBLE else View.GONE
-                binding.infoProgress.visibility = if (showDetails) View.VISIBLE else View.GONE
+                updateCurrentProgramUi(current)
             }
             programs.next?.takeIf { it.title.isNotBlank() }?.let { next ->
                 val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -1018,6 +1030,31 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun updateCurrentProgramUi(current: ProgramSummary) {
+        binding.currentProgram.text = current.title
+        binding.currentProgram.visibility = if (displayPreferences.showCurrentProgram) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        binding.programTime.text = getString(
+            R.string.program_time_format,
+            timeFormat.format(Date(current.startTimeMillis)),
+            timeFormat.format(Date(current.endTimeMillis)),
+        )
+        val now = System.currentTimeMillis()
+        val duration = (current.endTimeMillis - current.startTimeMillis).coerceAtLeast(1L)
+        val progress = (((now - current.startTimeMillis) * 100L / duration)
+            .coerceIn(0L, 100L)).toInt()
+        binding.infoProgress.progress = progress
+        binding.programRemaining.text = getString(R.string.percent_value, progress)
+        binding.programMeta.visibility =
+            if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
+        binding.infoProgress.visibility =
+            if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
     }
 
     private fun showInfoBar() {
@@ -4115,6 +4152,7 @@ class MainActivity : AppCompatActivity() {
         focusedProgramJob?.cancel()
         visibleProgramsJob?.cancel()
         channelLoadJob?.cancel()
+        epgRefreshJob?.cancel()
         sleepTimerJob?.cancel()
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()

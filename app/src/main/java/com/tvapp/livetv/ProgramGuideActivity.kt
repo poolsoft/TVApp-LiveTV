@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -50,6 +52,14 @@ class ProgramGuideActivity : AppCompatActivity() {
     private lateinit var reminderStore: ProgramReminderStore
     private lateinit var reminderScheduler: ProgramReminderScheduler
     private var pendingReminder: Pair<LiveChannel, ProgramSummary>? = null
+    private val programGuideHandler = Handler(Looper.getMainLooper())
+    private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
+    private val programGuideRefresh = object : Runnable {
+        override fun run() {
+            refreshCurrentPrograms()
+            programGuideHandler.postDelayed(this, GUIDE_REFRESH_INTERVAL_MS)
+        }
+    }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -99,6 +109,16 @@ class ProgramGuideActivity : AppCompatActivity() {
         loadChannels()
     }
 
+    override fun onResume() {
+        super.onResume()
+        programGuideHandler.post(programGuideRefresh)
+    }
+
+    override fun onPause() {
+        programGuideHandler.removeCallbacks(programGuideRefresh)
+        super.onPause()
+    }
+
     private fun applyPercentageGeometry() {
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
@@ -131,11 +151,12 @@ class ProgramGuideActivity : AppCompatActivity() {
                 channelRepository.channels().getOrDefault(emptyList())
             }
             channels = loaded
-            val currentPrograms = withContext(Dispatchers.IO) {
+            val loadedPrograms = withContext(Dispatchers.IO) {
                 runCatching {
                     programRepository.currentProgramsForChannels(loaded)
                 }.getOrDefault(emptyMap())
             }
+            currentPrograms = loadedPrograms
             channelAdapter.submitList(loaded, currentPrograms)
             if (loaded.isEmpty()) {
                 binding.emptyPrograms.visibility = View.VISIBLE
@@ -344,6 +365,21 @@ class ProgramGuideActivity : AppCompatActivity() {
             .map { it.startTimeMillis }
             .toSet()
 
+    private fun refreshCurrentPrograms() {
+        if (channels.isEmpty()) return
+        focusJob?.cancel()
+        focusJob = lifecycleScope.launch {
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching {
+                    programRepository.currentProgramsForChannels(channels)
+                }.getOrDefault(emptyMap())
+            }
+            if (fresh.isEmpty()) return@launch
+            currentPrograms = fresh
+            channelAdapter.submitList(channels, currentPrograms)
+        }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
@@ -398,6 +434,7 @@ class ProgramGuideActivity : AppCompatActivity() {
         private const val COLUMN_PADDING_FRACTION = 0.008f
         private const val CHANNEL_FOCUS_DELAY_MS = 250L
         private const val FOCUS_RETRY_DELAY_MS = 60L
+        private const val GUIDE_REFRESH_INTERVAL_MS = 15_000L
         private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
     }
