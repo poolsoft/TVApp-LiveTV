@@ -142,20 +142,6 @@
             android:screenOrientation="landscape" />
 
         <activity
-            android:name=".EpgIntentSinkActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="vnd.android.cursor.item/channel" />
-                <data android:mimeType="vnd.android.cursor.dir/channel" />
-            </intent-filter>
-        </activity>
-
-        <activity
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"

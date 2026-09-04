@@ -6,8 +6,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
-### Vendor EPG yönlendirmesi
-* Vendor TIF'in kanal URI'si için gönderdiği EPG görüntüleme isteği, ana oynatıcıyı yeniden açmadan görünmez bir köprü activity içinde karşılanıyor. Böylece varsayılan Live TV uygulamasına geçiş ve tekrar tune döngüsü önleniyor.
+### EPG uygulaması yönlendirmesi
+* TVApp'in sistem kanal URI'leri için Live TV/EPG uygulaması olarak kaydolmasına neden olan standart kanal MIME intent filtresi tamamen kaldırıldı. EPG verileri yalnızca `TvContract` sorgularıyla okunuyor; uygulama açılırken sistemin Live TV uygulamasına geçmesi veya "Şununla aç" penceresi göstermesi engelleniyor.
 
 ### Kanal sistem bilgileri
 * Kanal listesindeki uzun OK menüsüne kanal/TIF alanlarını ve canlı track verilerini key/value biçiminde gösteren kaydırılabilir Sistem bilgileri paneli eklendi.
