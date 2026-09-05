@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV medya tuşu kontrol modu
+* IPTV seekbar ve kompakt oynatma kontrolleri infobarın program alanına yerleştirildi; teknik rozet satırındaki kalabalık IPTV düğmeleri kaldırıldı.
+* Medya tuşları IPTV kontrol modunu açarken Yukarı/Aşağı her durumda kanal değiştirmeye devam ediyor. Seekbar seçiliyken Sol/Sağ sarar; OK kompakt kontrol satırına geçer.
+* Oynatma satırı Oynat/Duraklat, Buffer, VOD Hızı ve Ses/Altyazı/Kalite birleşik menüsünden oluşuyor. Buffer ve hız OK ile açılan seçim listesinden ayarlanıyor.
+
 ### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu
 * Infobar orta alanındaki metinli butonlar kaldırılarak dikey sıkışıklık giderildi; zaman çizgisi (Seekbar) ferah ve temiz bir görünüme kavuşturuldu.
 * Kontrol butonları metin içermeyen saf vektör ikonlar (`ic_play`/`ic_pause`, `ic_buffer`, `ic_speed`, `ic_quality`, `ic_audio`, `ic_subtitle`) olarak Infobar altındaki teknik ikon barına (`technical_row`) taşındı.

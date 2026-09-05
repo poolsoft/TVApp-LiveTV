@@ -33,6 +33,9 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ### IPTV
 
+- IPTV oynatma kontrolleri medya tuşuyla infobar içinde açılır. Kontroller açıkken `Yukarı/Aşağı` kanal değiştirmeyi sürdürür; seekbar üzerinde `Sol/Sağ` sarar ve `OK` kompakt işlem satırına geçer.
+- Kompakt işlem satırında oynat/duraklat, buffer, VOD hızı ve ses/altyazı/kalite menüsü bulunur. `Sol/Sağ` işlem seçer, `OK` uygular.
+
 - Oynatma OSD'sinde Yukarı/Aşağı ile zaman çizgisi, buffer hedefi ve VOD oynatma hızı seçilir; Sol/Sağ seçili satırı değiştirir.
 - Buffer hedefi `OK` ile uygulanır; değerler arasında gezinirken yayın tekrar tekrar başlatılmaz. OSD açıkken kanal değiştirme yalnız `CH+`/`CH-` ile yapılır.
 - Kalıcı buffer hedefi ve varsayılan VOD hızı `Ayarlar > Oynatma` bölümünden de seçilebilir.
