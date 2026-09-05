@@ -618,20 +618,20 @@
         <LinearLayout
             android:id="@+id/iptv_playback_container"
             android:layout_width="match_parent"
-            android:layout_height="76dp"
+            android:layout_height="66dp"
             android:orientation="vertical"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="6dp"
             android:visibility="gone">
 
             <LinearLayout
                 android:id="@+id/iptv_seekbar_row"
                 android:layout_width="match_parent"
-                android:layout_height="32dp"
+                android:layout_height="29dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="3dp">
+                android:paddingHorizontal="2dp">
 
                 <TextView
                     android:id="@+id/iptv_time_position"
@@ -646,7 +646,7 @@
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="0dp"
                     android:layout_height="8dp"
-                    android:layout_marginHorizontal="12dp"
+                    android:layout_marginHorizontal="8dp"
                     android:layout_weight="1"
                     android:max="1000"
                     android:progressBackgroundTint="#52606B"
@@ -664,70 +664,72 @@
             <LinearLayout
                 android:id="@+id/iptv_action_bar"
                 android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:layout_marginTop="4dp"
+                android:layout_height="35dp"
+                android:layout_marginTop="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <ImageView
+                <TextView
                     android:id="@+id/iptv_btn_play_pause"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_weight="1"
+                    android:layout_height="32dp"
+                    android:layout_weight="2"
                     android:background="@drawable/bg_iptv_control"
                     android:clickable="true"
                     android:contentDescription="@string/iptv_action_live"
+                    android:drawablePadding="6dp"
                     android:focusable="true"
-                    android:padding="7dp"
-                    android:src="@drawable/ic_pause"
-                    app:tint="@color/text_primary" />
+                    android:gravity="center"
+                    android:paddingHorizontal="2dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp" />
 
                 <TextView
                     android:id="@+id/iptv_btn_buffer"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="3dp"
                     android:layout_weight="2"
                     android:background="@drawable/bg_iptv_control"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawableStart="@drawable/ic_buffer_small"
-                    android:drawablePadding="7dp"
-                    android:paddingHorizontal="4dp"
+                    android:drawablePadding="5dp"
+                    android:paddingHorizontal="2dp"
                     android:textColor="@color/text_primary"
                     android:textSize="11sp" />
 
                 <TextView
                     android:id="@+id/iptv_btn_speed"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="3dp"
                     android:layout_weight="2"
                     android:background="@drawable/bg_iptv_control"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawableStart="@drawable/ic_speed_small"
-                    android:drawablePadding="7dp"
-                    android:paddingHorizontal="4dp"
+                    android:drawablePadding="5dp"
+                    android:paddingHorizontal="2dp"
                     android:textColor="@color/text_primary"
                     android:textSize="11sp"
-                    android:visibility="gone" />
+                    android:visibility="visible" />
 
                 <TextView
                     android:id="@+id/iptv_btn_more"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_marginStart="6dp"
-                    android:layout_weight="3"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="3dp"
+                    android:layout_weight="2"
                     android:background="@drawable/bg_iptv_control"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawableStart="@drawable/ic_tune_small"
-                    android:drawablePadding="7dp"
-                    android:paddingHorizontal="4dp"
+                    android:drawablePadding="5dp"
+                    android:paddingHorizontal="2dp"
                     android:text="@string/iptv_more_controls"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
@@ -883,55 +885,6 @@
                 android:paddingEnd="2dp" />
         </LinearLayout>
 
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/iptv_control_hints"
-            android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="10dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/iptv_hint_up_down"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="start|center_vertical"
-                android:text="@string/iptv_controls_up_down_full_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/iptv_hint_media"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/iptv_controls_media_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/iptv_hint_left_right"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:text="@string/iptv_controls_left_right_full_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="end|center_vertical"
-                android:text="@string/iptv_controls_back_full_hint"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
         </LinearLayout>
 
     </LinearLayout>

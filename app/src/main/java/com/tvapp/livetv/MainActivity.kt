@@ -10,6 +10,9 @@ import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
 import android.media.tv.TvTrackInfo
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.util.Rational
@@ -97,7 +100,7 @@ class MainActivity : AppCompatActivity() {
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
         private const val INFO_COMPACT_HEIGHT_FRACTION = 0.205f
-        private const val IPTV_INFO_EXTRA_HEIGHT_DP = 106
+        private const val IPTV_INFO_EXTRA_HEIGHT_DP = 66
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -1213,7 +1216,6 @@ class MainActivity : AppCompatActivity() {
         binding.programMeta.visibility = View.GONE
         binding.nextProgram.visibility = View.GONE
         binding.iptvPlaybackContainer.visibility = View.VISIBLE
-        binding.iptvControlHints.visibility = View.VISIBLE
         if (wasHidden) pendingBufferSeconds = iptvPlayback.targetBufferSeconds()
         updateInfoBarHeight()
         updateInfoColorActions()
@@ -1298,7 +1300,6 @@ class MainActivity : AppCompatActivity() {
         iptvControlsJob?.cancel()
         iptvControlsInteractive = false
         binding.iptvPlaybackContainer.visibility = View.GONE
-        binding.iptvControlHints.visibility = View.GONE
         updateInfoBarHeight()
         updateInfoColorActions()
         iptvControlRow = IptvControlRow.TIMELINE
@@ -1356,27 +1357,52 @@ class MainActivity : AppCompatActivity() {
         }
 
         val isPlaying = state.isPlaying
-        binding.iptvBtnPlayPause.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
-        binding.iptvBtnBuffer.text = if (pendingBufferSeconds == 0) {
-            getString(R.string.iptv_buffer_compact_auto)
-        } else {
-            getString(R.string.iptv_buffer_compact_seconds, pendingBufferSeconds)
-        }
-        binding.iptvBtnSpeed.text = getString(
-            R.string.iptv_speed_compact,
+        binding.iptvBtnPlayPause.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+            0,
+            0,
+            0,
+        )
+        binding.iptvBtnPlayPause.setText(
+            if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label,
+        )
+        setIptvControlLabel(
+            binding.iptvBtnBuffer,
+            getString(R.string.iptv_buffer_label),
+            if (pendingBufferSeconds == 0) {
+                getString(R.string.automatic_abr)
+            } else {
+                getString(R.string.seconds_value, pendingBufferSeconds)
+            },
+        )
+        setIptvControlLabel(
+            binding.iptvBtnSpeed,
+            getString(R.string.iptv_speed_label),
             String.format(Locale.getDefault(), "%.2gx", iptvPlayback.vodPlaybackSpeed()),
         )
-        binding.iptvBtnSpeed.visibility = if (currentIptvContentKind == IptvContentKind.VOD) View.VISIBLE else View.GONE
+        binding.iptvBtnSpeed.visibility = View.VISIBLE
 
         updateIptvActionBarState()
         renderIptvControlSelection()
+    }
+
+    private fun setIptvControlLabel(view: TextView, label: String, value: String) {
+        val fullText = "$label  $value"
+        view.text = SpannableString(fullText).apply {
+            setSpan(
+                ForegroundColorSpan(ContextCompat.getColor(this@MainActivity, R.color.accent)),
+                label.length + 2,
+                fullText.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
     }
 
     private fun cycleIptvButton(direction: Int) {
         val visibleButtons = buildList {
             add(IptvControlButton.PLAY_PAUSE)
             add(IptvControlButton.BUFFER)
-            if (currentIptvContentKind == IptvContentKind.VOD) add(IptvControlButton.SPEED)
+            add(IptvControlButton.SPEED)
             add(IptvControlButton.MORE)
         }
         val idx = visibleButtons.indexOf(selectedIptvButton).coerceAtLeast(0)
@@ -1426,7 +1452,12 @@ class MainActivity : AppCompatActivity() {
         }
         binding.iptvActionBar.visibility = View.VISIBLE
         val isChannelPanelOpen = binding.channelPanel.visibility == View.VISIBLE
-        binding.iptvActionBar.alpha = if (isChannelPanelOpen) 0.35f else 1.0f
+        binding.iptvActionBar.alpha = when {
+            isChannelPanelOpen -> 0.35f
+            !iptvControlsInteractive -> 0.50f
+            else -> 1.0f
+        }
+        binding.iptvSeekbarRow.alpha = if (iptvControlsInteractive) 1.0f else 0.65f
         val focusable = iptvControlsInteractive && !isChannelPanelOpen
         binding.iptvBtnPlayPause.isFocusable = focusable
         binding.iptvBtnBuffer.isFocusable = focusable
@@ -3894,6 +3925,28 @@ class MainActivity : AppCompatActivity() {
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
+            val hints = if (iptvControlsInteractive) {
+                intArrayOf(
+                    R.string.iptv_controls_up_down_hint,
+                    R.string.iptv_controls_left_right_hint,
+                    R.string.iptv_controls_ok_hint,
+                    R.string.iptv_controls_back_hint,
+                )
+            } else {
+                intArrayOf(
+                    R.string.iptv_controls_up_down_channel_hint,
+                    R.string.iptv_controls_media_hint,
+                )
+            }
+            hints.forEach { label ->
+                binding.infoColorActions.addView(TextView(this).apply {
+                    setText(label)
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    textSize = 9f
+                    setPadding(dp(10), 0, 0, 0)
+                    setSingleLine(true)
+                })
+            }
             return
         }
         fun action(color: Int, label: Int) {
@@ -3919,20 +3972,7 @@ class MainActivity : AppCompatActivity() {
         action(R.color.remote_blue, R.string.settings_short)
     }
 
-    private fun updateIptvControlHints() {
-        binding.iptvHintUpDown.setText(
-            if (iptvControlsInteractive) R.string.iptv_controls_up_down_full_hint
-            else R.string.iptv_controls_up_down_channel_hint,
-        )
-        binding.iptvHintMedia.setText(
-            if (iptvControlsInteractive) R.string.iptv_controls_media_active_hint
-            else R.string.iptv_controls_media_hint,
-        )
-        binding.iptvHintLeftRight.setText(
-            if (iptvControlsInteractive) R.string.iptv_controls_left_right_full_hint
-            else R.string.iptv_controls_left_right_inactive_hint,
-        )
-    }
+    private fun updateIptvControlHints() = updateInfoColorActions()
 
     private fun colorKeyDrawable(color: Int): Int = when (color) {
         R.color.remote_red -> R.drawable.key_red
