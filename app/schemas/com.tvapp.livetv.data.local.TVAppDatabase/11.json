@@ -1,0 +1,668 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 11,
+    "identityHash": "330ff90bc4e756b19cd544a0d2cf20be",
+    "entities": [
+      {
+        "tableName": "user_channels",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceKey` TEXT NOT NULL, `sourceType` TEXT NOT NULL, `originalDisplayNumber` TEXT NOT NULL, `lastKnownName` TEXT NOT NULL, `customNumber` INTEGER, `customName` TEXT, `sortOrder` INTEGER NOT NULL, `favorite` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, `groupId` INTEGER, `lastSeenAt` INTEGER NOT NULL, PRIMARY KEY(`sourceKey`), FOREIGN KEY(`groupId`) REFERENCES `channel_groups`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "sourceKey",
+            "columnName": "sourceKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceType",
+            "columnName": "sourceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalDisplayNumber",
+            "columnName": "originalDisplayNumber",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastKnownName",
+            "columnName": "lastKnownName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customNumber",
+            "columnName": "customNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "customName",
+            "columnName": "customName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favorite",
+            "columnName": "favorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hidden",
+            "columnName": "hidden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "groupId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "lastSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sourceKey"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_user_channels_groupId",
+            "unique": false,
+            "columnNames": [
+              "groupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_channels_groupId` ON `${TABLE_NAME}` (`groupId`)"
+          },
+          {
+            "name": "index_user_channels_sortOrder",
+            "unique": false,
+            "columnNames": [
+              "sortOrder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_user_channels_sortOrder` ON `${TABLE_NAME}` (`sortOrder`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "channel_groups",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "groupId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "channel_groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_channel_groups_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_channel_groups_name` ON `${TABLE_NAME}` (`name`)"
+          },
+          {
+            "name": "index_channel_groups_sortOrder",
+            "unique": false,
+            "columnNames": [
+              "sortOrder"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_channel_groups_sortOrder` ON `${TABLE_NAME}` (`sortOrder`)"
+          }
+        ]
+      },
+      {
+        "tableName": "iptv_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `location` TEXT NOT NULL, `kind` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `lastUpdatedAt` INTEGER NOT NULL, `serverUrl` TEXT, `username` TEXT, `password` TEXT, `macAddress` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdatedAt",
+            "columnName": "lastUpdatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverUrl",
+            "columnName": "serverUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "username",
+            "columnName": "username",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "password",
+            "columnName": "password",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "macAddress",
+            "columnName": "macAddress",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_iptv_sources_location",
+            "unique": true,
+            "columnNames": [
+              "location"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_iptv_sources_location` ON `${TABLE_NAME}` (`location`)"
+          }
+        ]
+      },
+      {
+        "tableName": "iptv_channels",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sourceKey` TEXT NOT NULL, `sourceId` INTEGER NOT NULL, `tvgId` TEXT, `tvgName` TEXT, `displayName` TEXT NOT NULL, `streamUrl` TEXT NOT NULL, `logoUrl` TEXT, `groupTitle` TEXT, `userAgent` TEXT, `referrer` TEXT, `subtitleUrl` TEXT, `originalIndex` INTEGER NOT NULL, `contentType` TEXT NOT NULL, `selected` INTEGER NOT NULL, `lastSeenAt` INTEGER NOT NULL, PRIMARY KEY(`sourceKey`), FOREIGN KEY(`sourceId`) REFERENCES `iptv_sources`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "sourceKey",
+            "columnName": "sourceKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tvgId",
+            "columnName": "tvgId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tvgName",
+            "columnName": "tvgName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "streamUrl",
+            "columnName": "streamUrl",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logoUrl",
+            "columnName": "logoUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "groupTitle",
+            "columnName": "groupTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "userAgent",
+            "columnName": "userAgent",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "referrer",
+            "columnName": "referrer",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "subtitleUrl",
+            "columnName": "subtitleUrl",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalIndex",
+            "columnName": "originalIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentType",
+            "columnName": "contentType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selected",
+            "columnName": "selected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenAt",
+            "columnName": "lastSeenAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sourceKey"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_iptv_channels_sourceId",
+            "unique": false,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          },
+          {
+            "name": "index_iptv_channels_originalIndex",
+            "unique": false,
+            "columnNames": [
+              "originalIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_originalIndex` ON `${TABLE_NAME}` (`originalIndex`)"
+          },
+          {
+            "name": "index_iptv_channels_selected",
+            "unique": false,
+            "columnNames": [
+              "selected"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_selected` ON `${TABLE_NAME}` (`selected`)"
+          },
+          {
+            "name": "index_iptv_channels_sourceId_originalIndex",
+            "unique": false,
+            "columnNames": [
+              "sourceId",
+              "originalIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_originalIndex` ON `${TABLE_NAME}` (`sourceId`, `originalIndex`)"
+          },
+          {
+            "name": "index_iptv_channels_sourceId_contentType_originalIndex",
+            "unique": false,
+            "columnNames": [
+              "sourceId",
+              "contentType",
+              "originalIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_contentType_originalIndex` ON `${TABLE_NAME}` (`sourceId`, `contentType`, `originalIndex`)"
+          },
+          {
+            "name": "index_iptv_channels_sourceId_contentType_groupTitle_originalIndex",
+            "unique": false,
+            "columnNames": [
+              "sourceId",
+              "contentType",
+              "groupTitle",
+              "originalIndex"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_contentType_groupTitle_originalIndex` ON `${TABLE_NAME}` (`sourceId`, `contentType`, `groupTitle`, `originalIndex`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "iptv_sources",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "xmltv_programs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sourceId` INTEGER NOT NULL, `channelId` TEXT NOT NULL, `channelName` TEXT NOT NULL, `normalizedChannelId` TEXT NOT NULL, `normalizedChannelName` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `startTimeMillis` INTEGER NOT NULL, `endTimeMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelId",
+            "columnName": "channelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelName",
+            "columnName": "channelName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedChannelId",
+            "columnName": "normalizedChannelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedChannelName",
+            "columnName": "normalizedChannelName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startTimeMillis",
+            "columnName": "startTimeMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endTimeMillis",
+            "columnName": "endTimeMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_xmltv_programs_sourceId",
+            "unique": false,
+            "columnNames": [
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_sourceId` ON `${TABLE_NAME}` (`sourceId`)"
+          },
+          {
+            "name": "index_xmltv_programs_normalizedChannelId_startTimeMillis_endTimeMillis",
+            "unique": false,
+            "columnNames": [
+              "normalizedChannelId",
+              "startTimeMillis",
+              "endTimeMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_normalizedChannelId_startTimeMillis_endTimeMillis` ON `${TABLE_NAME}` (`normalizedChannelId`, `startTimeMillis`, `endTimeMillis`)"
+          },
+          {
+            "name": "index_xmltv_programs_normalizedChannelName_startTimeMillis_endTimeMillis",
+            "unique": false,
+            "columnNames": [
+              "normalizedChannelName",
+              "startTimeMillis",
+              "endTimeMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_normalizedChannelName_startTimeMillis_endTimeMillis` ON `${TABLE_NAME}` (`normalizedChannelName`, `startTimeMillis`, `endTimeMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "xmltv_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `location` TEXT NOT NULL, `kind` TEXT NOT NULL, `lastUpdatedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "location",
+            "columnName": "location",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUpdatedAt",
+            "columnName": "lastUpdatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_xmltv_sources_location",
+            "unique": true,
+            "columnNames": [
+              "location"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_xmltv_sources_location` ON `${TABLE_NAME}` (`location`)"
+          }
+        ]
+      },
+      {
+        "tableName": "xtream_epg_programs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `channelId` TEXT NOT NULL, `channelName` TEXT NOT NULL, `normalizedChannelId` TEXT NOT NULL, `normalizedChannelName` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `startTimeMillis` INTEGER NOT NULL, `endTimeMillis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelId",
+            "columnName": "channelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelName",
+            "columnName": "channelName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedChannelId",
+            "columnName": "normalizedChannelId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedChannelName",
+            "columnName": "normalizedChannelName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startTimeMillis",
+            "columnName": "startTimeMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endTimeMillis",
+            "columnName": "endTimeMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_xtream_epg_programs_normalizedChannelId_startTimeMillis_endTimeMillis",
+            "unique": false,
+            "columnNames": [
+              "normalizedChannelId",
+              "startTimeMillis",
+              "endTimeMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_xtream_epg_programs_normalizedChannelId_startTimeMillis_endTimeMillis` ON `${TABLE_NAME}` (`normalizedChannelId`, `startTimeMillis`, `endTimeMillis`)"
+          },
+          {
+            "name": "index_xtream_epg_programs_normalizedChannelName_startTimeMillis_endTimeMillis",
+            "unique": false,
+            "columnNames": [
+              "normalizedChannelName",
+              "startTimeMillis",
+              "endTimeMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_xtream_epg_programs_normalizedChannelName_startTimeMillis_endTimeMillis` ON `${TABLE_NAME}` (`normalizedChannelName`, `startTimeMillis`, `endTimeMillis`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '330ff90bc4e756b19cd544a0d2cf20be')"
+    ]
+  }
+}
