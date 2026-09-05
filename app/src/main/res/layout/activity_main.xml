@@ -156,18 +156,19 @@
 
     <LinearLayout
         android:id="@+id/iptv_playback_controls"
-        android:layout_width="720dp"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="110dp"
         android:layout_gravity="bottom|center_horizontal"
         android:background="@drawable/bg_status"
         android:focusable="false"
         android:orientation="vertical"
-        android:padding="18dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
         android:visibility="gone">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="20dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -179,7 +180,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_primary"
-                android:textSize="17sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -187,15 +188,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/accent"
-                android:textSize="14sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/iptv_control_timeline_row"
             android:layout_width="match_parent"
-            android:layout_height="36dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="22dp"
+            android:layout_marginTop="3dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="8dp">
@@ -204,7 +205,7 @@
                 android:id="@+id/iptv_control_progress"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="0dp"
-                android:layout_height="4dp"
+                android:layout_height="3dp"
                 android:layout_weight="1"
                 android:max="1000"
                 android:progressBackgroundTint="#52606B"
@@ -214,46 +215,60 @@
             <TextView
                 android:id="@+id/iptv_control_position"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="20dp"
                 android:layout_marginStart="12dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/iptv_control_options"
+            android:layout_width="match_parent"
+            android:layout_height="25dp"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal">
+
         <TextView
             android:id="@+id/iptv_control_buffer_row"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
+            android:layout_width="0dp"
+            android:layout_height="25dp"
+            android:layout_weight="1"
             android:gravity="center_vertical"
             android:paddingHorizontal="8dp"
             android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/iptv_control_speed_row"
-            android:layout_width="match_parent"
-            android:layout_height="36dp"
+            android:layout_width="0dp"
+            android:layout_height="25dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
             android:gravity="center_vertical"
             android:paddingHorizontal="8dp"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="11sp"
             android:visibility="gone" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/iptv_control_technical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
+            android:layout_marginTop="0dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:textSize="10sp"
+            android:visibility="gone" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="7dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/iptv_control_hint"
@@ -270,7 +285,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="0dp"

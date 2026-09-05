@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         private const val CLOCK_REFRESH_MS = 30_000L
         private const val CHANNEL_PANEL_TIMEOUT_MS = 10_000L
         private const val INTERNAL_MINI_WIDTH_FRACTION = 0.38f
-        private const val IPTV_CONTROLS_WIDTH_FRACTION = 0.68f
+        private const val IPTV_CONTROLS_WIDTH_FRACTION = 0.92f
         private const val IPTV_CONTROLS_BOTTOM_MARGIN_FRACTION = 0.045f
         private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
         private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
@@ -1212,6 +1212,12 @@ class MainActivity : AppCompatActivity() {
         binding.iptvPlaybackControls.visibility = View.VISIBLE
         binding.iptvControlTitle.text = currentChannel?.displayName.orEmpty()
         binding.iptvControlState.setText(stateText)
+        binding.iptvControlState.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (currentIptvContentKind == IptvContentKind.LIVE) android.R.color.holo_red_light else R.color.accent,
+            ),
+        )
         binding.iptvControlRedAction.setText(
             if (iptvPlaybackFailed) {
                 R.string.iptv_action_refresh
@@ -1345,6 +1351,49 @@ class MainActivity : AppCompatActivity() {
             }
         }
         updateIptvPlaybackControls()
+    }
+
+    private fun openIptvControlChoices() {
+        when (iptvControlRow) {
+            IptvControlRow.BUFFER -> {
+                val options = IptvPlaybackPreferences.BUFFER_OPTIONS
+                val labels = options.map { seconds ->
+                    if (seconds == 0) getString(R.string.automatic_abr)
+                    else getString(R.string.seconds_value, seconds)
+                }
+                AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+                    .setTitle(R.string.iptv_default_buffer)
+                    .setSingleChoiceItems(labels.toTypedArray(), options.indexOf(pendingBufferSeconds)) { dialog, which ->
+                        pendingBufferSeconds = options[which]
+                        iptvPlayback.setTargetBufferSeconds(pendingBufferSeconds)
+                        updateIptvPlaybackControls()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            IptvControlRow.SPEED -> {
+                val options = IptvPlaybackPreferences.SPEED_OPTIONS
+                val labels = options.map { String.format(Locale.getDefault(), "%.2gx", it) }
+                AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+                    .setTitle(R.string.iptv_default_vod_speed)
+                    .setSingleChoiceItems(labels.toTypedArray(), options.indexOf(iptvPlayback.vodPlaybackSpeed())) { dialog, which ->
+                        iptvPlayback.setVodPlaybackSpeed(options[which])
+                        updateIptvPlaybackControls()
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            IptvControlRow.TIMELINE -> {
+                if (currentIptvContentKind == IptvContentKind.LIVE) {
+                    iptvManualTimeshift = false
+                    iptvPlayback.goLive()
+                } else {
+                    iptvPlayback.togglePlayPause()
+                }
+            }
+        }
     }
 
     private fun bufferTargetLabel(seconds: Int): String = if (seconds == 0) {
@@ -4336,14 +4385,9 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     when (iptvControlRow) {
                         IptvControlRow.BUFFER -> {
-                            iptvPlayback.setTargetBufferSeconds(pendingBufferSeconds)
-                            binding.iptvControlState.text = bufferTargetLabel(pendingBufferSeconds)
+                            openIptvControlChoices()
                         }
-                        IptvControlRow.SPEED -> Unit
-                        IptvControlRow.TIMELINE -> if (currentIptvContentKind == IptvContentKind.LIVE) {
-                            iptvManualTimeshift = false
-                            iptvPlayback.goLive()
-                        } else iptvPlayback.togglePlayPause()
+                        IptvControlRow.SPEED, IptvControlRow.TIMELINE -> openIptvControlChoices()
                     }
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
