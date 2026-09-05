@@ -189,6 +189,7 @@
     <string name="xmltv_source_url">URL</string>
     <string name="xmltv_source_file">File</string>
     <string name="xmltv_source_deleted">XMLTV source deleted.</string>
+    <string name="xmltv_add_url">Add URL</string>
     <string name="not_configured_short">Not configured</string>
     <string name="logo_cache_enabled">Channel logo cache</string>
     <string name="logo_cache_size">Logo cache limit</string>

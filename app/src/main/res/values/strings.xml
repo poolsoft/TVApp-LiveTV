@@ -202,6 +202,7 @@
     <string name="xmltv_source_url">URL</string>
     <string name="xmltv_source_file">Dosya</string>
     <string name="xmltv_source_deleted">XMLTV kaynağı silindi.</string>
+    <string name="xmltv_add_url">URL ekle</string>
     <string name="not_configured_short">Ayarlanmadı</string>
     <string name="logo_cache_enabled">Kanal logosu önbelleği</string>
     <string name="logo_cache_size">Logo önbelleği sınırı</string>

@@ -476,31 +476,80 @@ class DisplaySettingsActivity : AppCompatActivity() {
     }
 
     private fun showXmlTvManagement() {
-        val actions = arrayOf(
-            getString(R.string.xmltv_from_url),
-            getString(R.string.xmltv_from_file),
-            getString(R.string.xmltv_saved_sources),
-            getString(R.string.xmltv_clear),
-        )
-        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            hint = getString(R.string.xmltv_url_hint)
+            setSingleLine()
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            setBackgroundResource(R.drawable.bg_focusable)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        fun action(text: Int) = TextView(this).apply {
+            setText(text)
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 16f
+            gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            isClickable = true
+            setBackgroundResource(R.drawable.bg_focusable)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        val fileAction = action(R.string.xmltv_from_file)
+        val savedAction = action(R.string.xmltv_saved_sources)
+        val clearAction = action(R.string.xmltv_clear)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(TextView(this@DisplaySettingsActivity).apply {
+                text = xmlTvRepository.sourceLabel() ?: getString(R.string.xmltv_not_configured)
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 0, 0, dp(12))
+            })
+            addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            listOf(fileAction, savedAction, clearAction).forEach { view ->
+                addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)).apply {
+                    topMargin = dp(8)
+                })
+            }
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.xmltv_alternative_epg)
-            .setMessage(xmlTvRepository.sourceLabel() ?: getString(R.string.xmltv_not_configured))
-            .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> showXmlTvUrlEditor()
-                    1 -> openXmlTvFile.launch(arrayOf("application/xml", "text/xml", "*/*"))
-                    2 -> showXmlTvSavedSources()
-                    3 -> {
-                        lifecycleScope.launch {
-                            withContext(Dispatchers.IO) { xmlTvRepository.clear() }
-                            xmlTvSettingRow?.value?.setText(R.string.not_configured_short)
-                            Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_cleared, Toast.LENGTH_SHORT).show()
-                        }
-                    }
+            .setView(container)
+            .setPositiveButton(R.string.xmltv_add_url, null)
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString().trim()
+                val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+                if (scheme == "http" || scheme == "https") {
+                    dialog.dismiss()
+                    importXmlTv { xmlTvRepository.importUrl(url) }
+                } else {
+                    input.error = getString(R.string.xmltv_url_invalid)
+                    input.requestFocus()
                 }
             }
-            .setNegativeButton(R.string.close, null)
-            .show()
+            fileAction.setOnClickListener {
+                dialog.dismiss()
+                openXmlTvFile.launch(arrayOf("application/xml", "text/xml", "*/*"))
+            }
+            savedAction.setOnClickListener {
+                dialog.dismiss()
+                showXmlTvSavedSources()
+            }
+            clearAction.setOnClickListener {
+                dialog.dismiss()
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) { xmlTvRepository.clear() }
+                    xmlTvSettingRow?.value?.setText(R.string.not_configured_short)
+                    Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_cleared, Toast.LENGTH_SHORT).show()
+                }
+            }
+            input.requestFocus()
+        }
+        dialog.show()
     }
 
     private fun showXmlTvUrlEditor() {
