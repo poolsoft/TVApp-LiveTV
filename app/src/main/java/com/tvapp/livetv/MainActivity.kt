@@ -333,6 +333,12 @@ class MainActivity : AppCompatActivity() {
                 "TIF_VIDEO_SIZE_RAW | channel=${currentChannel?.sourceKey}, width=$width, height=$height",
             )
         }
+        playback.onCallbackEvent = { event ->
+            debugLog.recordDebug(
+                "TIF_CALLBACK_RAW | event=${event.name}, " +
+                    event.values.entries.joinToString { (key, value) -> "$key=$value" },
+            )
+        }
         playback.onVideoStateChanged = { available, _ ->
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF) {
@@ -2916,6 +2922,21 @@ class MainActivity : AppCompatActivity() {
             )
             videoState?.unavailableReason?.let { reason ->
                 add(getString(R.string.system_info_unavailable_reason) to reason.toString())
+            }
+            val callbackEvents = if (isCurrentTif) playback.callbackEventHistory() else emptyList()
+            if (callbackEvents.isEmpty()) {
+                add(getString(R.string.system_info_callback_events) to getString(R.string.none))
+            } else {
+                val callbackTime = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
+                callbackEvents.forEachIndexed { index, event ->
+                    val prefix = getString(R.string.system_info_callback_index, index + 1)
+                    add("$prefix ${getString(R.string.system_info_callback_name)}" to event.name)
+                    add(
+                        "$prefix ${getString(R.string.system_info_callback_time)}" to
+                            callbackTime.format(Date(event.timestampMillis)),
+                    )
+                    event.values.forEach { (key, value) -> add("$prefix $key" to value) }
+                }
             }
             add(getString(R.string.system_info_quality) to quality)
             add(getString(R.string.system_info_encrypted) to yesNo(channel.encrypted))

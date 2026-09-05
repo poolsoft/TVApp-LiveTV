@@ -36,6 +36,10 @@
     <string name="system_info_section_callback">Canlı callback ve track değerleri</string>
     <string name="system_info_raw_channel_empty">Ham kanal satırı bulunamadı</string>
     <string name="system_info_raw_read_error">Ham kanal okuma hatası</string>
+    <string name="system_info_callback_events">Callback olayları</string>
+    <string name="system_info_callback_index">Callback %1$d</string>
+    <string name="system_info_callback_name">olay</string>
+    <string name="system_info_callback_time">zaman</string>
     <string name="system_info_audio">Ses</string>
     <string name="system_info_subtitle">Altyazı</string>
     <string name="unknown_value">Bilinmiyor</string>
