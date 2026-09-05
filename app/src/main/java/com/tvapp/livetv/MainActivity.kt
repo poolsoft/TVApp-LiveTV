@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
-        private const val INFO_HEIGHT_FRACTION = 0.205f
+        private const val INFO_HEIGHT_FRACTION = 0.30f
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -1254,6 +1254,7 @@ class MainActivity : AppCompatActivity() {
         binding.nextProgram.visibility = View.GONE
         binding.programDescription.visibility = View.GONE
         binding.iptvPlaybackContainer.visibility = View.VISIBLE
+        binding.iptvControlHints.visibility = View.VISIBLE
         updateInfoColorActions()
 
         setInfoBarVisible(true)
@@ -1288,6 +1289,7 @@ class MainActivity : AppCompatActivity() {
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
         binding.iptvPlaybackContainer.visibility = View.GONE
+        binding.iptvControlHints.visibility = View.GONE
         updateInfoColorActions()
         iptvControlRow = IptvControlRow.TIMELINE
         val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_focusable)
@@ -3880,18 +3882,6 @@ class MainActivity : AppCompatActivity() {
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
-            fun hint(label: Int) {
-                binding.infoColorActions.addView(TextView(this).apply {
-                    setText(label)
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                    textSize = 10f
-                    setPadding(dp(10), 0, 0, 0)
-                })
-            }
-            hint(R.string.iptv_controls_up_down_hint)
-            hint(R.string.iptv_controls_left_right_hint)
-            hint(R.string.iptv_controls_ok_hint)
-            hint(R.string.iptv_controls_back_hint)
             return
         }
         fun action(color: Int, label: Int) {

@@ -428,6 +428,10 @@
     <string name="iptv_controls_left_right_hint">◀▶ Seek / Value</string>
     <string name="iptv_controls_ok_hint">OK Apply</string>
     <string name="iptv_controls_back_hint">BACK Close</string>
+    <string name="iptv_controls_up_down_full_hint">▲ ▼  Change row</string>
+    <string name="iptv_controls_media_hint">MEDIA  Open controls</string>
+    <string name="iptv_controls_left_right_full_hint">◀ ▶  Seek / value</string>
+    <string name="iptv_controls_back_full_hint">BACK  Close controls</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">IPTV channel to open in PiP</string>
     <string name="iptv_pip_no_channels">No live IPTV channels are available for PiP.</string>

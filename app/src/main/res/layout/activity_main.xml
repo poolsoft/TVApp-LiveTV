@@ -459,9 +459,17 @@
         android:layout_width="match_parent"
         android:layout_height="260dp"
         android:layout_gravity="end|top"
-        android:background="@drawable/bg_info"
+        android:background="@android:color/transparent"
         android:orientation="vertical"
         android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/info_card"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_info"
+            android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -885,6 +893,54 @@
                 android:orientation="horizontal"
                 android:paddingStart="8dp"
                 android:paddingEnd="2dp" />
+        </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/iptv_control_hints"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="start|center_vertical"
+                android:text="@string/iptv_controls_up_down_full_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/iptv_controls_media_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="@string/iptv_controls_left_right_full_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="end|center_vertical"
+                android:text="@string/iptv_controls_back_full_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
         </LinearLayout>
 
     </LinearLayout>
