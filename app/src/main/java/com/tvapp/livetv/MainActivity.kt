@@ -4422,7 +4422,7 @@ class MainActivity : AppCompatActivity() {
             event.action == KeyEvent.ACTION_DOWN &&
             isIptv &&
             isChannelPanelClosed &&
-            (binding.iptvPlaybackContainer.visibility == View.VISIBLE || (isInfoBarOpen && iptvControlRow == IptvControlRow.BUTTONS))
+            binding.iptvPlaybackContainer.visibility == View.VISIBLE
         ) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_PROG_RED -> {
