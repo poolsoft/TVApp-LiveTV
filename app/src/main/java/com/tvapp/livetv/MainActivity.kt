@@ -1288,15 +1288,31 @@ class MainActivity : AppCompatActivity() {
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
         binding.iptvPlaybackContainer.visibility = View.GONE
+        iptvControlRow = IptvControlRow.TIMELINE
+        val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_focusable)
+        binding.iptvSeekbarRow.background = defaultBg
+        binding.iptvBtnPlayPause.background = defaultBg
+        binding.iptvBtnBuffer.background = defaultBg
+        binding.iptvBtnSpeed.background = defaultBg
+        binding.iptvBtnQuality.background = defaultBg
+        binding.iptvBtnAudio.background = defaultBg
+        binding.iptvBtnSubtitle.background = defaultBg
+
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
         if (hideInfoBar) {
             setInfoBarVisible(false)
+        } else {
+            updateIptvActionBarState()
         }
     }
 
     private fun showIptvNotice(message: Int) {
-        binding.iptvNotice.setText(message)
+        showIptvNoticeText(getString(message))
+    }
+
+    private fun showIptvNoticeText(text: String) {
+        binding.iptvNotice.text = text
         (binding.iptvNotice.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = Gravity.END or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
                 Gravity.BOTTOM
@@ -1328,19 +1344,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         val isPlaying = state.isPlaying
-        binding.iptvBtnPlayPause.text = if (isPlaying) "⏸ Duraklat" else "▶ Oynat"
+        binding.iptvBtnPlayPause.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play)
+        binding.iptvBtnSpeed.visibility = if (currentIptvContentKind == IptvContentKind.VOD) View.VISIBLE else View.GONE
 
-        val targetSec = pendingBufferSeconds
-        binding.iptvBtnBuffer.text = if (targetSec == 0) {
-            "🛡 Tampon: Oto"
-        } else {
-            "🛡 Tampon: ${targetSec}s"
-        }
-
-        if (currentIptvContentKind == IptvContentKind.VOD) {
-            binding.iptvBtnSpeed.text = String.format(Locale.getDefault(), "⚡ %.2gx", iptvPlayback.vodPlaybackSpeed())
-        }
-
+        updateIptvActionBarState()
         renderIptvControlSelection()
     }
 
@@ -1369,7 +1376,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val isButtonsRow = iptvControlRow == IptvControlRow.BUTTONS
-        fun updateButton(btn: TextView, isThisSelected: Boolean) {
+        fun updateButton(btn: ImageView, isThisSelected: Boolean) {
             btn.background = if (isButtonsRow && isThisSelected) {
                 selectedBg
             } else {
@@ -1383,6 +1390,24 @@ class MainActivity : AppCompatActivity() {
         updateButton(binding.iptvBtnQuality, selectedIptvButton == IptvControlButton.QUALITY)
         updateButton(binding.iptvBtnAudio, selectedIptvButton == IptvControlButton.AUDIO)
         updateButton(binding.iptvBtnSubtitle, selectedIptvButton == IptvControlButton.SUBTITLE)
+    }
+
+    private fun updateIptvActionBarState() {
+        val isIptv = currentChannel?.source == LiveChannel.Source.IPTV
+        if (!isIptv || binding.infoBar.visibility != View.VISIBLE) {
+            binding.iptvActionBar.visibility = View.GONE
+            return
+        }
+        binding.iptvActionBar.visibility = View.VISIBLE
+        val isChannelPanelOpen = binding.channelPanel.visibility == View.VISIBLE
+        binding.iptvActionBar.alpha = if (isChannelPanelOpen) 0.35f else 1.0f
+        val focusable = !isChannelPanelOpen
+        binding.iptvBtnPlayPause.isFocusable = focusable
+        binding.iptvBtnBuffer.isFocusable = focusable
+        binding.iptvBtnSpeed.isFocusable = focusable
+        binding.iptvBtnQuality.isFocusable = focusable
+        binding.iptvBtnAudio.isFocusable = focusable
+        binding.iptvBtnSubtitle.isFocusable = focusable
     }
 
     private fun activateSelectedIptvButton() {
@@ -1400,10 +1425,12 @@ class MainActivity : AppCompatActivity() {
                 val index = options.indexOf(pendingBufferSeconds).coerceAtLeast(0)
                 pendingBufferSeconds = options[(index + 1) % options.size]
                 iptvPlayback.setTargetBufferSeconds(pendingBufferSeconds)
-                showIptvNotice(
-                    if (pendingBufferSeconds == 0) R.string.iptv_buffer_target_auto
-                    else R.string.iptv_buffer_seconds
-                )
+                val label = if (pendingBufferSeconds == 0) {
+                    getString(R.string.iptv_buffer_target_auto)
+                } else {
+                    getString(R.string.iptv_buffer_target, pendingBufferSeconds)
+                }
+                showIptvNoticeText(label)
             }
             IptvControlButton.SPEED -> {
                 val options = IptvPlaybackPreferences.SPEED_OPTIONS
@@ -1411,6 +1438,7 @@ class MainActivity : AppCompatActivity() {
                 val index = options.indexOf(current).coerceAtLeast(0)
                 val next = options[(index + 1) % options.size]
                 iptvPlayback.setVodPlaybackSpeed(next)
+                showIptvNoticeText(String.format(Locale.getDefault(), "⚡ %.2gx", next))
             }
             IptvControlButton.QUALITY -> {
                 showIptvVideoOptions()
@@ -3853,6 +3881,7 @@ class MainActivity : AppCompatActivity() {
         binding.infoColorActions.visibility = if (
             visible && binding.channelPanel.visibility != View.VISIBLE
         ) View.VISIBLE else View.GONE
+        updateIptvActionBarState()
     }
 
     private fun updateChannelListModeIcon() {
@@ -4369,10 +4398,15 @@ class MainActivity : AppCompatActivity() {
             if (event.action == KeyEvent.ACTION_DOWN) handleIptvMediaKey(event.keyCode)
             return true
         }
+        val isIptv = currentChannel?.source == LiveChannel.Source.IPTV
+        val isChannelPanelClosed = binding.channelPanel.visibility != View.VISIBLE
+        val isInfoBarOpen = binding.infoBar.visibility == View.VISIBLE
+
         if (
             event.action == KeyEvent.ACTION_DOWN &&
-            binding.iptvPlaybackContainer.visibility == View.VISIBLE &&
-            currentChannel?.source == LiveChannel.Source.IPTV
+            isIptv &&
+            isChannelPanelClosed &&
+            (binding.iptvPlaybackContainer.visibility == View.VISIBLE || (isInfoBarOpen && iptvControlRow == IptvControlRow.BUTTONS))
         ) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_PROG_RED -> {
@@ -4465,8 +4499,8 @@ class MainActivity : AppCompatActivity() {
         }
         if (
             event.action == KeyEvent.ACTION_DOWN &&
-            currentChannel?.source == LiveChannel.Source.IPTV &&
-            binding.channelPanel.visibility != View.VISIBLE &&
+            isIptv &&
+            isChannelPanelClosed &&
             binding.iptvPlaybackContainer.visibility != View.VISIBLE &&
             event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
         ) {
@@ -4481,6 +4515,19 @@ class MainActivity : AppCompatActivity() {
             ) {
                 iptvManualTimeshift = true
             }
+            iptvControlRow = IptvControlRow.TIMELINE
+            showIptvPlaybackControls()
+            return true
+        }
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            isIptv &&
+            isChannelPanelClosed &&
+            isInfoBarOpen &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+        ) {
+            iptvControlRow = IptvControlRow.BUTTONS
+            renderIptvControlSelection()
             showIptvPlaybackControls()
             return true
         }

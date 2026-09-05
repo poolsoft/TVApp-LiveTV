@@ -7,10 +7,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu
-* IPTV ve VOD yayınlarında harici yüzen OSD paneli kaldırılarak zaman çubuğu (progressbar/seekbar), pozisyon/süre sayaçları, oynat/duraklat, tampon (buffer) ayarı, oynatma hızı, kalite, ses ve altyazı butonları doğrudan bilgi çubuğuna (Infobar) entegre edildi.
-* Kumanda yön tuşları ile iki satırlı hiyerarşik kontrol sağlandı: Yukarı/Aşağı tuşları zaman çizgisi (Timeline) ile butonlar satırı arasında geçiş yapar; Sol/Sağ tuşları zaman çizgisindeyken yayını ileri/geri sarar, butonlar satırındayken butonlar arasında gezinir. `OK` tuşu seçili butonun işlevini (Oynat/Duraklat, Tampon seviyesi değişimi, Hız değişimi, Kalite/Ses/Altyazı menüleri) tetikler.
-* Kanal listesi açıkken yön tuşları kanal listesinde kalır; çakışma önlenmiştir.
-* `BACK` tuşuna basıldığında veya zaman aşımı dolduğunda IPTV kontrolleri kapanır ve Infobar normal program bilgisi moduna geri döner.
+* Infobar orta alanındaki metinli butonlar kaldırılarak dikey sıkışıklık giderildi; zaman çizgisi (Seekbar) ferah ve temiz bir görünüme kavuşturuldu.
+* Kontrol butonları metin içermeyen saf vektör ikonlar (`ic_play`/`ic_pause`, `ic_buffer`, `ic_speed`, `ic_quality`, `ic_audio`, `ic_subtitle`) olarak Infobar altındaki teknik ikon barına (`technical_row`) taşındı.
+* IPTV kanallarında bu ikonlar daima görünür ve hazır bekler. Kanal listesi açıkken ikonlar pasif (`alpha = 0.35`, dokunulamaz) hale gelerek yön tuşlarının çakışmasını önler.
+* Kumanda yön tuşlarıyla: Zaman çizgisindeyken Sol/Sağ ile sarma, Aşağı tuşuyla alt ikon barına odaklanma, ikonlardayken Sol/Sağ ile gezinme ve `OK` ile işlem yürütme sağlandı. Tampon ve hız değişimleri zarif anlık bildirimle ekranda gösterilir.
 
 ### Son İzlenen Kanallar Paneli Modernizasyonu
 * Geri tuşuyla açılan son 5 kanal paneli yatay kaydırma gerektirmeyecek şekilde ekran genişliğine eşit olarak paylaştırıldı (`weight=1`).

@@ -616,100 +616,6 @@
                             android:textColor="@color/text_secondary"
                             android:textSize="11sp" />
                     </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/iptv_controls_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/iptv_btn_play_pause"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="⏸ Duraklat"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/iptv_btn_buffer"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="🛡 Tampon: Oto"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp" />
-
-                        <TextView
-                            android:id="@+id/iptv_btn_speed"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="⚡ 1.0x"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp"
-                            android:visibility="gone" />
-
-                        <TextView
-                            android:id="@+id/iptv_btn_quality"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="⚙ Kalite"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp" />
-
-                        <TextView
-                            android:id="@+id/iptv_btn_audio"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="🔊 Ses"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp" />
-
-                        <TextView
-                            android:id="@+id/iptv_btn_subtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="26dp"
-                            android:layout_marginStart="6dp"
-                            android:background="@drawable/bg_focusable"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center"
-                            android:paddingHorizontal="9dp"
-                            android:text="💬 Altyazı"
-                            android:textColor="@color/text_primary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
@@ -882,6 +788,94 @@
                     android:src="@drawable/ic_lock"
                     android:visibility="gone" />
             </FrameLayout>
+
+            <LinearLayout
+                android:id="@+id/iptv_action_bar"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/iptv_btn_play_pause"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/play"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_pause"
+                    app:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/iptv_btn_buffer"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/iptv_buffer_target_auto"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_buffer"
+                    app:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/iptv_btn_speed"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/playback_speed"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_speed"
+                    android:visibility="gone"
+                    app:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/iptv_btn_quality"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/video_quality"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_quality"
+                    app:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/iptv_btn_audio"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/audio_tracks"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_audio"
+                    app:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/iptv_btn_subtitle"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_focusable"
+                    android:clickable="true"
+                    android:contentDescription="@string/subtitles"
+                    android:focusable="true"
+                    android:padding="4dp"
+                    android:src="@drawable/ic_subtitle"
+                    app:tint="@color/text_primary" />
+            </LinearLayout>
 
             <View
                 android:layout_width="0dp"
