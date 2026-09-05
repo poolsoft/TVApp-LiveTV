@@ -11,6 +11,7 @@ import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.data.local.XmlTvSourceEntity
+import com.tvapp.livetv.data.local.XmlTvChannelCatalogRow
 import com.tvapp.livetv.model.LiveChannel
 import org.json.JSONArray
 import java.io.InputStream
@@ -28,6 +29,19 @@ class XmlTvRepository(context: Context) {
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
 
     fun sources(): List<XmlTvSourceEntity> = dao.sources()
+
+    fun channelCatalog(): List<XmlTvChannelOption> {
+        val sourceNames = sources().associate { it.id to it.name }
+        return dao.channelCatalog().map { row ->
+            XmlTvChannelOption(
+                sourceId = row.sourceId,
+                sourceName = sourceNames[row.sourceId] ?: "XMLTV",
+                channelId = row.channelId,
+                channelName = row.channelName,
+                programCount = row.programCount,
+            )
+        }
+    }
 
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE_SUMMARY, null)
         ?: preferences.getString(KEY_SOURCE, null)
@@ -142,7 +156,7 @@ class XmlTvRepository(context: Context) {
         migrateLegacyCacheIfNeeded()
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
-        val xmlTv = dao.programs(epgId.orEmpty(), name, start, end).map {
+        val xmlTv = dao.programs(epgId.orEmpty(), name, channel.epgSourceId, start, end).map {
             ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
         }
         val xtream = xtreamEpgDao.programs(epgId.orEmpty(), name, start, end).map {
@@ -172,9 +186,13 @@ class XmlTvRepository(context: Context) {
         channels.forEach { channel ->
             val epgId = channel.epgId?.normalize()?.takeIf(String::isNotBlank)
             val name = channel.displayName.normalize()
-            val match = epgId?.let(byId::get)?.firstOrNull()
-                ?: byName[name]?.firstOrNull()
-                ?: byId[name]?.firstOrNull()
+            val match = sequenceOf(
+                epgId?.let(byId::get),
+                byName[name],
+                byId[name],
+            ).filterNotNull().flatten().firstOrNull { candidate ->
+                channel.epgSourceId == null || candidate.sourceId == channel.epgSourceId
+            }
             match?.let {
                 result[channel.sourceKey] = ProgramSummary(
                     it.title,
@@ -470,6 +488,14 @@ class XmlTvRepository(context: Context) {
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
     }
 }
+
+data class XmlTvChannelOption(
+    val sourceId: Long,
+    val sourceName: String,
+    val channelId: String,
+    val channelName: String,
+    val programCount: Int,
+)
 
 internal fun mergeProgramSources(
     primary: List<ProgramSummary>,

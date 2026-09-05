@@ -114,6 +114,15 @@ class ChannelRepository(context: Context) {
     suspend fun setGroup(sourceKey: String, groupId: Long?) =
         channelDao.setGroup(sourceKey, groupId)
 
+    suspend fun channelPreference(sourceKey: String): UserChannelEntity? =
+        channelDao.getChannel(sourceKey)
+
+    suspend fun channelPreferences(): Map<String, UserChannelEntity> =
+        channelDao.getAllChannels().associateBy(UserChannelEntity::sourceKey)
+
+    suspend fun setEpgOverride(sourceKey: String, epgId: String?, sourceId: Long?) =
+        channelDao.setEpgOverride(sourceKey, epgId, sourceId)
+
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int) =
         channelDao.setSortOrder(sourceKey, sortOrder)
 

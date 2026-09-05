@@ -61,6 +61,20 @@ class ChannelMergerTest {
         assertTrue(result.first().hidden)
     }
 
+    @Test
+    fun merge_appliesManualXmlTvSourceAndChannelId() {
+        val channel = channel("first", "1", "TRT 1").copy(epgId = "trt1.auto")
+        val preference = preference(channel, sortOrder = 0).copy(
+            epgIdOverride = "TRT1.tr",
+            epgSourceIdOverride = 42L,
+        )
+
+        val result = ChannelMerger.merge(listOf(channel), listOf(preference)).single()
+
+        assertEquals("TRT1.tr", result.epgId)
+        assertEquals(42L, result.epgSourceId)
+    }
+
     private fun channel(key: String, number: String, name: String) = LiveChannel(
         id = key.hashCode().toLong(),
         sourceKey = key,

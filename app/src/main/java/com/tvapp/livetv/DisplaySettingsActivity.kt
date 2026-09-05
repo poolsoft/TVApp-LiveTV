@@ -497,6 +497,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
         val fileAction = action(R.string.xmltv_from_file)
         val savedAction = action(R.string.xmltv_saved_sources)
+        val matchAction = action(R.string.xmltv_match_editor)
         val clearAction = action(R.string.xmltv_clear)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -507,7 +508,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, dp(12))
             })
             addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            listOf(fileAction, savedAction, clearAction).forEach { view ->
+            listOf(fileAction, savedAction, matchAction, clearAction).forEach { view ->
                 addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)).apply {
                     topMargin = dp(8)
                 })
@@ -538,6 +539,10 @@ class DisplaySettingsActivity : AppCompatActivity() {
             savedAction.setOnClickListener {
                 dialog.dismiss()
                 showXmlTvSavedSources()
+            }
+            matchAction.setOnClickListener {
+                dialog.dismiss()
+                startActivity(Intent(this, XmlTvEpgEditorActivity::class.java))
             }
             clearAction.setOnClickListener {
                 dialog.dismiss()

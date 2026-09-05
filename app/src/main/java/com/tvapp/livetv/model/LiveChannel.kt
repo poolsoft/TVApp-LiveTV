@@ -14,6 +14,7 @@ data class LiveChannel(
     val logoUrl: String? = null,
     val groupTitle: String? = null,
     val epgId: String? = null,
+    val epgSourceId: Long? = null,
     val userAgent: String? = null,
     val referrer: String? = null,
     val subtitleUrl: String? = null,

@@ -17,6 +17,8 @@ object ChannelMerger {
                 favorite = preference.favorite,
                 hidden = preference.hidden,
                 groupId = preference.groupId,
+                epgId = preference.epgIdOverride ?: channel.epgId,
+                epgSourceId = preference.epgSourceIdOverride,
             )
         }.sortedWith(
             compareBy<LiveChannel> { preferencesByKey[it.sourceKey]?.sortOrder ?: Int.MAX_VALUE }

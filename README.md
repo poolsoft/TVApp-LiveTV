@@ -53,7 +53,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Cihaz destekliyorsa sistem PiP, desteklemiyorsa uygulama içi mini pencere kullanılabilir.
 - Google TV Home için son izlenen kanal satırı ve isteğe bağlı açılışta TVApp'i başlatma desteği vardır.
 - Yapılandırma, kanal düzeni ve IPTV seçimleri sürümlü yedek dosyasına aktarılıp geri alınabilir.
-- Birden fazla XMLTV URL/dosya kaynağı ayrı ayrı eklenebilir, güncellenebilir ve silinebilir. Programlar kaynak kimliği ile Room'da saklanır; bir kaynağı yenilemek diğer EPG verilerini silmez ve kayıtlı URL kaynakları ağ varken 12 saatte bir yenilenir.
+- Birden fazla XMLTV URL/dosya kaynağı ayrı ayrı eklenebilir, güncellenebilir ve silinebilir. Programlar kaynak kimliği ile Room'da saklanır; bir kaynağı yenilemek diğer EPG verilerini silmez ve kayıtlı URL kaynakları ağ varken 12 saatte bir yenilenir. EPG eşleştirme editörü otomatik `tvg-id`/kanal adı sonucunu gösterir ve yanlış eşleşmelerin belirli bir XMLTV kanalına elle bağlanmasını sağlar.
 
 ## Kumanda kullanımı
 

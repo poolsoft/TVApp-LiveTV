@@ -42,6 +42,9 @@ interface ChannelDao {
     @Query("UPDATE user_channels SET groupId = :groupId WHERE sourceKey = :sourceKey")
     suspend fun setGroup(sourceKey: String, groupId: Long?)
 
+    @Query("UPDATE user_channels SET epgIdOverride = :epgId, epgSourceIdOverride = :sourceId WHERE sourceKey = :sourceKey")
+    suspend fun setEpgOverride(sourceKey: String, epgId: String?, sourceId: Long?)
+
     @Query("UPDATE user_channels SET sortOrder = :sortOrder WHERE sourceKey = :sourceKey")
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int)
 

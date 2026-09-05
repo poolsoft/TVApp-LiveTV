@@ -28,5 +28,7 @@ data class UserChannelEntity(
     val favorite: Boolean = false,
     val hidden: Boolean = false,
     val groupId: Long? = null,
+    val epgIdOverride: String? = null,
+    val epgSourceIdOverride: Long? = null,
     val lastSeenAt: Long,
 )
