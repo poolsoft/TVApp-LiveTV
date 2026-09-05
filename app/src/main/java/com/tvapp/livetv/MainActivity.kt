@@ -1254,6 +1254,7 @@ class MainActivity : AppCompatActivity() {
         binding.nextProgram.visibility = View.GONE
         binding.programDescription.visibility = View.GONE
         binding.iptvPlaybackContainer.visibility = View.VISIBLE
+        updateInfoColorActions()
 
         setInfoBarVisible(true)
 
@@ -1287,13 +1288,15 @@ class MainActivity : AppCompatActivity() {
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
         binding.iptvPlaybackContainer.visibility = View.GONE
+        updateInfoColorActions()
         iptvControlRow = IptvControlRow.TIMELINE
         val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_focusable)
         binding.iptvSeekbarRow.background = defaultBg
-        binding.iptvBtnPlayPause.background = defaultBg
-        binding.iptvBtnBuffer.background = defaultBg
-        binding.iptvBtnSpeed.background = defaultBg
-        binding.iptvBtnMore.background = defaultBg
+        val controlBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control)
+        binding.iptvBtnPlayPause.background = controlBg
+        binding.iptvBtnBuffer.background = controlBg
+        binding.iptvBtnSpeed.background = controlBg
+        binding.iptvBtnMore.background = controlBg
 
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
@@ -1378,7 +1381,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderIptvControlSelection() {
         val selectedBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control_selected)
-        val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_focusable)
+        val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control)
 
         binding.iptvSeekbarRow.background = if (iptvControlRow == IptvControlRow.TIMELINE) {
             selectedBg
@@ -3876,6 +3879,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
+        if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
+            fun hint(label: Int) {
+                binding.infoColorActions.addView(TextView(this).apply {
+                    setText(label)
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    textSize = 10f
+                    setPadding(dp(10), 0, 0, 0)
+                })
+            }
+            hint(R.string.iptv_controls_up_down_hint)
+            hint(R.string.iptv_controls_left_right_hint)
+            hint(R.string.iptv_controls_ok_hint)
+            hint(R.string.iptv_controls_back_hint)
+            return
+        }
         fun action(color: Int, label: Int) {
             if (binding.infoColorActions.childCount > 0) {
                 binding.infoColorActions.addView(TextView(this).apply {
