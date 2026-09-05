@@ -312,7 +312,7 @@ class XmlTvRepository(context: Context) {
     }
 
     private fun importStream(stream: InputStream, location: String, name: String, kind: String): Int {
-        val parser = Xml.newPullParser().apply { setInput(stream, null) }
+        val parser = Xml.newPullParser().apply { setInput(stream.openXmlTvContent(), null) }
         val channelNames = mutableMapOf<String, String>()
         val programs = mutableListOf<XmlTvProgramEntity>()
         var event = parser.eventType
