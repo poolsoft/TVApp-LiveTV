@@ -31,6 +31,7 @@ class XmlTvRepository(context: Context) {
     fun sources(): List<XmlTvSourceEntity> = dao.sources()
 
     fun channelCatalog(): List<XmlTvChannelOption> {
+        ensureCurrentNormalization()
         val sourceNames = sources().associate { it.id to it.name }
         return dao.channelCatalog().map { row ->
             XmlTvChannelOption(
@@ -154,6 +155,7 @@ class XmlTvRepository(context: Context) {
 
     fun programs(channel: LiveChannel, start: Long, end: Long): List<ProgramSummary> {
         migrateLegacyCacheIfNeeded()
+        ensureCurrentNormalization()
         val epgId = channel.epgId?.normalize()
         val name = channel.displayName.normalize()
         val xmlTv = dao.programs(epgId.orEmpty(), name, channel.epgSourceId, start, end).map {
@@ -171,6 +173,7 @@ class XmlTvRepository(context: Context) {
     ): Map<String, ProgramSummary> {
         if (channels.isEmpty()) return emptyMap()
         migrateLegacyCacheIfNeeded()
+        ensureCurrentNormalization()
         val channelKeys = channels.flatMap { channel ->
             listOfNotNull(
                 channel.epgId?.normalize()?.takeIf(String::isNotBlank),
@@ -466,9 +469,21 @@ class XmlTvRepository(context: Context) {
         }.apply()
     }
 
-    private fun String.normalize(): String = lowercase(Locale.ROOT)
-        .replace(Regex("[^a-z0-9çğıöşü]+"), "")
-        .removeSuffix("hd").removeSuffix("sd").removeSuffix("4k")
+    private fun ensureCurrentNormalization() {
+        if (preferences.getInt(KEY_NORMALIZATION_VERSION, 0) >= NORMALIZATION_VERSION) return
+        val programs = dao.allPrograms()
+        database.runInTransaction {
+            programs.asSequence().map { program ->
+                program.copy(
+                    normalizedChannelId = program.channelId.normalizeEpgKey(),
+                    normalizedChannelName = program.channelName.normalizeEpgKey(),
+                )
+            }.chunked(INSERT_BATCH_SIZE).forEach(dao::updatePrograms)
+        }
+        preferences.edit().putInt(KEY_NORMALIZATION_VERSION, NORMALIZATION_VERSION).apply()
+    }
+
+    private fun String.normalize(): String = normalizeEpgKey()
 
     companion object {
         internal const val XTREAM_REFRESH_JOB_ID = 0x545651
@@ -477,6 +492,7 @@ class XmlTvRepository(context: Context) {
         const val KEY_UPDATED = "updated"
         const val KEY_SOURCE_SUMMARY = "source_summary"
         const val KEY_XTREAM_UPDATED = "xtream_updated"
+        const val KEY_NORMALIZATION_VERSION = "normalization_version"
         const val KIND_URL = "URL"
         const val KIND_FILE = "FILE"
         const val INSERT_BATCH_SIZE = 1_000
@@ -486,6 +502,7 @@ class XmlTvRepository(context: Context) {
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
+        private const val NORMALIZATION_VERSION = 2
     }
 }
 

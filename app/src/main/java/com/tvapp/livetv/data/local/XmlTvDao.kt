@@ -3,6 +3,7 @@ package com.tvapp.livetv.data.local
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface XmlTvDao {
@@ -12,6 +13,12 @@ interface XmlTvDao {
             "ORDER BY channelName COLLATE NOCASE",
     )
     fun channelCatalog(): List<XmlTvChannelCatalogRow>
+
+    @Query("SELECT * FROM xmltv_programs")
+    fun allPrograms(): List<XmlTvProgramEntity>
+
+    @Update
+    fun updatePrograms(programs: List<XmlTvProgramEntity>)
 
     @Query("SELECT * FROM xmltv_sources ORDER BY name COLLATE NOCASE")
     fun sources(): List<XmlTvSourceEntity>

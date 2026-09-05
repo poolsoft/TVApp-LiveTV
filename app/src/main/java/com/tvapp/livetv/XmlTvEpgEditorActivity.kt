@@ -90,19 +90,21 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
         binding.title.setText(R.string.xmltv_match_editor)
         binding.subtitle.setText(R.string.xmltv_match_editor_summary)
         binding.hint.setText(R.string.xmltv_match_editor_hint)
+        val matchIndex = XmlTvMatcher.Index(options)
         val rows = channels.map { channel ->
             val preference = preferences[channel.sourceKey]
             val manual = preference?.epgIdOverride
+            val automatic = if (manual == null) matchIndex.resolve(channel) else null
             val match = if (manual != null) {
                 options.firstOrNull { it.sourceId == preference.epgSourceIdOverride && it.channelId == manual }
             } else {
-                XmlTvMatcher.automaticMatch(channel, options)
+                automatic?.option
             }
             val status = when {
                 manual != null && match != null -> getString(R.string.xmltv_match_manual, match.channelName)
                 manual != null -> getString(R.string.xmltv_match_missing_manual, manual)
                 match != null -> {
-                    val type = XmlTvMatcher.automaticResolution(channel, options)?.type
+                    val type = automatic?.type
                     val label = if (type == XmlTvMatcher.MatchType.ID) R.string.xmltv_match_by_id else R.string.xmltv_match_by_name
                     getString(label, match.channelName)
                 }

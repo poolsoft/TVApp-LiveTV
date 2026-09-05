@@ -27,6 +27,17 @@ class XmlTvMatcherTest {
         assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
     }
 
+    @Test
+    fun matching_ignoresCountrySuffixAfterQualityMarker() {
+        val result = XmlTvMatcher.automaticResolution(
+            channel("TRT 1 HD", null),
+            listOf(option("TRT1 HD.tr", "TRT1 HD.tr")),
+        )
+
+        assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
+        assertEquals("trt1", "TRT1 HD.tr".normalizeEpgKey())
+    }
+
     private fun channel(name: String, epgId: String?) = LiveChannel(
         id = 1,
         sourceKey = "channel",

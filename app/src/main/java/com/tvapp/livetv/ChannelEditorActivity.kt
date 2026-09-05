@@ -964,6 +964,7 @@ class ChannelEditorActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_PAGE_DOWN,
         )
         val handlesBack = event.keyCode == KeyEvent.KEYCODE_BACK
+        val handlesEpg = event.keyCode == KeyEvent.KEYCODE_GUIDE
         val digit = digitForKeyCode(event.keyCode)
 
         // Vendor TV firmware may attach system actions to the key-up phase of color keys.
@@ -971,7 +972,7 @@ class ChannelEditorActivity : AppCompatActivity() {
         if (event.action != KeyEvent.ACTION_DOWN) {
             return if (
                 editorColor != null || handlesMoveDirection || handlesPage || handlesBack ||
-                handlesMoveConfirm || digit != null
+                handlesMoveConfirm || handlesEpg || digit != null
             ) {
                 true
             } else {
@@ -979,7 +980,7 @@ class ChannelEditorActivity : AppCompatActivity() {
             }
         }
         if (event.repeatCount > 0 && !handlesMoveDirection) {
-            return if (editorColor != null || handlesBack || handlesMoveConfirm || digit != null) {
+            return if (editorColor != null || handlesBack || handlesMoveConfirm || handlesEpg || digit != null) {
                 true
             } else {
                 super.dispatchKeyEvent(event)
@@ -1025,6 +1026,9 @@ class ChannelEditorActivity : AppCompatActivity() {
                 }
                 KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> pageChannels(-1)
                 KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> pageChannels(1)
+                KeyEvent.KEYCODE_GUIDE -> if (mode == Mode.NORMAL) {
+                    startActivity(Intent(this, XmlTvEpgEditorActivity::class.java))
+                }
                 KeyEvent.KEYCODE_BACK -> if (mode == Mode.NORMAL) {
                     crashReportStore.recordEditorExit(
                         "BACK received in NORMAL mode; keyCode=${event.keyCode}, " +
