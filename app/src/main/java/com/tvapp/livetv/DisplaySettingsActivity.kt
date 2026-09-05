@@ -29,6 +29,8 @@ import com.tvapp.livetv.settings.ChannelPanelSide
 import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
+import com.tvapp.livetv.settings.IptvPlaybackPreferences
+import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.LogoCachePreferences
 import com.tvapp.livetv.settings.LogoCachePreferencesStore
@@ -52,6 +54,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private lateinit var xmlTvRepository: XmlTvRepository
     private lateinit var logoCacheStore: LogoCachePreferencesStore
     private lateinit var externalPlayerStore: ExternalPlayerPreferencesStore
+    private lateinit var iptvPlaybackStore: IptvPlaybackPreferencesStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
@@ -71,6 +74,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
         xmlTvRepository = XmlTvRepository(this)
         logoCacheStore = LogoCachePreferencesStore(this)
         externalPlayerStore = ExternalPlayerPreferencesStore(this)
+        iptvPlaybackStore = IptvPlaybackPreferencesStore(this)
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
@@ -195,6 +199,28 @@ class DisplaySettingsActivity : AppCompatActivity() {
         ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
 
         section(R.string.playback_settings)
+        val iptvPlaybackPreferences = iptvPlaybackStore.load()
+        val bufferOptions = IptvPlaybackPreferences.BUFFER_OPTIONS
+        choice(
+            R.string.iptv_default_buffer,
+            bufferOptions.map { seconds ->
+                if (seconds == 0) getString(R.string.automatic_abr)
+                else getString(R.string.seconds_value, seconds)
+            },
+            bufferOptions.indexOf(iptvPlaybackPreferences.targetBufferSeconds).coerceAtLeast(0),
+        ) { index ->
+            iptvPlaybackStore.saveTargetBufferSeconds(bufferOptions[index])
+            markChanged()
+        }
+        val speedOptions = IptvPlaybackPreferences.SPEED_OPTIONS
+        choice(
+            R.string.iptv_default_vod_speed,
+            speedOptions.map { String.format(java.util.Locale.getDefault(), "%.2gx", it) },
+            speedOptions.indexOf(iptvPlaybackPreferences.vodPlaybackSpeed).coerceAtLeast(0),
+        ) { index ->
+            iptvPlaybackStore.saveVodPlaybackSpeed(speedOptions[index])
+            markChanged()
+        }
         val externalPlayers = ExternalPlayerPreference.entries
         choice(
             R.string.external_player,

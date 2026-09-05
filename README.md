@@ -33,6 +33,10 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ### IPTV
 
+- Oynatma OSD'sinde Yukarı/Aşağı ile zaman çizgisi, buffer hedefi ve VOD oynatma hızı seçilir; Sol/Sağ seçili satırı değiştirir.
+- Buffer hedefi `OK` ile uygulanır; değerler arasında gezinirken yayın tekrar tekrar başlatılmaz. OSD açıkken kanal değiştirme yalnız `CH+`/`CH-` ile yapılır.
+- Kalıcı buffer hedefi ve varsayılan VOD hızı `Ayarlar > Oynatma` bölümünden de seçilebilir.
+
 - M3U/M3U8 listeleri URL'den veya dosyadan eklenebilir, yenilenebilir ve silinebilir.
 - Xtream Codes hesaplarından canlı kanal ve film/VOD katalogları alınabilir.
 - Stalker Portal kaynakları MAC adresiyle eklenebilir; canlı bağlantı oynatma anında yenilenir.

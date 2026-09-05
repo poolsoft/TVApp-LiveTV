@@ -24,6 +24,7 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -46,8 +47,10 @@ class IptvPlaybackController(
     private var currentChannel: LiveChannel? = null
     private var hasReachedReady = false
     private var explicitLoading = true
-    private var targetBufferSeconds = appContext.getSharedPreferences(BUFFER_PREFS, Context.MODE_PRIVATE)
-        .getInt(KEY_TARGET_BUFFER_SECONDS, DEFAULT_TARGET_BUFFER_SECONDS)
+    private val playbackPreferencesStore = IptvPlaybackPreferencesStore(appContext)
+    private var playbackPreferences = playbackPreferencesStore.load()
+    private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
+    private var vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
     private val retryRunnable = Runnable {
         player?.let { current ->
             explicitLoading = true
@@ -68,6 +71,16 @@ class IptvPlaybackController(
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
+        val previousBufferSeconds = targetBufferSeconds
+        playbackPreferences = playbackPreferencesStore.load()
+        targetBufferSeconds = playbackPreferences.targetBufferSeconds
+        vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
+        if (player != null && previousBufferSeconds != targetBufferSeconds) {
+            playerView.player = null
+            player?.release()
+            player = null
+            trackSelector = null
+        }
         hasReachedReady = false
         explicitLoading = true
         resetProgressObservation()
@@ -172,6 +185,7 @@ class IptvPlaybackController(
             exoPlayer.setMediaSource(mediaSource)
         }
         exoPlayer.prepare()
+        exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
     }
 
@@ -284,21 +298,13 @@ class IptvPlaybackController(
 
     fun targetBufferSeconds(): Int = targetBufferSeconds
 
-    fun adjustTargetBufferSeconds(deltaSeconds: Int): Int {
+    fun setTargetBufferSeconds(seconds: Int): Int {
         if (profile != IptvPlaybackProfile.PRIMARY) return targetBufferSeconds
-        val updated = when {
-            deltaSeconds < 0 && targetBufferSeconds <= MIN_TARGET_BUFFER_SECONDS -> AUTO_TARGET_BUFFER_SECONDS
-            deltaSeconds > 0 && targetBufferSeconds == AUTO_TARGET_BUFFER_SECONDS -> MIN_TARGET_BUFFER_SECONDS
-            else -> (targetBufferSeconds + deltaSeconds).coerceIn(
-                MIN_TARGET_BUFFER_SECONDS,
-                MAX_TARGET_BUFFER_SECONDS,
-            )
-        }
+        val updated = seconds.takeIf { it in com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS }
+            ?: return targetBufferSeconds
         if (updated == targetBufferSeconds) return updated
         targetBufferSeconds = updated
-        appContext.getSharedPreferences(BUFFER_PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_TARGET_BUFFER_SECONDS, updated)
-            .apply()
+        playbackPreferencesStore.saveTargetBufferSeconds(updated)
         val channel = currentChannel ?: return updated
         val resumePosition = player?.currentPosition?.takeIf {
             contentKind() == IptvContentKind.VOD
@@ -310,6 +316,17 @@ class IptvPlaybackController(
         trackSelector = null
         play(channel, resumePosition)
         return updated
+    }
+
+    fun vodPlaybackSpeed(): Float = vodPlaybackSpeed
+
+    fun setVodPlaybackSpeed(speed: Float): Float {
+        if (profile != IptvPlaybackProfile.PRIMARY) return vodPlaybackSpeed
+        if (speed !in com.tvapp.livetv.settings.IptvPlaybackPreferences.SPEED_OPTIONS) return vodPlaybackSpeed
+        vodPlaybackSpeed = speed
+        playbackPreferencesStore.saveVodPlaybackSpeed(speed)
+        if (contentKind() == IptvContentKind.VOD) player?.setPlaybackSpeed(speed)
+        return speed
     }
 
     fun technicalSnapshot(): IptvTechnicalSnapshot {
@@ -516,13 +533,6 @@ class IptvPlaybackController(
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
         const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
-        const val BUFFER_PREFS = "iptv_playback"
-        const val KEY_TARGET_BUFFER_SECONDS = "target_buffer_seconds"
-        const val DEFAULT_TARGET_BUFFER_SECONDS = 20
-        const val AUTO_TARGET_BUFFER_SECONDS = 0
-        const val MIN_TARGET_BUFFER_SECONDS = 5
-        const val MAX_TARGET_BUFFER_SECONDS = 60
-
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
         ) {

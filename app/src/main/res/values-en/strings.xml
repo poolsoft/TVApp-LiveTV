@@ -161,7 +161,7 @@
     <string name="iptv_vod_playing">Playing</string>
     <string name="iptv_vod_paused">Paused</string>
     <string name="iptv_vod_stopped">Stopped</string>
-    <string name="iptv_vod_remote_hint">←/→ Seek    ↑/↓ Buffer    CH+/CH− Channel    OK Play/Pause    BACK Close</string>
+    <string name="iptv_vod_remote_hint">↑/↓ Select row · ←/→ Change · OK Apply/Play · CH+/CH− Channel · BACK Close</string>
     <string name="iptv_action_live">Live</string>
     <string name="iptv_action_restart">Restart</string>
     <string name="iptv_action_audio">Audio</string>
@@ -415,6 +415,11 @@
     <string name="iptv_buffer_target_auto">Buffer target: Auto (ABR)</string>
     <string name="iptv_buffer_target_auto_short">Target Auto (ABR)</string>
     <string name="iptv_buffer_changed">Buffer setting changed</string>
+    <string name="iptv_control_buffer_row">Buffer target    &lt;  %1$s  &gt;</string>
+    <string name="iptv_control_speed_row">Playback speed    &lt;  %1$s  &gt;</string>
+    <string name="iptv_default_buffer">IPTV buffer target</string>
+    <string name="iptv_default_vod_speed">Default VOD speed</string>
+    <string name="automatic_abr">Auto (ABR)</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">IPTV channel to open in PiP</string>
     <string name="iptv_pip_no_channels">No live IPTV channels are available for PiP.</string>

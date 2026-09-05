@@ -68,6 +68,7 @@ import com.tvapp.livetv.settings.ChannelSourceFilter
 import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
+import com.tvapp.livetv.settings.IptvPlaybackPreferences
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
@@ -114,7 +115,6 @@ class MainActivity : AppCompatActivity() {
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
-        private const val IPTV_BUFFER_STEP_SECONDS = 5
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
         private const val IPTV_LIBRARY_SOURCE_ID = "source-id"
         private const val IPTV_LIBRARY_CONTENT_TYPE = "content-type"
@@ -126,6 +126,7 @@ class MainActivity : AppCompatActivity() {
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
     private enum class IptvLibraryContentType { ALL, LIVE, VOD, CONTINUE }
+    private enum class IptvControlRow { TIMELINE, BUFFER, SPEED }
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var repository: ChannelRepository
@@ -216,6 +217,8 @@ class MainActivity : AppCompatActivity() {
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private var iptvManualTimeshift = false
     private var iptvPlaybackFailed = false
+    private var iptvControlRow = IptvControlRow.TIMELINE
+    private var pendingBufferSeconds = IptvPlaybackPreferences.DEFAULT_BUFFER_SECONDS
     private var iptvAlternativeStreams: List<LiveChannel> = emptyList()
     private var iptvAlternativeIndex = 0
     private var iptvAlternativeLoadKey: String? = null
@@ -1199,6 +1202,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showIptvPlaybackControls(stateText: Int, autoHide: Boolean = true) {
+        val wasHidden = binding.iptvPlaybackControls.visibility != View.VISIBLE
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
         channelPanelExpanded = false
@@ -1220,8 +1224,10 @@ class MainActivity : AppCompatActivity() {
         val timeline = iptvPlayback.playbackSnapshot().let {
             iptvPlaybackFailed || it.kind == IptvContentKind.VOD || it.isSeekable
         }
-        binding.iptvControlProgress.visibility = if (timeline) View.VISIBLE else View.GONE
-        binding.iptvControlPosition.visibility = if (timeline) View.VISIBLE else View.GONE
+        binding.iptvControlTimelineRow.visibility = if (timeline) View.VISIBLE else View.GONE
+        if (!timeline && iptvControlRow == IptvControlRow.TIMELINE) iptvControlRow = IptvControlRow.BUFFER
+        if (wasHidden) pendingBufferSeconds = iptvPlayback.targetBufferSeconds()
+        binding.iptvControlSpeedRow.visibility = if (currentIptvContentKind == IptvContentKind.VOD) View.VISIBLE else View.GONE
         binding.iptvControlHint.visibility = if (timeline && !iptvPlaybackFailed) {
             View.VISIBLE
         } else {
@@ -1289,6 +1295,56 @@ class MainActivity : AppCompatActivity() {
                 else getString(R.string.iptv_buffer_target_short, target),
             )
         }.joinToString("  ·  ")
+        binding.iptvControlBufferRow.text = getString(
+            R.string.iptv_control_buffer_row,
+            if (pendingBufferSeconds == 0) getString(R.string.automatic_abr)
+            else getString(R.string.seconds_value, pendingBufferSeconds),
+        )
+        binding.iptvControlSpeedRow.text = getString(
+            R.string.iptv_control_speed_row,
+            String.format(Locale.getDefault(), "%.2gx", iptvPlayback.vodPlaybackSpeed()),
+        )
+        renderIptvControlSelection()
+    }
+
+    private fun moveIptvControlSelection(direction: Int) {
+        val rows = buildList {
+            if (binding.iptvControlTimelineRow.visibility == View.VISIBLE) add(IptvControlRow.TIMELINE)
+            add(IptvControlRow.BUFFER)
+            if (currentIptvContentKind == IptvContentKind.VOD) add(IptvControlRow.SPEED)
+        }
+        val index = rows.indexOf(iptvControlRow).coerceAtLeast(0)
+        iptvControlRow = rows[(index + direction + rows.size) % rows.size]
+        renderIptvControlSelection()
+    }
+
+    private fun renderIptvControlSelection() {
+        val selected = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control_selected)
+        binding.iptvControlTimelineRow.background = if (iptvControlRow == IptvControlRow.TIMELINE) selected else null
+        binding.iptvControlBufferRow.background = if (iptvControlRow == IptvControlRow.BUFFER) selected?.constantState?.newDrawable() else null
+        binding.iptvControlSpeedRow.background = if (iptvControlRow == IptvControlRow.SPEED) selected?.constantState?.newDrawable() else null
+    }
+
+    private fun adjustSelectedIptvControl(direction: Int) {
+        when (iptvControlRow) {
+            IptvControlRow.TIMELINE -> {
+                if (iptvPlayback.seekBy(direction * IPTV_VOD_SEEK_STEP_MS) && currentIptvContentKind == IptvContentKind.LIVE) {
+                    iptvManualTimeshift = true
+                }
+            }
+            IptvControlRow.BUFFER -> {
+                val options = IptvPlaybackPreferences.BUFFER_OPTIONS
+                val index = options.indexOf(pendingBufferSeconds).coerceAtLeast(0)
+                pendingBufferSeconds = options[(index + direction + options.size) % options.size]
+            }
+            IptvControlRow.SPEED -> {
+                val options = IptvPlaybackPreferences.SPEED_OPTIONS
+                val current = iptvPlayback.vodPlaybackSpeed()
+                val index = options.indexOf(current).coerceAtLeast(0)
+                iptvPlayback.setVodPlaybackSpeed(options[(index + direction + options.size) % options.size])
+            }
+        }
+        updateIptvPlaybackControls()
     }
 
     private fun bufferTargetLabel(seconds: Int): String = if (seconds == 0) {
@@ -4268,45 +4324,38 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (
-                        iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS) &&
-                        currentIptvContentKind == IptvContentKind.LIVE
-                    ) {
-                        iptvManualTimeshift = true
-                    }
+                    adjustSelectedIptvControl(-1)
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (
-                        iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS) &&
-                        currentIptvContentKind == IptvContentKind.LIVE
-                    ) {
-                        iptvManualTimeshift = true
-                    }
+                    adjustSelectedIptvControl(1)
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    if (currentIptvContentKind == IptvContentKind.LIVE) {
-                        iptvManualTimeshift = false
-                        iptvPlayback.goLive()
-                    } else {
-                        iptvPlayback.togglePlayPause()
+                    when (iptvControlRow) {
+                        IptvControlRow.BUFFER -> {
+                            iptvPlayback.setTargetBufferSeconds(pendingBufferSeconds)
+                            binding.iptvControlState.text = bufferTargetLabel(pendingBufferSeconds)
+                        }
+                        IptvControlRow.SPEED -> Unit
+                        IptvControlRow.TIMELINE -> if (currentIptvContentKind == IptvContentKind.LIVE) {
+                            iptvManualTimeshift = false
+                            iptvPlayback.goLive()
+                        } else iptvPlayback.togglePlayPause()
                     }
                     showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    val seconds = iptvPlayback.adjustTargetBufferSeconds(IPTV_BUFFER_STEP_SECONDS)
-                    showIptvPlaybackControls(R.string.iptv_buffer_changed)
-                    binding.iptvControlState.text = bufferTargetLabel(seconds)
+                    moveIptvControlSelection(-1)
+                    showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    val seconds = iptvPlayback.adjustTargetBufferSeconds(-IPTV_BUFFER_STEP_SECONDS)
-                    showIptvPlaybackControls(R.string.iptv_buffer_changed)
-                    binding.iptvControlState.text = bufferTargetLabel(seconds)
+                    moveIptvControlSelection(1)
+                    showIptvPlaybackControls(iptvPlaybackStateText())
                     return true
                 }
                 KeyEvent.KEYCODE_CHANNEL_UP -> {

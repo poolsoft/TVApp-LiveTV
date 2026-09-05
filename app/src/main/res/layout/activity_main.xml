@@ -191,16 +191,53 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/iptv_control_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <LinearLayout
+            android:id="@+id/iptv_control_timeline_row"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
+            android:layout_height="36dp"
             android:layout_marginTop="12dp"
-            android:max="1000"
-            android:progressBackgroundTint="#52606B"
-            android:secondaryProgressTint="#7A8B99"
-            android:progressTint="@color/accent" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <ProgressBar
+                android:id="@+id/iptv_control_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="0dp"
+                android:layout_height="4dp"
+                android:layout_weight="1"
+                android:max="1000"
+                android:progressBackgroundTint="#52606B"
+                android:secondaryProgressTint="#7A8B99"
+                android:progressTint="@color/accent" />
+
+            <TextView
+                android:id="@+id/iptv_control_position"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/iptv_control_buffer_row"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/iptv_control_speed_row"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/iptv_control_technical"
@@ -219,16 +256,8 @@
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/iptv_control_position"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
-
-            <TextView
                 android:id="@+id/iptv_control_hint"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/iptv_vod_remote_hint"
                 android:textColor="@color/text_secondary"

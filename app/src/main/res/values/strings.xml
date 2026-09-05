@@ -161,7 +161,7 @@
     <string name="iptv_vod_playing">Oynatılıyor</string>
     <string name="iptv_vod_paused">Duraklatıldı</string>
     <string name="iptv_vod_stopped">Durduruldu</string>
-    <string name="iptv_vod_remote_hint">←/→ Sar    ↑/↓ Buffer    CH+/CH− Kanal    OK Oynat/Duraklat    BACK Kapat</string>
+    <string name="iptv_vod_remote_hint">↑/↓ Satır seç · ←/→ Değiştir · OK Uygula/Oynat · CH+/CH− Kanal · BACK Kapat</string>
     <string name="iptv_action_live">Canlı</string>
     <string name="iptv_action_restart">Baştan oynat</string>
     <string name="iptv_action_audio">Ses</string>
@@ -428,6 +428,11 @@
     <string name="iptv_buffer_target_auto">Buffer hedefi: Otomatik (ABR)</string>
     <string name="iptv_buffer_target_auto_short">Hedef Otomatik (ABR)</string>
     <string name="iptv_buffer_changed">Buffer ayarı değiştirildi</string>
+    <string name="iptv_control_buffer_row">Buffer hedefi    &lt;  %1$s  &gt;</string>
+    <string name="iptv_control_speed_row">Oynatma hızı    &lt;  %1$s  &gt;</string>
+    <string name="iptv_default_buffer">IPTV buffer hedefi</string>
+    <string name="iptv_default_vod_speed">Varsayılan VOD hızı</string>
+    <string name="automatic_abr">Otomatik (ABR)</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">PiP’te açılacak IPTV kanalı</string>
     <string name="iptv_pip_no_channels">PiP için kullanılabilir canlı IPTV kanalı yok.</string>
