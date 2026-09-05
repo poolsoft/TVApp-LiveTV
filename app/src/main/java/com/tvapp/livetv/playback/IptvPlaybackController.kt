@@ -76,14 +76,16 @@ class IptvPlaybackController(
         } else {
             MAX_BUFFER_MS
         }
-        val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                MIN_BUFFER_MS.coerceAtMost(maximumBufferMs),
-                maximumBufferMs,
-                BUFFER_FOR_PLAYBACK_MS,
-                BUFFER_AFTER_REBUFFER_MS,
-            )
-            .build()
+        val loadControl = DefaultLoadControl.Builder().apply {
+            if (maximumBufferMs > 0) {
+                setBufferDurationsMs(
+                    MIN_BUFFER_MS.coerceAtMost(maximumBufferMs),
+                    maximumBufferMs,
+                    BUFFER_FOR_PLAYBACK_MS,
+                    BUFFER_AFTER_REBUFFER_MS,
+                )
+            }
+        }.build()
         val trackSelectionFactory = AdaptiveTrackSelection.Factory(
             ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
             ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
@@ -284,10 +286,14 @@ class IptvPlaybackController(
 
     fun adjustTargetBufferSeconds(deltaSeconds: Int): Int {
         if (profile != IptvPlaybackProfile.PRIMARY) return targetBufferSeconds
-        val updated = (targetBufferSeconds + deltaSeconds).coerceIn(
-            MIN_TARGET_BUFFER_SECONDS,
-            MAX_TARGET_BUFFER_SECONDS,
-        )
+        val updated = when {
+            deltaSeconds < 0 && targetBufferSeconds <= MIN_TARGET_BUFFER_SECONDS -> AUTO_TARGET_BUFFER_SECONDS
+            deltaSeconds > 0 && targetBufferSeconds == AUTO_TARGET_BUFFER_SECONDS -> MIN_TARGET_BUFFER_SECONDS
+            else -> (targetBufferSeconds + deltaSeconds).coerceIn(
+                MIN_TARGET_BUFFER_SECONDS,
+                MAX_TARGET_BUFFER_SECONDS,
+            )
+        }
         if (updated == targetBufferSeconds) return updated
         targetBufferSeconds = updated
         appContext.getSharedPreferences(BUFFER_PREFS, Context.MODE_PRIVATE).edit()
@@ -513,6 +519,7 @@ class IptvPlaybackController(
         const val BUFFER_PREFS = "iptv_playback"
         const val KEY_TARGET_BUFFER_SECONDS = "target_buffer_seconds"
         const val DEFAULT_TARGET_BUFFER_SECONDS = 20
+        const val AUTO_TARGET_BUFFER_SECONDS = 0
         const val MIN_TARGET_BUFFER_SECONDS = 5
         const val MAX_TARGET_BUFFER_SECONDS = 60
 

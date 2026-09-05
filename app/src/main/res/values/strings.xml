@@ -425,6 +425,8 @@
     <string name="iptv_loading">Yükleniyor…</string>
     <string name="iptv_buffer_target">Buffer hedefi: %1$d saniye</string>
     <string name="iptv_buffer_target_short">Hedef %1$d sn</string>
+    <string name="iptv_buffer_target_auto">Buffer hedefi: Otomatik (ABR)</string>
+    <string name="iptv_buffer_target_auto_short">Hedef Otomatik (ABR)</string>
     <string name="iptv_buffer_changed">Buffer ayarı değiştirildi</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">PiP’te açılacak IPTV kanalı</string>

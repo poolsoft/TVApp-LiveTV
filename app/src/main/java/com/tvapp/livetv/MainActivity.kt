@@ -1283,8 +1283,18 @@ class MainActivity : AppCompatActivity() {
                 add(String.format(Locale.getDefault(), "%.1f Mbps", it / 1_000_000f))
             }
             add(getString(R.string.iptv_buffer_seconds, technical.bufferedDurationMillis / 1_000L))
-            add(getString(R.string.iptv_buffer_target_short, iptvPlayback.targetBufferSeconds()))
+            val target = iptvPlayback.targetBufferSeconds()
+            add(
+                if (target == 0) getString(R.string.iptv_buffer_target_auto_short)
+                else getString(R.string.iptv_buffer_target_short, target),
+            )
         }.joinToString("  ·  ")
+    }
+
+    private fun bufferTargetLabel(seconds: Int): String = if (seconds == 0) {
+        getString(R.string.iptv_buffer_target_auto)
+    } else {
+        getString(R.string.iptv_buffer_target, seconds)
     }
 
     private fun formatPlaybackTime(milliseconds: Long): String {
@@ -4290,13 +4300,13 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     val seconds = iptvPlayback.adjustTargetBufferSeconds(IPTV_BUFFER_STEP_SECONDS)
                     showIptvPlaybackControls(R.string.iptv_buffer_changed)
-                    binding.iptvControlState.text = getString(R.string.iptv_buffer_target, seconds)
+                    binding.iptvControlState.text = bufferTargetLabel(seconds)
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     val seconds = iptvPlayback.adjustTargetBufferSeconds(-IPTV_BUFFER_STEP_SECONDS)
                     showIptvPlaybackControls(R.string.iptv_buffer_changed)
-                    binding.iptvControlState.text = getString(R.string.iptv_buffer_target, seconds)
+                    binding.iptvControlState.text = bufferTargetLabel(seconds)
                     return true
                 }
                 KeyEvent.KEYCODE_CHANNEL_UP -> {

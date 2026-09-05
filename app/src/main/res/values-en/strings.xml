@@ -412,6 +412,8 @@
     <string name="iptv_loading">Loading…</string>
     <string name="iptv_buffer_target">Buffer target: %1$d seconds</string>
     <string name="iptv_buffer_target_short">Target %1$d sec</string>
+    <string name="iptv_buffer_target_auto">Buffer target: Auto (ABR)</string>
+    <string name="iptv_buffer_target_auto_short">Target Auto (ABR)</string>
     <string name="iptv_buffer_changed">Buffer setting changed</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">IPTV channel to open in PiP</string>

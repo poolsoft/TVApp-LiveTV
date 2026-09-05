@@ -7,7 +7,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### IPTV buffer ve son kanallar
-* Birincil IPTV oynatıcının buffer hedefi oynatma çubuğu açıkken Yukarı/Aşağı ile 5 saniyelik adımlarla 5-60 saniye arasında değiştirilebiliyor ve seçim kalıcı saklanıyor. Bu görünümde kanal değiştirme yalnız CH+/CH- ile yapılıyor.
+* Birincil IPTV oynatıcının buffer hedefi oynatma çubuğu açıkken Yukarı/Aşağı ile Otomatik (0) veya 5 saniyelik adımlarla 5-60 saniye arasında değiştirilebiliyor ve seçim kalıcı saklanıyor. Otomatik seçim Media3 LoadControl varsayılanlarını, görüntü kalitesi ise her durumda ABR'yi kullanıyor. Bu görünümde kanal değiştirme yalnız CH+/CH- ile yapılıyor.
 * Normal yeniden buffer alma artık donma/yeniden bağlanma sayılmıyor; küçük köşe bildirimi “Buffer alınıyor” gösteriyor. Ortadaki yükleme durumu ilk açılış ve gerçek tekrar yükleme işlemlerine ayrıldı.
 * Ana yayında başka OSD yokken Back, altta kumandayla gezilebilen son 5 kanal kartlarını açıyor. LAST CHANNEL/RECALL tuşu önceki kanala doğrudan dönmeye devam ediyor.
 
