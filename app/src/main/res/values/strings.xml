@@ -443,6 +443,9 @@
     <string name="iptv_controls_back_hint">BACK Kapat</string>
     <string name="iptv_controls_up_down_full_hint">▲ ▼  Satır değiştir</string>
     <string name="iptv_controls_media_hint">MEDIA  Kontrolleri aç</string>
+    <string name="iptv_controls_media_active_hint">MEDIA  Oynat / Duraklat</string>
+    <string name="iptv_controls_up_down_channel_hint">▲ ▼  Kanal değiştir</string>
+    <string name="iptv_controls_left_right_inactive_hint">◀ ▶  Önce MEDIA ile etkinleştir</string>
     <string name="iptv_controls_left_right_full_hint">◀ ▶  Seek / değer</string>
     <string name="iptv_controls_back_full_hint">BACK  Kontrolleri kapat</string>
     <string name="iptv_pip">PiP</string>

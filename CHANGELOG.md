@@ -12,6 +12,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * IPTV kontrol bantları büyütüldü; oynatma eylemleri ikonlu ve yalnız odakta belirginleşen kontrollere dönüştürüldü.
 * Çalışma anındaki infobar oranı yeni tasarımla eşitlendi; üst kanal/EPG/saat alanının sıkışması giderildi ve kumanda yardım şeridi ana bilgi kartının altına ayrıldı.
 * Infobar yüksekliği içeriğe göre dinamik hale getirildi: TIF görünümü kompakt kalıyor, IPTV görünümü yükleme durumundan bağımsız olarak seek ve işlem satırlarını gösterip ekran merkezine doğru genişliyor.
+* IPTV'nin üst kanal/EPG/saat satırı eski infobar yüksekliğinde sabitlendi; seek ve yardım bantları toplam yüksekliğe ayrıca ekleniyor. Kontroller medya Play/Pause tuşuna kadar pasif kalıyor ve bu durumda Yukarı/Aşağı kanal değiştiriyor.
 * Oynatma satırı Oynat/Duraklat, Buffer, VOD Hızı ve Ses/Altyazı/Kalite birleşik menüsünden oluşuyor. Buffer ve hız OK ile açılan seçim listesinden ayarlanıyor.
 
 ### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu

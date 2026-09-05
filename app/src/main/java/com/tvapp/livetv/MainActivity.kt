@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
         private const val INFO_COMPACT_HEIGHT_FRACTION = 0.205f
-        private const val INFO_IPTV_HEIGHT_FRACTION = 0.38f
+        private const val IPTV_INFO_EXTRA_HEIGHT_DP = 106
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -222,6 +222,7 @@ class MainActivity : AppCompatActivity() {
     private var iptvPlaybackFailed = false
     private var iptvControlRow = IptvControlRow.TIMELINE
     private var selectedIptvButton = IptvControlButton.PLAY_PAUSE
+    private var iptvControlsInteractive = false
     private var pendingBufferSeconds = IptvPlaybackPreferences.DEFAULT_BUFFER_SECONDS
     private var iptvAlternativeStreams: List<LiveChannel> = emptyList()
     private var iptvAlternativeIndex = 0
@@ -1109,7 +1110,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showInfoBar() {
         if (currentChannel?.source == LiveChannel.Source.IPTV) {
-            showIptvPlaybackControls(autoHide = false)
+            showIptvPlaybackChrome(interactive = false)
         } else {
             hideIptvPlaybackControls(hideInfoBar = false)
         }
@@ -1201,8 +1202,23 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 iptvPlayback.togglePlayPause()
+                showIptvPlaybackControls()
             }
         }
+    }
+
+    private fun showIptvPlaybackChrome(interactive: Boolean) {
+        val wasHidden = binding.iptvPlaybackContainer.visibility != View.VISIBLE
+        iptvControlsInteractive = interactive
+        binding.programMeta.visibility = View.GONE
+        binding.nextProgram.visibility = View.GONE
+        binding.iptvPlaybackContainer.visibility = View.VISIBLE
+        binding.iptvControlHints.visibility = View.VISIBLE
+        if (wasHidden) pendingBufferSeconds = iptvPlayback.targetBufferSeconds()
+        updateInfoBarHeight()
+        updateInfoColorActions()
+        updateIptvPlaybackControls()
+        updateIptvControlHints()
     }
 
     private fun setupIptvControls() {
@@ -1247,12 +1263,7 @@ class MainActivity : AppCompatActivity() {
         binding.channelPanel.visibility = View.GONE
         binding.advancedFilterRow.visibility = View.GONE
 
-        binding.programMeta.visibility = View.GONE
-        binding.nextProgram.visibility = View.GONE
-        binding.iptvPlaybackContainer.visibility = View.VISIBLE
-        binding.iptvControlHints.visibility = View.VISIBLE
-        updateInfoBarHeight()
-        updateInfoColorActions()
+        showIptvPlaybackChrome(interactive = true)
 
         setInfoBarVisible(true)
 
@@ -1285,6 +1296,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
+        iptvControlsInteractive = false
         binding.iptvPlaybackContainer.visibility = View.GONE
         binding.iptvControlHints.visibility = View.GONE
         updateInfoBarHeight()
@@ -1376,6 +1388,15 @@ class MainActivity : AppCompatActivity() {
         val selectedBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control_selected)
         val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control)
 
+        if (!iptvControlsInteractive) {
+            binding.iptvSeekbarRow.background = defaultBg
+            binding.iptvBtnPlayPause.background = defaultBg
+            binding.iptvBtnBuffer.background = defaultBg
+            binding.iptvBtnSpeed.background = defaultBg
+            binding.iptvBtnMore.background = defaultBg
+            return
+        }
+
         binding.iptvSeekbarRow.background = if (iptvControlRow == IptvControlRow.TIMELINE) {
             selectedBg
         } else {
@@ -1406,7 +1427,7 @@ class MainActivity : AppCompatActivity() {
         binding.iptvActionBar.visibility = View.VISIBLE
         val isChannelPanelOpen = binding.channelPanel.visibility == View.VISIBLE
         binding.iptvActionBar.alpha = if (isChannelPanelOpen) 0.35f else 1.0f
-        val focusable = !isChannelPanelOpen
+        val focusable = iptvControlsInteractive && !isChannelPanelOpen
         binding.iptvBtnPlayPause.isFocusable = focusable
         binding.iptvBtnBuffer.isFocusable = focusable
         binding.iptvBtnSpeed.isFocusable = focusable
@@ -3898,6 +3919,21 @@ class MainActivity : AppCompatActivity() {
         action(R.color.remote_blue, R.string.settings_short)
     }
 
+    private fun updateIptvControlHints() {
+        binding.iptvHintUpDown.setText(
+            if (iptvControlsInteractive) R.string.iptv_controls_up_down_full_hint
+            else R.string.iptv_controls_up_down_channel_hint,
+        )
+        binding.iptvHintMedia.setText(
+            if (iptvControlsInteractive) R.string.iptv_controls_media_active_hint
+            else R.string.iptv_controls_media_hint,
+        )
+        binding.iptvHintLeftRight.setText(
+            if (iptvControlsInteractive) R.string.iptv_controls_left_right_full_hint
+            else R.string.iptv_controls_left_right_inactive_hint,
+        )
+    }
+
     private fun colorKeyDrawable(color: Int): Int = when (color) {
         R.color.remote_red -> R.drawable.key_red
         R.color.remote_green -> R.drawable.key_green
@@ -3992,7 +4028,7 @@ class MainActivity : AppCompatActivity() {
         val verticalMargin = (screenHeight * VERTICAL_MARGIN_FRACTION).toInt()
         val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
         val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
-        val infoHeight = (screenHeight * currentInfoBarHeightFraction()).toInt()
+        val infoHeight = currentInfoBarHeight(screenHeight)
         val panelWidth = if (channelPanelExpanded) {
             (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
         } else {
@@ -4061,16 +4097,19 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun currentInfoBarHeightFraction(): Float = when {
-        binding.iptvPlaybackContainer.visibility == View.VISIBLE -> INFO_IPTV_HEIGHT_FRACTION
-        else -> INFO_COMPACT_HEIGHT_FRACTION
-    }
+    private fun currentInfoBarHeight(screenHeight: Int): Int =
+        (screenHeight * INFO_COMPACT_HEIGHT_FRACTION).toInt() +
+            if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
+                dp(IPTV_INFO_EXTRA_HEIGHT_DP)
+            } else {
+                0
+            }
 
     private fun updateInfoBarHeight() {
         val screenHeight = binding.root.height.takeIf { it > 0 }
             ?: resources.displayMetrics.heightPixels
         binding.infoBar.layoutParams = binding.infoBar.layoutParams.apply {
-            height = (screenHeight * currentInfoBarHeightFraction()).toInt()
+            height = currentInfoBarHeight(screenHeight)
         }
     }
 
@@ -4450,6 +4489,7 @@ class MainActivity : AppCompatActivity() {
             event.action == KeyEvent.ACTION_DOWN &&
             isIptv &&
             isChannelPanelClosed &&
+            iptvControlsInteractive &&
             binding.iptvPlaybackContainer.visibility == View.VISIBLE
         ) {
             when (event.keyCode) {
