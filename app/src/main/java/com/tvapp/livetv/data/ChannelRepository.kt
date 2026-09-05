@@ -21,6 +21,9 @@ class ChannelRepository(context: Context) {
 
     fun physicalInputs(): List<TvInputInfo> = tifRepository.physicalInputs()
 
+    fun tifChannelRawValues(channelId: Long): Result<List<Pair<String, String>>> =
+        tifRepository.channelRawValues(channelId)
+
     fun tunerSetupIntent(): Intent? = tunerInputs()
         .firstNotNullOfOrNull { input -> input.createSetupIntent() }
 

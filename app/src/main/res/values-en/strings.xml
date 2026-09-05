@@ -31,6 +31,11 @@
     <string name="system_info_video_unavailable">Video unavailable</string>
     <string name="system_info_callback_resolution">Callback resolution</string>
     <string name="system_info_unavailable_reason">Video unavailable reason code</string>
+    <string name="system_info_section_app">App mapping</string>
+    <string name="system_info_section_raw_channel">Raw TvContract.Channels values</string>
+    <string name="system_info_section_callback">Live callback and track values</string>
+    <string name="system_info_raw_channel_empty">Raw channel row not found</string>
+    <string name="system_info_raw_read_error">Raw channel read error</string>
     <string name="system_info_audio">Audio</string>
     <string name="system_info_subtitle">Subtitle</string>
     <string name="unknown_value">Unknown</string>

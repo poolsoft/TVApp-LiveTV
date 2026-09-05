@@ -30,6 +30,19 @@ class TifRepository(context: Context) {
             "/HW" in input.id
     }
 
+    fun channelRawValues(channelId: Long): Result<List<Pair<String, String>>> = runCatching {
+        appContext.contentResolver.query(
+            TvContract.buildChannelUri(channelId),
+            null,
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use emptyList()
+            cursor.columnNames.mapIndexed { index, name -> name to cursor.diagnosticValueAt(index) }
+        }.orEmpty()
+    }
+
     fun channels(
         forceRefresh: Boolean = false,
         saveDiagnostics: Boolean = false,
@@ -156,28 +169,29 @@ class TifRepository(context: Context) {
     }
 
     private fun Cursor.diagnosticRow(): String = columnNames.mapIndexed { index, name ->
-        val value = runCatching {
-            when (getType(index)) {
-                Cursor.FIELD_TYPE_NULL -> "null"
-                Cursor.FIELD_TYPE_INTEGER -> getLong(index).toString()
-                Cursor.FIELD_TYPE_FLOAT -> getDouble(index).toString()
-                Cursor.FIELD_TYPE_STRING -> getString(index).diagnosticValue()
-                Cursor.FIELD_TYPE_BLOB -> {
-                    val bytes = getBlob(index)
-                    val hex = bytes.take(DIAGNOSTIC_BLOB_BYTES)
-                        .joinToString("") { byte -> "%02x".format(byte) }
-                    val text = String(bytes.take(DIAGNOSTIC_BLOB_BYTES).toByteArray(), Charsets.UTF_8)
-                        .diagnosticValue()
-                    "blob(${bytes.size}) hex=$hex text=$text"
-                }
-                else -> "unknown"
-            }
-        }.getOrElse { error -> "<${error.javaClass.simpleName}>" }
-        "$name=$value"
+        "$name=${diagnosticValueAt(index)}"
     }.joinToString(" | ")
+
+    private fun Cursor.diagnosticValueAt(index: Int): String = runCatching {
+        when (getType(index)) {
+            Cursor.FIELD_TYPE_NULL -> "null"
+            Cursor.FIELD_TYPE_INTEGER -> getLong(index).toString()
+            Cursor.FIELD_TYPE_FLOAT -> getDouble(index).toString()
+            Cursor.FIELD_TYPE_STRING -> getString(index).diagnosticValue()
+            Cursor.FIELD_TYPE_BLOB -> {
+                val bytes = getBlob(index)
+                val preview = bytes.take(DIAGNOSTIC_BLOB_BYTES).toByteArray()
+                val hex = preview.joinToString("") { byte -> "%02x".format(byte) }
+                val text = String(preview, Charsets.UTF_8).diagnosticValue()
+                "blob(${bytes.size}) hex=$hex text=$text"
+            }
+            else -> "unknown"
+        }
+    }.getOrElse { error -> "<${error.javaClass.simpleName}>" }
 
     private fun String.diagnosticValue(): String = replace('\n', ' ')
         .replace('\r', ' ')
+        .replace('\u0000', ' ')
         .take(DIAGNOSTIC_VALUE_LENGTH)
 
     private fun String.isTruthyEncryptionValue(): Boolean = trim().lowercase() in setOf(

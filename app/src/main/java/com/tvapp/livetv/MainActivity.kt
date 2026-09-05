@@ -11,6 +11,7 @@ import android.media.tv.TvInputInfo
 import android.media.tv.TvTrackInfo
 import android.os.Bundle
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.util.Rational
 import android.text.InputType
 import android.view.Gravity
@@ -1466,10 +1467,13 @@ class MainActivity : AppCompatActivity() {
                 )
                 else -> emptyList()
             }
+            val extraFields = track.debugExtraValues()
+                .joinToString(", ") { (key, value) -> "$key=$value" }
+                .ifBlank { track.extra?.toString() ?: "null" }
             debugLog.recordDebug(
                 "TIF_TRACK_RAW | channel=$channelKey, index=$index, type=$type, id=${track.id}, " +
                     "language=${track.language}, description=${track.description}, " +
-                    "${typeFields.joinToString(", ")}, extra=${track.extra}",
+                    "${typeFields.joinToString(", ")}, extra={$extraFields}",
             )
         }
     }
@@ -1478,6 +1482,23 @@ class MainActivity : AppCompatActivity() {
         runCatching { reader().toString() }.getOrElse { error ->
             "unavailable(${error.javaClass.simpleName})"
         }
+
+    private fun TvTrackInfo.debugExtraValues(): List<Pair<String, String>> = runCatching {
+        val values = extra ?: return@runCatching emptyList()
+        values.keySet().sorted().map { key -> key to values.get(key).debugMetadataValue() }
+    }.getOrDefault(emptyList())
+
+    private fun Any?.debugMetadataValue(): String = when (this) {
+        null -> "null"
+        is ByteArray -> "bytes(${size}) " + take(64).joinToString("") { "%02x".format(it) }
+        is IntArray -> joinToString(prefix = "[", postfix = "]")
+        is LongArray -> joinToString(prefix = "[", postfix = "]")
+        is FloatArray -> joinToString(prefix = "[", postfix = "]")
+        is DoubleArray -> joinToString(prefix = "[", postfix = "]")
+        is BooleanArray -> joinToString(prefix = "[", postfix = "]")
+        is Array<*> -> joinToString(prefix = "[", postfix = "]") { it.toString() }
+        else -> toString().replace('\n', ' ').replace('\r', ' ').take(256)
+    }
 
     private fun updateTechnicalBadgesForIptv(
         channel: LiveChannel,
@@ -2824,6 +2845,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChannelSystemInformation(channel: LiveChannel) {
+        lifecycleScope.launch {
+            val rawValues = if (channel.source == LiveChannel.Source.TIF) {
+                withContext(Dispatchers.IO) { repository.tifChannelRawValues(channel.id) }
+                    .getOrElse { error ->
+                        listOf(
+                            getString(R.string.system_info_raw_read_error) to
+                                "${error.javaClass.simpleName}: ${error.message.orEmpty()}",
+                        )
+                    }
+            } else {
+                emptyList()
+            }
+            if (!isFinishing && !isDestroyed) {
+                showChannelSystemInformationDialog(channel, rawValues)
+            }
+        }
+    }
+
+    private fun showChannelSystemInformationDialog(
+        channel: LiveChannel,
+        rawValues: List<Pair<String, String>>,
+    ) {
         val isCurrentTif = channel.source == LiveChannel.Source.TIF &&
             channel.sourceKey == currentChannel?.sourceKey
         val tracks = if (isCurrentTif) playback.allTracks() else emptyList()
@@ -2838,6 +2881,7 @@ class MainActivity : AppCompatActivity() {
             channel.videoFormat.orEmpty().uppercase(Locale.ROOT),
         ) ?: getString(R.string.unknown_value)
         val rows = buildList {
+            add(getString(R.string.system_info_section_app) to "")
             add(getString(R.string.system_info_source) to channel.source.name)
             add(getString(R.string.system_info_channel_id) to channel.id.toString())
             add(getString(R.string.system_info_source_key) to channel.sourceKey)
@@ -2847,6 +2891,15 @@ class MainActivity : AppCompatActivity() {
             add(getString(R.string.system_info_channel_name) to channel.displayName)
             add(getString(R.string.system_info_service_type) to channel.serviceType.orUnknown())
             add(getString(R.string.system_info_video_format) to channel.videoFormat.orUnknown())
+            if (channel.source == LiveChannel.Source.TIF) {
+                add(getString(R.string.system_info_section_raw_channel) to "")
+                if (rawValues.isEmpty()) {
+                    add(getString(R.string.system_info_raw_channel_empty) to getString(R.string.unknown_value))
+                } else {
+                    addAll(rawValues)
+                }
+            }
+            add(getString(R.string.system_info_section_callback) to "")
             add(
                 getString(R.string.system_info_live_video_state) to when (videoState?.available) {
                     true -> getString(R.string.system_info_video_available)
@@ -2894,7 +2947,14 @@ class MainActivity : AppCompatActivity() {
                         add("$prefix ${getString(R.string.system_info_audio_channels)}" to track.debugValue { audioChannelCount })
                         add("$prefix ${getString(R.string.system_info_sample_rate)}" to track.debugValue { audioSampleRate })
                     }
-                    add("$prefix Extra" to track.extra?.toString().orUnknown())
+                    val extraValues = track.debugExtraValues()
+                    if (extraValues.isEmpty()) {
+                        add("$prefix Extra" to track.extra?.toString().orUnknown())
+                    } else {
+                        extraValues.forEach { (key, value) ->
+                            add("$prefix Extra / $key" to value)
+                        }
+                    }
                 }
             }
         }
@@ -2918,6 +2978,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun LinearLayout.addSystemInformationRow(key: String, value: String, index: Int) {
+        if (value.isEmpty()) {
+            addView(TextView(this@MainActivity).apply {
+                text = key
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
+                textSize = 14f
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(dp(10), dp(14), dp(10), dp(8))
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ))
+            return
+        }
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.TOP
