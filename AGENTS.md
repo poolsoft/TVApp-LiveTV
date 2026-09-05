@@ -139,6 +139,9 @@ still needs device verification.
 - Do not add generic large rectangular buttons when a remote color action, icon, or focused list
   row is the established interaction. Focused state must remain clearly visible on the dark OSD.
 - Add every user-visible string to both `values/strings.xml` and `values-en/strings.xml`.
+- Always inspect existing resources before creating new files, icons, drawables, or strings. Check
+  `res/drawable/`, `res/layout/`, `values/strings.xml`, and `values-en/strings.xml` first. Never
+  create redundant or duplicate files, and never invent missing resource IDs without checking existing keys.
 
 ## Diagnostics And Documentation
 
