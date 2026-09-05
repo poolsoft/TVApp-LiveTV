@@ -1025,6 +1025,7 @@ class MainActivity : AppCompatActivity() {
         if (clearExisting) {
             binding.currentProgram.visibility = View.GONE
             binding.nextProgram.visibility = View.GONE
+            binding.programDescription.visibility = View.GONE
             binding.programMeta.visibility = View.GONE
             binding.infoProgress.visibility = View.GONE
         }
@@ -1059,6 +1060,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 binding.programMeta.visibility = View.GONE
                 binding.infoProgress.visibility = View.GONE
+                binding.programDescription.visibility = View.GONE
             }
             current?.let(::updateCurrentProgramUi)
             programs.next?.takeIf { it.title.isNotBlank() }?.let { next ->
@@ -1104,6 +1106,12 @@ class MainActivity : AppCompatActivity() {
             if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
         binding.infoProgress.visibility =
             if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
+        binding.programDescription.text = current.description
+        binding.programDescription.visibility = if (
+            displayPreferences.showCurrentProgram &&
+            currentChannel?.source == LiveChannel.Source.TIF &&
+            current.description.isNotBlank()
+        ) View.VISIBLE else View.GONE
     }
 
     private fun showInfoBar() {
@@ -1244,6 +1252,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.programMeta.visibility = View.GONE
         binding.nextProgram.visibility = View.GONE
+        binding.programDescription.visibility = View.GONE
         binding.iptvPlaybackContainer.visibility = View.VISIBLE
 
         setInfoBarVisible(true)
@@ -1288,6 +1297,13 @@ class MainActivity : AppCompatActivity() {
 
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
+        currentChannel?.takeIf { it.source == LiveChannel.Source.TIF }
+            ?.let { currentPrograms[it.sourceKey] }
+            ?.takeIf { displayPreferences.showCurrentProgram && it.description.isNotBlank() }
+            ?.let {
+                binding.programDescription.text = it.description
+                binding.programDescription.visibility = View.VISIBLE
+            } ?: run { binding.programDescription.visibility = View.GONE }
         if (hideInfoBar) {
             setInfoBarVisible(false)
         } else {
@@ -4450,11 +4466,15 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    zap(1)
+                    iptvControlRow = IptvControlRow.TIMELINE
+                    renderIptvControlSelection()
+                    showIptvPlaybackControls()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    zap(-1)
+                    iptvControlRow = IptvControlRow.BUTTONS
+                    renderIptvControlSelection()
+                    showIptvPlaybackControls()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {

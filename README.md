@@ -27,16 +27,16 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - TKGS veya vendor taramasından sonra TIF kanallarıyla yeniden eşitlenebilir.
 - Kanal listesi, infobar, EPG, ses ve altyazı seçimi kumandayla kullanılabilir.
 - Ana yayında Back tuşu son 5 kanal şeridini açar; LAST CHANNEL/RECALL önceki kanala doğrudan döner.
-- IPTV oynatma çubuğunda Yukarı/Aşağı kalıcı buffer hedefini, CH+/CH- kanalı değiştirir. Normal buffer doldurma ilk yükleme ve gerçek yeniden denemeden ayrı gösterilir.
+- IPTV oynatma çubuğunda Yukarı/Aşağı zaman çizgisi ile işlem satırı arasında geçer; CH+/CH- kanalı değiştirir. Normal buffer doldurma ilk yükleme ve gerçek yeniden denemeden ayrı gösterilir.
 - EPG'de gelecek bir programa uzun OK ile hatırlatıcı kurulabilir; program başlayınca bildirim gösterilir ve bildirime basınca kanala geçilir. Hatırlatıcılar yeniden başlatmada korunur.
 - Son kanal, önceki kanal ve izleme geçmişi yerel olarak saklanır.
 
 ### IPTV
 
-- IPTV oynatma kontrolleri medya tuşuyla infobar içinde açılır. Kontroller açıkken `Yukarı/Aşağı` kanal değiştirmeyi sürdürür; seekbar üzerinde `Sol/Sağ` sarar ve `OK` kompakt işlem satırına geçer.
+- IPTV oynatma kontrolleri medya tuşuyla infobar içinde açılır. Kontroller açıkken `Yukarı/Aşağı` zaman çizgisi ile işlem satırı arasında geçer; seekbar üzerinde `Sol/Sağ` sarar ve `OK` işlem satırına geçer. Kanal değiştirme `CH+/CH-` ile yapılır.
 - Kompakt işlem satırında oynat/duraklat, buffer, VOD hızı ve ses/altyazı/kalite menüsü bulunur. `Sol/Sağ` işlem seçer, `OK` uygular.
 
-- Oynatma OSD'sinde Yukarı/Aşağı ile zaman çizgisi, buffer hedefi ve VOD oynatma hızı seçilir; Sol/Sağ seçili satırı değiştirir.
+- Oynatma OSD'sinde Yukarı/Aşağı ile zaman çizgisi ve işlem satırı seçilir; Sol/Sağ zaman çizgisinde sarar, işlem satırında seçenekler arasında gezer.
 - Buffer hedefi `OK` ile uygulanır; değerler arasında gezinirken yayın tekrar tekrar başlatılmaz. OSD açıkken kanal değiştirme yalnız `CH+`/`CH-` ile yapılır.
 - Kalıcı buffer hedefi ve varsayılan VOD hızı `Ayarlar > Oynatma` bölümünden de seçilebilir.
 
