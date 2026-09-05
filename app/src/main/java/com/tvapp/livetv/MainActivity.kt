@@ -96,7 +96,8 @@ class MainActivity : AppCompatActivity() {
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
         private const val COMPACT_PANEL_WIDTH_FRACTION = 0.25f
         private const val EXPANDED_PANEL_FRACTION = 0.44f
-        private const val INFO_HEIGHT_FRACTION = 0.30f
+        private const val INFO_COMPACT_HEIGHT_FRACTION = 0.205f
+        private const val INFO_IPTV_HEIGHT_FRACTION = 0.38f
         private const val OVERLAY_GAP_FRACTION = 0.008f
         private const val VERTICAL_MARGIN_FRACTION = 0.026f
         private const val INFO_HORIZONTAL_PADDING_FRACTION = 0.012f
@@ -1025,7 +1026,6 @@ class MainActivity : AppCompatActivity() {
         if (clearExisting) {
             binding.currentProgram.visibility = View.GONE
             binding.nextProgram.visibility = View.GONE
-            binding.programDescription.visibility = View.GONE
             binding.programMeta.visibility = View.GONE
             binding.infoProgress.visibility = View.GONE
         }
@@ -1060,7 +1060,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 binding.programMeta.visibility = View.GONE
                 binding.infoProgress.visibility = View.GONE
-                binding.programDescription.visibility = View.GONE
             }
             current?.let(::updateCurrentProgramUi)
             programs.next?.takeIf { it.title.isNotBlank() }?.let { next ->
@@ -1106,16 +1105,14 @@ class MainActivity : AppCompatActivity() {
             if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
         binding.infoProgress.visibility =
             if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
-        binding.programDescription.text = current.description
-        binding.programDescription.visibility = if (
-            displayPreferences.showCurrentProgram &&
-            currentChannel?.source == LiveChannel.Source.TIF &&
-            current.description.isNotBlank()
-        ) View.VISIBLE else View.GONE
     }
 
     private fun showInfoBar() {
-        hideIptvPlaybackControls(hideInfoBar = false)
+        if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            showIptvPlaybackControls(autoHide = false)
+        } else {
+            hideIptvPlaybackControls(hideInfoBar = false)
+        }
         setInfoBarVisible(true)
         infoBarJob?.cancel()
         if (channelPanelExpanded) return
@@ -1252,9 +1249,9 @@ class MainActivity : AppCompatActivity() {
 
         binding.programMeta.visibility = View.GONE
         binding.nextProgram.visibility = View.GONE
-        binding.programDescription.visibility = View.GONE
         binding.iptvPlaybackContainer.visibility = View.VISIBLE
         binding.iptvControlHints.visibility = View.VISIBLE
+        updateInfoBarHeight()
         updateInfoColorActions()
 
         setInfoBarVisible(true)
@@ -1290,6 +1287,7 @@ class MainActivity : AppCompatActivity() {
         iptvControlsJob?.cancel()
         binding.iptvPlaybackContainer.visibility = View.GONE
         binding.iptvControlHints.visibility = View.GONE
+        updateInfoBarHeight()
         updateInfoColorActions()
         iptvControlRow = IptvControlRow.TIMELINE
         val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_focusable)
@@ -1302,13 +1300,6 @@ class MainActivity : AppCompatActivity() {
 
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
-        currentChannel?.takeIf { it.source == LiveChannel.Source.TIF }
-            ?.let { currentPrograms[it.sourceKey] }
-            ?.takeIf { displayPreferences.showCurrentProgram && it.description.isNotBlank() }
-            ?.let {
-                binding.programDescription.text = it.description
-                binding.programDescription.visibility = View.VISIBLE
-            } ?: run { binding.programDescription.visibility = View.GONE }
         if (hideInfoBar) {
             setInfoBarVisible(false)
         } else {
@@ -4001,7 +3992,7 @@ class MainActivity : AppCompatActivity() {
         val verticalMargin = (screenHeight * VERTICAL_MARGIN_FRACTION).toInt()
         val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
         val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
-        val infoHeight = (screenHeight * INFO_HEIGHT_FRACTION).toInt()
+        val infoHeight = (screenHeight * currentInfoBarHeightFraction()).toInt()
         val panelWidth = if (channelPanelExpanded) {
             (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
         } else {
@@ -4068,6 +4059,19 @@ class MainActivity : AppCompatActivity() {
             infoHorizontalPadding,
             infoVerticalPadding,
         )
+    }
+
+    private fun currentInfoBarHeightFraction(): Float = when {
+        binding.iptvPlaybackContainer.visibility == View.VISIBLE -> INFO_IPTV_HEIGHT_FRACTION
+        else -> INFO_COMPACT_HEIGHT_FRACTION
+    }
+
+    private fun updateInfoBarHeight() {
+        val screenHeight = binding.root.height.takeIf { it > 0 }
+            ?: resources.displayMetrics.heightPixels
+        binding.infoBar.layoutParams = binding.infoBar.layoutParams.apply {
+            height = (screenHeight * currentInfoBarHeightFraction()).toInt()
+        }
     }
 
     private fun startClock() {
