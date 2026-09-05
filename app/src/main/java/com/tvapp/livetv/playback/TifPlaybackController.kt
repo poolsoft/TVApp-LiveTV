@@ -6,8 +6,16 @@ import android.media.tv.TvView
 import android.net.Uri
 import com.tvapp.livetv.model.LiveChannel
 
+data class TifVideoState(
+    val available: Boolean? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+    val unavailableReason: Int? = null,
+)
+
 class TifPlaybackController(private val tvView: TvView) {
     private var tracks: List<TvTrackInfo> = emptyList()
+    private var videoState = TifVideoState()
     var onTracksChanged: ((List<TvTrackInfo>) -> Unit)? = null
     var onVideoStateChanged: ((available: Boolean, reason: Int?) -> Unit)? = null
     var onVideoSizeChanged: ((width: Int, height: Int) -> Unit)? = null
@@ -24,6 +32,7 @@ class TifPlaybackController(private val tvView: TvView) {
             }
 
             override fun onVideoAvailable(inputId: String) {
+                videoState = videoState.copy(available = true, unavailableReason = null)
                 val currentTracks = listOf(
                     TvTrackInfo.TYPE_VIDEO, TvTrackInfo.TYPE_AUDIO, TvTrackInfo.TYPE_SUBTITLE,
                 ).flatMap { tvView.getTracks(it).orEmpty() }
@@ -33,6 +42,7 @@ class TifPlaybackController(private val tvView: TvView) {
 
             override fun onVideoSizeChanged(inputId: String, width: Int, height: Int) {
                 if (width <= 0 || height <= 0) return
+                videoState = videoState.copy(width = width, height = height)
                 onVideoSizeChanged?.invoke(width, height)
                 val sizeTrack = TvTrackInfo.Builder(TvTrackInfo.TYPE_VIDEO, SIZE_TRACK_ID)
                     .setVideoWidth(width)
@@ -43,6 +53,7 @@ class TifPlaybackController(private val tvView: TvView) {
             }
 
             override fun onVideoUnavailable(inputId: String, reason: Int) {
+                videoState = videoState.copy(available = false, unavailableReason = reason)
                 onVideoStateChanged?.invoke(false, reason)
             }
         })
@@ -51,17 +62,21 @@ class TifPlaybackController(private val tvView: TvView) {
     fun play(channel: LiveChannel) {
         require(channel.source == LiveChannel.Source.TIF)
         tracks = emptyList()
+        videoState = TifVideoState()
         tvView.tune(channel.inputId, Uri.parse(channel.uri))
     }
 
     fun playPassthrough(inputId: String) {
         tracks = emptyList()
+        videoState = TifVideoState()
         tvView.tune(inputId, TvContract.buildChannelUriForPassthroughInput(inputId))
     }
 
     fun audioTracks(): List<TvTrackInfo> = tracks.filter { it.type == TvTrackInfo.TYPE_AUDIO }
 
     fun allTracks(): List<TvTrackInfo> = tracks.toList()
+
+    fun currentVideoState(): TifVideoState = videoState
 
     fun subtitleTracks(): List<TvTrackInfo> = tracks.filter {
         it.type == TvTrackInfo.TYPE_SUBTITLE
@@ -85,6 +100,7 @@ class TifPlaybackController(private val tvView: TvView) {
 
     fun stop() {
         tracks = emptyList()
+        videoState = TifVideoState()
         tvView.setStreamVolume(1f)
         tvView.reset()
     }

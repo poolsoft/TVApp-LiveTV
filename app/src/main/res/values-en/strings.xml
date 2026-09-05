@@ -26,6 +26,11 @@
     <string name="system_info_audio_channels">Audio channels</string>
     <string name="system_info_sample_rate">Sample rate</string>
     <string name="system_info_video">Video</string>
+    <string name="system_info_live_video_state">Live video state</string>
+    <string name="system_info_video_available">Video available</string>
+    <string name="system_info_video_unavailable">Video unavailable</string>
+    <string name="system_info_callback_resolution">Callback resolution</string>
+    <string name="system_info_unavailable_reason">Video unavailable reason code</string>
     <string name="system_info_audio">Audio</string>
     <string name="system_info_subtitle">Subtitle</string>
     <string name="unknown_value">Unknown</string>

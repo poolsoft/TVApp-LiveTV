@@ -1363,8 +1363,11 @@ class MainActivity : AppCompatActivity() {
     private fun updateTechnicalBadges(channel: LiveChannel, tracks: List<TvTrackInfo>) {
         val videoTrack = tracks.filter { it.type == TvTrackInfo.TYPE_VIDEO }
             .maxByOrNull { it.videoWidth.toLong() * it.videoHeight }
-        val width = videoTrack?.videoWidth ?: 0
-        val height = videoTrack?.videoHeight ?: 0
+        val callbackSize = if (
+            channel.source == LiveChannel.Source.TIF && channel.sourceKey == currentChannel?.sourceKey
+        ) playback.currentVideoState() else null
+        val width = callbackSize?.width?.takeIf { it > 0 } ?: videoTrack?.videoWidth ?: 0
+        val height = callbackSize?.height?.takeIf { it > 0 } ?: videoTrack?.videoHeight ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
         val quality = if (radio) null else VideoQuality.label(width, height, format)
@@ -2821,14 +2824,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChannelSystemInformation(channel: LiveChannel) {
-        val tracks = if (
-            channel.source == LiveChannel.Source.TIF && channel.sourceKey == currentChannel?.sourceKey
-        ) playback.allTracks() else emptyList()
+        val isCurrentTif = channel.source == LiveChannel.Source.TIF &&
+            channel.sourceKey == currentChannel?.sourceKey
+        val tracks = if (isCurrentTif) playback.allTracks() else emptyList()
+        val videoState = if (isCurrentTif) playback.currentVideoState() else null
         val videoTrack = tracks.filter { it.type == TvTrackInfo.TYPE_VIDEO }
             .maxByOrNull { it.videoWidth.toLong() * it.videoHeight }
+        val width = videoState?.width?.takeIf { it > 0 } ?: videoTrack?.videoWidth ?: 0
+        val height = videoState?.height?.takeIf { it > 0 } ?: videoTrack?.videoHeight ?: 0
         val quality = VideoQuality.label(
-            videoTrack?.videoWidth ?: 0,
-            videoTrack?.videoHeight ?: 0,
+            width,
+            height,
             channel.videoFormat.orEmpty().uppercase(Locale.ROOT),
         ) ?: getString(R.string.unknown_value)
         val rows = buildList {
@@ -2841,6 +2847,23 @@ class MainActivity : AppCompatActivity() {
             add(getString(R.string.system_info_channel_name) to channel.displayName)
             add(getString(R.string.system_info_service_type) to channel.serviceType.orUnknown())
             add(getString(R.string.system_info_video_format) to channel.videoFormat.orUnknown())
+            add(
+                getString(R.string.system_info_live_video_state) to when (videoState?.available) {
+                    true -> getString(R.string.system_info_video_available)
+                    false -> getString(R.string.system_info_video_unavailable)
+                    null -> getString(R.string.unknown_value)
+                },
+            )
+            add(
+                getString(R.string.system_info_callback_resolution) to if (width > 0 && height > 0) {
+                    "$width × $height"
+                } else {
+                    getString(R.string.unknown_value)
+                },
+            )
+            videoState?.unavailableReason?.let { reason ->
+                add(getString(R.string.system_info_unavailable_reason) to reason.toString())
+            }
             add(getString(R.string.system_info_quality) to quality)
             add(getString(R.string.system_info_encrypted) to yesNo(channel.encrypted))
             add(getString(R.string.system_info_locked) to yesNo(channel.locked))

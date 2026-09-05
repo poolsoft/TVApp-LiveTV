@@ -26,6 +26,11 @@
     <string name="system_info_audio_channels">Ses kanalı</string>
     <string name="system_info_sample_rate">Örnekleme hızı</string>
     <string name="system_info_video">Video</string>
+    <string name="system_info_live_video_state">Canlı video durumu</string>
+    <string name="system_info_video_available">Görüntü kullanılabilir</string>
+    <string name="system_info_video_unavailable">Görüntü kullanılamıyor</string>
+    <string name="system_info_callback_resolution">Callback çözünürlüğü</string>
+    <string name="system_info_unavailable_reason">Görüntü yok neden kodu</string>
     <string name="system_info_audio">Ses</string>
     <string name="system_info_subtitle">Altyazı</string>
     <string name="unknown_value">Bilinmiyor</string>
