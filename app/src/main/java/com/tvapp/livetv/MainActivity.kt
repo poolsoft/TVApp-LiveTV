@@ -1449,18 +1449,32 @@ class MainActivity : AppCompatActivity() {
                 TvTrackInfo.TYPE_SUBTITLE -> "SUBTITLE"
                 else -> "UNKNOWN(${track.type})"
             }
+            val typeFields = when (track.type) {
+                TvTrackInfo.TYPE_VIDEO -> listOf(
+                    "videoWidth=${track.debugValue { videoWidth }}",
+                    "videoHeight=${track.debugValue { videoHeight }}",
+                    "videoFrameRate=${track.debugValue { videoFrameRate }}",
+                    "videoPixelAspectRatio=${track.debugValue { videoPixelAspectRatio }}",
+                    "videoActiveFormatDescription=${track.debugValue { videoActiveFormatDescription }}",
+                )
+                TvTrackInfo.TYPE_AUDIO -> listOf(
+                    "audioChannelCount=${track.debugValue { audioChannelCount }}",
+                    "audioSampleRate=${track.debugValue { audioSampleRate }}",
+                )
+                else -> emptyList()
+            }
             debugLog.recordDebug(
                 "TIF_TRACK_RAW | channel=$channelKey, index=$index, type=$type, id=${track.id}, " +
                     "language=${track.language}, description=${track.description}, " +
-                    "videoWidth=${track.videoWidth}, videoHeight=${track.videoHeight}, " +
-                    "videoFrameRate=${track.videoFrameRate}, " +
-                    "videoPixelAspectRatio=${track.videoPixelAspectRatio}, " +
-                    "videoActiveFormatDescription=${track.videoActiveFormatDescription}, " +
-                    "audioChannelCount=${track.audioChannelCount}, " +
-                    "audioSampleRate=${track.audioSampleRate}, extra=${track.extra}",
+                    "${typeFields.joinToString(", ")}, extra=${track.extra}",
             )
         }
     }
+
+    private inline fun TvTrackInfo.debugValue(reader: TvTrackInfo.() -> Any): String =
+        runCatching { reader().toString() }.getOrElse { error ->
+            "unavailable(${error.javaClass.simpleName})"
+        }
 
     private fun updateTechnicalBadgesForIptv(
         channel: LiveChannel,
@@ -2848,14 +2862,14 @@ class MainActivity : AppCompatActivity() {
                     add("$prefix ${getString(R.string.system_info_language)}" to track.language.orUnknown())
                     add("$prefix ${getString(R.string.system_info_description)}" to track.description?.toString().orUnknown())
                     if (track.type == TvTrackInfo.TYPE_VIDEO) {
-                        add("$prefix ${getString(R.string.system_info_resolution)}" to "${track.videoWidth} × ${track.videoHeight}")
-                        add("$prefix FPS" to track.videoFrameRate.toString())
-                        add("$prefix ${getString(R.string.system_info_pixel_ratio)}" to track.videoPixelAspectRatio.toString())
-                        add("$prefix AFD" to track.videoActiveFormatDescription.toString())
+                        add("$prefix ${getString(R.string.system_info_resolution)}" to "${track.debugValue { videoWidth }} × ${track.debugValue { videoHeight }}")
+                        add("$prefix FPS" to track.debugValue { videoFrameRate })
+                        add("$prefix ${getString(R.string.system_info_pixel_ratio)}" to track.debugValue { videoPixelAspectRatio })
+                        add("$prefix AFD" to track.debugValue { videoActiveFormatDescription })
                     }
                     if (track.type == TvTrackInfo.TYPE_AUDIO) {
-                        add("$prefix ${getString(R.string.system_info_audio_channels)}" to track.audioChannelCount.toString())
-                        add("$prefix ${getString(R.string.system_info_sample_rate)}" to track.audioSampleRate.toString())
+                        add("$prefix ${getString(R.string.system_info_audio_channels)}" to track.debugValue { audioChannelCount })
+                        add("$prefix ${getString(R.string.system_info_sample_rate)}" to track.debugValue { audioSampleRate })
                     }
                     add("$prefix Extra" to track.extra?.toString().orUnknown())
                 }
