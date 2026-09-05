@@ -200,6 +200,7 @@ class MainActivity : AppCompatActivity() {
     private var restoredInitialChannel = false
     private var pendingEditorChannelKey: String? = null
     private var pendingHomeChannelKey: String? = null
+    private var pendingExternalChannelUri: String? = null
     private var focusedListSourceKey: String? = null
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
@@ -315,6 +316,7 @@ class MainActivity : AppCompatActivity() {
         applyIptvAspectMode(iptvViewPreferencesStore.aspectMode())
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
+        pendingExternalChannelUri = intent.getStringExtra(TvChannelViewActivity.EXTRA_TIF_CHANNEL_URI)
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
@@ -540,7 +542,11 @@ class MainActivity : AppCompatActivity() {
                     pendingEditorChannelKey = null
                     val requestedKey = pendingHomeChannelKey ?: editorChannelKey
                     pendingHomeChannelKey = null
-                    val editorChannel = requestedKey?.let { key ->
+                    val requestedUri = pendingExternalChannelUri
+                    pendingExternalChannelUri = null
+                    val editorChannel = requestedUri?.let { uri ->
+                        loaded.firstOrNull { it.uri == uri }
+                    } ?: requestedKey?.let { key ->
                         panelChannels().firstOrNull { it.sourceKey == key }
                             ?: loaded.firstOrNull { it.sourceKey == key }
                     }
@@ -4464,12 +4470,22 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val sourceKey = intent.data?.getQueryParameter("sourceKey") ?: return
-        channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
-            ?: run {
+        val requestedUri = intent.getStringExtra(TvChannelViewActivity.EXTRA_TIF_CHANNEL_URI)
+        if (requestedUri != null) {
+            if (currentChannel?.uri == requestedUri) return
+            channels.firstOrNull { it.uri == requestedUri }?.let(::selectChannel)
+                ?: run {
+                    pendingExternalChannelUri = requestedUri
+                    loadChannels(preserveCurrentPlayback = true)
+                }
+            return
+        }
+        intent.data?.getQueryParameter("sourceKey")?.let { sourceKey ->
+            channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel) ?: run {
                 pendingHomeChannelKey = sourceKey
                 loadChannels(preserveCurrentPlayback = true)
             }
+        }
     }
 
 }
