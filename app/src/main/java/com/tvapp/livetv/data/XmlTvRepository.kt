@@ -10,6 +10,7 @@ import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
+import com.tvapp.livetv.data.local.XmlTvSourceEntity
 import com.tvapp.livetv.model.LiveChannel
 import org.json.JSONArray
 import java.io.InputStream
@@ -26,7 +27,10 @@ class XmlTvRepository(context: Context) {
     private val xtreamEpgDao = database.xtreamEpgDao()
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
 
-    fun sourceLabel(): String? = preferences.getString(KEY_SOURCE, null)
+    fun sources(): List<XmlTvSourceEntity> = dao.sources()
+
+    fun sourceLabel(): String? = preferences.getString(KEY_SOURCE_SUMMARY, null)
+        ?: preferences.getString(KEY_SOURCE, null)
 
     fun importUrl(url: String): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
@@ -39,7 +43,7 @@ class XmlTvRepository(context: Context) {
             check(connection.responseCode in 200..299) {
                 "HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
-            connection.inputStream.use { importStream(it, url) }.also {
+            connection.inputStream.use { importStream(it, url, sourceName(url), KIND_URL) }.also {
                 ensurePeriodicRefresh()
             }
         } finally {
@@ -47,23 +51,52 @@ class XmlTvRepository(context: Context) {
         }
     }
 
-    fun refreshSavedUrl(): Int {
-        val source = sourceLabel()?.takeIf {
-            it.startsWith("http://") || it.startsWith("https://")
-        } ?: return 0
-        return importUrl(source)
+    fun refreshSavedUrls(): Int {
+        val urls = sources().filter { it.kind == KIND_URL }
+        if (urls.isEmpty()) {
+            val legacy = preferences.getString(KEY_SOURCE, null)?.takeIf {
+                it.startsWith("http://") || it.startsWith("https://")
+            }
+            return legacy?.let(::importUrl) ?: 0
+        }
+        var count = 0
+        var firstError: Throwable? = null
+        urls.forEach { source ->
+            runCatching { importUrl(source.location) }
+                .onSuccess { count += it }
+                .onFailure { if (firstError == null) firstError = it }
+        }
+        if (count == 0) firstError?.let { throw it }
+        return count
     }
 
     fun importDocument(uri: Uri): Int = appContext.contentResolver.openInputStream(uri)?.use {
-        importStream(it, uri.toString())
+        importStream(it, uri.toString(), documentName(uri), KIND_FILE)
     } ?: error("XMLTV dosyası açılamadı")
+
+    fun deleteSource(sourceId: Long) {
+        database.runInTransaction {
+            dao.clearPrograms(sourceId)
+            dao.deleteSource(sourceId)
+        }
+        updateSourceSummary()
+        if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
+    }
+
+    fun refreshSource(source: XmlTvSourceEntity): Int = when (source.kind) {
+        KIND_URL -> importUrl(source.location)
+        else -> error("Dosya kaynağı yeniden seçilmelidir")
+    }
 
     fun clear() {
         preferences.edit().clear().apply()
-        database.runInTransaction { dao.clearPrograms() }
+        val sourceIds = sources().map { it.id }
+        database.runInTransaction {
+            dao.clearPrograms()
+            sourceIds.forEach(dao::deleteSource)
+        }
         legacyCacheFile.delete()
-        (appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler)
-            .cancel(REFRESH_JOB_ID)
+        cancelPeriodicRefresh()
     }
 
     fun ensurePeriodicRefresh() {
@@ -278,7 +311,7 @@ class XmlTvRepository(context: Context) {
         return distinctPrograms.size
     }
 
-    private fun importStream(stream: InputStream, label: String): Int {
+    private fun importStream(stream: InputStream, location: String, name: String, kind: String): Int {
         val parser = Xml.newPullParser().apply { setInput(stream, null) }
         val channelNames = mutableMapOf<String, String>()
         val programs = mutableListOf<XmlTvProgramEntity>()
@@ -330,11 +363,19 @@ class XmlTvRepository(context: Context) {
             }
             event = parser.next()
         }
+        val now = System.currentTimeMillis()
+        val existing = dao.sourceByLocation(location)
+        val sourceId = existing?.id ?: dao.insertSource(
+            XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
+        )
         database.runInTransaction {
-            dao.clearPrograms()
-            programs.chunked(INSERT_BATCH_SIZE).forEach(dao::insertPrograms)
+            dao.updateSource(sourceId, name, now)
+            dao.clearPrograms(sourceId)
+            programs.asSequence().map { it.copy(sourceId = sourceId) }.chunked(INSERT_BATCH_SIZE)
+                .forEach { dao.insertPrograms(it) }
         }
-        preferences.edit().putString(KEY_SOURCE, label).putLong(KEY_UPDATED, System.currentTimeMillis()).apply()
+        updateSourceSummary()
+        preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
         legacyCacheFile.delete()
         return programs.size
     }
@@ -380,6 +421,33 @@ class XmlTvRepository(context: Context) {
         } ?: 0L
     }
 
+    private fun sourceName(url: String): String = runCatching {
+        URL(url).path.substringAfterLast('/').takeIf(String::isNotBlank)
+            ?: URL(url).host
+    }.getOrDefault("XMLTV")
+
+    private fun documentName(uri: Uri): String = appContext.contentResolver.query(
+        uri,
+        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+        null,
+        null,
+        null,
+    )?.use { cursor ->
+        cursor.takeIf { it.moveToFirst() }?.getString(0)
+    }?.takeIf(String::isNotBlank) ?: "XMLTV dosyası"
+
+    private fun cancelPeriodicRefresh() {
+        (appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler)
+            .cancel(REFRESH_JOB_ID)
+    }
+
+    private fun updateSourceSummary() {
+        val summary = sources().joinToString(limit = 2, truncated = "…") { it.name }
+        preferences.edit().apply {
+            if (summary.isBlank()) remove(KEY_SOURCE_SUMMARY) else putString(KEY_SOURCE_SUMMARY, summary)
+        }.apply()
+    }
+
     private fun String.normalize(): String = lowercase(Locale.ROOT)
         .replace(Regex("[^a-z0-9çğıöşü]+"), "")
         .removeSuffix("hd").removeSuffix("sd").removeSuffix("4k")
@@ -389,7 +457,10 @@ class XmlTvRepository(context: Context) {
         internal const val EXTRA_FORCE_REFRESH = "force-xtream-refresh"
         const val KEY_SOURCE = "source"
         const val KEY_UPDATED = "updated"
+        const val KEY_SOURCE_SUMMARY = "source_summary"
         const val KEY_XTREAM_UPDATED = "xtream_updated"
+        const val KIND_URL = "URL"
+        const val KIND_FILE = "FILE"
         const val INSERT_BATCH_SIZE = 1_000
         const val CURRENT_PROGRAM_QUERY_CHUNK_SIZE = 400
         const val MAX_XTREAM_EPG_CHANNELS_PER_SOURCE = 250

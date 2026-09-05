@@ -184,6 +184,11 @@
     <string name="xmltv_import_failed">XMLTV import failed: %1$s</string>
     <string name="xmltv_url_hint">https://example.com/epg.xml or epg.xml.gz</string>
     <string name="xmltv_url_invalid">Enter a valid HTTP or HTTPS address.</string>
+    <string name="xmltv_saved_sources">Saved XMLTV sources</string>
+    <string name="xmltv_source_row">%1$s  ·  %2$s</string>
+    <string name="xmltv_source_url">URL</string>
+    <string name="xmltv_source_file">File</string>
+    <string name="xmltv_source_deleted">XMLTV source deleted.</string>
     <string name="not_configured_short">Not configured</string>
     <string name="logo_cache_enabled">Channel logo cache</string>
     <string name="logo_cache_size">Logo cache limit</string>

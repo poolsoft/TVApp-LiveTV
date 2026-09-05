@@ -27,7 +27,7 @@ class XmlTvRefreshJobService : JobService() {
                             force = params.extras.getBoolean(XmlTvRepository.EXTRA_FORCE_REFRESH),
                         )
                     } else {
-                        repository.refreshSavedUrl()
+                        repository.refreshSavedUrls()
                         repository.refreshXtreamShortEpg(force = true)
                     }
                 }.isFailure

@@ -197,6 +197,11 @@
     <string name="xmltv_import_failed">XMLTV alınamadı: %1$s</string>
     <string name="xmltv_url_hint">https://ornek.com/epg.xml veya epg.xml.gz</string>
     <string name="xmltv_url_invalid">Geçerli bir HTTP veya HTTPS adresi girin.</string>
+    <string name="xmltv_saved_sources">Kayıtlı XMLTV kaynakları</string>
+    <string name="xmltv_source_row">%1$s  ·  %2$s</string>
+    <string name="xmltv_source_url">URL</string>
+    <string name="xmltv_source_file">Dosya</string>
+    <string name="xmltv_source_deleted">XMLTV kaynağı silindi.</string>
     <string name="not_configured_short">Ayarlanmadı</string>
     <string name="logo_cache_enabled">Kanal logosu önbelleği</string>
     <string name="logo_cache_size">Logo önbelleği sınırı</string>

@@ -479,6 +479,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
         val actions = arrayOf(
             getString(R.string.xmltv_from_url),
             getString(R.string.xmltv_from_file),
+            getString(R.string.xmltv_saved_sources),
             getString(R.string.xmltv_clear),
         )
         AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
@@ -488,10 +489,13 @@ class DisplaySettingsActivity : AppCompatActivity() {
                 when (which) {
                     0 -> showXmlTvUrlEditor()
                     1 -> openXmlTvFile.launch(arrayOf("application/xml", "text/xml", "*/*"))
-                    2 -> {
-                        xmlTvRepository.clear()
-                        xmlTvSettingRow?.value?.setText(R.string.not_configured_short)
-                        Toast.makeText(this, R.string.xmltv_cleared, Toast.LENGTH_SHORT).show()
+                    2 -> showXmlTvSavedSources()
+                    3 -> {
+                        lifecycleScope.launch {
+                            withContext(Dispatchers.IO) { xmlTvRepository.clear() }
+                            xmlTvSettingRow?.value?.setText(R.string.not_configured_short)
+                            Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_cleared, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -502,7 +506,6 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private fun showXmlTvUrlEditor() {
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            setText(xmlTvRepository.sourceLabel()?.takeIf { it.startsWith("http") }.orEmpty())
             hint = getString(R.string.xmltv_url_hint)
             setSingleLine()
             setTextColor(getColor(R.color.text_primary))
@@ -542,6 +545,54 @@ class DisplaySettingsActivity : AppCompatActivity() {
             input.requestFocus()
         }
         dialog.show()
+    }
+
+    private fun showXmlTvSavedSources() {
+        lifecycleScope.launch {
+            val sources = withContext(Dispatchers.IO) { xmlTvRepository.sources() }
+            if (sources.isEmpty()) {
+                Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_not_configured, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val labels = sources.map { source ->
+                getString(
+                    R.string.xmltv_source_row,
+                    source.name,
+                    if (source.kind == XmlTvRepository.KIND_URL) getString(R.string.xmltv_source_url)
+                    else getString(R.string.xmltv_source_file),
+                )
+            }.toTypedArray()
+            AlertDialog.Builder(this@DisplaySettingsActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(R.string.xmltv_saved_sources)
+                .setItems(labels) { _, index -> showXmlTvSourceActions(sources[index]) }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+    }
+
+    private fun showXmlTvSourceActions(source: com.tvapp.livetv.data.local.XmlTvSourceEntity) {
+        val actions = if (source.kind == XmlTvRepository.KIND_URL) {
+            arrayOf(getString(R.string.update), getString(R.string.delete))
+        } else {
+            arrayOf(getString(R.string.delete))
+        }
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(source.name)
+            .setMessage(source.location)
+            .setItems(actions) { _, index ->
+                if (source.kind == XmlTvRepository.KIND_URL && index == 0) {
+                    importXmlTv { xmlTvRepository.refreshSource(source) }
+                } else {
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { xmlTvRepository.deleteSource(source.id) }
+                        xmlTvSettingRow?.value?.text = xmlTvRepository.sourceLabel()
+                            ?: getString(R.string.not_configured_short)
+                        Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_source_deleted, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     private fun importXmlTv(action: () -> Int) {

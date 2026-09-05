@@ -14,9 +14,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         IptvSourceEntity::class,
         IptvChannelEntity::class,
         XmlTvProgramEntity::class,
+        XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -44,6 +45,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_7_8,
                 MIGRATION_8_9,
                 MIGRATION_9_10,
+                MIGRATION_10_11,
             )
                 .build()
                 .also { instance = it }
@@ -200,6 +202,28 @@ abstract class TVAppDatabase : RoomDatabase() {
                         "`index_xtream_epg_programs_normalizedChannelName_startTimeMillis_endTimeMillis` " +
                         "ON `xtream_epg_programs` " +
                         "(`normalizedChannelName`, `startTimeMillis`, `endTimeMillis`)",
+                )
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `xmltv_sources` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `location` TEXT NOT NULL, " +
+                        "`kind` TEXT NOT NULL, `lastUpdatedAt` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_xmltv_sources_location` " +
+                        "ON `xmltv_sources` (`location`)",
+                )
+                db.execSQL(
+                    "ALTER TABLE `xmltv_programs` ADD COLUMN `sourceId` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_xmltv_programs_sourceId` " +
+                        "ON `xmltv_programs` (`sourceId`)",
                 )
             }
         }

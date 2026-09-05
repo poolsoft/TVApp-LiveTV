@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -676,18 +678,22 @@ class ChannelEditorActivity : AppCompatActivity() {
         val actions = arrayOf(
             getString(R.string.xmltv_from_url),
             getString(R.string.xmltv_from_file),
+            getString(R.string.xmltv_saved_sources),
             getString(R.string.xmltv_clear),
         )
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.xmltv_alternative_epg)
             .setMessage(xmlTvRepository.sourceLabel() ?: getString(R.string.xmltv_not_configured))
             .setItems(actions) { _, which ->
                 when (which) {
                     0 -> showXmlTvUrlEditor()
                     1 -> openXmlTvFile.launch(arrayOf("application/xml", "text/xml", "*/*"))
-                    2 -> {
-                        xmlTvRepository.clear()
-                        binding.syncStatus.setText(R.string.xmltv_cleared)
+                    2 -> showXmlTvSavedSources()
+                    3 -> {
+                        lifecycleScope.launch {
+                            withContext(Dispatchers.IO) { xmlTvRepository.clear() }
+                            binding.syncStatus.setText(R.string.xmltv_cleared)
+                        }
                     }
                 }
             }
@@ -698,19 +704,88 @@ class ChannelEditorActivity : AppCompatActivity() {
     private fun showXmlTvUrlEditor() {
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            setText(xmlTvRepository.sourceLabel()?.takeIf { it.startsWith("http") }.orEmpty())
+            hint = getString(R.string.xmltv_url_hint)
+            setSingleLine()
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            setBackgroundResource(R.drawable.bg_focusable)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
         }
-        AlertDialog.Builder(this)
+        val container = LinearLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(input, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.xmltv_from_url)
-            .setView(input)
-            .setPositiveButton(R.string.update) { _, _ ->
-                input.text.toString().trim().takeIf { it.startsWith("http") }?.let { url ->
+            .setView(container)
+            .setPositiveButton(R.string.update, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString().trim()
+                val scheme = runCatching { android.net.Uri.parse(url).scheme?.lowercase() }.getOrNull()
+                if (scheme == "http" || scheme == "https") {
+                    dialog.dismiss()
                     importXmlTv { xmlTvRepository.importUrl(url) }
+                } else {
+                    input.error = getString(R.string.xmltv_url_invalid)
+                    input.requestFocus()
                 }
             }
-            .setNegativeButton(R.string.cancel, null)
+            input.requestFocus()
+        }
+        dialog.show()
+    }
+
+    private fun showXmlTvSavedSources() {
+        lifecycleScope.launch {
+            val sources = withContext(Dispatchers.IO) { xmlTvRepository.sources() }
+            if (sources.isEmpty()) {
+                binding.syncStatus.setText(R.string.xmltv_not_configured)
+                return@launch
+            }
+            val labels = sources.map { source ->
+                getString(
+                    R.string.xmltv_source_row,
+                    source.name,
+                    if (source.kind == XmlTvRepository.KIND_URL) getString(R.string.xmltv_source_url)
+                    else getString(R.string.xmltv_source_file),
+                )
+            }.toTypedArray()
+            AlertDialog.Builder(this@ChannelEditorActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(R.string.xmltv_saved_sources)
+                .setItems(labels) { _, index -> showXmlTvSourceActions(sources[index]) }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+    }
+
+    private fun showXmlTvSourceActions(source: com.tvapp.livetv.data.local.XmlTvSourceEntity) {
+        val actions = if (source.kind == XmlTvRepository.KIND_URL) {
+            arrayOf(getString(R.string.update), getString(R.string.delete))
+        } else arrayOf(getString(R.string.delete))
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(source.name)
+            .setMessage(source.location)
+            .setItems(actions) { _, index ->
+                if (source.kind == XmlTvRepository.KIND_URL && index == 0) {
+                    importXmlTv { xmlTvRepository.refreshSource(source) }
+                } else {
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { xmlTvRepository.deleteSource(source.id) }
+                        binding.syncStatus.setText(R.string.xmltv_source_deleted)
+                    }
+                }
+            }
+            .setNegativeButton(R.string.close, null)
             .show()
     }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun importXmlTv(action: () -> Int) {
         operationInProgress = true
