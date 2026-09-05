@@ -6,6 +6,16 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu
+* IPTV ve VOD yayınlarında harici yüzen OSD paneli kaldırılarak zaman çubuğu (progressbar/seekbar), pozisyon/süre sayaçları, oynat/duraklat, tampon (buffer) ayarı, oynatma hızı, kalite, ses ve altyazı butonları doğrudan bilgi çubuğuna (Infobar) entegre edildi.
+* Kumanda yön tuşları ile iki satırlı hiyerarşik kontrol sağlandı: Yukarı/Aşağı tuşları zaman çizgisi (Timeline) ile butonlar satırı arasında geçiş yapar; Sol/Sağ tuşları zaman çizgisindeyken yayını ileri/geri sarar, butonlar satırındayken butonlar arasında gezinir. `OK` tuşu seçili butonun işlevini (Oynat/Duraklat, Tampon seviyesi değişimi, Hız değişimi, Kalite/Ses/Altyazı menüleri) tetikler.
+* Kanal listesi açıkken yön tuşları kanal listesinde kalır; çakışma önlenmiştir.
+* `BACK` tuşuna basıldığında veya zaman aşımı dolduğunda IPTV kontrolleri kapanır ve Infobar normal program bilgisi moduna geri döner.
+
+### Son İzlenen Kanallar Paneli Modernizasyonu
+* Geri tuşuyla açılan son 5 kanal paneli yatay kaydırma gerektirmeyecek şekilde ekran genişliğine eşit olarak paylaştırıldı (`weight=1`).
+* Kartlar modern cam panel (`bg_glass_panel`) temasına uyumlu hale getirildi; kanal numarası, kaynak rozeti (DVB/TIF veya IPTV), kalın kanal adı ve alt satırda yayınlanan program başlığı eklendi. Kumanda odağı ve görsel seçilebilirlik güçlendirildi.
+
 ### IPTV oynatma OSD ve genel ayarlar
 * Oynatma OSD'si satır seçmeli kumanda düzenine geçirildi: Yukarı/Aşağı zaman çizgisi, buffer ve VOD hız satırlarında gezinir; Sol/Sağ seçili satırı değiştirir, buffer `OK` ile uygulanır ve kanal değiştirme yalnız CH+/CH- ile yapılır.
 * IPTV buffer hedefi (Otomatik/5-60 saniye) ve varsayılan VOD oynatma hızı genel Oynatma ayarlarına eklendi. OSD ile genel ayarlar aynı kalıcı tercihleri kullanır.
