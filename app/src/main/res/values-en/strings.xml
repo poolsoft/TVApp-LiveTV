@@ -161,7 +161,7 @@
     <string name="iptv_vod_playing">Playing</string>
     <string name="iptv_vod_paused">Paused</string>
     <string name="iptv_vod_stopped">Stopped</string>
-    <string name="iptv_vod_remote_hint">←/→ 30 sec    OK Play/Pause    BACK Close</string>
+    <string name="iptv_vod_remote_hint">←/→ Seek    ↑/↓ Buffer    CH+/CH− Channel    OK Play/Pause    BACK Close</string>
     <string name="iptv_action_live">Live</string>
     <string name="iptv_action_restart">Restart</string>
     <string name="iptv_action_audio">Audio</string>
@@ -171,6 +171,7 @@
     <string name="iptv_reconnecting">Reconnecting stream</string>
     <string name="iptv_buffer_seconds">Buffer %1$d sec</string>
     <string name="home_recent_channels">Recently watched channels</string>
+    <string name="recent_channels">Last 5 channels</string>
     <string name="home_watch_next_description">Live TV - Channel %1$s</string>
     <string name="radio_channels">Radio channels</string>
     <string name="xmltv_alternative_epg">Alternative EPG (XMLTV)</string>
@@ -408,6 +409,10 @@
     <string name="iptv_grid_no_channels">No live IPTV channels are available for the grid.</string>
     <string name="iptv_connecting">Connecting…</string>
     <string name="iptv_buffering">Buffering…</string>
+    <string name="iptv_loading">Loading…</string>
+    <string name="iptv_buffer_target">Buffer target: %1$d seconds</string>
+    <string name="iptv_buffer_target_short">Target %1$d sec</string>
+    <string name="iptv_buffer_changed">Buffer setting changed</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">IPTV channel to open in PiP</string>
     <string name="iptv_pip_no_channels">No live IPTV channels are available for PiP.</string>
@@ -458,7 +463,7 @@
     <string name="access_active">Active</string>
     <string name="access_inactive">Inactive</string>
     <string name="about_content">TVApp\n\nVersion: %1$s (%2$d)\nDistribution: %3$s\n\nIPTV purchase state: %4$s\nIPTV access: %5$s\nTrial remaining: %6$d days\n\nIPTV sources: %7$d\nTotal IPTV items: %8$d\nAdded to the main channel list: %9$d\n\nTVApp provides a live TV and IPTV experience compatible with Android TV Input Framework sources.</string>
-    <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nOn live content, Left or Right opens playback controls. Red returns to live or retries. On VOD, Left and Right seek, and OK toggles play/pause. Green opens audio, Yellow subtitles and Blue video options. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
+    <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions. On unobstructed playback, Back shows the last 5 channels; LAST CHANNEL returns directly to the previous channel.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nOn live content, Left or Right opens playback controls. While controls are open, Up/Down changes the buffer target and CH+/CH- changes channels. Red returns to live or retries. On VOD, Left and Right seek, and OK toggles play/pause. Green opens audio, Yellow subtitles and Blue video options. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
     <string name="system_settings_unavailable">System settings could not be opened.</string>
     <string name="verbose_remote_key_logging">Write remote keys to the debug log</string>
     <string name="guide_control_hints">OK: Watch  ·  Hold OK: Reminder  ·  ▶: Programs  ·  ◀: Channels  ·  BACK: Close</string>

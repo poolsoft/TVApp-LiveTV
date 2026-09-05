@@ -161,7 +161,7 @@
     <string name="iptv_vod_playing">Oynatılıyor</string>
     <string name="iptv_vod_paused">Duraklatıldı</string>
     <string name="iptv_vod_stopped">Durduruldu</string>
-    <string name="iptv_vod_remote_hint">←/→ 30 sn    OK Oynat/Duraklat    BACK Kapat</string>
+    <string name="iptv_vod_remote_hint">←/→ Sar    ↑/↓ Buffer    CH+/CH− Kanal    OK Oynat/Duraklat    BACK Kapat</string>
     <string name="iptv_action_live">Canlı</string>
     <string name="iptv_action_restart">Baştan oynat</string>
     <string name="iptv_action_audio">Ses</string>
@@ -184,6 +184,7 @@
     <string name="iptv_reconnecting">Yayın yeniden bağlanıyor</string>
     <string name="iptv_buffer_seconds">Buffer %1$d sn</string>
     <string name="home_recent_channels">Son izlenen kanallar</string>
+    <string name="recent_channels">Son 5 kanal</string>
     <string name="home_watch_next_description">Canlı TV · Kanal %1$s</string>
     <string name="radio_channels">Radyo kanalları</string>
     <string name="xmltv_alternative_epg">Alternatif EPG (XMLTV)</string>
@@ -420,7 +421,11 @@
     <string name="iptv_grid_empty">Grid için en az bir kanal seçin.</string>
     <string name="iptv_grid_no_channels">Grid için kullanılabilir canlı IPTV kanalı yok.</string>
     <string name="iptv_connecting">Bağlanıyor…</string>
-    <string name="iptv_buffering">Yükleniyor…</string>
+    <string name="iptv_buffering">Buffer alınıyor…</string>
+    <string name="iptv_loading">Yükleniyor…</string>
+    <string name="iptv_buffer_target">Buffer hedefi: %1$d saniye</string>
+    <string name="iptv_buffer_target_short">Hedef %1$d sn</string>
+    <string name="iptv_buffer_changed">Buffer ayarı değiştirildi</string>
     <string name="iptv_pip">PiP</string>
     <string name="iptv_pip_title">PiP’te açılacak IPTV kanalı</string>
     <string name="iptv_pip_no_channels">PiP için kullanılabilir canlı IPTV kanalı yok.</string>
@@ -458,7 +463,7 @@
     <string name="access_active">Aktif</string>
     <string name="access_inactive">Aktif değil</string>
     <string name="about_content">TVApp\n\nSürüm: %1$s (%2$d)\nDağıtım: %3$s\n\nIPTV satın alma durumu: %4$s\nIPTV erişimi: %5$s\nKalan deneme: %6$d gün\n\nIPTV listesi: %7$d\nToplam IPTV içeriği: %8$d\nAna kanal listesine ekli: %9$d\n\nTVApp, Android TV Input Framework kaynaklarıyla uyumlu canlı TV ve IPTV deneyimi sunar.</string>
-    <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nCanlı yayında sol veya sağ tuş oynatma çubuğunu açar. Kırmızı canlıya döner veya yeniden dener. VOD içeriğinde sol ve sağ ileri/geri sarar, OK oynatır veya duraklatır. Yeşil ses, sarı altyazı, mavi görüntü seçeneklerini açar. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
+    <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir. Boş ekranda Back son 5 kanalı gösterir; LAST CHANNEL önceki kanala döner.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nCanlı yayında sol veya sağ tuş oynatma çubuğunu açar. Çubuk açıkken Yukarı/Aşağı buffer hedefini, CH+/CH- kanalı değiştirir. Kırmızı canlıya döner veya yeniden dener. VOD içeriğinde sol ve sağ ileri/geri sarar, OK oynatır veya duraklatır. Yeşil ses, sarı altyazı, mavi görüntü seçeneklerini açar. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
     <string name="system_settings_unavailable">Sistem ayarları açılamadı.</string>
     <string name="verbose_remote_key_logging">Kumanda tuşlarını debug loguna yaz</string>
     <string name="guide_control_hints">OK: İzle  ·  Uzun OK: Hatırlatıcı  ·  ▶: Programlar  ·  ◀: Kanallar  ·  BACK: Kapat</string>

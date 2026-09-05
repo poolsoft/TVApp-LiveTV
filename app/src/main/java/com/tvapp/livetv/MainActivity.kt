@@ -50,6 +50,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
+import com.tvapp.livetv.playback.IptvBufferingState
 import com.tvapp.livetv.playback.IptvPlaybackProfile
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
@@ -113,6 +114,7 @@ class MainActivity : AppCompatActivity() {
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
+        private const val IPTV_BUFFER_STEP_SECONDS = 5
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
         private const val IPTV_LIBRARY_SOURCE_ID = "source-id"
         private const val IPTV_LIBRARY_CONTENT_TYPE = "content-type"
@@ -372,10 +374,19 @@ class MainActivity : AppCompatActivity() {
                 currentChannel?.let(::updateTechnicalBadgesForIptv)
             }
         }
-        iptvPlayback.onBuffering = { isBuffering ->
+        iptvPlayback.onBuffering = { state ->
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
-                binding.iptvBufferingText.setText(R.string.iptv_buffering)
-                binding.iptvBufferingContainer.visibility = if (isBuffering) View.VISIBLE else View.GONE
+                when (state) {
+                    IptvBufferingState.NONE -> binding.iptvBufferingContainer.visibility = View.GONE
+                    IptvBufferingState.LOADING -> {
+                        binding.iptvBufferingText.setText(R.string.iptv_loading)
+                        binding.iptvBufferingContainer.visibility = View.VISIBLE
+                    }
+                    IptvBufferingState.BUFFERING -> {
+                        binding.iptvBufferingContainer.visibility = View.GONE
+                        showIptvNotice(R.string.iptv_buffering)
+                    }
+                }
             }
         }
         iptvPlayback.onContentKindChanged = { kind ->
@@ -1272,6 +1283,7 @@ class MainActivity : AppCompatActivity() {
                 add(String.format(Locale.getDefault(), "%.1f Mbps", it / 1_000_000f))
             }
             add(getString(R.string.iptv_buffer_seconds, technical.bufferedDurationMillis / 1_000L))
+            add(getString(R.string.iptv_buffer_target_short, iptvPlayback.targetBufferSeconds()))
         }.joinToString("  ·  ")
     }
 
@@ -3997,6 +4009,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleBackNavigation() {
         when {
+            binding.recentChannelsPanel.visibility == View.VISIBLE -> hideRecentChannels()
             iptvGridActive -> stopIptvGrid(resumePrevious = true)
             iptvOverlayActive -> stopIptvOverlay()
             multiViewActive -> stopMultiView()
@@ -4012,8 +4025,46 @@ class MainActivity : AppCompatActivity() {
                 infoBarJob?.cancel()
                 setInfoBarVisible(false)
             }
-            else -> Unit
+            else -> showRecentChannels()
         }
+    }
+
+    private fun showRecentChannels() {
+        val recent = playbackHistory.keys().asSequence()
+            .filter { it != currentChannel?.sourceKey }
+            .mapNotNull { key -> channels.firstOrNull { it.sourceKey == key } }
+            .take(5)
+            .toList()
+        if (recent.isEmpty()) return
+        binding.recentChannelsContainer.removeAllViews()
+        recent.forEach { channel ->
+            val card = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(210), dp(74)).apply {
+                    marginEnd = dp(10)
+                }
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_focusable)
+                isFocusable = true
+                isClickable = true
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                text = "${channel.displayNumber}  ${channel.displayName}"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                textSize = 15f
+                maxLines = 2
+                setOnClickListener {
+                    hideRecentChannels()
+                    selectChannel(channel)
+                }
+            }
+            binding.recentChannelsContainer.addView(card)
+        }
+        binding.recentChannelsPanel.visibility = View.VISIBLE
+        binding.recentChannelsContainer.getChildAt(0)?.requestFocus()
+    }
+
+    private fun hideRecentChannels() {
+        binding.recentChannelsPanel.visibility = View.GONE
+        binding.recentChannelsContainer.removeAllViews()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -4152,6 +4203,13 @@ class MainActivity : AppCompatActivity() {
             }
             return super.dispatchKeyEvent(event)
         }
+        if (binding.recentChannelsPanel.visibility == View.VISIBLE) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+                hideRecentChannels()
+                return true
+            }
+            return super.dispatchKeyEvent(event)
+        }
         val isIptvMediaKey = event.keyCode in setOf(
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY,
@@ -4227,6 +4285,26 @@ class MainActivity : AppCompatActivity() {
                         iptvPlayback.togglePlayPause()
                     }
                     showIptvPlaybackControls(iptvPlaybackStateText())
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    val seconds = iptvPlayback.adjustTargetBufferSeconds(IPTV_BUFFER_STEP_SECONDS)
+                    showIptvPlaybackControls(R.string.iptv_buffer_changed)
+                    binding.iptvControlState.text = getString(R.string.iptv_buffer_target, seconds)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    val seconds = iptvPlayback.adjustTargetBufferSeconds(-IPTV_BUFFER_STEP_SECONDS)
+                    showIptvPlaybackControls(R.string.iptv_buffer_changed)
+                    binding.iptvControlState.text = getString(R.string.iptv_buffer_target, seconds)
+                    return true
+                }
+                KeyEvent.KEYCODE_CHANNEL_UP -> {
+                    zap(1)
+                    return true
+                }
+                KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                    zap(-1)
                     return true
                 }
                 KeyEvent.KEYCODE_BACK -> {

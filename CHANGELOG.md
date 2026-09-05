@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV buffer ve son kanallar
+* Birincil IPTV oynatıcının buffer hedefi oynatma çubuğu açıkken Yukarı/Aşağı ile 5 saniyelik adımlarla 5-60 saniye arasında değiştirilebiliyor ve seçim kalıcı saklanıyor. Bu görünümde kanal değiştirme yalnız CH+/CH- ile yapılıyor.
+* Normal yeniden buffer alma artık donma/yeniden bağlanma sayılmıyor; küçük köşe bildirimi “Buffer alınıyor” gösteriyor. Ortadaki yükleme durumu ilk açılış ve gerçek tekrar yükleme işlemlerine ayrıldı.
+* Ana yayında başka OSD yokken Back, altta kumandayla gezilebilen son 5 kanal kartlarını açıyor. LAST CHANNEL/RECALL tuşu önceki kanala doğrudan dönmeye devam ediyor.
+
 ### XMLTV EPG eşleştirme editörü
 * Kanalın XMLTV ile otomatik olarak `tvg-id`/`channel id` veya sadeleştirilmiş kanal adı üzerinden eşleştiği artık ayrı editörde görülebiliyor.
 * Kumandayla belirli bir XMLTV kaynağı ve kanal kimliği elle seçilebiliyor; tercih Room'da kalıcı saklanıyor ve aynı kimliğe sahip farklı EPG kaynakları birbirine karışmıyor.

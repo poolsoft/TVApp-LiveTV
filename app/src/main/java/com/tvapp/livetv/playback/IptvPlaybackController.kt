@@ -43,15 +43,21 @@ class IptvPlaybackController(
     private var released = false
     private var lastObservedPosition = C.TIME_UNSET
     private var lastProgressAt = SystemClock.elapsedRealtime()
+    private var currentChannel: LiveChannel? = null
+    private var hasReachedReady = false
+    private var explicitLoading = true
+    private var targetBufferSeconds = appContext.getSharedPreferences(BUFFER_PREFS, Context.MODE_PRIVATE)
+        .getInt(KEY_TARGET_BUFFER_SECONDS, DEFAULT_TARGET_BUFFER_SECONDS)
     private val retryRunnable = Runnable {
         player?.let { current ->
+            explicitLoading = true
             current.prepare()
             current.playWhenReady = true
         }
     }
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
     var onPlaybackReady: (() -> Unit)? = null
-    var onBuffering: ((Boolean) -> Unit)? = null
+    var onBuffering: ((IptvBufferingState) -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
 
@@ -61,11 +67,19 @@ class IptvPlaybackController(
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
         selectedVideoTrackId = null
+        currentChannel = channel
+        hasReachedReady = false
+        explicitLoading = true
         resetProgressObservation()
+        val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
+            targetBufferSeconds * 1_000
+        } else {
+            MAX_BUFFER_MS
+        }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                MIN_BUFFER_MS,
-                MAX_BUFFER_MS,
+                MIN_BUFFER_MS.coerceAtMost(maximumBufferMs),
+                maximumBufferMs,
                 BUFFER_FOR_PLAYBACK_MS,
                 BUFFER_AFTER_REBUFFER_MS,
             )
@@ -92,17 +106,22 @@ class IptvPlaybackController(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
-                            onBuffering?.invoke(true)
+                            onBuffering?.invoke(
+                                if (!hasReachedReady || explicitLoading) IptvBufferingState.LOADING
+                                else IptvBufferingState.BUFFERING,
+                            )
                         }
                         Player.STATE_READY -> {
                             retryHandler.removeCallbacks(retryRunnable)
                             retryCount = 0
-                            onBuffering?.invoke(false)
+                            hasReachedReady = true
+                            explicitLoading = false
+                            onBuffering?.invoke(IptvBufferingState.NONE)
                             onPlaybackReady?.invoke()
                             onContentKindChanged?.invoke(contentKind())
                         }
                         Player.STATE_ENDED, Player.STATE_IDLE -> {
-                            onBuffering?.invoke(false)
+                            onBuffering?.invoke(IptvBufferingState.NONE)
                         }
                     }
                 }
@@ -157,7 +176,7 @@ class IptvPlaybackController(
     fun stop() {
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
-        onBuffering?.invoke(false)
+        onBuffering?.invoke(IptvBufferingState.NONE)
         player?.stop()
         player?.clearMediaItems()
     }
@@ -217,6 +236,7 @@ class IptvPlaybackController(
         val current = player ?: return false
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
+        explicitLoading = true
         current.prepare()
         current.playWhenReady = true
         return true
@@ -238,7 +258,8 @@ class IptvPlaybackController(
         if (
             !current.playWhenReady ||
             current.playbackState == Player.STATE_IDLE ||
-            current.playbackState == Player.STATE_ENDED
+            current.playbackState == Player.STATE_ENDED ||
+            current.playbackState == Player.STATE_BUFFERING
         ) {
             lastObservedPosition = current.currentPosition
             lastProgressAt = now
@@ -257,6 +278,32 @@ class IptvPlaybackController(
         current.play()
         resetProgressObservation()
         return true
+    }
+
+    fun targetBufferSeconds(): Int = targetBufferSeconds
+
+    fun adjustTargetBufferSeconds(deltaSeconds: Int): Int {
+        if (profile != IptvPlaybackProfile.PRIMARY) return targetBufferSeconds
+        val updated = (targetBufferSeconds + deltaSeconds).coerceIn(
+            MIN_TARGET_BUFFER_SECONDS,
+            MAX_TARGET_BUFFER_SECONDS,
+        )
+        if (updated == targetBufferSeconds) return updated
+        targetBufferSeconds = updated
+        appContext.getSharedPreferences(BUFFER_PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_TARGET_BUFFER_SECONDS, updated)
+            .apply()
+        val channel = currentChannel ?: return updated
+        val resumePosition = player?.currentPosition?.takeIf {
+            contentKind() == IptvContentKind.VOD
+        } ?: 0L
+        retryHandler.removeCallbacks(retryRunnable)
+        playerView.player = null
+        player?.release()
+        player = null
+        trackSelector = null
+        play(channel, resumePosition)
+        return updated
     }
 
     fun technicalSnapshot(): IptvTechnicalSnapshot {
@@ -399,7 +446,7 @@ class IptvPlaybackController(
     fun release() {
         released = true
         retryHandler.removeCallbacks(retryRunnable)
-        onBuffering?.invoke(false)
+        onBuffering?.invoke(IptvBufferingState.NONE)
         playerView.player = null
         player?.release()
         player = null
@@ -463,6 +510,11 @@ class IptvPlaybackController(
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
         const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
+        const val BUFFER_PREFS = "iptv_playback"
+        const val KEY_TARGET_BUFFER_SECONDS = "target_buffer_seconds"
+        const val DEFAULT_TARGET_BUFFER_SECONDS = 20
+        const val MIN_TARGET_BUFFER_SECONDS = 5
+        const val MAX_TARGET_BUFFER_SECONDS = 60
 
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
@@ -476,6 +528,8 @@ class IptvPlaybackController(
 }
 
 enum class IptvContentKind { LIVE, VOD, UNKNOWN }
+
+enum class IptvBufferingState { NONE, LOADING, BUFFERING }
 
 enum class IptvPlaybackProfile(
     val maximumWidth: Int,
