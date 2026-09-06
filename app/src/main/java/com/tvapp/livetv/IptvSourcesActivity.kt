@@ -79,7 +79,11 @@ class IptvSourcesActivity : AppCompatActivity() {
                 _, _, position, _ ->
             selectedSourcePosition = position
             sources.getOrNull(position)?.let { summary ->
-                openChannelSelection(summary.source.id, summary.source.name)
+                if (summary.source.kind == IptvRepository.KIND_URL) {
+                    showSourceActions(summary)
+                } else {
+                    openChannelSelection(summary.source.id, summary.source.name)
+                }
             }
         }
         binding.sourceList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {

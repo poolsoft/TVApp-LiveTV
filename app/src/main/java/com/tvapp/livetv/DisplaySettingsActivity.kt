@@ -675,22 +675,25 @@ class DisplaySettingsActivity : AppCompatActivity() {
 
     private fun showXmlTvSavedSources() {
         lifecycleScope.launch {
-            val sources = withContext(Dispatchers.IO) { xmlTvRepository.sources() }
-            if (sources.isEmpty()) {
+            val summaries = withContext(Dispatchers.IO) { xmlTvRepository.sourceSummaries() }
+            if (summaries.isEmpty()) {
                 Toast.makeText(this@DisplaySettingsActivity, R.string.xmltv_not_configured, Toast.LENGTH_SHORT).show()
                 return@launch
             }
-            val labels = sources.map { source ->
+            val labels = summaries.map { summary ->
+                val source = summary.source
                 getString(
-                    R.string.xmltv_source_row,
+                    R.string.xmltv_source_row_detailed,
                     source.name,
                     if (source.kind == XmlTvRepository.KIND_URL) getString(R.string.xmltv_source_url)
                     else getString(R.string.xmltv_source_file),
+                    summary.channelCount,
+                    summary.programCount,
                 )
             }.toTypedArray()
             AlertDialog.Builder(this@DisplaySettingsActivity, R.style.Theme_TVApp_Dialog)
                 .setTitle(R.string.xmltv_saved_sources)
-                .setItems(labels) { _, index -> showXmlTvSourceActions(sources[index]) }
+                .setItems(labels) { _, index -> showXmlTvSourceActions(summaries[index].source) }
                 .setNegativeButton(R.string.close, null)
                 .show()
         }

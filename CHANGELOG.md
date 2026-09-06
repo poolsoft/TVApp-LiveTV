@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Editör ve kaynak yönetimi performansı
+* Kanal Editörü liste farkı hesabı arka plana alındı ve depo/çizim süreleri debug loguna eklendi.
+* URL tabanlı IPTV kaynak işlemleri kısa OK ile görünür hale getirildi; uzun basış menüsü korunuyor.
+* XMLTV kaynaklarına kanal/program istatistikleri eklendi ve büyük rehberlerde eşleştirme indeksli hale getirildi.
+* URL yenilenirken kullanıcının verdiği XMLTV kaynak adının sıfırlanması engellendi.
+
 ### IPTV medya tuşu kontrol modu
 * IPTV kontrol düğmeleri eşit sütunlara yayılmak yerine içerik genişliğinde ve soldan başlayan kompakt bir grup haline getirildi.
 * Kontrol simgeleri metinlerine yaklaştırıldı; kanal değişimi veya infobar zaman aşımında medya kontrolleri pasif duruma dönüyor ve gereksiz mavi odak çerçeveleri temizleniyor.

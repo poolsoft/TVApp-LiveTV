@@ -2,6 +2,7 @@ package com.tvapp.livetv
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
@@ -127,6 +128,7 @@ class ChannelEditorActivity : AppCompatActivity() {
     private fun loadChannels(syncMessage: Boolean, preferredKey: String? = focusedChannel?.sourceKey) {
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
             val result = withContext(Dispatchers.IO) {
                 repository.channels(
                     includeHidden = true,
@@ -134,13 +136,21 @@ class ChannelEditorActivity : AppCompatActivity() {
                 )
             }
             result.onSuccess { loaded ->
+                val repositoryFinishedAt = SystemClock.elapsedRealtime()
                 crashReportStore.recordDebug(
-                    "EDITOR_CHANNEL_LOAD_SUCCESS | count=${loaded.size}, sync=$syncMessage",
+                    "EDITOR_CHANNEL_LOAD_SUCCESS | count=${loaded.size}, sync=$syncMessage, " +
+                        "repository=${repositoryFinishedAt - startedAt}ms",
                 )
                 val previousCount = channels.size
                 channels.clear()
                 channels.addAll(loaded)
-                adapter.submitList(loaded)
+                adapter.submitList(loaded) {
+                    crashReportStore.recordDebug(
+                        "EDITOR_CHANNEL_RENDER_SUCCESS | count=${loaded.size}, " +
+                            "diffAndDispatch=${SystemClock.elapsedRealtime() - repositoryFinishedAt}ms, " +
+                            "total=${SystemClock.elapsedRealtime() - startedAt}ms",
+                    )
+                }
                 binding.channelCount.text = resources.getQuantityString(
                     R.plurals.channel_count,
                     loaded.size,
@@ -502,7 +512,7 @@ class ChannelEditorActivity : AppCompatActivity() {
                 R.string.unlock_channel
             },
         )
-        adapter.notifyDataSetChanged()
+        adapter.notifyChannelStateChanged(channel.sourceKey)
         setResult(RESULT_OK)
     }
 
@@ -797,22 +807,25 @@ class ChannelEditorActivity : AppCompatActivity() {
 
     private fun showXmlTvSavedSources() {
         lifecycleScope.launch {
-            val sources = withContext(Dispatchers.IO) { xmlTvRepository.sources() }
-            if (sources.isEmpty()) {
+            val summaries = withContext(Dispatchers.IO) { xmlTvRepository.sourceSummaries() }
+            if (summaries.isEmpty()) {
                 binding.syncStatus.setText(R.string.xmltv_not_configured)
                 return@launch
             }
-            val labels = sources.map { source ->
+            val labels = summaries.map { summary ->
+                val source = summary.source
                 getString(
-                    R.string.xmltv_source_row,
+                    R.string.xmltv_source_row_detailed,
                     source.name,
                     if (source.kind == XmlTvRepository.KIND_URL) getString(R.string.xmltv_source_url)
                     else getString(R.string.xmltv_source_file),
+                    summary.channelCount,
+                    summary.programCount,
                 )
             }.toTypedArray()
             AlertDialog.Builder(this@ChannelEditorActivity, R.style.Theme_TVApp_Dialog)
                 .setTitle(R.string.xmltv_saved_sources)
-                .setItems(labels) { _, index -> showXmlTvSourceActions(sources[index]) }
+                .setItems(labels) { _, index -> showXmlTvSourceActions(summaries[index].source) }
                 .setNegativeButton(R.string.close, null)
                 .show()
         }

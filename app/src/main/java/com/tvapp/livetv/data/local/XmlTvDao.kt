@@ -23,6 +23,14 @@ interface XmlTvDao {
     @Query("SELECT * FROM xmltv_sources ORDER BY name COLLATE NOCASE")
     fun sources(): List<XmlTvSourceEntity>
 
+    @Query("SELECT COUNT(*) FROM xmltv_programs WHERE sourceId = :sourceId")
+    fun sourceProgramCount(sourceId: Long): Int
+
+    @Query(
+        "SELECT COUNT(DISTINCT channelId) FROM xmltv_programs WHERE sourceId = :sourceId",
+    )
+    fun sourceChannelCount(sourceId: Long): Int
+
     @Query("SELECT * FROM xmltv_sources WHERE location = :location LIMIT 1")
     fun sourceByLocation(location: String): XmlTvSourceEntity?
 

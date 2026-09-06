@@ -30,6 +30,14 @@ class XmlTvRepository(context: Context) {
 
     fun sources(): List<XmlTvSourceEntity> = dao.sources()
 
+    fun sourceSummaries(): List<XmlTvSourceSummary> = sources().map { source ->
+        XmlTvSourceSummary(
+            source = source,
+            channelCount = dao.sourceChannelCount(source.id),
+            programCount = dao.sourceProgramCount(source.id),
+        )
+    }
+
     fun channelCatalog(): List<XmlTvChannelOption> {
         ensureCurrentNormalization()
         val sourceNames = sources().associate { it.id to it.name }
@@ -47,7 +55,7 @@ class XmlTvRepository(context: Context) {
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE_SUMMARY, null)
         ?: preferences.getString(KEY_SOURCE, null)
 
-    fun importUrl(url: String): Int {
+    fun importUrl(url: String, nameOverride: String? = null): Int {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
@@ -58,7 +66,8 @@ class XmlTvRepository(context: Context) {
             check(connection.responseCode in 200..299) {
                 "HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
-            connection.inputStream.use { importStream(it, url, sourceName(url), KIND_URL) }.also {
+            val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: sourceName(url)
+            connection.inputStream.use { importStream(it, url, name, KIND_URL) }.also {
                 ensurePeriodicRefresh()
             }
         } finally {
@@ -99,7 +108,7 @@ class XmlTvRepository(context: Context) {
     }
 
     fun refreshSource(source: XmlTvSourceEntity): Int = when (source.kind) {
-        KIND_URL -> importUrl(source.location)
+        KIND_URL -> importUrl(source.location, source.name)
         else -> error("Dosya kaynağı yeniden seçilmelidir")
     }
 
@@ -511,6 +520,12 @@ data class XmlTvChannelOption(
     val sourceName: String,
     val channelId: String,
     val channelName: String,
+    val programCount: Int,
+)
+
+data class XmlTvSourceSummary(
+    val source: XmlTvSourceEntity,
+    val channelCount: Int,
     val programCount: Int,
 )
 

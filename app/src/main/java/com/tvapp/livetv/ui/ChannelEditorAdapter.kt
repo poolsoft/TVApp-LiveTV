@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.RecyclerView
 import com.tvapp.livetv.R
 import com.tvapp.livetv.databinding.ItemEditorChannelBinding
@@ -14,26 +15,24 @@ class ChannelEditorAdapter(
     private val onClicked: (LiveChannel) -> Unit,
     private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ChannelEditorAdapter.ViewHolder>() {
-    private val channels = mutableListOf<LiveChannel>()
+    private val differ = AsyncListDiffer(this, object : DiffUtil.ItemCallback<LiveChannel>() {
+        override fun areItemsTheSame(oldItem: LiveChannel, newItem: LiveChannel) =
+            oldItem.sourceKey == newItem.sourceKey
+
+        override fun areContentsTheSame(oldItem: LiveChannel, newItem: LiveChannel) =
+            oldItem == newItem
+    })
     private var selectedKeys: Set<String> = emptySet()
     private var movingKeys: Set<String> = emptySet()
     var focusedSourceKey: String? = null
         private set
 
-    fun submitList(items: List<LiveChannel>) {
-        val old = channels.toList()
-        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
-            override fun getOldListSize() = old.size
-            override fun getNewListSize() = items.size
-            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int) =
-                old[oldItemPosition].sourceKey == items[newItemPosition].sourceKey
+    fun submitList(items: List<LiveChannel>, commitCallback: (() -> Unit)? = null) =
+        differ.submitList(items.toList(), commitCallback)
 
-            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int) =
-                old[oldItemPosition] == items[newItemPosition]
-        })
-        channels.clear()
-        channels.addAll(items)
-        diff.dispatchUpdatesTo(this)
+    fun notifyChannelStateChanged(sourceKey: String) {
+        val position = differ.currentList.indexOfFirst { it.sourceKey == sourceKey }
+        if (position >= 0) notifyItemChanged(position, PAYLOAD_STATE)
     }
 
     fun setSelection(selected: Set<String>, moving: Set<String> = emptySet()) {
@@ -47,10 +46,10 @@ class ChannelEditorAdapter(
     )
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(channels[position])
+        holder.bind(differ.currentList[position])
     }
 
-    override fun getItemCount(): Int = channels.size
+    override fun getItemCount(): Int = differ.currentList.size
 
     inner class ViewHolder(
         private val binding: ItemEditorChannelBinding,

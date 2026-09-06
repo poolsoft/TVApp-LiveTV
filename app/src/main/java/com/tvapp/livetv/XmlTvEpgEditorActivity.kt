@@ -1,6 +1,7 @@
 package com.tvapp.livetv
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -14,6 +15,7 @@ import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.XmlTvChannelOption
 import com.tvapp.livetv.data.XmlTvMatcher
 import com.tvapp.livetv.data.XmlTvRepository
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.data.local.UserChannelEntity
 import com.tvapp.livetv.databinding.ActivityXmltvEpgEditorBinding
 import com.tvapp.livetv.databinding.ItemXmltvMatchBinding
@@ -26,12 +28,15 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
     private lateinit var binding: ActivityXmltvEpgEditorBinding
     private val channelRepository by lazy { ChannelRepository(this) }
     private val xmlTvRepository by lazy { XmlTvRepository(this) }
+    private val debugLog by lazy { CrashReportStore(this) }
     private val adapter = MatchAdapter(::selectRow)
     private var channels = emptyList<LiveChannel>()
     private var preferences = emptyMap<String, UserChannelEntity>()
     private var options = emptyList<XmlTvChannelOption>()
     private var selectedChannel: LiveChannel? = null
     private var sourceFilter: Long? = null
+    private var optionBySourceAndId = emptyMap<Pair<Long, String>, XmlTvChannelOption>()
+    private var matchIndex = XmlTvMatcher.Index(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +75,7 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
 
     private fun loadData() {
         lifecycleScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
             val loaded = withContext(Dispatchers.IO) {
                 Triple(
                     channelRepository.channels(includeHidden = true).getOrThrow(),
@@ -80,6 +86,12 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
             channels = loaded.first
             preferences = loaded.second
             options = loaded.third
+            optionBySourceAndId = options.associateBy { it.sourceId to it.channelId }
+            matchIndex = XmlTvMatcher.Index(options)
+            debugLog.recordDebug(
+                "XMLTV_EDITOR_LOAD | channels=${channels.size}, options=${options.size}, " +
+                    "duration=${SystemClock.elapsedRealtime() - startedAt}ms",
+            )
             showChannels()
         }
     }
@@ -90,13 +102,13 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
         binding.title.setText(R.string.xmltv_match_editor)
         binding.subtitle.setText(R.string.xmltv_match_editor_summary)
         binding.hint.setText(R.string.xmltv_match_editor_hint)
-        val matchIndex = XmlTvMatcher.Index(options)
+        val startedAt = SystemClock.elapsedRealtime()
         val rows = channels.map { channel ->
             val preference = preferences[channel.sourceKey]
             val manual = preference?.epgIdOverride
             val automatic = if (manual == null) matchIndex.resolve(channel) else null
             val match = if (manual != null) {
-                options.firstOrNull { it.sourceId == preference.epgSourceIdOverride && it.channelId == manual }
+                optionBySourceAndId[preference.epgSourceIdOverride to manual]
             } else {
                 automatic?.option
             }
@@ -112,6 +124,9 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
             }
             MatchRow(channel.sourceKey, channel.displayNumber, channel.displayName, channel.epgId.orEmpty(), status)
         }
+        debugLog.recordDebug(
+            "XMLTV_EDITOR_MATCH | channels=${rows.size}, duration=${SystemClock.elapsedRealtime() - startedAt}ms",
+        )
         adapter.submitList(rows) { focusKey?.let(::focusRow) ?: focusRow(rows.firstOrNull()?.key) }
     }
 

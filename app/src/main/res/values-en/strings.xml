@@ -196,6 +196,7 @@
     <string name="xmltv_url_invalid">Enter a valid HTTP or HTTPS address.</string>
     <string name="xmltv_saved_sources">Saved XMLTV sources</string>
     <string name="xmltv_source_row">%1$s  ·  %2$s</string>
+    <string name="xmltv_source_row_detailed">%1$s  ·  %2$s\n%3$d channels · %4$d programmes</string>
     <string name="xmltv_source_url">URL</string>
     <string name="xmltv_source_file">File</string>
     <string name="xmltv_source_deleted">XMLTV source deleted.</string>

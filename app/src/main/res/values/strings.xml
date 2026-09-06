@@ -209,6 +209,7 @@
     <string name="xmltv_url_invalid">Geçerli bir HTTP veya HTTPS adresi girin.</string>
     <string name="xmltv_saved_sources">Kayıtlı XMLTV kaynakları</string>
     <string name="xmltv_source_row">%1$s  ·  %2$s</string>
+    <string name="xmltv_source_row_detailed">%1$s  ·  %2$s\n%3$d kanal · %4$d program</string>
     <string name="xmltv_source_url">URL</string>
     <string name="xmltv_source_file">Dosya</string>
     <string name="xmltv_source_deleted">XMLTV kaynağı silindi.</string>
