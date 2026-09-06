@@ -47,7 +47,6 @@ import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.ProgramRepository
 import com.tvapp.livetv.data.ProgramSummary
-import com.tvapp.livetv.data.replaceCurrentPrograms
 import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
@@ -155,7 +154,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ChannelAdapter
     private var displayPreferences = DisplayPreferences()
     private var channels: List<LiveChannel> = emptyList()
-    private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
+    private val currentPrograms = mutableMapOf<String, ProgramSummary>()
     private var currentChannel: LiveChannel? = null
     private var activePassthroughInputId: String? = null
     private var resumeTifPlayback = false
@@ -955,12 +954,8 @@ class MainActivity : AppCompatActivity() {
             }
             if (focusedListSourceKey != channel.sourceKey || result.isFailure) return@launch
             val current = result.getOrNull()
-            currentPrograms = replaceCurrentPrograms(
-                currentPrograms,
-                listOf(channel),
-                current?.let { mapOf(channel.sourceKey to it) }.orEmpty(),
-            )
-            adapter.submitPrograms(currentPrograms)
+            updateCachedProgram(channel.sourceKey, current)
+            adapter.submitProgram(channel.sourceKey, current)
         }
     }
 
@@ -985,8 +980,27 @@ class MainActivity : AppCompatActivity() {
                 runCatching { programRepository.currentProgramsForChannels(missing) }
             }
             val programs = result.getOrNull() ?: return@launch
-            currentPrograms = replaceCurrentPrograms(currentPrograms, missing, programs)
-            adapter.submitPrograms(currentPrograms)
+            updateCachedPrograms(missing, programs)
+            missing.forEach { channel ->
+                adapter.submitProgram(channel.sourceKey, programs[channel.sourceKey])
+            }
+        }
+    }
+
+    private fun updateCachedProgram(sourceKey: String, program: ProgramSummary?) {
+        if (program == null || program.title.isBlank()) {
+            currentPrograms.remove(sourceKey)
+        } else {
+            currentPrograms[sourceKey] = program
+        }
+    }
+
+    private fun updateCachedPrograms(
+        refreshedChannels: Collection<LiveChannel>,
+        fresh: Map<String, ProgramSummary>,
+    ) {
+        refreshedChannels.forEach { channel ->
+            updateCachedProgram(channel.sourceKey, fresh[channel.sourceKey])
         }
     }
 
@@ -997,8 +1011,10 @@ class MainActivity : AppCompatActivity() {
                 runCatching { programRepository.currentProgramsForChannels(loaded) }
             }
             val loadedPrograms = result.getOrNull() ?: return@launch
-            currentPrograms = replaceCurrentPrograms(currentPrograms, loaded, loadedPrograms)
-            adapter.submitPrograms(currentPrograms)
+            updateCachedPrograms(loaded, loadedPrograms)
+            loaded.forEach { channel ->
+                adapter.submitProgram(channel.sourceKey, loadedPrograms[channel.sourceKey])
+            }
         }
     }
 
@@ -1019,7 +1035,7 @@ class MainActivity : AppCompatActivity() {
             runCatching { programRepository.currentProgramsForChannels(list) }
         }
         val fresh = result.getOrNull() ?: return
-        currentPrograms = replaceCurrentPrograms(currentPrograms, list, fresh)
+        updateCachedPrograms(list, fresh)
         adapter.submitPrograms(currentPrograms)
         val selected = currentChannel ?: return
         loadPrograms(selected, clearExisting = false)
@@ -1045,12 +1061,8 @@ class MainActivity : AppCompatActivity() {
                 )
             }.getOrNull() ?: return@launch
             val current = programs.current?.takeIf { it.title.isNotBlank() }
-            currentPrograms = replaceCurrentPrograms(
-                currentPrograms,
-                listOf(channel),
-                current?.let { mapOf(channel.sourceKey to it) }.orEmpty(),
-            )
-            adapter.submitPrograms(currentPrograms)
+            updateCachedProgram(channel.sourceKey, current)
+            adapter.submitProgram(channel.sourceKey, current)
             debugLog.recordDebug(
                 "EPG_QUERY_RESULT | channel=${channel.id}, " +
                     "current=${programs.current?.title}, next=${programs.next?.title}",

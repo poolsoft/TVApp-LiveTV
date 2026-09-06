@@ -21,7 +21,8 @@ class ChannelAdapter(
     private val isParentalLocked: (LiveChannel) -> Boolean,
 ) : RecyclerView.Adapter<ChannelAdapter.ChannelViewHolder>() {
     private val channels = mutableListOf<LiveChannel>()
-    private var programs: Map<String, ProgramSummary> = emptyMap()
+    private val channelIndexBySourceKey = mutableMapOf<String, Int>()
+    private val programs = mutableMapOf<String, ProgramSummary>()
     private var rowOptions = ChannelRowOptions()
     private var showIptvMembership = false
     private var selectedId: Long? = null
@@ -39,6 +40,7 @@ class ChannelAdapter(
         })
         channels.clear()
         channels.addAll(items)
+        rebuildChannelIndex()
         diff.dispatchUpdatesTo(this)
     }
 
@@ -46,6 +48,9 @@ class ChannelAdapter(
         if (items.isEmpty()) return
         val start = channels.size
         channels.addAll(items)
+        items.forEachIndexed { offset, channel ->
+            channelIndexBySourceKey[channel.sourceKey] = start + offset
+        }
         notifyItemRangeInserted(start, items.size)
     }
 
@@ -63,12 +68,33 @@ class ChannelAdapter(
     }
 
     fun submitPrograms(items: Map<String, ProgramSummary>) {
-        val previous = programs
-        programs = items
-        channels.forEachIndexed { index, channel ->
-            if (previous[channel.sourceKey] != items[channel.sourceKey]) {
+        val previous = programs.toMap()
+        programs.clear()
+        programs.putAll(items)
+        val changedKeys = buildSet {
+            previous.forEach { (key, value) -> if (items[key] != value) add(key) }
+            items.forEach { (key, value) -> if (previous[key] != value) add(key) }
+        }
+        changedKeys.forEach { sourceKey ->
+            channelIndexBySourceKey[sourceKey]?.let { index ->
                 notifyItemChanged(index, PAYLOAD_PROGRAM)
             }
+        }
+    }
+
+    fun submitProgram(sourceKey: String, program: ProgramSummary?) {
+        val previous = programs[sourceKey]
+        if (previous == program) return
+        if (program == null) programs.remove(sourceKey) else programs[sourceKey] = program
+        channelIndexBySourceKey[sourceKey]?.let { index ->
+            notifyItemChanged(index, PAYLOAD_PROGRAM)
+        }
+    }
+
+    private fun rebuildChannelIndex() {
+        channelIndexBySourceKey.clear()
+        channels.forEachIndexed { index, channel ->
+            channelIndexBySourceKey[channel.sourceKey] = index
         }
     }
 
