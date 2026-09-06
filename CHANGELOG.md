@@ -7,6 +7,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Editör ve kaynak yönetimi performansı
+* Kanal listesinin ±5 EPG penceresine program-bitiş süreli pozitif cache ve 20 saniyelik boş-sonuç cache'i eklendi.
+* Pencere sorgusunda TIF verisi yalnız eksik kanallardan alınırken XMLTV fallback tek toplu Room sorgusuna indirildi.
 * IPTV kaynak işlem diyaloğu TV temasında görünmeyen standart liste yerine ayrı, odaklanabilir işlem satırlarıyla yeniden kuruldu.
 * XMLTV için URL/dosya ekleme, kaynak istatistikleri, yenileme, yeniden adlandırma, eşleştirme ve silmeyi birleştiren merkezi yönetim ekranı eklendi.
 * Ayarlar ve Kanal Editörü XMLTV işlemleri aynı merkezi yönetim ekranına bağlandı.

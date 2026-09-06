@@ -35,6 +35,7 @@ internal fun replaceCurrentPrograms(
 class ProgramRepository(context: Context) {
     private val contentResolver = context.applicationContext.contentResolver
     private val xmlTvRepository = XmlTvRepository(context)
+    private val listWindowCache = mutableMapOf<String, CachedCurrentProgram>()
 
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
@@ -193,12 +194,57 @@ class ProgramRepository(context: Context) {
     fun currentProgramsForListWindow(
         channels: List<LiveChannel>,
         now: Long = System.currentTimeMillis(),
-    ): Map<String, ProgramSummary> = buildMap {
-        channels.forEach { channel ->
-            runCatching { nowAndNext(channel, now).current }
-                .getOrNull()
-                ?.takeIf { it.title.isNotBlank() }
-                ?.let { put(channel.sourceKey, it) }
+    ): Map<String, ProgramSummary> {
+        if (channels.isEmpty()) return emptyMap()
+        val result = mutableMapOf<String, ProgramSummary>()
+        val unresolved = mutableListOf<LiveChannel>()
+        synchronized(listWindowCache) {
+            listWindowCache.entries.removeAll { it.value.expiresAtMillis <= now }
+            channels.forEach { channel ->
+                val cached = listWindowCache[channel.sourceKey]
+                if (cached != null && cached.expiresAtMillis > now) {
+                    cached.program?.let { result[channel.sourceKey] = it }
+                } else {
+                    unresolved += channel
+                }
+            }
+        }
+
+        val missingXmlTv = mutableListOf<LiveChannel>()
+        unresolved.forEach { channel ->
+            val tifProgram = if (channel.source == LiveChannel.Source.TIF) {
+                runCatching { nowAndNext(channel.id, now).current }.getOrNull()
+            } else null
+            if (tifProgram != null && tifProgram.title.isNotBlank()) {
+                result[channel.sourceKey] = tifProgram
+                cacheCurrent(channel.sourceKey, tifProgram, now)
+            } else {
+                missingXmlTv += channel
+            }
+        }
+
+        val xmlTvPrograms = runCatching {
+            xmlTvRepository.currentPrograms(missingXmlTv, now)
+        }.getOrDefault(emptyMap())
+        missingXmlTv.forEach { channel ->
+            val program = xmlTvPrograms[channel.sourceKey]?.takeIf { it.title.isNotBlank() }
+            if (program != null) result[channel.sourceKey] = program
+            cacheCurrent(channel.sourceKey, program, now)
+        }
+        return result
+    }
+
+    private fun cacheCurrent(sourceKey: String, program: ProgramSummary?, now: Long) {
+        val expiry = program?.endTimeMillis
+            ?.coerceAtMost(now + POSITIVE_CACHE_MAX_MS)
+            ?.coerceAtLeast(now + MINIMUM_CACHE_MS)
+            ?: now + NEGATIVE_CACHE_MS
+        synchronized(listWindowCache) {
+            listWindowCache[sourceKey] = CachedCurrentProgram(program, expiry)
+            if (listWindowCache.size > MAX_LIST_WINDOW_CACHE_ENTRIES) {
+                listWindowCache.minByOrNull { it.value.expiresAtMillis }?.key
+                    ?.let(listWindowCache::remove)
+            }
         }
     }
 
@@ -308,7 +354,16 @@ class ProgramRepository(context: Context) {
         const val MAX_PROGRAMS = 32
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
+        const val NEGATIVE_CACHE_MS = 20_000L
+        const val MINIMUM_CACHE_MS = 5_000L
+        const val POSITIVE_CACHE_MAX_MS = 5 * 60_000L
+        const val MAX_LIST_WINDOW_CACHE_ENTRIES = 160
     }
+
+    private data class CachedCurrentProgram(
+        val program: ProgramSummary?,
+        val expiresAtMillis: Long,
+    )
 
     private fun android.database.Cursor.programDescription(
         longDescriptionIndex: Int,
