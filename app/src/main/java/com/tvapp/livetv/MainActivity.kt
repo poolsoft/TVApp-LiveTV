@@ -1177,7 +1177,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     else -> return
                 }
-                showIptvPlaybackControls(R.string.iptv_returned_live)
+                showIptvPlaybackControls(R.string.iptv_returned_live, activateControls = true)
             }
             IptvContentKind.VOD -> {
                 when (keyCode) {
@@ -1198,6 +1198,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         R.string.iptv_vod_paused
                     },
+                    activateControls = true,
                 )
             }
             IptvContentKind.UNKNOWN -> {
@@ -1205,7 +1206,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 iptvPlayback.togglePlayPause()
-                showIptvPlaybackControls()
+                showIptvPlaybackControls(activateControls = true)
             }
         }
     }
@@ -1257,7 +1258,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showIptvPlaybackControls(stateText: Int? = null, autoHide: Boolean = true) {
+    private fun showIptvPlaybackControls(
+        stateText: Int? = null,
+        autoHide: Boolean = true,
+        activateControls: Boolean = iptvControlsInteractive,
+    ) {
         val wasHidden = binding.iptvPlaybackContainer.visibility != View.VISIBLE
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
@@ -1265,7 +1270,7 @@ class MainActivity : AppCompatActivity() {
         binding.channelPanel.visibility = View.GONE
         binding.advancedFilterRow.visibility = View.GONE
 
-        showIptvPlaybackChrome(interactive = true)
+        showIptvPlaybackChrome(interactive = activateControls)
 
         setInfoBarVisible(true)
 
@@ -1415,6 +1420,11 @@ class MainActivity : AppCompatActivity() {
         val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_iptv_control)
 
         if (!iptvControlsInteractive) {
+            binding.iptvSeekbarRow.clearFocus()
+            binding.iptvBtnPlayPause.clearFocus()
+            binding.iptvBtnBuffer.clearFocus()
+            binding.iptvBtnSpeed.clearFocus()
+            binding.iptvBtnMore.clearFocus()
             binding.iptvSeekbarRow.background = defaultBg
             binding.iptvBtnPlayPause.background = defaultBg
             binding.iptvBtnBuffer.background = defaultBg
@@ -3984,6 +3994,12 @@ class MainActivity : AppCompatActivity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun setInfoBarVisible(visible: Boolean) {
+        if (!visible && iptvControlsInteractive) {
+            iptvControlsInteractive = false
+            iptvControlRow = IptvControlRow.TIMELINE
+            renderIptvControlSelection()
+            updateIptvControlHints()
+        }
         val visibility = if (visible) View.VISIBLE else View.GONE
         binding.infoBar.visibility = visibility
         binding.infoColorActions.visibility = if (
