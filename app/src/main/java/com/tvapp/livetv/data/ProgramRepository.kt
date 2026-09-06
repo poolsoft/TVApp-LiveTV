@@ -41,7 +41,12 @@ class ProgramRepository(context: Context) {
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
         synchronized(nowNextCache) {
             nowNextCache[channel.sourceKey]?.takeIf { cached ->
-                now - cached.loadedAtMillis < NOW_NEXT_CACHE_TTL_MS &&
+                val ttl = if (cached.programs.current == null) {
+                    NOW_NEXT_NEGATIVE_CACHE_TTL_MS
+                } else {
+                    NOW_NEXT_CACHE_TTL_MS
+                }
+                now - cached.loadedAtMillis < ttl &&
                     (cached.programs.current == null || now < cached.programs.current.endTimeMillis) &&
                     (cached.programs.current != null || cached.programs.next?.startTimeMillis?.let {
                         now < it
@@ -260,6 +265,7 @@ class ProgramRepository(context: Context) {
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
         const val NOW_NEXT_CACHE_TTL_MS = 60_000L
+        const val NOW_NEXT_NEGATIVE_CACHE_TTL_MS = 5_000L
         const val NOW_NEXT_CACHE_MAX_ENTRIES = 256
     }
 

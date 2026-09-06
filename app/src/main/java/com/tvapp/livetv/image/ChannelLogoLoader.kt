@@ -14,14 +14,14 @@ import com.tvapp.livetv.settings.LogoCachePreferencesStore
 object ChannelLogoLoader {
     private var holder: LoaderHolder? = null
 
-    fun load(imageView: ImageView, url: String?, fallbackRes: Int) {
-        if (url.isNullOrBlank()) {
+    fun load(imageView: ImageView, data: Any?, fallbackRes: Int) {
+        if (data == null || data is String && data.isBlank()) {
             imageView.dispose()
             imageView.setImageResource(fallbackRes)
             return
         }
         val current = loader(imageView.context)
-        imageView.load(url, current.loader) {
+        imageView.load(data, current.loader) {
             placeholder(fallbackRes)
             error(fallbackRes)
             fallback(fallbackRes)

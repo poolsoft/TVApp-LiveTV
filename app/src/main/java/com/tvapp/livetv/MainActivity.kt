@@ -119,6 +119,7 @@ class MainActivity : AppCompatActivity() {
         private const val EPG_REFRESH_INTERVAL_MS = 60_000L
         private const val EPG_WINDOW_RADIUS = 20
         private const val EPG_CACHE_TTL_MS = 60_000L
+        private const val EPG_NEGATIVE_CACHE_TTL_MS = 5_000L
         private const val EPG_CACHE_MAX_ENTRIES = 256
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
@@ -951,13 +952,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadVisiblePrograms() {
+    private fun loadVisiblePrograms(force: Boolean = false) {
         if (binding.channelPanel.visibility != View.VISIBLE) return
         val layoutManager = binding.channelList.layoutManager as? LinearLayoutManager ?: return
         val first = layoutManager.findFirstVisibleItemPosition().takeIf { it >= 0 } ?: return
         val last = layoutManager.findLastVisibleItemPosition().takeIf { it >= first } ?: return
         val center = adapter.channelAt((first + last) / 2) ?: return
-        loadEpgWindow(center.sourceKey)
+        loadEpgWindow(center.sourceKey, force)
     }
 
     private fun updateCachedProgram(sourceKey: String, program: ProgramSummary?) {
@@ -1003,6 +1004,10 @@ class MainActivity : AppCompatActivity() {
                 runCatching { programRepository.currentProgramsForChannels(pending) }
             }
             val programs = result.getOrNull() ?: return@launch
+            debugLog.recordDebug(
+                "EPG_WINDOW_RESULT | center=$centerSourceKey, " +
+                    "requested=${pending.size}, matched=${programs.size}",
+            )
             updateCachedPrograms(pending, programs)
             pending.forEach { channel ->
                 adapter.submitProgram(channel.sourceKey, programs[channel.sourceKey])
@@ -1013,7 +1018,8 @@ class MainActivity : AppCompatActivity() {
     private fun isEpgCacheFresh(sourceKey: String, now: Long): Boolean {
         val program = currentPrograms[sourceKey]
         if (program != null && now in program.startTimeMillis until program.endTimeMillis) return true
-        return now - (epgLookupTimes[sourceKey] ?: return false) < EPG_CACHE_TTL_MS
+        val ttl = if (program == null) EPG_NEGATIVE_CACHE_TTL_MS else EPG_CACHE_TTL_MS
+        return now - (epgLookupTimes[sourceKey] ?: return false) < ttl
     }
 
     private fun startEpgRefresh() {
@@ -4052,7 +4058,7 @@ class MainActivity : AppCompatActivity() {
         applyPanelGeometry()
         showInfoBar()
         focusCurrentListChannel()
-        binding.channelList.post(::loadVisiblePrograms)
+        binding.channelList.post { loadVisiblePrograms(force = true) }
         scheduleChannelPanelClose()
     }
 

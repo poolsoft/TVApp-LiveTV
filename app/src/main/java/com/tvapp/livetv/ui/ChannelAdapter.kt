@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import coil.dispose
 import com.tvapp.livetv.R
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ItemChannelBinding
@@ -203,14 +202,11 @@ class ChannelAdapter(
             if (channel.source == LiveChannel.Source.IPTV) {
                 ChannelLogoLoader.load(channelLogo, channel.logoUrl, fallbackLogo)
             } else {
-                channelLogo.dispose()
-                channelLogo.setImageResource(fallbackLogo)
-                runCatching {
-                    channelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id))
-                }
-                if (channelLogo.drawable == null) {
-                    channelLogo.setImageResource(fallbackLogo)
-                }
+                ChannelLogoLoader.load(
+                    channelLogo,
+                    TvContract.buildChannelLogoUri(channel.id),
+                    fallbackLogo,
+                )
             }
             channelLogo.visibility = if (rowOptions.showLogo) View.VISIBLE else View.GONE
             channelProgram.visibility = if (rowOptions.showProgram) View.VISIBLE else View.GONE

@@ -23,6 +23,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * EPG güncellemeleri artık büyük kanal listelerinin tamamını her odak hareketinde taramıyor; yalnız program bilgisi değişen satırlar indeks üzerinden güncelleniyor.
 * EPG, odaktaki kanalın 20 önce ve 20 sonrasından oluşan kaydırmalı pencereyle tembel yükleniyor. Oynatılan kanal ayrıca korunuyor; sonuçlar ve sonuç bulunamayan sorgular 60 saniye, en fazla 256 kanal için önbelleğe alınıyor.
 * Periyodik EPG yenilemesi bütün katalog yerine yalnız etkin pencereyi sorguluyor; infobar için gereken şimdi/sonraki sonucu repository önbelleğinden tekrar kullanılabiliyor.
+* Açılışta geçici olarak boş dönen EPG sonuçlarının uzun süre saklanması önlendi; negatif cache 5 saniyeye indirildi ve kanal listesi açılışında görünür pencere zorla yenileniyor.
+* TIF/DTV kanal logoları ana iş parçacığındaki doğrudan URI çözümlemesi yerine Coil bellek ve sınırlı disk cache hattından yükleniyor.
 
 ### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu
 * Infobar orta alanındaki metinli butonlar kaldırılarak dikey sıkışıklık giderildi; zaman çizgisi (Seekbar) ferah ve temiz bir görünüme kavuşturuldu.
