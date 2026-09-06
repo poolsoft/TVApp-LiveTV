@@ -117,6 +117,8 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
         private const val IPTV_STALL_TIMEOUT_MS = 15_000L
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
+        private const val EPG_FOCUS_DEBOUNCE_MS = 300L
+        private const val EPG_LIST_WINDOW_RADIUS = 5
         private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
@@ -201,7 +203,6 @@ class MainActivity : AppCompatActivity() {
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
-    private var channelProgramsJob: Job? = null
     private var channelLoadJob: Job? = null
     private var clockJob: Job? = null
     private var statusRetryAction: (() -> Unit)? = null
@@ -212,7 +213,6 @@ class MainActivity : AppCompatActivity() {
     private var focusedListSourceKey: String? = null
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
-    private var focusedProgramJob: Job? = null
     private var visibleProgramsJob: Job? = null
     private var epgRefreshJob: Job? = null
     private var sleepTimerJob: Job? = null
@@ -556,7 +556,6 @@ class MainActivity : AppCompatActivity() {
                     currentChannel = loaded.firstOrNull { it.sourceKey == currentKey }
                         ?: playingChannel.takeIf { preserveCurrentPlayback }
                     applyChannelFilter(requestFocus = false)
-                    loadChannelPrograms(loaded)
                     startEpgRefresh()
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
                     val editorChannelKey = pendingEditorChannelKey
@@ -942,21 +941,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadFocusedProgram(channel: LiveChannel) {
-        val now = System.currentTimeMillis()
-        if (currentPrograms[channel.sourceKey]?.let { now in it.startTimeMillis until it.endTimeMillis } == true) {
-            return
-        }
-        focusedProgramJob?.cancel()
-        focusedProgramJob = lifecycleScope.launch {
-            delay(180L)
-            val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.nowAndNext(channel).current }
-            }
-            if (focusedListSourceKey != channel.sourceKey || result.isFailure) return@launch
-            val current = result.getOrNull()
-            updateCachedProgram(channel.sourceKey, current)
-            adapter.submitProgram(channel.sourceKey, current)
-        }
+        loadProgramWindow(channel.sourceKey, EPG_FOCUS_DEBOUNCE_MS)
     }
 
     private fun loadVisiblePrograms() {
@@ -964,18 +949,29 @@ class MainActivity : AppCompatActivity() {
         val layoutManager = binding.channelList.layoutManager as? LinearLayoutManager ?: return
         val first = layoutManager.findFirstVisibleItemPosition().takeIf { it >= 0 } ?: return
         val last = layoutManager.findLastVisibleItemPosition().takeIf { it >= first } ?: return
-        val visibleChannels = panelChannels()
-        val now = System.currentTimeMillis()
-        val missing = (first..last).mapNotNull { position ->
-            visibleChannels.getOrNull(position)?.takeIf { channel ->
+        val list = panelChannels()
+        val centerKey = focusedListSourceKey?.takeIf { key ->
+            list.any { it.sourceKey == key }
+        } ?: list.getOrNull((first + last) / 2)?.sourceKey ?: return
+        loadProgramWindow(centerKey, 0L)
+    }
+
+    private fun loadProgramWindow(centerSourceKey: String, debounceMillis: Long) {
+        visibleProgramsJob?.cancel()
+        visibleProgramsJob = lifecycleScope.launch {
+            if (debounceMillis > 0L) delay(debounceMillis)
+            if (
+                binding.channelPanel.visibility != View.VISIBLE ||
+                (debounceMillis > 0L && focusedListSourceKey != centerSourceKey)
+            ) return@launch
+            val window = programWindow(centerSourceKey)
+            val now = System.currentTimeMillis()
+            val missing = window.filter { channel ->
                 currentPrograms[channel.sourceKey]?.let {
                     now in it.startTimeMillis until it.endTimeMillis
                 } != true
             }
-        }
-        if (missing.isEmpty()) return
-        visibleProgramsJob?.cancel()
-        visibleProgramsJob = lifecycleScope.launch {
+            if (missing.isEmpty()) return@launch
             val result = withContext(Dispatchers.IO) {
                 runCatching { programRepository.currentProgramsForChannels(missing) }
             }
@@ -985,6 +981,15 @@ class MainActivity : AppCompatActivity() {
                 adapter.submitProgram(channel.sourceKey, programs[channel.sourceKey])
             }
         }
+    }
+
+    private fun programWindow(centerSourceKey: String?): List<LiveChannel> {
+        val list = panelChannels()
+        if (list.isEmpty()) return emptyList()
+        val center = list.indexOfFirst { it.sourceKey == centerSourceKey }.takeIf { it >= 0 } ?: 0
+        val start = (center - EPG_LIST_WINDOW_RADIUS).coerceAtLeast(0)
+        val endExclusive = (center + EPG_LIST_WINDOW_RADIUS + 1).coerceAtMost(list.size)
+        return list.subList(start, endExclusive)
     }
 
     private fun updateCachedProgram(sourceKey: String, program: ProgramSummary?) {
@@ -1004,20 +1009,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadChannelPrograms(loaded: List<LiveChannel>) {
-        channelProgramsJob?.cancel()
-        channelProgramsJob = lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.currentProgramsForChannels(loaded) }
-            }
-            val loadedPrograms = result.getOrNull() ?: return@launch
-            updateCachedPrograms(loaded, loadedPrograms)
-            loaded.forEach { channel ->
-                adapter.submitProgram(channel.sourceKey, loadedPrograms[channel.sourceKey])
-            }
-        }
-    }
-
     private fun startEpgRefresh() {
         epgRefreshJob?.cancel()
         epgRefreshJob = lifecycleScope.launch {
@@ -1029,15 +1020,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun refreshCurrentPrograms() {
-        val list = channels
-        if (list.isEmpty()) return
-        val result = withContext(Dispatchers.IO) {
-            runCatching { programRepository.currentProgramsForChannels(list) }
-        }
-        val fresh = result.getOrNull() ?: return
-        updateCachedPrograms(list, fresh)
-        adapter.submitPrograms(currentPrograms)
         val selected = currentChannel ?: return
+        if (binding.channelPanel.visibility == View.VISIBLE) {
+            val window = programWindow(focusedListSourceKey ?: selected.sourceKey)
+            val result = withContext(Dispatchers.IO) {
+                runCatching { programRepository.currentProgramsForChannels(window) }
+            }
+            result.getOrNull()?.let { fresh ->
+                updateCachedPrograms(window, fresh)
+                window.forEach { channel ->
+                    adapter.submitProgram(channel.sourceKey, fresh[channel.sourceKey])
+                }
+            }
+        }
         loadPrograms(selected, clearExisting = false)
     }
 
@@ -4837,8 +4832,6 @@ class MainActivity : AppCompatActivity() {
         infoBarJob?.cancel()
         channelPanelJob?.cancel()
         programJob?.cancel()
-        channelProgramsJob?.cancel()
-        focusedProgramJob?.cancel()
         visibleProgramsJob?.cancel()
         channelLoadJob?.cancel()
         epgRefreshJob?.cancel()
