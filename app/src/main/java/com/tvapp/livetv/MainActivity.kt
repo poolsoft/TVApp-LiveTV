@@ -3145,6 +3145,14 @@ class MainActivity : AppCompatActivity() {
             ),
         ) { toggleChannelLock(channel) }
         action(getString(R.string.system_information)) { showChannelSystemInformation(channel) }
+        action(getString(R.string.program_guide)) {
+            programGuide.launch(
+                Intent(this, ProgramGuideActivity::class.java).putExtra(
+                    ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY,
+                    channel.sourceKey,
+                ),
+            )
+        }
         if (BuildConfig.DIAGNOSTICS_ENABLED) {
             action(getString(R.string.epg_diagnostics)) {
                 val runtime = if (

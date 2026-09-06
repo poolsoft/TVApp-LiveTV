@@ -515,7 +515,10 @@
     <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions. On unobstructed playback, Back shows the last 5 channels; LAST CHANNEL returns directly to the previous channel.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nA media key opens playback controls. While controls are open, Up/Down moves between the timeline and action row; CH+/CH- changes channels. On the timeline, Left/Right seeks backward or forward. On the action row, Left/Right moves between actions and OK activates the selection. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
     <string name="system_settings_unavailable">System settings could not be opened.</string>
     <string name="verbose_remote_key_logging">Write remote keys to the debug log</string>
-    <string name="guide_control_hints">OK: Watch  ·  Hold OK: Reminder  ·  ▶: Programs  ·  ◀: Channels  ·  BACK: Close</string>
+    <string name="guide_control_hints">RED: TIF · GREEN: XMLTV · BLUE: Merged · OK: Watch · BACK: Close</string>
+    <string name="epg_source_tif">TIF guide</string>
+    <string name="epg_source_xmltv">XMLTV guide</string>
+    <string name="epg_source_merged">Merged guide</string>
     <string name="program_time_duration">%1$s - %2$s (%3$d min)</string>
     <string name="reminder_channel_name">Program reminders</string>
     <string name="reminder_notification_title">%1$s is starting</string>

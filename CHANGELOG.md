@@ -7,6 +7,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Editör ve kaynak yönetimi performansı
+* URL tabanlı IPTV kaynağında Yenile işleminin kaynağın kendi adresini yinelenen liste sanması düzeltildi; eklenen ve kaldırılan içerikler aynı kaynakta güncelleniyor.
+* Kanal uzun basış menüsüne seçilen kanaldan Program Rehberini açma eklendi. Rehberde Kırmızı TIF, Yeşil XMLTV ve Mavi birleşik sonucu ayrı ayrı gösteriyor.
+* Genel Program Rehberi açılışta bütün kanal kataloğunu sorgulamak yerine seçili kanal çevresindeki 13 kanallık pencereyi yükleyerek ilk açılış ve gezinme gecikmesini azalttı.
 * URL tabanlı IPTV listelerinin adresi, kaynak kimliği ve seçili kanallar korunarak düzenlenebilir hale getirildi; kaynak satırında son başarılı güncelleme zamanı gösteriliyor.
 * XMLTV yönetimine adres düzenleme, etkinleştirme/devre dışı bırakma, son güncelleme zamanı ve son yenileme hatası eklendi. Başarısız yenileme mevcut EPG verisini koruyor.
 * XMLTV kaynak durumları Room 12→13 migrasyonuyla kullanıcı verisi silinmeden kalıcılaştırıldı; devre dışı kaynaklar eşleştirme ve EPG sorgularından çıkarılıyor.

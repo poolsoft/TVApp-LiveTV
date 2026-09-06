@@ -275,7 +275,7 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
-        KIND_URL -> importUrl(source.location, source.name)
+        KIND_URL -> importUrlInternal(source.location, source.name, source)
         KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name)
         KIND_XTREAM -> importXtream(
             checkNotNull(source.serverUrl),

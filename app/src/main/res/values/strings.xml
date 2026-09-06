@@ -515,7 +515,10 @@
     <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir. Boş ekranda Back son 5 kanalı gösterir; LAST CHANNEL önceki kanala döner.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nMedya tuşu oynatma çubuğunu açar. Çubuk açıkken Yukarı/Aşağı zaman çizgisi ile işlem satırı arasında geçer; CH+/CH- kanalı değiştirir. Zaman çizgisinde Sol/Sağ ileri veya geri sarar. İşlem satırında Sol/Sağ seçenekler arasında gezer, OK seçimi çalıştırır. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
     <string name="system_settings_unavailable">Sistem ayarları açılamadı.</string>
     <string name="verbose_remote_key_logging">Kumanda tuşlarını debug loguna yaz</string>
-    <string name="guide_control_hints">OK: İzle  ·  Uzun OK: Hatırlatıcı  ·  ▶: Programlar  ·  ◀: Kanallar  ·  BACK: Kapat</string>
+    <string name="guide_control_hints">KIRMIZI: TIF · YEŞİL: XMLTV · MAVİ: Birleşik · OK: İzle · BACK: Kapat</string>
+    <string name="epg_source_tif">TIF rehberi</string>
+    <string name="epg_source_xmltv">XMLTV rehberi</string>
+    <string name="epg_source_merged">Birleşik rehber</string>
     <string name="program_time_duration">%1$s - %2$s (%3$d dk)</string>
     <string name="reminder_channel_name">Program hatırlatıcıları</string>
     <string name="reminder_notification_title">%1$s başlıyor</string>

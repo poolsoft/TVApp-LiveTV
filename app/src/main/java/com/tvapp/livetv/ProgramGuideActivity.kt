@@ -54,6 +54,7 @@ class ProgramGuideActivity : AppCompatActivity() {
     private var pendingReminder: Pair<LiveChannel, ProgramSummary>? = null
     private val programGuideHandler = Handler(Looper.getMainLooper())
     private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
+    private var epgSourceMode = EpgSourceMode.MERGED
     private val programGuideRefresh = object : Runnable {
         override fun run() {
             refreshCurrentPrograms()
@@ -106,6 +107,7 @@ class ProgramGuideActivity : AppCompatActivity() {
         ).format(Date()).replaceFirstChar {
             it.uppercase(resources.configuration.locales[0])
         }
+        updateEpgSourceLabel()
         loadChannels()
     }
 
@@ -151,12 +153,7 @@ class ProgramGuideActivity : AppCompatActivity() {
                 channelRepository.channels().getOrDefault(emptyList())
             }
             channels = loaded
-            val loadedPrograms = withContext(Dispatchers.IO) {
-                runCatching {
-                    programRepository.currentProgramsForChannels(loaded)
-                }.getOrDefault(emptyMap())
-            }
-            currentPrograms = loadedPrograms
+            currentPrograms = emptyMap()
             channelAdapter.submitList(loaded, currentPrograms)
             if (loaded.isEmpty()) {
                 binding.emptyPrograms.visibility = View.VISIBLE
@@ -166,6 +163,7 @@ class ProgramGuideActivity : AppCompatActivity() {
             val preferredKey = intent.getStringExtra(EXTRA_CURRENT_SOURCE_KEY)
             val initial = loaded.firstOrNull { it.sourceKey == preferredKey } ?: loaded.first()
             focusedChannelIndex = loaded.indexOf(initial).coerceAtLeast(0)
+            refreshCurrentPrograms()
             channelAdapter.select(initial.sourceKey)
             loadPrograms(initial)
             focusChannel(initial.sourceKey)
@@ -180,6 +178,7 @@ class ProgramGuideActivity : AppCompatActivity() {
         focusJob?.cancel()
         focusJob = lifecycleScope.launch {
             delay(CHANNEL_FOCUS_DELAY_MS)
+            refreshCurrentPrograms()
             loadPrograms(channel)
         }
     }
@@ -190,17 +189,31 @@ class ProgramGuideActivity : AppCompatActivity() {
         binding.selectedChannelName.text = channel.displayName
         lifecycleScope.launch {
             val now = System.currentTimeMillis()
+            val requestedMode = epgSourceMode
             val loaded = withContext(Dispatchers.IO) {
                 runCatching {
-                    programRepository.programsForChannel(
-                        channel = channel,
-                        startTimeMillis = now - PAST_WINDOW_MS,
-                        endTimeMillis = now + GUIDE_WINDOW_MS,
-                    )
+                    when (requestedMode) {
+                        EpgSourceMode.TIF -> programRepository.tifProgramsForChannel(
+                            channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
+                        )
+                        EpgSourceMode.XMLTV -> programRepository.xmlTvProgramsForChannel(
+                            channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
+                        )
+                        EpgSourceMode.MERGED -> programRepository.programsForChannel(
+                            channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
+                        )
+                    }
                 }.getOrDefault(emptyList())
             }
-            if (focusedChannel?.sourceKey != channel.sourceKey) return@launch
+            if (focusedChannel?.sourceKey != channel.sourceKey || epgSourceMode != requestedMode) {
+                return@launch
+            }
             programs = loaded
+            val current = loaded.firstOrNull { now in it.startTimeMillis until it.endTimeMillis }
+            currentPrograms = currentPrograms.toMutableMap().apply {
+                if (current == null) remove(channel.sourceKey) else put(channel.sourceKey, current)
+            }
+            channelAdapter.submitPrograms(currentPrograms)
             programAdapter.submitList(loaded, remindedStartsFor(channel.sourceKey))
             binding.emptyPrograms.visibility = if (loaded.isEmpty()) View.VISIBLE else View.GONE
             if (loaded.isEmpty()) {
@@ -209,11 +222,11 @@ class ProgramGuideActivity : AppCompatActivity() {
                 binding.detailDescription.text = ""
                 binding.detailDescription.visibility = View.GONE
             } else {
-                val current = loaded.firstOrNull {
+                val selectedProgram = loaded.firstOrNull {
                     now in it.startTimeMillis until it.endTimeMillis
                 } ?: loaded.first()
-                focusedProgramIndex = loaded.indexOf(current).coerceAtLeast(0)
-                showProgramDetail(current)
+                focusedProgramIndex = loaded.indexOf(selectedProgram).coerceAtLeast(0)
+                showProgramDetail(selectedProgram)
             }
         }
     }
@@ -367,13 +380,57 @@ class ProgramGuideActivity : AppCompatActivity() {
 
     private fun refreshCurrentPrograms() {
         if (channels.isEmpty()) return
+        val from = (focusedChannelIndex - GUIDE_CHANNEL_RADIUS).coerceAtLeast(0)
+        val to = (focusedChannelIndex + GUIDE_CHANNEL_RADIUS + 1).coerceAtMost(channels.size)
+        val window = channels.subList(from, to)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.currentProgramsForChannels(channels) }
+                runCatching {
+                    val now = System.currentTimeMillis()
+                    when (epgSourceMode) {
+                        EpgSourceMode.MERGED -> programRepository.currentProgramsForChannels(window)
+                        else -> window.mapNotNull { channel ->
+                            val items = when (epgSourceMode) {
+                                EpgSourceMode.TIF -> programRepository.tifProgramsForChannel(
+                                    channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
+                                )
+                                EpgSourceMode.XMLTV -> programRepository.xmlTvProgramsForChannel(
+                                    channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
+                                )
+                                EpgSourceMode.MERGED -> emptyList()
+                            }
+                            items.firstOrNull { now in it.startTimeMillis until it.endTimeMillis }
+                                ?.let { channel.sourceKey to it }
+                        }.toMap()
+                    }
+                }
             }
-            currentPrograms = result.getOrNull() ?: return@launch
+            val fresh = result.getOrNull() ?: return@launch
+            currentPrograms = currentPrograms.filterKeys { key ->
+                window.none { it.sourceKey == key }
+            } + fresh
             channelAdapter.submitPrograms(currentPrograms)
         }
+    }
+
+    private fun selectEpgSource(mode: EpgSourceMode) {
+        if (epgSourceMode == mode) return
+        epgSourceMode = mode
+        currentPrograms = emptyMap()
+        channelAdapter.submitPrograms(emptyMap())
+        updateEpgSourceLabel()
+        focusedChannel?.let(::loadPrograms)
+        refreshCurrentPrograms()
+    }
+
+    private fun updateEpgSourceLabel() {
+        binding.guideSource.setText(
+            when (epgSourceMode) {
+                EpgSourceMode.TIF -> R.string.epg_source_tif
+                EpgSourceMode.XMLTV -> R.string.epg_source_xmltv
+                EpgSourceMode.MERGED -> R.string.epg_source_merged
+            },
+        )
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -402,6 +459,18 @@ class ProgramGuideActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_INFO,
                 KeyEvent.KEYCODE_GUIDE -> {
                     finish()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_RED -> {
+                    selectEpgSource(EpgSourceMode.TIF)
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_GREEN -> {
+                    selectEpgSource(EpgSourceMode.XMLTV)
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_BLUE -> {
+                    selectEpgSource(EpgSourceMode.MERGED)
                     return true
                 }
                 KeyEvent.KEYCODE_SETTINGS,
@@ -433,5 +502,8 @@ class ProgramGuideActivity : AppCompatActivity() {
         private const val GUIDE_REFRESH_INTERVAL_MS = 15_000L
         private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
+        private const val GUIDE_CHANNEL_RADIUS = 6
     }
+
+    private enum class EpgSourceMode { TIF, XMLTV, MERGED }
 }

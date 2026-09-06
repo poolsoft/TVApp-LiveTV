@@ -55,6 +55,22 @@ class ProgramRepository(context: Context) {
         return mergeProgramSources(tif, fallback)
     }
 
+    fun tifProgramsForChannel(
+        channel: LiveChannel,
+        startTimeMillis: Long,
+        endTimeMillis: Long,
+    ): List<ProgramSummary> = if (channel.source == LiveChannel.Source.TIF) {
+        programsForChannel(channel.id, startTimeMillis, endTimeMillis)
+    } else {
+        emptyList()
+    }
+
+    fun xmlTvProgramsForChannel(
+        channel: LiveChannel,
+        startTimeMillis: Long,
+        endTimeMillis: Long,
+    ): List<ProgramSummary> = xmlTvRepository.programs(channel, startTimeMillis, endTimeMillis)
+
     fun nowAndNext(channelId: Long, now: Long = System.currentTimeMillis()): NowNextPrograms {
         val projection = arrayOf(
             TvContract.Programs.COLUMN_TITLE,
