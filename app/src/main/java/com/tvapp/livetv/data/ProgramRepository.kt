@@ -28,15 +28,37 @@ internal fun replaceCurrentPrograms(
 class ProgramRepository(context: Context) {
     private val contentResolver = context.applicationContext.contentResolver
     private val xmlTvRepository = XmlTvRepository(context)
+    private val nowNextCache = object : LinkedHashMap<String, CachedNowNext>(
+        NOW_NEXT_CACHE_MAX_ENTRIES,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, CachedNowNext>?,
+        ): Boolean = size > NOW_NEXT_CACHE_MAX_ENTRIES
+    }
 
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
+        synchronized(nowNextCache) {
+            nowNextCache[channel.sourceKey]?.takeIf { cached ->
+                now - cached.loadedAtMillis < NOW_NEXT_CACHE_TTL_MS &&
+                    (cached.programs.current == null || now < cached.programs.current.endTimeMillis) &&
+                    (cached.programs.current != null || cached.programs.next?.startTimeMillis?.let {
+                        now < it
+                    } != false)
+            }?.let { return it.programs }
+        }
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
         else NowNextPrograms(null, null)
         val fallback = xmlTvRepository.nowAndNext(channel, now)
-        return NowNextPrograms(
+        val result = NowNextPrograms(
             current = tif.current ?: fallback.current,
             next = tif.next ?: fallback.next,
         )
+        synchronized(nowNextCache) {
+            nowNextCache[channel.sourceKey] = CachedNowNext(result, now)
+        }
+        return result
     }
 
     fun programsForChannel(channel: LiveChannel, startTimeMillis: Long, endTimeMillis: Long): List<ProgramSummary> {
@@ -237,7 +259,14 @@ class ProgramRepository(context: Context) {
         const val MAX_PROGRAMS = 32
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
+        const val NOW_NEXT_CACHE_TTL_MS = 60_000L
+        const val NOW_NEXT_CACHE_MAX_ENTRIES = 256
     }
+
+    private data class CachedNowNext(
+        val programs: NowNextPrograms,
+        val loadedAtMillis: Long,
+    )
 
     private fun android.database.Cursor.programDescription(
         longDescriptionIndex: Int,

@@ -54,6 +54,16 @@ class ChannelAdapter(
         notifyItemRangeInserted(start, items.size)
     }
 
+    fun channelAt(position: Int): LiveChannel? = channels.getOrNull(position)
+
+    fun channelsAround(sourceKey: String?, radius: Int): List<LiveChannel> {
+        if (channels.isEmpty()) return emptyList()
+        val center = sourceKey?.let(channelIndexBySourceKey::get) ?: 0
+        val start = (center - radius).coerceAtLeast(0)
+        val end = (center + radius).coerceAtMost(channels.lastIndex)
+        return channels.subList(start, end + 1).toList()
+    }
+
     fun select(sourceKey: String) {
         val oldId = selectedId
         val channel = channels.firstOrNull { it.sourceKey == sourceKey } ?: return
