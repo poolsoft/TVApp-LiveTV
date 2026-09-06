@@ -181,8 +181,25 @@ class IptvRepository(context: Context) {
         )
 
     suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
+        return importUrlInternal(location, nameOverride, null)
+    }
+
+    suspend fun updateUrl(source: IptvSourceEntity, location: String): IptvImportResult {
+        require(source.kind == KIND_URL) { "Yalniz URL kaynaklari duzenlenebilir." }
+        return importUrlInternal(location, source.name, source)
+    }
+
+    private suspend fun importUrlInternal(
+        location: String,
+        nameOverride: String?,
+        replacementSource: IptvSourceEntity?,
+    ): IptvImportResult {
         val normalized = location.trim()
         require(normalized.startsWith("http://") || normalized.startsWith("https://"))
+        val conflicting = dao.getSourceByLocation(normalized)
+        require(conflicting == null || conflicting.id == replacementSource?.id) {
+            "Bu adres zaten baska bir IPTV listesinde kayitli."
+        }
         val connection = URL(normalized).openConnection() as HttpURLConnection
         connection.connectTimeout = CONNECTION_TIMEOUT_MS
         connection.readTimeout = READ_TIMEOUT_MS
@@ -202,7 +219,9 @@ class IptvRepository(context: Context) {
                 ?: Uri.parse(normalized).host
                 ?: "IPTV"
             val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: derivedName
-            return input.use { importStream(normalized, KIND_URL, name, it) }
+            return input.use {
+                importStream(normalized, KIND_URL, name, it, replacementSource)
+            }
         } finally {
             connection.disconnect()
         }
@@ -282,7 +301,8 @@ class IptvRepository(context: Context) {
         kind: String,
         name: String,
         input: InputStream,
-    ): IptvImportResult = importGenerated(location, kind, name) {
+        replacementSource: IptvSourceEntity? = null,
+    ): IptvImportResult = importGenerated(location, kind, name, replacementSource = replacementSource) {
         M3uParser.sequence(InputStreamReader(input, Charsets.UTF_8)).asIterable()
     }
 
@@ -294,11 +314,12 @@ class IptvRepository(context: Context) {
         username: String? = null,
         password: String? = null,
         macAddress: String? = null,
+        replacementSource: IptvSourceEntity? = null,
         produce: () -> Iterable<ParsedIptvChannel>,
     ): IptvImportResult {
         val now = System.currentTimeMillis()
         val result = database.withTransaction {
-            val existing = dao.getSourceByLocation(location)
+            val existing = replacementSource ?: dao.getSourceByLocation(location)
             val sourceId = existing?.id ?: dao.insertSource(
                 IptvSourceEntity(
                     name = name,
@@ -330,6 +351,7 @@ class IptvRepository(context: Context) {
                 kind = kind,
             )).copy(
                 name = name,
+                location = location,
                 kind = kind,
                 enabled = true,
                 lastUpdatedAt = now,

@@ -28,6 +28,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 
 class IptvSourcesActivity : AppCompatActivity() {
     private lateinit var binding: ActivityIptvSourcesBinding
@@ -293,6 +295,9 @@ class IptvSourcesActivity : AppCompatActivity() {
             if (summary.source.kind != IptvRepository.KIND_DOCUMENT) {
                 add(SourceAction.REFRESH to getString(R.string.refresh_iptv_source))
             }
+            if (summary.source.kind == IptvRepository.KIND_URL) {
+                add(SourceAction.EDIT_URL to getString(R.string.edit_iptv_source_url))
+            }
             add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
             add(SourceAction.DELETE to getString(R.string.delete))
         }
@@ -353,8 +358,36 @@ class IptvSourcesActivity : AppCompatActivity() {
             SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
                 renameSource(summary, name)
             }
+            SourceAction.EDIT_URL -> promptSourceUrl(summary)
             SourceAction.DELETE -> confirmDeleteSource(summary)
         }
+    }
+
+    private fun promptSourceUrl(summary: IptvSourceSummary) {
+        val input = credentialField(R.string.iptv_url, InputType.TYPE_TEXT_VARIATION_URI).apply {
+            setText(summary.source.location)
+            selectAll()
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.edit_iptv_source_url)
+            .setView(input)
+            .setPositiveButton(R.string.update, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString().trim()
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    input.error = getString(R.string.iptv_url_required)
+                    input.requestFocus()
+                } else {
+                    dialog.dismiss()
+                    runImport("IPTV_URL_UPDATE", url) { repository.updateUrl(summary.source, url) }
+                }
+            }
+            input.requestFocus()
+        }
+        dialog.show()
     }
 
     private fun renameSource(summary: IptvSourceSummary, name: String) {
@@ -432,11 +465,15 @@ class IptvSourcesActivity : AppCompatActivity() {
                 }
                 val labels = loaded.map { summary ->
                     getString(
-                        R.string.iptv_source_row_typed,
+                        R.string.iptv_source_row_detailed,
                         summary.source.name,
                         sourceTypeLabel(summary.source.kind),
                         summary.channelCount,
                         summary.selectedChannelCount,
+                        summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
+                            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                                .format(Date(it))
+                        } ?: getString(R.string.never),
                     )
                 }
                 binding.sourceList.adapter = ArrayAdapter(
@@ -498,7 +535,7 @@ class IptvSourcesActivity : AppCompatActivity() {
             .show()
     }
 
-    private enum class SourceAction { SELECT, REFRESH, RENAME, DELETE }
+    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (binding.sourceList.hasFocus()) {

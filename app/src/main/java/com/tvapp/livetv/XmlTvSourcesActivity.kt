@@ -21,6 +21,8 @@ import com.tvapp.livetv.data.XmlTvSourceSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.DateFormat
+import java.util.Date
 
 class XmlTvSourcesActivity : AppCompatActivity() {
     private val repository by lazy { XmlTvRepository(this) }
@@ -87,7 +89,7 @@ class XmlTvSourcesActivity : AppCompatActivity() {
                 R.layout.item_iptv_source,
                 sources.map { summary ->
                     getString(
-                        R.string.xmltv_source_row_detailed,
+                        R.string.xmltv_source_row_status,
                         summary.source.name,
                         getString(
                             if (summary.source.kind == XmlTvRepository.KIND_URL) {
@@ -98,6 +100,12 @@ class XmlTvSourcesActivity : AppCompatActivity() {
                         ),
                         summary.channelCount,
                         summary.programCount,
+                        getString(if (summary.source.enabled) R.string.source_enabled else R.string.source_disabled),
+                        summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
+                            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                                .format(Date(it))
+                        } ?: getString(R.string.never),
+                        summary.source.lastError?.let { getString(R.string.source_error_short, it) }.orEmpty(),
                     )
                 },
             )
@@ -139,8 +147,14 @@ class XmlTvSourcesActivity : AppCompatActivity() {
 
     private fun showSourceActions(summary: XmlTvSourceSummary) {
         val actions = buildList {
+            add(
+                Action.TOGGLE to getString(
+                    if (summary.source.enabled) R.string.disable_source else R.string.enable_source,
+                ),
+            )
             if (summary.source.kind == XmlTvRepository.KIND_URL) {
                 add(Action.REFRESH to getString(R.string.update))
+                add(Action.EDIT_URL to getString(R.string.edit_xmltv_source_url))
             }
             add(Action.RENAME to getString(R.string.rename_iptv_source))
             add(Action.MATCH to getString(R.string.xmltv_match_editor))
@@ -185,7 +199,14 @@ class XmlTvSourcesActivity : AppCompatActivity() {
             view.setOnClickListener {
                 dialog.dismiss()
                 when (actions[index].first) {
+                    Action.TOGGLE -> lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            repository.setSourceEnabled(summary.source.id, !summary.source.enabled)
+                        }
+                        loadSources()
+                    }
                     Action.REFRESH -> runOperation { repository.refreshSource(summary.source) }
+                    Action.EDIT_URL -> showEditUrlDialog(summary)
                     Action.RENAME -> showRenameDialog(summary)
                     Action.MATCH -> startActivity(Intent(this, XmlTvEpgEditorActivity::class.java))
                     Action.DELETE -> confirmDelete(summary)
@@ -193,6 +214,39 @@ class XmlTvSourcesActivity : AppCompatActivity() {
             }
         }
         dialog.setOnShowListener { actionViews.firstOrNull()?.requestFocus() }
+        dialog.show()
+    }
+
+    private fun showEditUrlDialog(summary: XmlTvSourceSummary) {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setText(summary.source.location)
+            selectAll()
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            setBackgroundResource(R.drawable.bg_focusable)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.edit_xmltv_source_url)
+            .setView(input)
+            .setPositiveButton(R.string.update, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val url = input.text.toString().trim()
+                val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+                if (scheme != "http" && scheme != "https") {
+                    input.error = getString(R.string.xmltv_url_invalid)
+                    input.requestFocus()
+                } else {
+                    dialog.dismiss()
+                    runOperation { repository.updateUrl(summary.source, url) }
+                }
+            }
+            input.requestFocus()
+        }
         dialog.show()
     }
 
@@ -259,5 +313,5 @@ class XmlTvSourcesActivity : AppCompatActivity() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
-    private enum class Action { REFRESH, RENAME, MATCH, DELETE }
+    private enum class Action { TOGGLE, REFRESH, EDIT_URL, RENAME, MATCH, DELETE }
 }

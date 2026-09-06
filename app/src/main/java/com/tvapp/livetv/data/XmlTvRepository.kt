@@ -55,8 +55,33 @@ class XmlTvRepository(context: Context) {
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE_SUMMARY, null)
         ?: preferences.getString(KEY_SOURCE, null)
 
-    fun importUrl(url: String, nameOverride: String? = null): Int {
-        val connection = URL(url).openConnection() as HttpURLConnection
+    fun importUrl(url: String, nameOverride: String? = null): Int =
+        importUrlInternal(url, nameOverride, null)
+
+    fun updateUrl(source: XmlTvSourceEntity, url: String): Int {
+        require(source.kind == KIND_URL) { "Yalniz URL kaynaklari duzenlenebilir." }
+        return runCatching { importUrlInternal(url, source.name, source) }
+            .onFailure { error ->
+                dao.setSourceError(
+                    source.id,
+                    error.message?.take(240) ?: error.javaClass.simpleName,
+                )
+            }
+            .getOrThrow()
+    }
+
+    private fun importUrlInternal(
+        url: String,
+        nameOverride: String?,
+        replacementSource: XmlTvSourceEntity?,
+    ): Int {
+        val normalizedUrl = url.trim()
+        require(normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://"))
+        val conflicting = dao.sourceByLocation(normalizedUrl)
+        require(conflicting == null || conflicting.id == replacementSource?.id) {
+            "Bu adres zaten baska bir XMLTV kaynaginda kayitli."
+        }
+        val connection = URL(normalizedUrl).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 30_000
         connection.instanceFollowRedirects = true
@@ -66,8 +91,10 @@ class XmlTvRepository(context: Context) {
             check(connection.responseCode in 200..299) {
                 "HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
-            val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: sourceName(url)
-            connection.inputStream.use { importStream(it, url, name, KIND_URL) }.also {
+            val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: sourceName(normalizedUrl)
+            connection.inputStream.use {
+                importStream(it, normalizedUrl, name, KIND_URL, replacementSource)
+            }.also {
                 ensurePeriodicRefresh()
             }
         } finally {
@@ -86,7 +113,7 @@ class XmlTvRepository(context: Context) {
         var count = 0
         var firstError: Throwable? = null
         urls.forEach { source ->
-            runCatching { importUrl(source.location) }
+            runCatching { refreshSource(source) }
                 .onSuccess { count += it }
                 .onFailure { if (firstError == null) firstError = it }
         }
@@ -107,9 +134,18 @@ class XmlTvRepository(context: Context) {
         if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
     }
 
-    fun refreshSource(source: XmlTvSourceEntity): Int = when (source.kind) {
-        KIND_URL -> importUrl(source.location, source.name)
-        else -> error("Dosya kaynağı yeniden seçilmelidir")
+    fun refreshSource(source: XmlTvSourceEntity): Int = runCatching {
+        when (source.kind) {
+            KIND_URL -> importUrlInternal(source.location, source.name, source)
+            else -> error("Dosya kaynağı yeniden seçilmelidir")
+        }
+    }.onFailure { error ->
+        dao.setSourceError(source.id, error.message?.take(240) ?: error.javaClass.simpleName)
+    }.getOrThrow()
+
+    fun setSourceEnabled(sourceId: Long, enabled: Boolean) {
+        dao.setSourceEnabled(sourceId, enabled)
+        updateSourceSummary()
     }
 
     fun renameSource(sourceId: Long, name: String) {
@@ -348,7 +384,13 @@ class XmlTvRepository(context: Context) {
         return distinctPrograms.size
     }
 
-    private fun importStream(stream: InputStream, location: String, name: String, kind: String): Int {
+    private fun importStream(
+        stream: InputStream,
+        location: String,
+        name: String,
+        kind: String,
+        replacementSource: XmlTvSourceEntity? = null,
+    ): Int {
         val parser = Xml.newPullParser().apply { setInput(stream.openXmlTvContent(), null) }
         val channelNames = mutableMapOf<String, String>()
         val programs = mutableListOf<XmlTvProgramEntity>()
@@ -401,12 +443,12 @@ class XmlTvRepository(context: Context) {
             event = parser.next()
         }
         val now = System.currentTimeMillis()
-        val existing = dao.sourceByLocation(location)
+        val existing = replacementSource ?: dao.sourceByLocation(location)
         val sourceId = existing?.id ?: dao.insertSource(
             XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
         )
         database.runInTransaction {
-            dao.updateSource(sourceId, name, now)
+            dao.updateSource(sourceId, name, location, kind, now)
             dao.clearPrograms(sourceId)
             programs.asSequence().map { it.copy(sourceId = sourceId) }.chunked(INSERT_BATCH_SIZE)
                 .forEach { dao.insertPrograms(it) }

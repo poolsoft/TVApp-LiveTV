@@ -214,6 +214,13 @@
     <string name="xmltv_delete_source_confirm">“%1$s” XMLTV kaynağı ve programları silinsin mi?</string>
     <string name="xmltv_source_row">%1$s  ·  %2$s</string>
     <string name="xmltv_source_row_detailed">%1$s  ·  %2$s\n%3$d kanal · %4$d program</string>
+    <string name="xmltv_source_row_status">%1$s · %2$s · %5$s\n%3$d kanal · %4$d program · %6$s%7$s</string>
+    <string name="source_enabled">Etkin</string>
+    <string name="source_disabled">Devre dışı</string>
+    <string name="enable_source">Kaynağı etkinleştir</string>
+    <string name="disable_source">Kaynağı devre dışı bırak</string>
+    <string name="edit_xmltv_source_url">XMLTV adresini düzenle</string>
+    <string name="source_error_short"> · Hata: %1$s</string>
     <string name="xmltv_source_url">URL</string>
     <string name="xmltv_source_file">Dosya</string>
     <string name="xmltv_source_deleted">XMLTV kaynağı silindi.</string>
@@ -494,6 +501,9 @@
     <string name="settings_short">Ayarlar</string>
     <string name="iptv_url_import_failed">İçe aktarılamadı. Adresi kontrol edin: %1$s</string>
     <string name="rename_iptv_source">Yeniden adlandır</string>
+    <string name="edit_iptv_source_url">Liste adresini düzenle</string>
+    <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d kanal · %4$d seçili · %5$s</string>
+    <string name="never">Henüz değil</string>
     <string name="iptv_source_renamed">Liste adı değiştirildi.</string>
     <string name="about">Hakkında</string>
     <string name="user_guide">Kullanım kılavuzu</string>

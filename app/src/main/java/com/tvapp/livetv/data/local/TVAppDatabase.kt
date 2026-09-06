@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -47,6 +47,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_9_10,
                 MIGRATION_10_11,
                 MIGRATION_11_12,
+                MIGRATION_12_13,
             )
                 .build()
                 .also { instance = it }
@@ -233,6 +234,16 @@ abstract class TVAppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `user_channels` ADD COLUMN `epgIdOverride` TEXT")
                 db.execSQL("ALTER TABLE `user_channels` ADD COLUMN `epgSourceIdOverride` INTEGER")
+            }
+        }
+
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `xmltv_sources` " +
+                        "ADD COLUMN `enabled` INTEGER NOT NULL DEFAULT 1",
+                )
+                db.execSQL("ALTER TABLE `xmltv_sources` ADD COLUMN `lastError` TEXT")
             }
         }
     }

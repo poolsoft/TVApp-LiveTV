@@ -14,4 +14,6 @@ data class XmlTvSourceEntity(
     val location: String,
     val kind: String,
     val lastUpdatedAt: Long,
+    val enabled: Boolean = true,
+    val lastError: String? = null,
 )

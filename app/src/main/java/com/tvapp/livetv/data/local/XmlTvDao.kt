@@ -9,7 +9,9 @@ import androidx.room.Update
 interface XmlTvDao {
     @Query(
         "SELECT sourceId, channelId, channelName, COUNT(*) AS programCount " +
-            "FROM xmltv_programs GROUP BY sourceId, channelId, channelName " +
+            "FROM xmltv_programs WHERE sourceId IN " +
+            "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+            "GROUP BY sourceId, channelId, channelName " +
             "ORDER BY channelName COLLATE NOCASE",
     )
     fun channelCatalog(): List<XmlTvChannelCatalogRow>
@@ -34,14 +36,32 @@ interface XmlTvDao {
     @Query("SELECT * FROM xmltv_sources WHERE location = :location LIMIT 1")
     fun sourceByLocation(location: String): XmlTvSourceEntity?
 
+    @Query("SELECT * FROM xmltv_sources WHERE id = :sourceId LIMIT 1")
+    fun sourceById(sourceId: Long): XmlTvSourceEntity?
+
     @Insert
     fun insertSource(source: XmlTvSourceEntity): Long
 
-    @Query("UPDATE xmltv_sources SET name = :name, lastUpdatedAt = :updatedAt WHERE id = :sourceId")
-    fun updateSource(sourceId: Long, name: String, updatedAt: Long)
+    @Query(
+        "UPDATE xmltv_sources SET name = :name, location = :location, kind = :kind, " +
+            "lastUpdatedAt = :updatedAt, lastError = NULL WHERE id = :sourceId",
+    )
+    fun updateSource(
+        sourceId: Long,
+        name: String,
+        location: String,
+        kind: String,
+        updatedAt: Long,
+    )
 
     @Query("UPDATE xmltv_sources SET name = :name WHERE id = :sourceId")
     fun renameSource(sourceId: Long, name: String)
+
+    @Query("UPDATE xmltv_sources SET enabled = :enabled WHERE id = :sourceId")
+    fun setSourceEnabled(sourceId: Long, enabled: Boolean)
+
+    @Query("UPDATE xmltv_sources SET lastError = :error WHERE id = :sourceId")
+    fun setSourceError(sourceId: Long, error: String?)
 
     @Query("DELETE FROM xmltv_sources WHERE id = :sourceId")
     fun deleteSource(sourceId: Long)
@@ -59,7 +79,9 @@ interface XmlTvDao {
     fun clearPrograms(sourceId: Long)
 
     @Query(
-        "SELECT * FROM xmltv_programs WHERE endTimeMillis > :start AND startTimeMillis < :end " +
+        "SELECT * FROM xmltv_programs WHERE sourceId IN " +
+            "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+            "AND endTimeMillis > :start AND startTimeMillis < :end " +
             "AND (:sourceId IS NULL OR sourceId = :sourceId) " +
             "AND ((:epgId != '' AND normalizedChannelId = :epgId) " +
             "OR normalizedChannelName = :channelName OR normalizedChannelId = :channelName) " +
@@ -74,7 +96,9 @@ interface XmlTvDao {
     ): List<XmlTvProgramEntity>
 
     @Query(
-        "SELECT * FROM xmltv_programs WHERE startTimeMillis <= :now AND endTimeMillis > :now " +
+        "SELECT * FROM xmltv_programs WHERE sourceId IN " +
+            "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+            "AND startTimeMillis <= :now AND endTimeMillis > :now " +
             "AND (normalizedChannelId IN (:channelKeys) OR normalizedChannelName IN (:channelKeys)) " +
             "ORDER BY startTimeMillis",
     )
