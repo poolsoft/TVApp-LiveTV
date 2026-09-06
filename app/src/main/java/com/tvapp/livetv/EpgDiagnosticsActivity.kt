@@ -18,10 +18,12 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.EpgDiagnosticStep
 import com.tvapp.livetv.data.ProgramRepository
+import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.TifRepository
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.playback.PlaybackHistoryStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,6 +34,8 @@ class EpgDiagnosticsActivity : AppCompatActivity() {
     private lateinit var runButton: Button
     private val repository by lazy { ProgramRepository(this) }
     private val tifRepository by lazy { TifRepository(this) }
+    private val channelRepository by lazy { ChannelRepository(this) }
+    private val playbackHistory by lazy { PlaybackHistoryStore(this) }
     private val database by lazy { TVAppDatabase.getInstance(this) }
     private val debugLog by lazy { CrashReportStore(this) }
 
@@ -47,7 +51,9 @@ class EpgDiagnosticsActivity : AppCompatActivity() {
             })
             lifecycleScope.launch {
                 val fallback = withContext(Dispatchers.IO) {
-                    tifRepository.channels().getOrNull()?.firstOrNull()
+                    val channels = channelRepository.channels(includeHidden = true).getOrNull().orEmpty()
+                    val lastKey = playbackHistory.keys().firstOrNull()
+                    channels.firstOrNull { it.sourceKey == lastKey } ?: channels.firstOrNull()
                 }
                 if (fallback == null) finish() else showChannel(fallback)
             }

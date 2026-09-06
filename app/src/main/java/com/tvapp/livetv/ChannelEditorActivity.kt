@@ -667,7 +667,7 @@ class ChannelEditorActivity : AppCompatActivity() {
                     0 -> loadChannels(syncMessage = true)
                     1 -> showChannelSources()
                     2 -> openIptvSources()
-                    3 -> showXmlTvManagement()
+                    3 -> startActivity(Intent(this, XmlTvSourcesActivity::class.java))
                     4 -> createBackupFile.launch(defaultBackupFileName())
                     5 -> openBackupFile.launch(arrayOf("application/json", "text/plain"))
                 }

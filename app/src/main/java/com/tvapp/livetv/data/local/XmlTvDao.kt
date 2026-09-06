@@ -40,6 +40,9 @@ interface XmlTvDao {
     @Query("UPDATE xmltv_sources SET name = :name, lastUpdatedAt = :updatedAt WHERE id = :sourceId")
     fun updateSource(sourceId: Long, name: String, updatedAt: Long)
 
+    @Query("UPDATE xmltv_sources SET name = :name WHERE id = :sourceId")
+    fun renameSource(sourceId: Long, name: String)
+
     @Query("DELETE FROM xmltv_sources WHERE id = :sourceId")
     fun deleteSource(sourceId: Long)
 

@@ -13,9 +13,16 @@ import com.tvapp.livetv.settings.LogoCachePreferencesStore
 
 object ChannelLogoLoader {
     private var holder: LoaderHolder? = null
+    private val failedRequests = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     fun load(imageView: ImageView, data: Any?, fallbackRes: Int) {
         if (data == null || data is String && data.isBlank()) {
+            imageView.dispose()
+            imageView.setImageResource(fallbackRes)
+            return
+        }
+        val requestKey = data.toString()
+        if (requestKey in failedRequests) {
             imageView.dispose()
             imageView.setImageResource(fallbackRes)
             return
@@ -25,6 +32,10 @@ object ChannelLogoLoader {
             placeholder(fallbackRes)
             error(fallbackRes)
             fallback(fallbackRes)
+            listener(
+                onSuccess = { _, _ -> failedRequests.remove(requestKey) },
+                onError = { _, _ -> failedRequests.add(requestKey) },
+            )
             diskCachePolicy(if (current.diskEnabled) CachePolicy.ENABLED else CachePolicy.DISABLED)
         }
     }
@@ -33,6 +44,7 @@ object ChannelLogoLoader {
     fun invalidate() {
         holder?.loader?.shutdown()
         holder = null
+        failedRequests.clear()
     }
 
     @OptIn(ExperimentalCoilApi::class)
@@ -40,6 +52,7 @@ object ChannelLogoLoader {
     fun clear(context: Context) {
         loader(context).loader.memoryCache?.clear()
         loader(context).loader.diskCache?.clear()
+        failedRequests.clear()
     }
 
     fun cacheSizeBytes(context: Context): Long = runCatching {

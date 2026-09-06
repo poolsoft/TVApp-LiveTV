@@ -112,6 +112,13 @@ class XmlTvRepository(context: Context) {
         else -> error("Dosya kaynağı yeniden seçilmelidir")
     }
 
+    fun renameSource(sourceId: Long, name: String) {
+        val normalized = name.trim()
+        require(normalized.isNotBlank()) { "XMLTV kaynak adi bos olamaz." }
+        dao.renameSource(sourceId, normalized)
+        updateSourceSummary()
+    }
+
     fun clear() {
         preferences.edit().clear().apply()
         val sourceIds = sources().map { it.id }

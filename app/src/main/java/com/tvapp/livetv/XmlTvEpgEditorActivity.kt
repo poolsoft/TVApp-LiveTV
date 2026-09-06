@@ -15,6 +15,7 @@ import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.XmlTvChannelOption
 import com.tvapp.livetv.data.XmlTvMatcher
 import com.tvapp.livetv.data.XmlTvRepository
+import com.tvapp.livetv.data.normalizeEpgKey
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.data.local.UserChannelEntity
 import com.tvapp.livetv.databinding.ActivityXmltvEpgEditorBinding
@@ -37,6 +38,9 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
     private var sourceFilter: Long? = null
     private var optionBySourceAndId = emptyMap<Pair<Long, String>, XmlTvChannelOption>()
     private var matchIndex = XmlTvMatcher.Index(emptyList())
+    private var matchFilter = MatchFilter.ALL
+    private var ambiguousIds = emptySet<String>()
+    private var ambiguousNames = emptySet<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +69,11 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
                 saveOverride(null)
                 return true
             }
+            KeyEvent.KEYCODE_PROG_YELLOW -> if (selectedChannel == null) {
+                matchFilter = matchFilter.next()
+                showChannels()
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -88,6 +97,8 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
             options = loaded.third
             optionBySourceAndId = options.associateBy { it.sourceId to it.channelId }
             matchIndex = XmlTvMatcher.Index(options)
+            ambiguousIds = duplicateKeys(options.map { it.channelId.normalizeEpgKey() })
+            ambiguousNames = duplicateKeys(options.map { it.channelName.normalizeEpgKey() })
             debugLog.recordDebug(
                 "XMLTV_EDITOR_LOAD | channels=${channels.size}, options=${options.size}, " +
                     "duration=${SystemClock.elapsedRealtime() - startedAt}ms",
@@ -100,8 +111,8 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
         selectedChannel = null
         sourceFilter = null
         binding.title.setText(R.string.xmltv_match_editor)
-        binding.subtitle.setText(R.string.xmltv_match_editor_summary)
-        binding.hint.setText(R.string.xmltv_match_editor_hint)
+        binding.subtitle.text = getString(R.string.xmltv_match_filter_status, matchFilter.label(this))
+        binding.hint.setText(R.string.xmltv_match_editor_filter_hint)
         val startedAt = SystemClock.elapsedRealtime()
         val rows = channels.map { channel ->
             val preference = preferences[channel.sourceKey]
@@ -122,8 +133,23 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
                 }
                 else -> getString(R.string.xmltv_match_none)
             }
-            MatchRow(channel.sourceKey, channel.displayNumber, channel.displayName, channel.epgId.orEmpty(), status)
-        }
+            val normalizedId = channel.epgId?.normalizeEpgKey().orEmpty()
+            val normalizedName = channel.displayName.normalizeEpgKey()
+            val state = when {
+                match == null -> MatchState.UNMATCHED
+                manual == null && (normalizedId.isNotBlank() && normalizedId in ambiguousIds ||
+                    normalizedName in ambiguousNames) -> MatchState.AMBIGUOUS
+                else -> MatchState.MATCHED
+            }
+            MatchRow(
+                channel.sourceKey,
+                channel.displayNumber,
+                channel.displayName,
+                channel.epgId.orEmpty(),
+                status,
+                matchState = state,
+            )
+        }.filter { row -> matchFilter.accepts(row.matchState) }
         debugLog.recordDebug(
             "XMLTV_EDITOR_MATCH | channels=${rows.size}, duration=${SystemClock.elapsedRealtime() - startedAt}ms",
         )
@@ -204,7 +230,32 @@ class XmlTvEpgEditorActivity : AppCompatActivity() {
         val detail: String,
         val status: String,
         val option: XmlTvChannelOption? = null,
+        val matchState: MatchState = MatchState.MATCHED,
     )
+
+    private fun duplicateKeys(keys: List<String>): Set<String> = keys.asSequence()
+        .filter(String::isNotBlank)
+        .groupingBy { it }
+        .eachCount()
+        .filterValues { it > 1 }
+        .keys
+
+    private enum class MatchState { MATCHED, UNMATCHED, AMBIGUOUS }
+
+    private enum class MatchFilter {
+        ALL, MATCHED, UNMATCHED, AMBIGUOUS;
+
+        fun next() = entries[(ordinal + 1) % entries.size]
+        fun accepts(state: MatchState) = this == ALL || name == state.name
+        fun label(activity: XmlTvEpgEditorActivity) = activity.getString(
+            when (this) {
+                ALL -> R.string.xmltv_filter_all
+                MATCHED -> R.string.xmltv_filter_matched
+                UNMATCHED -> R.string.xmltv_filter_unmatched
+                AMBIGUOUS -> R.string.xmltv_filter_ambiguous
+            },
+        )
+    }
 
     private class MatchAdapter(private val onClick: (MatchRow) -> Unit) :
         ListAdapter<MatchRow, MatchAdapter.Holder>(object : DiffUtil.ItemCallback<MatchRow>() {

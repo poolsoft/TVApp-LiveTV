@@ -154,6 +154,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var homeRecentChannelsPublisher: HomeRecentChannelsPublisher
     private lateinit var debugLog: CrashReportStore
     private lateinit var adapter: ChannelAdapter
+    private var lastTifTrackLogSignature: String? = null
+    private var lastTifCallbackLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
     private var channels: List<LiveChannel> = emptyList()
     private val currentPrograms = mutableMapOf<String, ProgramSummary>()
@@ -349,10 +351,12 @@ class MainActivity : AppCompatActivity() {
             )
         }
         playback.onCallbackEvent = { event ->
-            debugLog.recordDebug(
-                "TIF_CALLBACK_RAW | event=${event.name}, " +
-                    event.values.entries.joinToString { (key, value) -> "$key=$value" },
-            )
+            val detail = event.values.entries.joinToString { (key, value) -> "$key=$value" }
+            val signature = "${currentChannel?.sourceKey}|${event.name}|$detail"
+            if (signature != lastTifCallbackLogSignature) {
+                lastTifCallbackLogSignature = signature
+                debugLog.recordDebug("TIF_CALLBACK_RAW | event=${event.name}, $detail")
+            }
         }
         playback.onVideoStateChanged = { available, _ ->
             val channel = currentChannel
@@ -1740,6 +1744,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun logTifTracks(tracks: List<TvTrackInfo>) {
         val channelKey = currentChannel?.sourceKey
+        val signature = channelKey + "|" + tracks.joinToString(";") { track ->
+            listOf(
+                track.type,
+                track.id,
+                track.language?.trimEnd('\u0000'),
+                track.debugValue { if (type == TvTrackInfo.TYPE_VIDEO) videoWidth else 0 },
+                track.debugValue { if (type == TvTrackInfo.TYPE_VIDEO) videoHeight else 0 },
+                track.extra?.toString(),
+            ).joinToString(":")
+        }
+        if (signature == lastTifTrackLogSignature) return
+        lastTifTrackLogSignature = signature
         if (tracks.isEmpty()) {
             debugLog.recordDebug("TIF_TRACK_RAW | channel=$channelKey, tracks=empty")
             return
@@ -1770,7 +1786,7 @@ class MainActivity : AppCompatActivity() {
                 .ifBlank { track.extra?.toString() ?: "null" }
             debugLog.recordDebug(
                 "TIF_TRACK_RAW | channel=$channelKey, index=$index, type=$type, id=${track.id}, " +
-                    "language=${track.language}, description=${track.description}, " +
+                    "language=${track.language?.trimEnd('\u0000')}, description=${track.description}, " +
                     "${typeFields.joinToString(", ")}, extra={$extraFields}",
             )
         }

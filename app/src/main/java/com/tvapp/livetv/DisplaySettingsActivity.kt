@@ -283,7 +283,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
             xmlTvRepository.sourceLabel() ?: getString(R.string.not_configured_short),
         ) { row ->
             xmlTvSettingRow = row
-            showXmlTvManagement()
+            startActivity(Intent(this, XmlTvSourcesActivity::class.java))
         }
         action(
             R.string.iptv_input_name,

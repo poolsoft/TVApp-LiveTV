@@ -231,10 +231,12 @@ class ProgramRepository(context: Context) {
         return buildList {
             if (channel.source == LiveChannel.Source.TIF) {
                 add(run("TIF_CHANNEL_URI") { nowAndNext(channel.id, now).detail() })
-                add(run("TIF_GLOBAL_CURRENT") {
-                    val program = currentPrograms(setOf(channel.id), now)[channel.id]
-                    "now=${program?.title ?: "<empty>"}"
-                })
+                add(EpgDiagnosticStep(
+                    "TIF_GLOBAL_CURRENT",
+                    true,
+                    0L,
+                    "skipped: device providers may reject selection; channel URI path is authoritative",
+                ))
             } else {
                 add(EpgDiagnosticStep("TIF_CHANNEL_URI", true, 0L, "skipped: IPTV"))
                 add(EpgDiagnosticStep("TIF_GLOBAL_CURRENT", true, 0L, "skipped: IPTV"))

@@ -208,6 +208,10 @@
     <string name="xmltv_url_hint">https://ornek.com/epg.xml veya epg.xml.gz</string>
     <string name="xmltv_url_invalid">Geçerli bir HTTP veya HTTPS adresi girin.</string>
     <string name="xmltv_saved_sources">Kayıtlı XMLTV kaynakları</string>
+    <string name="xmltv_sources_title">XMLTV EPG yönetimi</string>
+    <string name="xmltv_source_remote_hint">OK: Kaynak işlemleri · CH+/CH-: Sayfa değiştir</string>
+    <string name="xmltv_source_counts">%1$d kanal · %2$d program</string>
+    <string name="xmltv_delete_source_confirm">“%1$s” XMLTV kaynağı ve programları silinsin mi?</string>
     <string name="xmltv_source_row">%1$s  ·  %2$s</string>
     <string name="xmltv_source_row_detailed">%1$s  ·  %2$s\n%3$d kanal · %4$d program</string>
     <string name="xmltv_source_url">URL</string>
@@ -216,6 +220,12 @@
     <string name="xmltv_add_url">URL ekle</string>
     <string name="xmltv_match_editor">EPG eşleştirme editörü</string>
     <string name="xmltv_match_editor_summary">TVApp kanallarının XMLTV kanal kimlikleriyle nasıl eşleştiğini gösterir.</string>
+    <string name="xmltv_match_filter_status">Eşleşme filtresi: %1$s</string>
+    <string name="xmltv_match_editor_filter_hint">OK: Eşleşmeyi aç · Sarı: Eşleşme filtresi · CH+/CH-: Sayfa · Back: Kapat</string>
+    <string name="xmltv_filter_matched">Eşleşen</string>
+    <string name="xmltv_filter_all">Tümü</string>
+    <string name="xmltv_filter_unmatched">Eşleşmeyen</string>
+    <string name="xmltv_filter_ambiguous">Belirsiz</string>
     <string name="xmltv_match_editor_hint">OK: Eşleşmeyi seç  •  CH+/CH−: Sayfa  •  Back: Kapat</string>
     <string name="xmltv_option_hint">OK: Bu XMLTV kanalını bağla  •  Kırmızı: Otomatiğe dön  •  Mavi: Kaynak  •  Back: Kanal listesi</string>
     <string name="xmltv_match_manual">Elle: %1$s</string>

@@ -195,6 +195,10 @@
     <string name="xmltv_url_hint">https://example.com/epg.xml or epg.xml.gz</string>
     <string name="xmltv_url_invalid">Enter a valid HTTP or HTTPS address.</string>
     <string name="xmltv_saved_sources">Saved XMLTV sources</string>
+    <string name="xmltv_sources_title">XMLTV EPG management</string>
+    <string name="xmltv_source_remote_hint">OK: Source actions · CH+/CH-: Change page</string>
+    <string name="xmltv_source_counts">%1$d channels · %2$d programmes</string>
+    <string name="xmltv_delete_source_confirm">Delete the “%1$s” XMLTV source and its programmes?</string>
     <string name="xmltv_source_row">%1$s  ·  %2$s</string>
     <string name="xmltv_source_row_detailed">%1$s  ·  %2$s\n%3$d channels · %4$d programmes</string>
     <string name="xmltv_source_url">URL</string>
@@ -203,6 +207,12 @@
     <string name="xmltv_add_url">Add URL</string>
     <string name="xmltv_match_editor">EPG matching editor</string>
     <string name="xmltv_match_editor_summary">Shows how TVApp channels match XMLTV channel identifiers.</string>
+    <string name="xmltv_match_filter_status">Match filter: %1$s</string>
+    <string name="xmltv_match_editor_filter_hint">OK: Open match · Yellow: Match filter · CH+/CH-: Page · Back: Close</string>
+    <string name="xmltv_filter_matched">Matched</string>
+    <string name="xmltv_filter_all">All</string>
+    <string name="xmltv_filter_unmatched">Unmatched</string>
+    <string name="xmltv_filter_ambiguous">Ambiguous</string>
     <string name="xmltv_match_editor_hint">OK: Choose match  •  CH+/CH−: Page  •  Back: Close</string>
     <string name="xmltv_option_hint">OK: Link XMLTV channel  •  Red: Use automatic  •  Blue: Source  •  Back: Channel list</string>
     <string name="xmltv_match_manual">Manual: %1$s</string>

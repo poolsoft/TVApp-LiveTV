@@ -14,6 +14,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.view.Gravity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -295,32 +296,65 @@ class IptvSourcesActivity : AppCompatActivity() {
             add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
             add(SourceAction.DELETE to getString(R.string.delete))
         }
-        AlertDialog.Builder(this)
-            .setTitle(summary.source.name)
-            .setMessage(
-                getString(
+        val padding = (20 * resources.displayMetrics.density).toInt()
+        val actionViews = mutableListOf<TextView>()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+            addView(TextView(this@IptvSourcesActivity).apply {
+                text = getString(
                     R.string.iptv_source_selection_summary,
                     summary.selectedChannelCount,
                     summary.channelCount,
-                ),
-            )
-            .setItems(actions.map { it.second }.toTypedArray()) { _, which ->
-                when (actions[which].first) {
-                    SourceAction.SELECT -> openChannelSelection(
-                        summary.source.id,
-                        summary.source.name,
-                    )
-                    SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.location) {
-                        repository.refresh(summary.source)
-                    }
-                    SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
-                        renameSource(summary, name)
-                    }
-                    SourceAction.DELETE -> confirmDeleteSource(summary)
-                }
+                )
+                setTextColor(getColor(R.color.text_secondary))
+                textSize = 14f
+                setPadding(4, 0, 4, padding / 2)
+            })
+            actions.forEach { (_, label) ->
+                addView(TextView(this@IptvSourcesActivity).apply {
+                    text = label
+                    setTextColor(getColor(R.color.text_primary))
+                    textSize = 17f
+                    gravity = Gravity.CENTER_VERTICAL
+                    isFocusable = true
+                    isClickable = true
+                    setBackgroundResource(R.drawable.bg_focusable)
+                    setPadding(padding, 0, padding, 0)
+                    actionViews += this
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (52 * resources.displayMetrics.density).toInt(),
+                ).apply { topMargin = (6 * resources.displayMetrics.density).toInt() })
             }
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(summary.source.name)
+            .setView(content)
             .setNegativeButton(R.string.close, null)
-            .show()
+            .create()
+        actionViews.forEach { view ->
+            view.setOnClickListener {
+                val index = actionViews.indexOf(view)
+                dialog.dismiss()
+                performSourceAction(summary, actions[index].first)
+            }
+        }
+        dialog.setOnShowListener { actionViews.firstOrNull()?.requestFocus() }
+        dialog.show()
+    }
+
+    private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
+        when (action) {
+            SourceAction.SELECT -> openChannelSelection(summary.source.id, summary.source.name)
+            SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.location) {
+                repository.refresh(summary.source)
+            }
+            SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
+                renameSource(summary, name)
+            }
+            SourceAction.DELETE -> confirmDeleteSource(summary)
+        }
     }
 
     private fun renameSource(summary: IptvSourceSummary, name: String) {
