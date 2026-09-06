@@ -24,6 +24,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * EPG bilgisinin hiç gelmemesine yol açan kaydırmalı pencere denemesi geri alındı; çalışan toplu sorgu ve yalnız değişen satırı yenileyen adapter davranışı korundu.
 * Kanal listesi EPG sorgusu odaktaki kanalın 5 öncesi ve 5 sonrasıyla sınırlandı. Hızlı gezinirken sorgu erteleniyor; odak 300 ms sabit kaldığında veya kaydırma durduğunda görünür pencere yükleniyor.
 * Periyodik EPG yenilemesi 15.000 kanallık kataloğun tamamı yerine yalnız açık listedeki 11 kanallık pencereyi ve infobardaki etkin kanalı güncelliyor.
+* Bazı MediaTek TIF sağlayıcılarının küçük kanal kümelerinde boş döndürdüğü genel program sorgusu liste penceresinde kullanılmıyor; 11 kanal güvenilir kanal-URI sorgusuyla ayrı ayrı okunuyor.
 * TIF/DTV kanal logoları ana iş parçacığındaki doğrudan URI çözümlemesi yerine Coil bellek ve sınırlı disk cache hattından yükleniyor.
 
 ### Yedekleme

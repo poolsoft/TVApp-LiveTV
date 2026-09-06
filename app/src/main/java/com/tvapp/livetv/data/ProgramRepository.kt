@@ -179,6 +179,22 @@ class ProgramRepository(context: Context) {
         return resultMap
     }
 
+    /**
+     * Small, focus-driven list windows use the per-channel URI because some vendor TV providers
+     * return no rows for the global current-program query unless a large channel set is supplied.
+     */
+    fun currentProgramsForListWindow(
+        channels: List<LiveChannel>,
+        now: Long = System.currentTimeMillis(),
+    ): Map<String, ProgramSummary> = buildMap {
+        channels.forEach { channel ->
+            runCatching { nowAndNext(channel, now).current }
+                .getOrNull()
+                ?.takeIf { it.title.isNotBlank() }
+                ?.let { put(channel.sourceKey, it) }
+        }
+    }
+
     fun programsForChannel(
         channelId: Long,
         startTimeMillis: Long,

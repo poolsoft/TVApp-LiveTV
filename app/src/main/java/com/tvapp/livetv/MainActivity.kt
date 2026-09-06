@@ -973,9 +973,13 @@ class MainActivity : AppCompatActivity() {
             }
             if (missing.isEmpty()) return@launch
             val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.currentProgramsForChannels(missing) }
+                runCatching { programRepository.currentProgramsForListWindow(missing) }
             }
             val programs = result.getOrNull() ?: return@launch
+            debugLog.recordDebug(
+                "EPG_LIST_WINDOW_RESULT | center=$centerSourceKey, " +
+                    "requested=${missing.size}, found=${programs.size}",
+            )
             updateCachedPrograms(missing, programs)
             missing.forEach { channel ->
                 adapter.submitProgram(channel.sourceKey, programs[channel.sourceKey])
@@ -1024,7 +1028,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.channelPanel.visibility == View.VISIBLE) {
             val window = programWindow(focusedListSourceKey ?: selected.sourceKey)
             val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.currentProgramsForChannels(window) }
+                runCatching { programRepository.currentProgramsForListWindow(window) }
             }
             result.getOrNull()?.let { fresh ->
                 updateCachedPrograms(window, fresh)
