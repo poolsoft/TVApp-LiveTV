@@ -37,10 +37,25 @@ class EpgDiagnosticsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        channel = intent.toChannel() ?: run {
-            finish()
-            return
+        val suppliedChannel = intent.toChannel()
+        if (suppliedChannel != null) {
+            showChannel(suppliedChannel)
+        } else {
+            setContentView(text(getString(R.string.epg_diagnostics_running), 18f, false).apply {
+                gravity = Gravity.CENTER
+                setBackgroundColor(ContextCompat.getColor(context, R.color.panel))
+            })
+            lifecycleScope.launch {
+                val fallback = withContext(Dispatchers.IO) {
+                    tifRepository.channels().getOrNull()?.firstOrNull()
+                }
+                if (fallback == null) finish() else showChannel(fallback)
+            }
         }
+    }
+
+    private fun showChannel(selectedChannel: LiveChannel) {
+        channel = selectedChannel
         setContentView(buildContent())
         runDiagnostics()
     }
@@ -207,6 +222,8 @@ class EpgDiagnosticsActivity : AppCompatActivity() {
         private const val EXTRA_EPG_ID = "epg_id"
         private const val EXTRA_EPG_SOURCE_ID = "epg_source_id"
         private const val EXTRA_RUNTIME = "runtime"
+
+        fun intent(context: Context) = Intent(context, EpgDiagnosticsActivity::class.java)
 
         fun intent(context: Context, channel: LiveChannel, runtime: String) = Intent(context, EpgDiagnosticsActivity::class.java).apply {
             putExtra(EXTRA_ID, channel.id)

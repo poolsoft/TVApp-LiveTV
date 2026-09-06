@@ -45,6 +45,7 @@ android {
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
+            buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")
         }
         create("paid") {
             dimension = "distribution"
@@ -53,6 +54,7 @@ android {
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "true")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
+            buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "false")
         }
     }
 

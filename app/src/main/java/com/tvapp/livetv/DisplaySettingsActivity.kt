@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -253,17 +254,28 @@ class DisplaySettingsActivity : AppCompatActivity() {
         }
 
         section(R.string.application_settings)
+        if (BuildConfig.DIAGNOSTICS_ENABLED || BuildConfig.DEBUG) {
+            section(R.string.debug_tools)
+            horizontalActionRow(
+                buildList {
+                    if (BuildConfig.DIAGNOSTICS_ENABLED) {
+                        add(R.string.epg_diagnostics to {
+                            startActivity(EpgDiagnosticsActivity.intent(this@DisplaySettingsActivity))
+                        })
+                    }
+                    if (BuildConfig.DEBUG) {
+                        add(R.string.billing_test_scenarios to {
+                            startActivity(
+                                Intent("com.tvapp.livetv.DEBUG_ENTITLEMENT").setPackage(packageName),
+                            )
+                        })
+                    }
+                },
+            )
+        }
         if (BuildConfig.DEBUG) {
             toggle(R.string.verbose_remote_key_logging, current.verboseRemoteKeyLogging) {
                 update { copy(verboseRemoteKeyLogging = it) }
-            }
-            action(
-                R.string.billing_test_scenarios,
-                getString(R.string.billing_test_scenarios_summary),
-            ) {
-                startActivity(
-                    Intent("com.tvapp.livetv.DEBUG_ENTITLEMENT").setPackage(packageName),
-                )
             }
         }
         action(
@@ -309,6 +321,40 @@ class DisplaySettingsActivity : AppCompatActivity() {
             textSize = 15f
             setPadding(dp(18), dp(22), dp(18), dp(7))
         })
+    }
+
+    private fun horizontalActionRow(actions: List<Pair<Int, () -> Unit>>) {
+        if (actions.isEmpty()) return
+        val strip = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(3), dp(8), dp(7))
+        }
+        actions.forEach { (titleRes, clicked) ->
+            strip.addView(TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(190), dp(62)).apply {
+                    marginEnd = dp(8)
+                }
+                background = AppCompatResources.getDrawable(
+                    this@DisplaySettingsActivity,
+                    R.drawable.bg_settings_item,
+                )
+                gravity = Gravity.CENTER
+                isFocusable = true
+                isClickable = true
+                setText(titleRes)
+                setTextColor(getColorStateList(R.color.settings_title_text))
+                textSize = 15f
+                maxLines = 2
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+                setOnClickListener { clicked() }
+            })
+        }
+        content.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            isFocusable = false
+            addView(strip)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)))
     }
 
     private fun toggle(titleRes: Int, initial: Boolean, changed: (Boolean) -> Unit) {

@@ -3129,7 +3129,7 @@ class MainActivity : AppCompatActivity() {
             ),
         ) { toggleChannelLock(channel) }
         action(getString(R.string.system_information)) { showChannelSystemInformation(channel) }
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DIAGNOSTICS_ENABLED) {
             action(getString(R.string.epg_diagnostics)) {
                 val runtime = if (
                     channel.source == LiveChannel.Source.TIF &&
