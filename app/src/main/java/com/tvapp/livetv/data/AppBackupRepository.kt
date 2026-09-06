@@ -1,7 +1,10 @@
 package com.tvapp.livetv.data
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.ChannelGroupEntity
 import com.tvapp.livetv.data.local.IptvChannelEntity
@@ -22,11 +25,17 @@ import com.tvapp.livetv.settings.ParentalControlSnapshot
 import com.tvapp.livetv.settings.ParentalControlStore
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.FileOutputStream
 
 data class BackupSummary(
     val channelCount: Int,
     val iptvSourceCount: Int,
     val iptvChannelCount: Int,
+)
+
+data class BackupExportResult(
+    val summary: BackupSummary,
+    val fallbackLocation: String? = null,
 )
 
 class AppBackupRepository(context: Context) {
@@ -38,7 +47,7 @@ class AppBackupRepository(context: Context) {
     private val sleepTimerStore = SleepTimerStore(appContext)
     private val parentalControlStore = ParentalControlStore(appContext)
 
-    suspend fun exportTo(uri: Uri): BackupSummary {
+    suspend fun exportTo(uri: Uri, fallbackFileName: String): BackupExportResult {
         val snapshot = database.withTransaction {
             val sources = database.iptvDao().getSources()
             BackupSnapshot(
@@ -54,11 +63,53 @@ class AppBackupRepository(context: Context) {
                 parentalControl = parentalControlStore.snapshot(),
             )
         }
-        val json = snapshot.toJson().toString(2)
-        appContext.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use {
-            it.write(json)
-        } ?: error("Yedek dosyası açılamadı")
-        return snapshot.summary()
+        val bytes = snapshot.toJson().toString(2).toByteArray(Charsets.UTF_8)
+        val primaryFailure = runCatching { writeDocument(uri, bytes) }.exceptionOrNull()
+        if (primaryFailure == null) return BackupExportResult(snapshot.summary())
+        runCatching { appContext.contentResolver.delete(uri, null, null) }
+
+        val fallbackLocation = runCatching {
+            writeToDownloads(fallbackFileName, bytes)
+        }.getOrElse { fallbackFailure ->
+            fallbackFailure.addSuppressed(primaryFailure)
+            throw fallbackFailure
+        }
+        return BackupExportResult(snapshot.summary(), fallbackLocation)
+    }
+
+    private fun writeDocument(uri: Uri, bytes: ByteArray) {
+        val descriptor = appContext.contentResolver.openFileDescriptor(uri, "rwt")
+            ?: error("Yedek dosyası açılamadı")
+        descriptor.use {
+            FileOutputStream(it.fileDescriptor).use { output ->
+                output.write(bytes)
+                output.flush()
+                output.fd.sync()
+            }
+        }
+    }
+
+    private fun writeToDownloads(fileName: String, bytes: ByteArray): String {
+        val resolver = appContext.contentResolver
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/TVApp"
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/json")
+            put(MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: error("İndirilenler klasöründe yedek dosyası oluşturulamadı")
+        try {
+            writeDocument(uri, bytes)
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        } catch (error: Throwable) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw error
+        }
+        return "$relativePath/$fileName"
     }
 
     suspend fun importFrom(uri: Uri): BackupSummary {

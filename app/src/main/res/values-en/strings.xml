@@ -220,6 +220,7 @@
     <string name="backup_exporting">Preparing TVApp backup...</string>
     <string name="backup_importing">Restoring TVApp backup...</string>
     <string name="backup_export_complete">%1$d channels and %2$d IPTV lists backed up.</string>
+    <string name="backup_export_complete_fallback">%1$d channels and %2$d IPTV lists backed up. The selected location was unavailable, so the file was saved to %3$s.</string>
     <string name="backup_import_complete">%1$d channels and %2$d IPTV lists restored.</string>
     <string name="import_backup_confirm">The current channel order, IPTV lists, and display settings will be replaced by the selected backup.</string>
     <string name="backup_failed">Backup operation failed</string>

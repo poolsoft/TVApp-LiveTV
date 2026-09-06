@@ -233,6 +233,7 @@
     <string name="backup_exporting">TVApp yedeği hazırlanıyor…</string>
     <string name="backup_importing">TVApp yedeği geri yükleniyor…</string>
     <string name="backup_export_complete">%1$d kanal ve %2$d IPTV listesi yedeklendi.</string>
+    <string name="backup_export_complete_fallback">%1$d kanal ve %2$d IPTV listesi yedeklendi. Seçilen konuma yazılamadığı için dosya %3$s konumuna kaydedildi.</string>
     <string name="backup_import_complete">%1$d kanal ve %2$d IPTV listesi geri yüklendi.</string>
     <string name="import_backup_confirm">Mevcut kanal sırası, IPTV listeleri ve görünüm ayarları seçilen yedekle değiştirilecek.</string>
     <string name="backup_failed">Yedek işlemi tamamlanamadı</string>

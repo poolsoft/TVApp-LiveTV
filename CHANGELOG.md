@@ -21,10 +21,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ### Kanal listesi performansı
 * EPG güncellemeleri artık büyük kanal listelerinin tamamını her odak hareketinde taramıyor; yalnız program bilgisi değişen satırlar indeks üzerinden güncelleniyor.
-* EPG, odaktaki kanalın 20 önce ve 20 sonrasından oluşan kaydırmalı pencereyle tembel yükleniyor. Oynatılan kanal ayrıca korunuyor; sonuçlar ve sonuç bulunamayan sorgular 60 saniye, en fazla 256 kanal için önbelleğe alınıyor.
-* Periyodik EPG yenilemesi bütün katalog yerine yalnız etkin pencereyi sorguluyor; infobar için gereken şimdi/sonraki sonucu repository önbelleğinden tekrar kullanılabiliyor.
-* Açılışta geçici olarak boş dönen EPG sonuçlarının uzun süre saklanması önlendi; negatif cache 5 saniyeye indirildi ve kanal listesi açılışında görünür pencere zorla yenileniyor.
+* EPG bilgisinin hiç gelmemesine yol açan kaydırmalı pencere denemesi geri alındı; çalışan toplu sorgu ve yalnız değişen satırı yenileyen adapter davranışı korundu.
 * TIF/DTV kanal logoları ana iş parçacığındaki doğrudan URI çözümlemesi yerine Coil bellek ve sınırlı disk cache hattından yükleniyor.
+
+### Yedekleme
+* Bazı Google TV belge sağlayıcılarında görülen `No root for primary` hatasına karşı yedek dışa aktarımı sağlamlaştırıldı. Seçilen URI yazılamazsa yedek otomatik olarak `Downloads/TVApp` klasörüne kaydediliyor.
 
 ### IPTV & VOD Seekbar ve Kontrollerinin Infobar'a Entegrasyonu
 * Infobar orta alanındaki metinli butonlar kaldırılarak dikey sıkışıklık giderildi; zaman çizgisi (Seekbar) ferah ve temiz bir görünüme kavuşturuldu.

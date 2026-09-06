@@ -862,13 +862,24 @@ class ChannelEditorActivity : AppCompatActivity() {
         binding.syncStatus.text = getString(R.string.backup_exporting)
         lifecycleScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { backupRepository.exportTo(uri) }
-            }.onSuccess { summary ->
-                binding.syncStatus.text = getString(
-                    R.string.backup_export_complete,
-                    summary.channelCount,
-                    summary.iptvSourceCount,
-                )
+                withContext(Dispatchers.IO) {
+                    backupRepository.exportTo(uri, defaultBackupFileName())
+                }
+            }.onSuccess { result ->
+                binding.syncStatus.text = if (result.fallbackLocation == null) {
+                    getString(
+                        R.string.backup_export_complete,
+                        result.summary.channelCount,
+                        result.summary.iptvSourceCount,
+                    )
+                } else {
+                    getString(
+                        R.string.backup_export_complete_fallback,
+                        result.summary.channelCount,
+                        result.summary.iptvSourceCount,
+                        result.fallbackLocation,
+                    )
+                }
             }.onFailure { error ->
                 binding.syncStatus.text = error.message ?: error.javaClass.simpleName
                 showBackupError(error)
