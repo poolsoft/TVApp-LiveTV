@@ -20,6 +20,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Oynatma satırı Oynat/Duraklat, Buffer, VOD Hızı ve Ses/Altyazı/Kalite birleşik menüsünden oluşuyor. Buffer ve hız OK ile açılan seçim listesinden ayarlanıyor.
 
 ### Kanal listesi performansı
+* Debug derlemesinde kanal uzun basış menüsüne Uygulama Tanılama ekranı eklendi. EPG yollarının yanında cihaz yetenekleri, izinler, TIF girişleri, ham kanal sütunları, logo erişimi, Room/IPTV sayıları ve canlı playback callback özeti süre ve sonuçlarıyla ekranda gösterilip debug loguna yazılıyor.
 * EPG güncellemeleri artık büyük kanal listelerinin tamamını her odak hareketinde taramıyor; yalnız program bilgisi değişen satırlar indeks üzerinden güncelleniyor.
 * EPG bilgisinin hiç gelmemesine yol açan kaydırmalı pencere denemesi geri alındı; çalışan toplu sorgu ve yalnız değişen satırı yenileyen adapter davranışı korundu.
 * Kanal listesi EPG sorgusu odaktaki kanalın 5 öncesi ve 5 sonrasıyla sınırlandı. Hızlı gezinirken sorgu erteleniyor; odak 300 ms sabit kaldığında veya kaydırma durduğunda görünür pencere yükleniyor.

@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="system_information">Sistem bilgileri</string>
+    <string name="epg_diagnostics">Uygulama tanılama</string>
+    <string name="epg_diagnostics_channel">Uygulama tanılama · %1$s</string>
+    <string name="epg_diagnostics_summary">Kanal: %1$s · Kimlik: %2$d · Kaynak: %3$s\nEPG kimliği: %4$s · XMLTV kaynağı: %5$s</string>
+    <string name="epg_diagnostics_run">Tüm testleri yeniden çalıştır</string>
+    <string name="epg_diagnostics_running">Uygulama testleri çalıştırılıyor…</string>
+    <string name="epg_diagnostics_result">%1$s · %2$s · %3$d ms\n%4$s</string>
+    <string name="epg_diagnostics_success">ÇALIŞTI</string>
+    <string name="epg_diagnostics_failure">HATA</string>
     <string name="system_information_channel">Sistem bilgileri · %1$s</string>
     <string name="system_info_source">Kaynak</string>
     <string name="system_info_channel_id">Kanal kimliği</string>

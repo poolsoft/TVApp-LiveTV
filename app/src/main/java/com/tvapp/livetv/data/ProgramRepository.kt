@@ -16,6 +16,13 @@ data class NowNextPrograms(
     val next: ProgramSummary?,
 )
 
+data class EpgDiagnosticStep(
+    val query: String,
+    val success: Boolean,
+    val durationMillis: Long,
+    val detail: String,
+)
+
 internal fun replaceCurrentPrograms(
     existing: Map<String, ProgramSummary>,
     refreshedChannels: Collection<LiveChannel>,
@@ -192,6 +199,52 @@ class ProgramRepository(context: Context) {
                 .getOrNull()
                 ?.takeIf { it.title.isNotBlank() }
                 ?.let { put(channel.sourceKey, it) }
+        }
+    }
+
+    fun diagnose(channel: LiveChannel, now: Long = System.currentTimeMillis()): List<EpgDiagnosticStep> {
+        fun run(query: String, block: () -> String): EpgDiagnosticStep {
+            val startedAt = android.os.SystemClock.elapsedRealtime()
+            return runCatching { block() }.fold(
+                onSuccess = { detail ->
+                    EpgDiagnosticStep(
+                        query,
+                        true,
+                        android.os.SystemClock.elapsedRealtime() - startedAt,
+                        detail,
+                    )
+                },
+                onFailure = { error ->
+                    EpgDiagnosticStep(
+                        query,
+                        false,
+                        android.os.SystemClock.elapsedRealtime() - startedAt,
+                        "${error.javaClass.simpleName}: ${error.message.orEmpty()}",
+                    )
+                },
+            )
+        }
+
+        fun NowNextPrograms.detail(): String =
+            "now=${current?.title ?: "<empty>"}; next=${next?.title ?: "<empty>"}"
+
+        return buildList {
+            if (channel.source == LiveChannel.Source.TIF) {
+                add(run("TIF_CHANNEL_URI") { nowAndNext(channel.id, now).detail() })
+                add(run("TIF_GLOBAL_CURRENT") {
+                    val program = currentPrograms(setOf(channel.id), now)[channel.id]
+                    "now=${program?.title ?: "<empty>"}"
+                })
+            } else {
+                add(EpgDiagnosticStep("TIF_CHANNEL_URI", true, 0L, "skipped: IPTV"))
+                add(EpgDiagnosticStep("TIF_GLOBAL_CURRENT", true, 0L, "skipped: IPTV"))
+            }
+            add(run("XMLTV_NOW_NEXT") { xmlTvRepository.nowAndNext(channel, now).detail() })
+            add(run("MERGED_NOW_NEXT") { nowAndNext(channel, now).detail() })
+            add(run("LIST_WINDOW_PATH") {
+                val program = currentProgramsForListWindow(listOf(channel), now)[channel.sourceKey]
+                "now=${program?.title ?: "<empty>"}"
+            })
         }
     }
 

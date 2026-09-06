@@ -10,5 +10,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".EpgDiagnosticsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
     </application>
 </manifest>

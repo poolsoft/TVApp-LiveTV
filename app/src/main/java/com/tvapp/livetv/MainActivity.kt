@@ -3129,6 +3129,22 @@ class MainActivity : AppCompatActivity() {
             ),
         ) { toggleChannelLock(channel) }
         action(getString(R.string.system_information)) { showChannelSystemInformation(channel) }
+        if (BuildConfig.DEBUG) {
+            action(getString(R.string.epg_diagnostics)) {
+                val runtime = if (
+                    channel.source == LiveChannel.Source.TIF &&
+                    channel.sourceKey == currentChannel?.sourceKey
+                ) {
+                    val tracks = playback.allTracks()
+                    val video = playback.currentVideoState()
+                    "tracks=${tracks.size}, video=${video.width}x${video.height}, " +
+                        "available=${video.available}, unavailableReason=${video.unavailableReason}"
+                } else {
+                    "not-current-tif-channel"
+                }
+                startActivity(EpgDiagnosticsActivity.intent(this, channel, runtime))
+            }
+        }
         action(
             getString(if (multiViewActive) R.string.close_multi_view else R.string.open_multi_view),
         ) { if (multiViewActive) stopMultiView() else startMultiView(channel) }

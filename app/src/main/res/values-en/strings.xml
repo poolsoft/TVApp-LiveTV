@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="system_information">System information</string>
+    <string name="epg_diagnostics">App diagnostics</string>
+    <string name="epg_diagnostics_channel">App diagnostics · %1$s</string>
+    <string name="epg_diagnostics_summary">Channel: %1$s · ID: %2$d · Source: %3$s\nEPG ID: %4$s · XMLTV source: %5$s</string>
+    <string name="epg_diagnostics_run">Run all tests again</string>
+    <string name="epg_diagnostics_running">Running app diagnostics…</string>
+    <string name="epg_diagnostics_result">%1$s · %2$s · %3$d ms\n%4$s</string>
+    <string name="epg_diagnostics_success">WORKED</string>
+    <string name="epg_diagnostics_failure">ERROR</string>
     <string name="system_information_channel">System information · %1$s</string>
     <string name="system_info_source">Source</string>
     <string name="system_info_channel_id">Channel ID</string>
