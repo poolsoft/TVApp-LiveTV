@@ -151,7 +151,9 @@ Mobil video yüzeyinde tek dokunma bilgi çubuğunu açıp kapatır, yukarı/aş
 değiştirir ve yatay kaydırma kanal listesini açar. Mobil workflow bu APK'yı Releases sayfasında
 ayrı bir prerelease olarak yayımlar; `version.json` üretmez, `latest` TV release'ine veya uygulama
 içi güncelleme manifestine eklemez. Mobil varyantta kanal listesi ve infobardaki renk eylemleri
-dokunulabilir; TV varyantlarında bu alanlar kumanda ipucu ve renk tuşu davranışını korur.
+dokunulabilir; ana kanal paneli yalnız tam IPTV kütüphanesini gösterir. Kanal editörü ve IPTV
+seçim ekranındaki renk eylemleri de dokunma hedefidir. TV varyantlarında bu alanlar kumanda ipucu
+ve renk tuşu davranışını korur.
 
 Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `paid` varyantıdır. Play için imzalı
 Android App Bundle şu komutla hazırlanır:

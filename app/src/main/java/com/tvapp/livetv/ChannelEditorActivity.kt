@@ -119,11 +119,50 @@ class ChannelEditorActivity : AppCompatActivity() {
         iptvPreview = IptvPlaybackController(this, binding.previewIptv)
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.channelList.adapter = adapter
+        setupMobileColorActions()
         loadChannels(
             syncMessage = false,
             preferredKey = restoredFocusedKey
                 ?: intent.getStringExtra(EXTRA_CURRENT_SOURCE_KEY),
         )
+    }
+
+    private fun setupMobileColorActions() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) return
+        fun bind(views: List<View>, color: EditorColor) {
+            views.forEach { view ->
+                view.isClickable = true
+                view.isFocusable = false
+                view.minimumWidth = (48 * resources.displayMetrics.density).toInt()
+                view.minimumHeight = (48 * resources.displayMetrics.density).toInt()
+                view.setOnClickListener { handleEditorColor(color) }
+            }
+        }
+        bind(listOf(binding.redActionIcon, binding.redAction), EditorColor.RED)
+        bind(listOf(binding.greenActionIcon, binding.greenAction), EditorColor.GREEN)
+        bind(listOf(binding.yellowActionIcon, binding.yellowAction), EditorColor.YELLOW)
+        bind(listOf(binding.blueActionIcon, binding.blueAction), EditorColor.BLUE)
+    }
+
+    private fun handleEditorColor(color: EditorColor) {
+        clearNavigationNumberInput()
+        when (color) {
+            EditorColor.RED -> if (mode == Mode.MOVE) showMoveTargetEditor() else toggleSkipped()
+            EditorColor.GREEN -> when (mode) {
+                Mode.NORMAL -> startSingleMove()
+                Mode.MULTI_SELECT -> startMultiMove()
+                Mode.MOVE -> commitMove()
+            }
+            EditorColor.YELLOW -> when (mode) {
+                Mode.NORMAL -> {
+                    mode = Mode.MULTI_SELECT
+                    updateModeLabels()
+                }
+                Mode.MULTI_SELECT -> showMultiNumberEditor()
+                Mode.MOVE -> cancelMode()
+            }
+            EditorColor.BLUE -> if (mode == Mode.NORMAL) showSourceManagement()
+        }
     }
 
     private fun loadChannels(syncMessage: Boolean, preferredKey: String? = focusedChannel?.sourceKey) {
@@ -1021,21 +1060,6 @@ class ChannelEditorActivity : AppCompatActivity() {
         if (editorColor != null || handlesBack) clearNavigationNumberInput()
 
         when (editorColor) {
-            EditorColor.RED -> if (mode == Mode.MOVE) showMoveTargetEditor() else toggleSkipped()
-            EditorColor.GREEN -> when (mode) {
-                Mode.NORMAL -> startSingleMove()
-                Mode.MULTI_SELECT -> startMultiMove()
-                Mode.MOVE -> commitMove()
-            }
-            EditorColor.YELLOW -> when (mode) {
-                Mode.NORMAL -> {
-                    mode = Mode.MULTI_SELECT
-                    updateModeLabels()
-                }
-                Mode.MULTI_SELECT -> showMultiNumberEditor()
-                Mode.MOVE -> cancelMode()
-            }
-            EditorColor.BLUE -> if (mode == Mode.NORMAL) showSourceManagement()
             null -> if (digit != null) {
                 if (mode == Mode.MOVE) appendMoveTargetDigit(digit)
                 else appendNavigationDigit(digit)
@@ -1066,6 +1090,7 @@ class ChannelEditorActivity : AppCompatActivity() {
                 }
                 else -> return super.dispatchKeyEvent(event)
             }
+            else -> handleEditorColor(editorColor)
         }
         return true
     }

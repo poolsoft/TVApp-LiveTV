@@ -60,7 +60,22 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
         configureList()
         configureFilters()
         configureActions()
+        optimizeMobileColorActions()
         loadInitialData()
+    }
+
+    private fun optimizeMobileColorActions() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) return
+        val minimum = (48 * resources.displayMetrics.density).toInt()
+        listOf(
+            binding.clearButton,
+            binding.categoryButton,
+            binding.selectedFilterButton,
+            binding.saveButton,
+        ).forEach { button ->
+            button.minimumHeight = minimum
+            button.isFocusable = false
+        }
     }
 
     private fun configurePreview() {

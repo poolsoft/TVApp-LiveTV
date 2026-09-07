@@ -7,6 +7,7 @@
     android:orientation="vertical">
 
     <LinearLayout
+        android:id="@+id/editor_color_actions"
         android:layout_width="match_parent"
         android:layout_height="74dp"
         android:gravity="center_vertical"
@@ -150,6 +151,7 @@
         android:paddingHorizontal="28dp">
 
         <TextView
+            android:id="@+id/red_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:background="@drawable/key_red"
@@ -165,6 +167,7 @@
             android:textSize="14sp" />
 
         <TextView
+            android:id="@+id/green_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:background="@drawable/key_green"
@@ -180,6 +183,7 @@
             android:textSize="14sp" />
 
         <TextView
+            android:id="@+id/yellow_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:background="@drawable/key_yellow"
@@ -195,11 +199,13 @@
             android:textSize="14sp" />
 
         <TextView
+            android:id="@+id/blue_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:background="@drawable/key_blue"
             android:contentDescription="@string/blue_key" />
         <TextView
+            android:id="@+id/blue_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"

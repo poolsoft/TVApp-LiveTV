@@ -992,7 +992,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 } else {
                     if (kotlin.math.abs(deltaX) < threshold) return false
-                    showChannelPanel(expanded = false)
+                    openMobileChannelPanel()
                     true
                 }
             }
@@ -1030,9 +1030,13 @@ class MainActivity : AppCompatActivity() {
                 showIptvPipPicker()
             }
         }
-        touchTarget(binding.channelActionYellow, ::cycleChannelListMode)
+        touchTarget(binding.channelActionYellow) {
+            if (BuildConfig.MOBILE_UI_ENABLED) showIptvLibraryFilterDialog()
+            else cycleChannelListMode()
+        }
         binding.channelActionYellow.setOnLongClickListener {
-            showChannelListModeDialog()
+            if (BuildConfig.MOBILE_UI_ENABLED) showIptvLibraryFilterDialog()
+            else showChannelListModeDialog()
             true
         }
         touchTarget(binding.channelActionBlue) {
@@ -1048,6 +1052,11 @@ class MainActivity : AppCompatActivity() {
         val filterAvailable = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
         binding.channelActionBlue.isEnabled = filterAvailable
         binding.channelActionBlue.alpha = if (filterAvailable) 1f else 0.42f
+    }
+
+    private fun openMobileChannelPanel() {
+        if (BuildConfig.MOBILE_UI_ENABLED) openSavedIptvLibrary()
+        else showChannelPanel(expanded = false)
     }
 
     private fun loadVisiblePrograms() {
@@ -4206,7 +4215,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleChannelPanel() {
         if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
-        else showChannelPanel(expanded = false)
+        else openMobileChannelPanel()
     }
 
     private fun showChannelPanel(expanded: Boolean) {
