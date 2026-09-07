@@ -39,7 +39,20 @@ class TifRepository(context: Context) {
             null,
         )?.use { cursor ->
             if (!cursor.moveToFirst()) return@use emptyList()
-            cursor.columnNames.mapIndexed { index, name -> name to cursor.diagnosticValueAt(index) }
+            val rawValues = cursor.columnNames.mapIndexed { index, name ->
+                name to cursor.diagnosticValueAt(index)
+            }
+            val providerDataIndex = cursor.getColumnIndex(
+                TvContract.Channels.COLUMN_INTERNAL_PROVIDER_DATA,
+            )
+            val providerDetails = cursor.providerDataBytes(providerDataIndex)
+                ?.let(TifProviderDataInspector::inspect)
+                .orEmpty()
+            debugLog.recordDebug(
+                "TIF_INTERNAL_PROVIDER_DATA | channelId=$channelId | " +
+                    providerDetails.joinToString(" | ") { "${it.first}=${it.second}" },
+            )
+            rawValues + providerDetails
         }.orEmpty()
     }
 
@@ -176,6 +189,15 @@ class TifRepository(context: Context) {
     private fun Cursor.diagnosticRow(): String = columnNames.mapIndexed { index, name ->
         "$name=${diagnosticValueAt(index)}"
     }.joinToString(" | ")
+
+    private fun Cursor.providerDataBytes(index: Int): ByteArray? = runCatching {
+        if (index < 0 || isNull(index)) return@runCatching null
+        when (getType(index)) {
+            Cursor.FIELD_TYPE_BLOB -> getBlob(index)
+            Cursor.FIELD_TYPE_STRING -> getString(index).toByteArray(Charsets.UTF_8)
+            else -> null
+        }
+    }.getOrNull()
 
     private fun Cursor.diagnosticValueAt(index: Int): String = runCatching {
         when (getType(index)) {

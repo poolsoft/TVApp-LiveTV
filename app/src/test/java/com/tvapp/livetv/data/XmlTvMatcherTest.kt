@@ -18,13 +18,39 @@ class XmlTvMatcherTest {
     }
 
     @Test
-    fun matching_ignoresQualitySuffixAndPunctuationInName() {
+    fun matching_usesRelaxedQualityMatchWhenThereIsOnlyOneCandidate() {
         val result = XmlTvMatcher.automaticResolution(
             channel("TRT-1 HD", null),
             listOf(option("trt.one", "TRT 1")),
         )
 
         assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
+    }
+
+    @Test
+    fun matching_doesNotCollapseDistinctQualityVariants() {
+        val result = XmlTvMatcher.automaticResolution(
+            channel("TRT 1", null),
+            listOf(
+                option("trt1", "TRT 1"),
+                option("trt1hd", "TRT 1 HD"),
+            ),
+        )
+
+        assertEquals("trt1", result?.option?.channelId)
+    }
+
+    @Test
+    fun relaxedMatchingRejectsAmbiguousQualityVariants() {
+        val result = XmlTvMatcher.automaticResolution(
+            channel("TRT 1 UHD", null),
+            listOf(
+                option("trt1", "TRT 1"),
+                option("trt1hd", "TRT 1 HD"),
+            ),
+        )
+
+        assertEquals(null, result)
     }
 
     @Test
@@ -35,7 +61,7 @@ class XmlTvMatcherTest {
         )
 
         assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
-        assertEquals("trt1", "TRT1 HD.tr".normalizeEpgKey())
+        assertEquals("trt1hd", "TRT1 HD.tr".normalizeEpgKey())
     }
 
     private fun channel(name: String, epgId: String?) = LiveChannel(
