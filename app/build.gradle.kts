@@ -56,6 +56,16 @@ android {
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "false")
         }
+        create("mobile") {
+            dimension = "distribution"
+            applicationIdSuffix = ".mobile"
+            versionNameSuffix = "-mobile-test"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+            buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
+            buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
+            buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")
+        }
     }
 
     buildFeatures {

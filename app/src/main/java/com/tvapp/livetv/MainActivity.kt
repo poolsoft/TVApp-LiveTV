@@ -520,6 +520,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ensurePermissionAndLoad() {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
+            debugLog.recordDebug("TIF_UNAVAILABLE | loading IPTV-only channel data")
+            loadChannels()
+            return
+        }
         if (ContextCompat.checkSelfPermission(
                 this,
                 READ_TV_LISTINGS,

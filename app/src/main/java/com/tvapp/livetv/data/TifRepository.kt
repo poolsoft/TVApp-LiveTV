@@ -53,6 +53,11 @@ class TifRepository(context: Context) {
         if (!forceRefresh && !saveDiagnostics && cachedInputKey == cacheKey) {
             cachedChannels?.let { return@runCatching it }
         }
+        if (inputManager == null || tunerInputIds.isEmpty()) {
+            cachedInputKey = cacheKey
+            cachedChannels = emptyList()
+            return@runCatching emptyList()
+        }
         appContext.contentResolver.query(
             TvContract.Channels.CONTENT_URI,
             null,

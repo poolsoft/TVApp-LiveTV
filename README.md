@@ -137,6 +137,17 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat assembleLocalDebug
 ```
 
+Telefon üzerinde IPTV/VOD ve yönetim ekranlarını sınamak için TV paketlerinden ayrı mobil test
+varyantı kullanılabilir:
+
+```powershell
+.\gradlew.bat assembleMobileDebug
+```
+
+Bu varyant `com.tvapp.livetv.mobile` paket kimliğiyle kurulur. Telefonlarda DVB/ATV ve fiziksel
+TV girişleri bulunmadığından bu kaynaklar gösterilmez; gerçek tuner davranışı Android/Google TV
+cihazında doğrulanmalıdır.
+
 Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `paid` varyantıdır. Play için imzalı
 Android App Bundle şu komutla hazırlanır:
 
