@@ -150,7 +150,8 @@ cihazında doğrulanmalıdır. Oluşan kolay adlı çıktı `app/build/TVApp-Mob
 Mobil video yüzeyinde tek dokunma bilgi çubuğunu açıp kapatır, yukarı/aşağı kaydırma kanal
 değiştirir ve yatay kaydırma kanal listesini açar. Mobil workflow bu APK'yı Releases sayfasında
 ayrı bir prerelease olarak yayımlar; `version.json` üretmez, `latest` TV release'ine veya uygulama
-içi güncelleme manifestine eklemez.
+içi güncelleme manifestine eklemez. Mobil varyantta kanal listesi ve infobardaki renk eylemleri
+dokunulabilir; TV varyantlarında bu alanlar kumanda ipucu ve renk tuşu davranışını korur.
 
 Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `paid` varyantıdır. Play için imzalı
 Android App Bundle şu komutla hazırlanır:

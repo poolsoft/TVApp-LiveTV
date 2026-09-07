@@ -409,6 +409,7 @@
             android:paddingBottom="8dp">
 
             <LinearLayout
+                android:id="@+id/channel_action_red"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
@@ -420,6 +421,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/channel_action_green"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
@@ -431,6 +433,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/channel_action_yellow"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
@@ -442,6 +445,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/channel_action_blue"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"

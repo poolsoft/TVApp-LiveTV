@@ -10,6 +10,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * `mobileDebug`, TV dağıtım paketlerinden ayrı `com.tvapp.livetv.mobile` kimliğiyle eklendi. Telefonlarda normal başlatıcıdan açılır; TIF bulunmayan cihazlarda DVB izin ve kanal sorgusunu atlayarak IPTV/VOD testlerine devam eder.
 * Mobil APK, Releases sayfasında `TVApp-Mobile-Test.apk` dosyalı ayrı bir prerelease olarak yayımlanıyor. `version.json` oluşturmaz ve TV release/güncelleme hattına katılmaz.
 * Mobil video yüzeyinde tek dokunma bilgi çubuğunu açıp kapatır, dikey kaydırma kanal değiştirir ve yatay kaydırma kanal listesini açar. Liste ve dialog dokunmaları bu hareketlerden ayrı tutulur.
+* Kanal listesi ve infobardaki renk eylemleri yalnız mobil varyantta en az 48dp dokunma hedeflerine dönüştürüldü. TV görünümü, D-pad odağı ve kumanda renk tuşları değiştirilmedi.
 
 ### Dialog görünürlüğü
 * Koyu TV dialogu yalnız IPTV/XMLTV URL, kaynak adı, Xtream, Stalker ve kanal düzenleme gibi metin girişi içeren pencerelere uygulandı. Kanal uzun-OK işlem menüsü ile diğer seçim/onay pencereleri özgün hafif görünümünü koruyor.

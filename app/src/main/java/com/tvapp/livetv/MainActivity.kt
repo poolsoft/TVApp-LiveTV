@@ -465,6 +465,7 @@ class MainActivity : AppCompatActivity() {
             applyChannelFilter(showFavorites = !favoriteFilter)
         }
         setupMobileTouchControls()
+        setupMobileColorActions()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 handleBackNavigation()
@@ -999,6 +1000,54 @@ class MainActivity : AppCompatActivity() {
         val listener = View.OnTouchListener { _, event -> detector.onTouchEvent(event) }
         binding.tvView.setOnTouchListener(listener)
         binding.iptvPlayerView.setOnTouchListener(listener)
+    }
+
+    private fun setupMobileColorActions() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) return
+        fun touchTarget(view: View, action: () -> Unit) {
+            view.isClickable = true
+            view.isFocusable = false
+            view.foreground = ContextCompat.getDrawable(
+                this,
+                android.R.drawable.list_selector_background,
+            )
+            view.setOnClickListener { action() }
+        }
+        touchTarget(binding.channelActionRed) {
+            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                openIptvEditor()
+            } else {
+                openChannelEditor()
+            }
+        }
+        touchTarget(binding.channelActionGreen) {
+            if (
+                channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ||
+                currentChannel?.source == LiveChannel.Source.IPTV
+            ) {
+                showIptvGridPicker()
+            } else {
+                showIptvPipPicker()
+            }
+        }
+        touchTarget(binding.channelActionYellow, ::cycleChannelListMode)
+        binding.channelActionYellow.setOnLongClickListener {
+            showChannelListModeDialog()
+            true
+        }
+        touchTarget(binding.channelActionBlue) {
+            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                showIptvLibraryFilterDialog()
+            }
+        }
+        updateMobileChannelActionState()
+    }
+
+    private fun updateMobileChannelActionState() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) return
+        val filterAvailable = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
+        binding.channelActionBlue.isEnabled = filterAvailable
+        binding.channelActionBlue.alpha = if (filterAvailable) 1f else 0.42f
     }
 
     private fun loadVisiblePrograms() {
@@ -4033,6 +4082,7 @@ class MainActivity : AppCompatActivity() {
         binding.greenActionLabel.setText(green)
         binding.yellowActionLabel.setText(yellow)
         binding.blueActionLabel.setText(blue)
+        updateMobileChannelActionState()
         updateInfoColorActions()
     }
 
@@ -4063,7 +4113,33 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        fun action(color: Int, label: Int) {
+        fun action(color: Int, label: Int, handler: () -> Unit) {
+            if (BuildConfig.MOBILE_UI_ENABLED) {
+                binding.infoColorActions.addView(LinearLayout(this).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    orientation = LinearLayout.HORIZONTAL
+                    isClickable = true
+                    isFocusable = false
+                    foreground = ContextCompat.getDrawable(
+                        this@MainActivity,
+                        android.R.drawable.list_selector_background,
+                    )
+                    setPadding(dp(10), 0, dp(10), 0)
+                    minimumHeight = dp(48)
+                    addView(ImageView(this@MainActivity).apply {
+                        setImageResource(colorKeyDrawable(color))
+                        contentDescription = getString(label)
+                    }, LinearLayout.LayoutParams(dp(22), dp(22)))
+                    addView(TextView(this@MainActivity).apply {
+                        setText(label)
+                        setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                        textSize = 12f
+                        setPadding(dp(6), 0, 0, 0)
+                    })
+                    setOnClickListener { handler() }
+                })
+                return
+            }
             if (binding.infoColorActions.childCount > 0) {
                 binding.infoColorActions.addView(TextView(this).apply {
                     text = ","
@@ -4082,8 +4158,8 @@ class MainActivity : AppCompatActivity() {
                 setPadding(dp(5), 0, 0, 0)
             })
         }
-        action(R.color.remote_green, R.string.iptv_grid)
-        action(R.color.remote_blue, R.string.settings_short)
+        action(R.color.remote_green, R.string.iptv_grid, ::showIptvGridPicker)
+        action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
     }
 
     private fun updateIptvControlHints() = updateInfoColorActions()
