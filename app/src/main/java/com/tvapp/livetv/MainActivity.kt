@@ -19,7 +19,9 @@ import android.util.Rational
 import android.text.InputType
 import android.view.Gravity
 import android.view.ContextThemeWrapper
+import android.view.GestureDetector
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
@@ -129,6 +131,7 @@ class MainActivity : AppCompatActivity() {
         private const val IPTV_LIBRARY_PAGE_SIZE = 250
         private const val IPTV_LIBRARY_PREFETCH_DISTANCE = 24
         private const val MULTIVIEW_TIF_RECOVERY_DELAY_MS = 350L
+        private const val MOBILE_SWIPE_DISTANCE_DP = 56
     }
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
@@ -461,6 +464,7 @@ class MainActivity : AppCompatActivity() {
         binding.favoriteFilter.setOnClickListener {
             applyChannelFilter(showFavorites = !favoriteFilter)
         }
+        setupMobileTouchControls()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 handleBackNavigation()
@@ -952,6 +956,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadFocusedProgram(channel: LiveChannel) {
         loadProgramWindow(channel.sourceKey, EPG_FOCUS_DEBOUNCE_MS)
+    }
+
+    @Suppress("ClickableViewAccessibility")
+    private fun setupMobileTouchControls() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) return
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent): Boolean = true
+
+            override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+                if (binding.channelPanel.visibility == View.VISIBLE) {
+                    hideChannelPanel()
+                } else if (binding.infoBar.visibility == View.VISIBLE) {
+                    setInfoBarVisible(false)
+                } else {
+                    currentChannel?.let(::showInfoBarForChannel) ?: showInfoBar()
+                }
+                return true
+            }
+
+            override fun onFling(
+                start: MotionEvent?,
+                end: MotionEvent,
+                velocityX: Float,
+                velocityY: Float,
+            ): Boolean {
+                start ?: return false
+                val deltaX = end.x - start.x
+                val deltaY = end.y - start.y
+                val threshold = dp(MOBILE_SWIPE_DISTANCE_DP).toFloat()
+                return if (kotlin.math.abs(deltaY) > kotlin.math.abs(deltaX)) {
+                    if (kotlin.math.abs(deltaY) < threshold) return false
+                    zap(if (deltaY < 0) 1 else -1)
+                    true
+                } else {
+                    if (kotlin.math.abs(deltaX) < threshold) return false
+                    showChannelPanel(expanded = false)
+                    true
+                }
+            }
+        })
+        val listener = View.OnTouchListener { _, event -> detector.onTouchEvent(event) }
+        binding.tvView.setOnTouchListener(listener)
+        binding.iptvPlayerView.setOnTouchListener(listener)
     }
 
     private fun loadVisiblePrograms() {

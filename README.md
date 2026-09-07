@@ -146,7 +146,10 @@ varyantı kullanılabilir:
 
 Bu varyant `com.tvapp.livetv.mobile` paket kimliğiyle kurulur. Telefonlarda DVB/ATV ve fiziksel
 TV girişleri bulunmadığından bu kaynaklar gösterilmez; gerçek tuner davranışı Android/Google TV
-cihazında doğrulanmalıdır.
+cihazında doğrulanmalıdır. Oluşan kolay adlı çıktı `app/build/TVApp-Mobile-Test.apk` dosyasıdır.
+Mobil video yüzeyinde tek dokunma bilgi çubuğunu açıp kapatır, yukarı/aşağı kaydırma kanal
+değiştirir ve yatay kaydırma kanal listesini açar. Mobil workflow bu APK'yı yalnız Actions
+artifact'i olarak yayımlar; TVApp release'ine veya uygulama içi güncelleme manifestine eklemez.
 
 Yerel GitHub güncelleme sürümü `local`, mağaza sürümü `paid` varyantıdır. Play için imzalı
 Android App Bundle şu komutla hazırlanır:

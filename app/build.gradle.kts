@@ -46,6 +46,7 @@ android {
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")
+            buildConfigField("boolean", "MOBILE_UI_ENABLED", "false")
         }
         create("paid") {
             dimension = "distribution"
@@ -55,6 +56,7 @@ android {
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "true")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "false")
+            buildConfigField("boolean", "MOBILE_UI_ENABLED", "false")
         }
         create("mobile") {
             dimension = "distribution"
@@ -65,6 +67,7 @@ android {
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")
+            buildConfigField("boolean", "MOBILE_UI_ENABLED", "true")
         }
     }
 
@@ -143,8 +146,21 @@ val exportNamedDebugApk by tasks.registering {
     }
 }
 
+val exportNamedMobileDebugApk by tasks.registering {
+    doLast {
+        val source = layout.buildDirectory.file(
+            "outputs/apk/mobile/debug/app-mobile-debug.apk",
+        ).get().asFile
+        val destination = layout.buildDirectory.file("TVApp-Mobile-Test.apk").get().asFile
+        source.copyTo(destination, overwrite = true)
+    }
+}
+
 tasks.configureEach {
     if (name == "assembleLocalDebug") {
         finalizedBy(exportNamedDebugApk)
+    }
+    if (name == "assembleMobileDebug") {
+        finalizedBy(exportNamedMobileDebugApk)
     }
 }
