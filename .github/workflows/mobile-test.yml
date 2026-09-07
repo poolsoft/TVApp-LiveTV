@@ -15,7 +15,7 @@ on:
       - ".build"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tvapp-mobile-test
@@ -58,10 +58,16 @@ jobs:
           chmod +x gradlew
           ./gradlew testMobileDebugUnitTest assembleMobileDebug
 
-      - name: Upload mobile test APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: TVApp-Mobile-Test-${{ github.run_number }}
-          path: app/build/TVApp-Mobile-Test.apk
-          if-no-files-found: error
-          retention-days: 14
+      - name: Publish mobile test prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="mobile-r${{ github.run_number }}"
+          SHA256=$(sha256sum app/build/TVApp-Mobile-Test.apk | cut -d' ' -f1)
+          NOTES="Mobile test revision ${{ github.run_number }} · Separate package com.tvapp.livetv.mobile · SHA-256: $SHA256 · This prerelease is not used by TVApp's update manifest."
+          gh release create "$TAG" app/build/TVApp-Mobile-Test.apk \
+            --target "$(git rev-parse HEAD)" \
+            --title "TVApp Mobile Test r${{ github.run_number }}" \
+            --notes "$NOTES" \
+            --prerelease
