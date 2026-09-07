@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
+import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -388,12 +389,12 @@ class ChannelEditorActivity : AppCompatActivity() {
             .takeIf { it >= 0 }
             ?.plus(1)
             ?: 1
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(currentPosition.toString())
             selectAll()
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.move_target_order)
             .setMessage(getString(R.string.selected_channel_count, movingKeys.size))
             .setView(input)
@@ -517,12 +518,12 @@ class ChannelEditorActivity : AppCompatActivity() {
     }
 
     private fun showNumberEditor(channel: LiveChannel) {
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(channel.displayNumber)
             selectAll()
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.move_to_channel_number)
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->
@@ -550,12 +551,12 @@ class ChannelEditorActivity : AppCompatActivity() {
             return
         }
         val firstSelectedKey = channels.firstOrNull { it.sourceKey in selectedKeys }?.sourceKey
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText("1")
             selectAll()
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.target_start_number)
             .setMessage(getString(R.string.selected_channel_count, selectedKeys.size))
             .setView(input)
@@ -576,12 +577,12 @@ class ChannelEditorActivity : AppCompatActivity() {
     }
 
     private fun showNameEditor(channel: LiveChannel) {
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setText(channel.displayName)
             selectAll()
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.change_channel_name)
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->

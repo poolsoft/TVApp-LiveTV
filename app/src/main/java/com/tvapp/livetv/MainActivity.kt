@@ -18,6 +18,7 @@ import android.graphics.Typeface
 import android.util.Rational
 import android.text.InputType
 import android.view.Gravity
+import android.view.ContextThemeWrapper
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -3830,7 +3831,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChannelNumberEditor(channel: LiveChannel) {
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(channel.displayNumber)
             selectAll()
@@ -3855,7 +3856,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChannelNameEditor(channel: LiveChannel) {
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setText(channel.displayName)
             selectAll()
@@ -3877,7 +3878,7 @@ class MainActivity : AppCompatActivity() {
         input: EditText,
         onSave: (String) -> Unit,
     ) {
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(title)
             .setView(input)
             .setPositiveButton(R.string.save, null)

@@ -15,6 +15,7 @@ import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.view.Gravity
+import android.view.ContextThemeWrapper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -126,7 +127,7 @@ class IptvSourcesActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = padding / 2 })
         }
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.import_iptv_url)
             .setView(content)
             .setPositiveButton(R.string.import_action, null)
@@ -197,12 +198,12 @@ class IptvSourcesActivity : AppCompatActivity() {
     }
 
     private fun promptSourceName(defaultName: String, onConfirmed: (String) -> Unit) {
-        val input = EditText(this).apply {
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             setText(defaultName)
             selectAll()
         }
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.iptv_source_name)
             .setView(input)
             .setPositiveButton(android.R.string.ok, null)
@@ -255,7 +256,7 @@ class IptvSourcesActivity : AppCompatActivity() {
     }
 
     private fun credentialField(hint: Int, variation: Int = InputType.TYPE_TEXT_VARIATION_NORMAL) =
-        EditText(this).apply {
+        EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
             this.hint = getString(hint)
             inputType = InputType.TYPE_CLASS_TEXT or variation
             setTextColor(getColor(R.color.text_primary))
@@ -274,7 +275,7 @@ class IptvSourcesActivity : AppCompatActivity() {
             setPadding(padding, padding / 2, padding, 0)
             fields.forEach { field -> addView(field) }
         }
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(title)
             .setView(content)
             .setPositiveButton(android.R.string.ok, null)

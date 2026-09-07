@@ -7,7 +7,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Dialog görünürlüğü
-* IPTV/XMLTV URL, kaynak adı, Xtream, Stalker ve kanal düzenleme dahil standart metin girişli pencereler ortak koyu TV temasına bağlandı. Beyaz zemin üzerindeki okunamayan açık metin sorunu uygulama genelinde giderildi.
+* Koyu TV dialogu yalnız IPTV/XMLTV URL, kaynak adı, Xtream, Stalker ve kanal düzenleme gibi metin girişi içeren pencerelere uygulandı. Kanal uzun-OK işlem menüsü ile diğer seçim/onay pencereleri özgün hafif görünümünü koruyor.
 
 ### Editör ve kaynak yönetimi performansı
 * URL tabanlı IPTV kaynağında Yenile işleminin kaynağın kendi adresini yinelenen liste sanması düzeltildi; eklenen ve kaldırılan içerikler aynı kaynakta güncelleniyor.
