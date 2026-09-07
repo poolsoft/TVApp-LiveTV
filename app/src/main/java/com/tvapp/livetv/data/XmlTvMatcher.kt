@@ -8,13 +8,13 @@ object XmlTvMatcher {
         automaticResolution(channel, options)?.option
 
     fun automaticResolution(channel: LiveChannel, options: List<XmlTvChannelOption>): Resolution? {
-        val epgId = channel.epgId?.normalizeEpgKey()?.takeIf(String::isNotBlank)
-        val name = channel.displayName.normalizeEpgKey()
-        return epgId?.let { id -> options.firstOrNull { it.channelId.normalizeEpgKey() == id } }
+        val epgId = channel.epgId?.normalizeExactEpgKey()?.takeIf(String::isNotBlank)
+        val name = channel.displayName.normalizeExactEpgKey()
+        return epgId?.let { id -> options.firstOrNull { it.channelId.normalizeExactEpgKey() == id } }
             ?.let { Resolution(it, MatchType.ID) }
-            ?: options.firstOrNull { it.channelName.normalizeEpgKey() == name }
+            ?: options.firstOrNull { it.channelName.normalizeExactEpgKey() == name }
                 ?.let { Resolution(it, MatchType.NAME) }
-            ?: options.firstOrNull { it.channelId.normalizeEpgKey() == name }
+            ?: options.firstOrNull { it.channelId.normalizeExactEpgKey() == name }
                 ?.let { Resolution(it, MatchType.NAME) }
             ?: uniqueRelaxedMatch(channel.displayName, options)?.let { Resolution(it, MatchType.NAME) }
     }
@@ -23,14 +23,14 @@ object XmlTvMatcher {
     enum class MatchType { ID, NAME }
 
     class Index(options: List<XmlTvChannelOption>) {
-        private val byId = options.associateBy { it.channelId.normalizeEpgKey() }
-        private val byName = options.associateBy { it.channelName.normalizeEpgKey() }
+        private val byId = options.associateBy { it.channelId.normalizeExactEpgKey() }
+        private val byName = options.associateBy { it.channelName.normalizeExactEpgKey() }
         private val relaxedByName = options.groupBy { it.channelName.normalizeRelaxedEpgKey() }
         private val relaxedById = options.groupBy { it.channelId.normalizeRelaxedEpgKey() }
 
         fun resolve(channel: LiveChannel): Resolution? {
-            val epgId = channel.epgId?.normalizeEpgKey()?.takeIf(String::isNotBlank)
-            val name = channel.displayName.normalizeEpgKey()
+            val epgId = channel.epgId?.normalizeExactEpgKey()?.takeIf(String::isNotBlank)
+            val name = channel.displayName.normalizeExactEpgKey()
             return epgId?.let(byId::get)?.let { Resolution(it, MatchType.ID) }
                 ?: byName[name]?.let { Resolution(it, MatchType.NAME) }
                 ?: byId[name]?.let { Resolution(it, MatchType.NAME) }
@@ -60,7 +60,12 @@ object XmlTvMatcher {
 fun String.normalizeEpgKey(): String = lowercase(Locale.ROOT)
     .trim()
     .replace(Regex("[._-][a-z]{2}$"), "")
+    .replace(Regex("(?:[\\s._-]+)?(?:uhd|fhd|hd|sd|4k)$"), "")
+    .replace(Regex("[^a-z0-9çğıöşü]+"), "")
+
+internal fun String.normalizeExactEpgKey(): String = lowercase(Locale.ROOT)
+    .trim()
+    .replace(Regex("[._-][a-z]{2}$"), "")
     .replace(Regex("[^a-z0-9çğıöşü]+"), "")
 
 internal fun String.normalizeRelaxedEpgKey(): String = normalizeEpgKey()
-    .replace(Regex("(?:uhd|fhd|hd|sd|4k)$"), "")

@@ -61,7 +61,8 @@ class XmlTvMatcherTest {
         )
 
         assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
-        assertEquals("trt1hd", "TRT1 HD.tr".normalizeEpgKey())
+        assertEquals("trt1", "TRT1 HD.tr".normalizeEpgKey())
+        assertEquals("trt1hd", "TRT1 HD.tr".normalizeExactEpgKey())
     }
 
     private fun channel(name: String, epgId: String?) = LiveChannel(

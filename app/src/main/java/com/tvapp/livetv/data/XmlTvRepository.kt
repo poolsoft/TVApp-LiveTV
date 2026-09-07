@@ -560,7 +560,7 @@ class XmlTvRepository(context: Context) {
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
-        private const val NORMALIZATION_VERSION = 3
+        private const val NORMALIZATION_VERSION = 2
     }
 }
 
