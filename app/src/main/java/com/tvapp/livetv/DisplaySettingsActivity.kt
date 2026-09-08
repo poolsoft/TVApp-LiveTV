@@ -18,6 +18,7 @@ import android.widget.HorizontalScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -49,6 +50,7 @@ import kotlin.math.abs
 
 class DisplaySettingsActivity : AppCompatActivity() {
     private lateinit var content: LinearLayout
+    private lateinit var tabs: LinearLayout
     private lateinit var displayStore: DisplayPreferencesStore
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var languageStore: AppLanguageStore
@@ -61,6 +63,21 @@ class DisplaySettingsActivity : AppCompatActivity() {
     private var pendingApkUri: Uri? = null
     private var logoCachePreferences = LogoCachePreferences()
     private var xmlTvSettingRow: SettingRow? = null
+    private var selectedPage = SettingsPage.APPEARANCE
+    private var firstContentFocusable: View? = null
+    private val tabViews = mutableListOf<TextView>()
+    private val manageIptvSources = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) markChanged()
+    }
+    private val manageXmlTvSources = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        xmlTvSettingRow?.value?.text = xmlTvRepository.sourceLabel()
+            ?: getString(R.string.not_configured_short)
+        if (result.resultCode == Activity.RESULT_OK) markChanged()
+    }
     private val openXmlTvFile = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { importXmlTv { xmlTvRepository.importDocument(it) } } }
@@ -79,8 +96,12 @@ class DisplaySettingsActivity : AppCompatActivity() {
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
-        buildSettings()
-        content.post { firstFocusableRow()?.requestFocus() }
+        tabs = findViewById(R.id.settings_tabs)
+        selectedPage = SettingsPage.entries.getOrElse(
+            savedInstanceState?.getInt(STATE_PAGE) ?: 0,
+        ) { SettingsPage.APPEARANCE }
+        buildTabs()
+        showPage(selectedPage, moveFocusToTab = true)
     }
 
     private fun configureWindow() {
@@ -97,8 +118,74 @@ class DisplaySettingsActivity : AppCompatActivity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
     }
 
-    private fun buildSettings() {
+    private fun buildTabs() {
+        tabs.removeAllViews()
+        tabViews.clear()
+        SettingsPage.entries.forEachIndexed { index, page ->
+            val tab = TextView(this).apply {
+                id = View.generateViewId()
+                layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply {
+                    if (index > 0) marginStart = dp(5)
+                }
+                background = AppCompatResources.getDrawable(
+                    this@DisplaySettingsActivity,
+                    R.drawable.bg_settings_tab,
+                )
+                gravity = Gravity.CENTER
+                isFocusable = true
+                isClickable = true
+                setText(page.titleRes)
+                setTextColor(getColorStateList(R.color.settings_tab_text))
+                textSize = 14f
+                maxLines = 1
+                setPadding(dp(8), 0, dp(8), 0)
+                setOnClickListener { showPage(page, moveFocusToTab = true) }
+                setOnKeyListener { _, keyCode, event ->
+                    if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                    when (keyCode) {
+                        KeyEvent.KEYCODE_DPAD_LEFT -> true.also {
+                            showPage(page.offset(-1), moveFocusToTab = true)
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> true.also {
+                            showPage(page.offset(1), moveFocusToTab = true)
+                        }
+                        KeyEvent.KEYCODE_DPAD_DOWN -> true.also {
+                            firstContentFocusable?.requestFocus()
+                        }
+                        else -> false
+                    }
+                }
+            }
+            tabViews += tab
+            tabs.addView(tab)
+        }
+    }
+
+    private fun showPage(page: SettingsPage, moveFocusToTab: Boolean) {
+        selectedPage = page
+        tabViews.forEachIndexed { index, tab ->
+            tab.isSelected = index == page.ordinal
+        }
+        buildSettings(page)
+        findViewById<View>(R.id.settings_scroll).scrollTo(0, 0)
+        if (moveFocusToTab) {
+            tabs.post { tabViews.getOrNull(page.ordinal)?.requestFocus() }
+        }
+    }
+
+    private fun buildSettings(page: SettingsPage) {
         content.removeAllViews()
+        firstContentFocusable = null
+        xmlTvSettingRow = null
+        when (page) {
+            SettingsPage.APPEARANCE -> buildAppearanceSettings()
+            SettingsPage.CHANNELS -> buildChannelSettings()
+            SettingsPage.IPTV_EPG -> buildIptvEpgSettings()
+            SettingsPage.SYSTEM -> buildSystemSettings()
+        }
+    }
+
+    private fun buildAppearanceSettings() {
         section(R.string.language_settings)
         val languages = AppLanguage.entries
         choice(
@@ -132,7 +219,9 @@ class DisplaySettingsActivity : AppCompatActivity() {
         number(R.string.info_bar_duration, 0, 15, current.infoBarDurationSeconds, 1, ::durationLabel) {
             update { copy(infoBarDurationSeconds = it) }
         }
+    }
 
+    private fun buildChannelSettings() {
         section(R.string.channel_list)
         choice(
             R.string.channel_panel_position,
@@ -198,6 +287,25 @@ class DisplaySettingsActivity : AppCompatActivity() {
             focusDelays.map(::millisecondsLabel),
             focusDelayIndex,
         ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
+    }
+
+    private fun buildIptvEpgSettings() {
+        section(R.string.source_management)
+        action(R.string.iptv_sources_title, getString(R.string.open_page)) {
+            manageIptvSources.launch(Intent(this, IptvSourcesActivity::class.java))
+        }
+        action(
+            R.string.xmltv_sources_title,
+            xmlTvRepository.sourceLabel() ?: getString(R.string.not_configured_short),
+        ) { row ->
+            xmlTvSettingRow = row
+            manageXmlTvSources.launch(Intent(this, XmlTvSourcesActivity::class.java))
+        }
+        action(
+            R.string.iptv_input_name,
+            getString(R.string.iptv_input_sync),
+            ::syncIptvInput,
+        )
 
         section(R.string.playback_settings)
         val iptvPlaybackPreferences = iptvPlaybackStore.load()
@@ -238,6 +346,10 @@ class DisplaySettingsActivity : AppCompatActivity() {
         toggle(R.string.subtitles_default, current.subtitlesEnabled) {
             update { copy(subtitlesEnabled = it) }
         }
+    }
+
+    private fun buildSystemSettings() {
+        section(R.string.playback_settings)
         val timerValues = listOf(0, 15, 30, 60, 90, 120)
         val remaining = sleepTimerStore.remainingMinutes()
         val timerIndex = if (remaining <= 0) 0 else timerValues.indices.minByOrNull {
@@ -278,18 +390,6 @@ class DisplaySettingsActivity : AppCompatActivity() {
                 update { copy(verboseRemoteKeyLogging = it) }
             }
         }
-        action(
-            R.string.xmltv_alternative_epg,
-            xmlTvRepository.sourceLabel() ?: getString(R.string.not_configured_short),
-        ) { row ->
-            xmlTvSettingRow = row
-            startActivity(Intent(this, XmlTvSourcesActivity::class.java))
-        }
-        action(
-            R.string.iptv_input_name,
-            getString(R.string.iptv_input_sync),
-            ::syncIptvInput,
-        )
         action(R.string.user_guide, getString(R.string.open_page)) {
             startActivity(
                 Intent(this, InformationActivity::class.java)
@@ -331,7 +431,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
             setPadding(dp(8), dp(3), dp(8), dp(7))
         }
         actions.forEach { (titleRes, clicked) ->
-            strip.addView(TextView(this).apply {
+            val actionView = TextView(this).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(190), dp(62)).apply {
                     marginEnd = dp(8)
                 }
@@ -348,7 +448,9 @@ class DisplaySettingsActivity : AppCompatActivity() {
                 maxLines = 2
                 setPadding(dp(12), dp(6), dp(12), dp(6))
                 setOnClickListener { clicked() }
-            })
+            }
+            if (firstContentFocusable == null) firstContentFocusable = actionView
+            strip.addView(actionView)
         }
         content.addView(HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -474,6 +576,7 @@ class DisplaySettingsActivity : AppCompatActivity() {
         row.addView(title)
         row.addView(value)
         content.addView(row)
+        if (firstContentFocusable == null) firstContentFocusable = row
         return SettingRow(row, value)
     }
 
@@ -767,6 +870,8 @@ class DisplaySettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        xmlTvSettingRow?.value?.text = xmlTvRepository.sourceLabel()
+            ?: getString(R.string.not_configured_short)
         val uri = pendingApkUri ?: return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) {
             pendingApkUri = null
@@ -785,9 +890,22 @@ class DisplaySettingsActivity : AppCompatActivity() {
         setResult(Activity.RESULT_OK)
     }
 
-    private fun firstFocusableRow(): View? = (0 until content.childCount)
-        .map(content::getChildAt)
-        .firstOrNull(View::isFocusable)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_UP &&
+            firstContentFocusable?.hasFocus() == true
+        ) {
+            tabViews.getOrNull(selectedPage.ordinal)?.requestFocus()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt(STATE_PAGE, selectedPage.ordinal)
+        super.onSaveInstanceState(outState)
+    }
 
     private fun languageLabel(language: AppLanguage): String = when (language) {
         AppLanguage.SYSTEM -> getString(R.string.system_language)
@@ -819,7 +937,21 @@ class DisplaySettingsActivity : AppCompatActivity() {
 
     private data class SettingRow(val root: LinearLayout, val value: TextView)
 
+    private enum class SettingsPage(@StringRes val titleRes: Int) {
+        APPEARANCE(R.string.settings_tab_appearance),
+        CHANNELS(R.string.settings_tab_channels),
+        IPTV_EPG(R.string.settings_tab_iptv_epg),
+        SYSTEM(R.string.settings_tab_system),
+        ;
+
+        fun offset(direction: Int): SettingsPage {
+            val pages = entries
+            return pages[(ordinal + direction + pages.size) % pages.size]
+        }
+    }
+
     private companion object {
+        const val STATE_PAGE = "settings_page"
         const val OSD_WIDTH_FRACTION = 0.40f
         const val OSD_HEIGHT_FRACTION = 0.94f
         const val OSD_EDGE_GAP_FRACTION = 0.012f

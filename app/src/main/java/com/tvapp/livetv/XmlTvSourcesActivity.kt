@@ -203,6 +203,7 @@ class XmlTvSourcesActivity : AppCompatActivity() {
                         withContext(Dispatchers.IO) {
                             repository.setSourceEnabled(summary.source.id, !summary.source.enabled)
                         }
+                        setResult(RESULT_OK)
                         loadSources()
                     }
                     Action.REFRESH -> runOperation { repository.refreshSource(summary.source) }
@@ -271,6 +272,7 @@ class XmlTvSourcesActivity : AppCompatActivity() {
                     dialog.dismiss()
                     lifecycleScope.launch {
                         withContext(Dispatchers.IO) { repository.renameSource(summary.source.id, name) }
+                        setResult(RESULT_OK)
                         loadSources()
                     }
                 }
@@ -286,6 +288,7 @@ class XmlTvSourcesActivity : AppCompatActivity() {
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) { repository.deleteSource(summary.source.id) }
+                    setResult(RESULT_OK)
                     status.setText(R.string.xmltv_source_deleted)
                     loadSources()
                 }
@@ -299,6 +302,7 @@ class XmlTvSourcesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching { withContext(Dispatchers.IO) { action() } }
                 .onSuccess { count ->
+                    setResult(RESULT_OK)
                     status.text = getString(R.string.xmltv_import_complete, count)
                     loadSources()
                 }
