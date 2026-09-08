@@ -132,4 +132,3 @@ doğrulanır.
   karşılaştırılması
 - OSD refactor'ının görünümü değiştirmeden yapılacağının screenshot tabanıyla sabitlenmesi
 - Catch-up için desteklenecek M3U ve Xtream biçimlerinin örnek kaynaklarla belirlenmesi
-
