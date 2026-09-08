@@ -68,4 +68,3 @@ fun resolveExperienceMode(
     capabilities.hasVendorTuner -> ExperienceMode.HYBRID_TV
     else -> ExperienceMode.IPTV_ONLY_TV
 }
-

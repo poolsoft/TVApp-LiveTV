@@ -72,4 +72,3 @@ class ExperienceModeResolverTest {
         isLowRamDevice = false,
     )
 }
-
