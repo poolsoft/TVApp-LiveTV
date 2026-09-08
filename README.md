@@ -110,6 +110,9 @@ kanalları oluşmaz.
 
 ## Yol haritası
 
+Ayrıntılı performans ve cihaz uyumluluğu planı [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md),
+uygulanabilir görev listesi ise [TASKS.md](TASKS.md) dosyasındadır.
+
 - [x] Vendor TIF keşfi, kanal okuma ve canlı oynatma
 - [x] Room tabanlı özel kanal sırası ve kanal editörü
 - [x] Kumanda odaklı kanal listesi, infobar ve görünüm ayarları
