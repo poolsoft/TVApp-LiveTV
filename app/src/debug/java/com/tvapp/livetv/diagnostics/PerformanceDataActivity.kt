@@ -12,6 +12,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
 import androidx.room.withTransaction
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.tvapp.livetv.R
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.IptvSourceEntity
@@ -31,6 +33,9 @@ class PerformanceDataActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(buildContent())
+        if (getDatabasePath(PERFORMANCE_DATABASE).exists()) {
+            status.setText(R.string.debug_performance_existing_data)
+        }
     }
 
     private fun buildContent() = ScrollView(this).apply {
@@ -54,7 +59,9 @@ class PerformanceDataActivity : AppCompatActivity() {
                         NumberFormat.getIntegerInstance().format(count),
                     ),
                 ) { generate(count) }.also(::addView)
-            } + actionButton(getString(R.string.debug_performance_clear), ::clearData).also(::addView) +
+            } + actionButton(getString(R.string.debug_performance_analyze), ::analyzeQueries)
+                .also(::addView) +
+                actionButton(getString(R.string.debug_performance_clear), ::clearData).also(::addView) +
                 actionButton(getString(R.string.close), ::finish).also(::addView)
         })
     }
@@ -151,6 +158,160 @@ class PerformanceDataActivity : AppCompatActivity() {
         }
     }
 
+    private fun analyzeQueries() {
+        if (!getDatabasePath(PERFORMANCE_DATABASE).exists()) {
+            status.setText(R.string.debug_performance_missing_data)
+            return
+        }
+        setBusy(true)
+        status.setText(R.string.debug_performance_analyzing)
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { runQueryAnalysis() }
+            }
+            setBusy(false)
+            result.onSuccess { analyses ->
+                val warnings = analyses.count { it.hasFullScan }
+                val totalDuration = analyses.sumOf(QueryAnalysis::durationMs)
+                status.text = getString(
+                    R.string.debug_performance_analysis_ready,
+                    analyses.size,
+                    warnings,
+                    totalDuration,
+                )
+                analyses.forEach { analysis ->
+                    debugLog.recordDebug(
+                        "QUERY_PLAN | name=${analysis.name}, durationMs=${analysis.durationMs}, " +
+                            "rows=${analysis.rowCount}, fullScan=${analysis.hasFullScan}, " +
+                            "plan=${analysis.plan.joinToString(" || ")}, " +
+                            "recommendation=${analysis.recommendation ?: "none"}",
+                    )
+                }
+            }.onFailure { error ->
+                status.text = getString(
+                    R.string.debug_performance_failed,
+                    error.message ?: error.javaClass.simpleName,
+                )
+                debugLog.recordDebug(
+                    "QUERY_PLAN_FAILURE | error=${error.javaClass.simpleName}",
+                )
+            }
+        }
+    }
+
+    private suspend fun runQueryAnalysis(): List<QueryAnalysis> {
+        val database = Room.databaseBuilder(
+            applicationContext,
+            TVAppDatabase::class.java,
+            PERFORMANCE_DATABASE,
+        ).build()
+        return try {
+            val sourceId = database.iptvDao().getSources().firstOrNull()?.id
+                ?: error("Performance IPTV source is missing")
+            analyzeCases(database.openHelper.readableDatabase, queryCases(sourceId))
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun analyzeCases(
+        database: SupportSQLiteDatabase,
+        cases: List<QueryCase>,
+    ): List<QueryAnalysis> = cases.map { case ->
+        val startedAt = SystemClock.elapsedRealtime()
+        val rowCount = database.query(SimpleSQLiteQuery(case.sql, case.args)).use { cursor ->
+            var count = 0
+            while (cursor.moveToNext()) count++
+            count
+        }
+        val duration = SystemClock.elapsedRealtime() - startedAt
+        val plan = database.query(
+            SimpleSQLiteQuery("EXPLAIN QUERY PLAN ${case.sql}", case.args),
+        ).use { cursor ->
+            buildList {
+                val detailColumn = cursor.getColumnIndex("detail")
+                while (cursor.moveToNext()) {
+                    add(cursor.getString(if (detailColumn >= 0) detailColumn else 3))
+                }
+            }
+        }
+        QueryAnalysis(
+            name = case.name,
+            durationMs = duration,
+            rowCount = rowCount,
+            plan = plan,
+            hasFullScan = plan.any(::isFullTableScan),
+            recommendation = case.recommendation,
+        )
+    }
+
+    private fun queryCases(sourceId: Long): List<QueryCase> {
+        val now = System.currentTimeMillis()
+        return listOf(
+            QueryCase(
+                "iptv_first_page",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "ORDER BY originalIndex LIMIT 120 OFFSET 0",
+                arrayOf(sourceId),
+            ),
+            QueryCase(
+                "iptv_high_offset",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "ORDER BY originalIndex LIMIT 120 OFFSET 14000",
+                arrayOf(sourceId),
+                "Replace high OFFSET paging with sourceId/originalIndex keyset paging.",
+            ),
+            QueryCase(
+                "iptv_live_category",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "AND contentType = 'LIVE' AND groupTitle = ? " +
+                    "ORDER BY originalIndex LIMIT 120",
+                arrayOf(sourceId, "Category 11"),
+            ),
+            QueryCase(
+                "iptv_selected",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? AND selected = 1 " +
+                    "ORDER BY originalIndex LIMIT 120",
+                arrayOf(sourceId),
+                "Add (sourceId, selected, originalIndex) when this route moves to projection paging.",
+            ),
+            QueryCase(
+                "iptv_search",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "AND (displayName LIKE ? COLLATE NOCASE OR groupTitle LIKE ? COLLATE NOCASE) " +
+                    "ORDER BY originalIndex LIMIT 120",
+                arrayOf(sourceId, "%Channel 149%", "%Channel 149%"),
+                "Leading-wildcard LIKE scans the source range; replace with Room FTS.",
+            ),
+            QueryCase(
+                "iptv_categories",
+                "SELECT DISTINCT TRIM(groupTitle) FROM iptv_channels WHERE sourceId = ? " +
+                    "AND groupTitle IS NOT NULL AND TRIM(groupTitle) != '' " +
+                    "ORDER BY TRIM(groupTitle) COLLATE NOCASE",
+                arrayOf(sourceId),
+                "Store normalized categories or index (sourceId, groupTitle) to avoid temporary B-trees.",
+            ),
+            QueryCase(
+                "xmltv_current_program",
+                "SELECT * FROM xmltv_programs WHERE sourceId IN " +
+                    "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+                    "AND startTimeMillis <= ? AND endTimeMillis > ? " +
+                    "AND (normalizedChannelId = ? OR normalizedChannelName = ?)",
+                arrayOf(now, now, "perf149", "performancechannel149"),
+            ),
+        )
+    }
+
+    private fun isFullTableScan(detail: String): Boolean {
+        val normalized = detail.uppercase()
+        val scansLargeTable = "SCAN TABLE IPTV_CHANNELS" in normalized ||
+            "SCAN IPTV_CHANNELS" in normalized ||
+            "SCAN TABLE XMLTV_PROGRAMS" in normalized ||
+            "SCAN XMLTV_PROGRAMS" in normalized
+        return scansLargeTable && "USING INDEX" !in normalized &&
+            "USING COVERING INDEX" !in normalized
+    }
+
     private fun iptvChannel(sourceId: Long, index: Int, now: Long) = IptvChannelEntity(
         sourceKey = "debug:performance:$index",
         sourceId = sourceId,
@@ -205,6 +366,22 @@ class PerformanceDataActivity : AppCompatActivity() {
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private data class QueryCase(
+        val name: String,
+        val sql: String,
+        val args: Array<out Any?>,
+        val recommendation: String? = null,
+    )
+
+    private data class QueryAnalysis(
+        val name: String,
+        val durationMs: Long,
+        val rowCount: Int,
+        val plan: List<String>,
+        val hasFullScan: Boolean,
+        val recommendation: String?,
+    )
 
     private companion object {
         const val PERFORMANCE_DATABASE = "tv-app-performance.db"

@@ -10,6 +10,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Debug araçlarına gerçek kullanıcı veritabanından tamamen ayrı çalışan performans veri üreticisi eklendi.
 * Emülatör ve fiziksel cihazlarda aynı şekilde tekrarlanabilen 500, 15.000 ve 50.000 IPTV kanalı ile XMLTV programı senaryoları eklendi.
 * Büyük veri setleri bellekte topluca kurulmadan 500 kayıtlık parçalarla yazılıyor; üretim süresi debug loguna kaydediliyor ve test verisi tek eylemle güvenle temizlenebiliyor.
+* İlk/yüksek offset sayfaları, kategori, seçili kanal, arama, kategori listesi ve XMLTV now/next sorguları gerçek süreleriyle çalıştırılıp `EXPLAIN QUERY PLAN` çıktıları ve tam tarama uyarıları debug loguna yazılıyor.
+* İlk 15.000 kayıtlık sorgu envanteri ve keyset paging, seçili kanal composite indeksi, FTS ile normalize kategori önerileri `PERFORMANCE_QUERY_REPORT.md` içinde kaydedildi.
 
 ### Cihaz yetenekleri ve IPTV-only çalışma
 * Uygulama artık yalnız `FEATURE_LIVE_TV` değerine güvenmiyor; kullanılabilir sistem/vendor tuner girişlerini ölçerek Hibrit TV, IPTV-only TV veya Mobil Test çalışma modunu seçiyor.

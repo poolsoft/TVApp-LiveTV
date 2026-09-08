@@ -22,4 +22,9 @@
     <string name="debug_performance_failed">Oluşturulamadı: %1$s</string>
     <string name="debug_performance_clear">Test verisini temizle</string>
     <string name="debug_performance_cleared">Ayrı performans veritabanı temizlendi.</string>
+    <string name="debug_performance_analyze">Sorgu planlarını analiz et</string>
+    <string name="debug_performance_analyzing">DAO sorguları ve indeks kullanımı analiz ediliyor…</string>
+    <string name="debug_performance_missing_data">Önce bir performans veri seti oluşturun.</string>
+    <string name="debug_performance_analysis_ready">%1$d sorgu ölçüldü · %2$d tam tarama uyarısı · toplam %3$d ms. Ayrıntılar debug logunda.</string>
+    <string name="debug_performance_existing_data">Mevcut performans veritabanı hazır. Yeniden oluşturabilir, analiz edebilir veya temizleyebilirsiniz.</string>
 </resources>

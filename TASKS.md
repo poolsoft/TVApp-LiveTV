@@ -55,7 +55,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic DATA - Büyük katalog ve veritabanı
 
-- [ ] **DATA-001 (P0): Sorgu envanteri ve query planı**
+- [x] **DATA-001 (P0): Sorgu envanteri ve query planı**
   IPTV/EPG DAO sorgularını `EXPLAIN QUERY PLAN` ile 15.000 ve 50.000 kayıtta ölç.
   **Kabul:** Tam tarama yapan ekran sorguları ve gerekli composite indeksler raporlanır.
 

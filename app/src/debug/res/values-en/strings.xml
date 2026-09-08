@@ -22,4 +22,9 @@
     <string name="debug_performance_failed">Generation failed: %1$s</string>
     <string name="debug_performance_clear">Clear test data</string>
     <string name="debug_performance_cleared">The separate performance database was cleared.</string>
+    <string name="debug_performance_analyze">Analyze query plans</string>
+    <string name="debug_performance_analyzing">Analyzing DAO queries and index usage…</string>
+    <string name="debug_performance_missing_data">Generate a performance data set first.</string>
+    <string name="debug_performance_analysis_ready">Measured %1$d queries · %2$d full-scan warnings · %3$d ms total. Details are in the debug log.</string>
+    <string name="debug_performance_existing_data">An existing performance database is ready. You can regenerate, analyze, or clear it.</string>
 </resources>
