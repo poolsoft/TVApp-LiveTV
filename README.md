@@ -188,6 +188,17 @@ Uygulama içi denetim, build numarası aynı fakat kurulu APK'nın SHA-256 özet
 farklıysa son development release'ini aynı sürüm koduyla yeniden kurmayı önerir. Güncelleme
 revizyonu `version.json` içinde ayrıca tutulur; Android sürüm koduna dönüştürülmez.
 
+### Google TV emülatörü
+
+`TVApp_GoogleTV_API31` AVD'si 1920x1080 Google TV API 31, D-pad ve isteğe bağlı fare girişiyle
+arayüz/fokus testlerinde kullanılabilir. Emülatör çalışırken `tools/TVAppRemote.cmd` dosyası
+masaüstü kumanda panelini açar. Panel; renk, medya, TV, kanal, sayı ve gezinme tuşlarını ADB
+üzerinden gönderir. `Sonraki tusa uzun bas` seçeneği bağlamsal menüleri sınamak içindir.
+
+Panel odaktayken yön tuşları, Enter ve Esc gezinme kumandasıdır; F5-F8 sırasıyla kırmızı,
+yeşil, sarı ve mavi; PageUp/PageDown ise CH+/CH- gönderir. Emülatör vendor MediaTek tuner
+sağlamadığı için TIF/DVB sinyal ve track callback testleri gerçek Google TV cihazında yapılır.
+
 ## GitHub Actions ve uygulama içi güncelleme
 
 `.github/workflows/release.yml`, `main` dalındaki kod değişikliklerinde veya elle

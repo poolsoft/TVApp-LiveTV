@@ -131,10 +131,10 @@
     <string name="display_short">Display</string>
     <string name="display_settings">Display and info bar</string>
     <string name="settings_title">TV settings</string>
-    <string name="settings_remote_hint">Tabs: Left/Right - Content: Up/Down - Value: Left/Right or OK</string>
+    <string name="settings_remote_hint">Tabs: ◀/▶ · Rows: ▲/▼ · Value: ◀/▶ or OK</string>
     <string name="settings_tab_appearance">Appearance</string>
     <string name="settings_tab_channels">Channels</string>
-    <string name="settings_tab_iptv_epg">IPTV &amp; EPG</string>
+    <string name="settings_tab_iptv_epg">IPTV/EPG</string>
     <string name="settings_tab_system">System</string>
     <string name="on">On</string>
     <string name="seconds_value">%1$d seconds</string>

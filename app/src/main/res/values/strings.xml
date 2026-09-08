@@ -131,10 +131,10 @@
     <string name="display_short">Ekran</string>
     <string name="display_settings">Ekran ve bilgi çubuğu</string>
     <string name="settings_title">TV ayarları</string>
-    <string name="settings_remote_hint">Sekmeler: Sol/Sağ · İçerik: Yukarı/Aşağı · Değer: Sol/Sağ veya OK</string>
+    <string name="settings_remote_hint">Sekmeler: ◀/▶ · Satırlar: ▲/▼ · Değer: ◀/▶ veya OK</string>
     <string name="settings_tab_appearance">Görünüm</string>
     <string name="settings_tab_channels">Kanallar</string>
-    <string name="settings_tab_iptv_epg">IPTV ve EPG</string>
+    <string name="settings_tab_iptv_epg">IPTV/EPG</string>
     <string name="settings_tab_system">Sistem</string>
     <string name="on">Açık</string>
     <string name="seconds_value">%1$d saniye</string>

@@ -136,9 +136,9 @@ class DisplaySettingsActivity : AppCompatActivity() {
                 isClickable = true
                 setText(page.titleRes)
                 setTextColor(getColorStateList(R.color.settings_tab_text))
-                textSize = 14f
+                textSize = 12.5f
                 maxLines = 1
-                setPadding(dp(8), 0, dp(8), 0)
+                setPadding(dp(4), 0, dp(4), 0)
                 setOnClickListener { showPage(page, moveFocusToTab = true) }
                 setOnKeyListener { _, keyCode, event ->
                     if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
