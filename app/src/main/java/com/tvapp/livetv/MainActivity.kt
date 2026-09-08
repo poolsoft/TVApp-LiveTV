@@ -192,6 +192,8 @@ class MainActivity : TvRemoteActivity() {
     private var yellowLongPressHandled = false
     private var settingsLongPressJob: Job? = null
     private var settingsLongPressHandled = false
+    private var lastChannelLongPressJob: Job? = null
+    private var lastChannelLongPressHandled = false
     private var gridReturnChannel: LiveChannel? = null
     private var gridChannels: List<LiveChannel> = emptyList()
     private val gridSelectedKeys = mutableListOf<String>()
@@ -4740,6 +4742,22 @@ class MainActivity : TvRemoteActivity() {
             }
             return super.dispatchKeyEvent(event)
         }
+        if (event.keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                lastChannelLongPressHandled = false
+                lastChannelLongPressJob?.cancel()
+                lastChannelLongPressJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    lastChannelLongPressHandled = true
+                    showRecentChannels()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                lastChannelLongPressJob?.cancel()
+                if (!lastChannelLongPressHandled) openPreviousChannel()
+                lastChannelLongPressHandled = false
+            }
+            return true
+        }
         val isIptvMediaKey = event.keyCode in setOf(
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY,
@@ -4909,7 +4927,6 @@ class MainActivity : TvRemoteActivity() {
                 KeyEvent.KEYCODE_BACK -> handleBackNavigation()
                 KeyEvent.KEYCODE_CHANNEL_UP -> zap(1)
                 KeyEvent.KEYCODE_CHANNEL_DOWN -> zap(-1)
-                KeyEvent.KEYCODE_LAST_CHANNEL -> openPreviousChannel()
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER -> if (numberInput.isNotEmpty()) {
                     commitChannelNumber()
@@ -4938,9 +4955,10 @@ class MainActivity : TvRemoteActivity() {
                 } else {
                     return super.dispatchKeyEvent(event)
                 }
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.channelPanel.visibility != View.VISIBLE) {
-                    openPreviousChannel()
-                } else if (binding.channelList.hasFocus()) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (
+                    binding.channelPanel.visibility == View.VISIBLE &&
+                    binding.channelList.hasFocus()
+                ) {
                     pageChannelList(-1)
                 } else {
                     return super.dispatchKeyEvent(event)
