@@ -14,4 +14,12 @@
     <string name="debug_state_purchase_restored">Purchase already owned / restored</string>
     <string name="debug_state_normal">Disable simulation</string>
     <string name="debug_test_access">Test access prompt</string>
+    <string name="debug_performance_title">Performance test data</string>
+    <string name="debug_performance_warning">Debug builds only. Uses a separate test database without touching real channel or EPG data.</string>
+    <string name="debug_performance_generate">Generate %1$s records</string>
+    <string name="debug_performance_generating">Generating %1$s IPTV channels and XMLTV programmes…</string>
+    <string name="debug_performance_ready">Ready: %1$s IPTV channels + %2$s XMLTV programmes in %3$d ms</string>
+    <string name="debug_performance_failed">Generation failed: %1$s</string>
+    <string name="debug_performance_clear">Clear test data</string>
+    <string name="debug_performance_cleared">The separate performance database was cleared.</string>
 </resources>

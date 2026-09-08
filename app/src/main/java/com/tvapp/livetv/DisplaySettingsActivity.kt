@@ -375,6 +375,12 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                         })
                     }
                     if (BuildConfig.DEBUG) {
+                        add(R.string.performance_test_data to {
+                            startActivity(
+                                Intent("com.tvapp.livetv.DEBUG_PERFORMANCE_DATA")
+                                    .setPackage(packageName),
+                            )
+                        })
                         add(R.string.billing_test_scenarios to {
                             startActivity(
                                 Intent("com.tvapp.livetv.DEBUG_ENTITLEMENT").setPackage(packageName),

@@ -10,6 +10,7 @@
     <string name="epg_diagnostics_success">ÇALIŞTI</string>
     <string name="epg_diagnostics_failure">HATA</string>
     <string name="debug_tools">Debug araçları</string>
+    <string name="performance_test_data">Performans test verisi</string>
     <string name="system_information_channel">Sistem bilgileri · %1$s</string>
     <string name="system_info_source">Kaynak</string>
     <string name="system_info_channel_id">Kanal kimliği</string>

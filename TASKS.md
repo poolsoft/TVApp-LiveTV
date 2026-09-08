@@ -10,7 +10,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   yapılandırılmış biçimde yaz. Release'te hassas URL veya kimlik kaydetme.
   **Kabul:** Her işlemde süre, kayıt sayısı ve cihaz çalışma modu görülebilir.
 
-- [ ] **PERF-002 (P0): Büyük veri test üreticisi**
+- [x] **PERF-002 (P0): Büyük veri test üreticisi**
   0/500/15.000/50.000 IPTV kaydı ve büyük XMLTV verisi üreten debug-only araç ekle.
   Üretim veritabanını kullanma; test verisi açıkça ayrı tutulmalı ve güvenle temizlenebilmelidir.
   **Kabul:** Aynı veri seti emülatör ve cihaz testlerinde tekrar üretilebilir.

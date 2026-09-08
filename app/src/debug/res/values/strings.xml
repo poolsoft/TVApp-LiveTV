@@ -14,4 +14,12 @@
     <string name="debug_state_purchase_restored">Satın alma zaten var / geri yüklendi</string>
     <string name="debug_state_normal">Simülasyonu kapat</string>
     <string name="debug_test_access">Erişim ekranını dene</string>
+    <string name="debug_performance_title">Performans test verisi</string>
+    <string name="debug_performance_warning">Yalnız debug sürümündedir. Gerçek kanal ve EPG verilerine dokunmadan ayrı bir test veritabanı kullanır.</string>
+    <string name="debug_performance_generate">%1$s kayıt oluştur</string>
+    <string name="debug_performance_generating">%1$s IPTV kanalı ve XMLTV programı oluşturuluyor…</string>
+    <string name="debug_performance_ready">Hazır: %1$s IPTV kanalı + %2$s XMLTV programı, %3$d ms</string>
+    <string name="debug_performance_failed">Oluşturulamadı: %1$s</string>
+    <string name="debug_performance_clear">Test verisini temizle</string>
+    <string name="debug_performance_cleared">Ayrı performans veritabanı temizlendi.</string>
 </resources>

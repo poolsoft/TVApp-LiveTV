@@ -14,5 +14,14 @@
             android:name=".EpgDiagnosticsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
+        <activity
+            android:name=".diagnostics.PerformanceDataActivity"
+            android:exported="false"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="com.tvapp.livetv.DEBUG_PERFORMANCE_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

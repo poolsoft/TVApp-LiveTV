@@ -10,6 +10,7 @@
     <string name="epg_diagnostics_success">WORKED</string>
     <string name="epg_diagnostics_failure">ERROR</string>
     <string name="debug_tools">Debug tools</string>
+    <string name="performance_test_data">Performance test data</string>
     <string name="system_information_channel">System information · %1$s</string>
     <string name="system_info_source">Source</string>
     <string name="system_info_channel_id">Channel ID</string>
