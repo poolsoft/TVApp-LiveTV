@@ -83,9 +83,6 @@ class IptvRepository(context: Context) {
         notifySharedChannelsChanged()
     }
 
-    suspend fun sourceChannels(sourceId: Long): List<IptvChannelEntity> =
-        dao.getChannelsForSource(sourceId)
-
     suspend fun sourceCategories(sourceId: Long): List<String> =
         dao.getCategoriesForSource(sourceId)
 
@@ -247,22 +244,12 @@ class IptvRepository(context: Context) {
         contentType: String,
     ): Int = dao.libraryCount(sourceId, category, contentType)
 
-    suspend fun libraryChannels(sourceId: Long?): List<IptvChannelEntity> =
-        sourceId?.let { dao.getChannelsForSource(it) } ?: dao.getAllEnabledLibraryChannels()
-
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
 
     suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> =
         dao.getAlternativeChannels(sourceKey)
             .distinctBy(IptvChannelEntity::streamUrl)
             .map { it.toLiveChannel() }
-
-    suspend fun libraryLiveChannels(sourceId: Long?, category: String?): List<LiveChannel> =
-        libraryChannels(sourceId)
-            .asSequence()
-            .filter { category == null || it.groupTitle?.trim() == category }
-            .map { it.toLiveChannel() }
-            .toList()
 
     suspend fun setSelectedChannels(sourceId: Long, sourceKeys: Set<String>) {
         database.withTransaction {
@@ -400,7 +387,7 @@ class IptvRepository(context: Context) {
             username = username.trim(),
             password = password,
             replacementSource = replacementSource,
-        ) { client.channels() }
+        ) { client.channels().asIterable() }
         xmlTvRepository.ensurePeriodicRefresh()
         xmlTvRepository.requestXtreamRefresh(force = true)
         return result
@@ -421,7 +408,7 @@ class IptvRepository(context: Context) {
             serverUrl = client.endpoint,
             macAddress = normalizedMac,
             replacementSource = replacementSource,
-        ) { client.channels() }
+        ) { client.channels().asIterable() }
     }
 
     suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {

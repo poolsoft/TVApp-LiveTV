@@ -12,7 +12,7 @@ class IptvInputChannelSyncRepository(context: Context) {
     private val appContext = context.applicationContext
 
     fun sync(inputId: String): IptvInputSyncResult {
-        val desired = TVAppDatabase.getInstance(appContext).iptvDao().getSharedChannels()
+        val dao = TVAppDatabase.getInstance(appContext).iptvDao()
         val resolver = appContext.contentResolver
         val existing = mutableMapOf<String, Long>()
         resolver.query(
@@ -33,37 +33,45 @@ class IptvInputChannelSyncRepository(context: Context) {
             }
         }
 
-        desired.forEachIndexed { index, channel ->
-            val values = ContentValues().apply {
-                put(TvContract.Channels.COLUMN_INPUT_ID, inputId)
-                put(TvContract.Channels.COLUMN_DISPLAY_NUMBER, (index + 1).toString())
-                put(TvContract.Channels.COLUMN_DISPLAY_NAME, channel.displayName)
-                put(TvContract.Channels.COLUMN_TYPE, TvContract.Channels.TYPE_OTHER)
-                put(
-                    TvContract.Channels.COLUMN_SERVICE_TYPE,
-                    TvContract.Channels.SERVICE_TYPE_AUDIO_VIDEO,
-                )
-                put(TvContract.Channels.COLUMN_SEARCHABLE, 1)
-                put(
-                    TvContract.Channels.COLUMN_INTERNAL_PROVIDER_ID,
-                    IptvInputChannelMetadata.PROVIDER_ID_PREFIX + channel.sourceKey,
-                )
-                put(
-                    TvContract.Channels.COLUMN_INTERNAL_PROVIDER_DATA,
-                    IptvInputChannelMetadata.from(channel).encode(),
-                )
+        var synced = 0
+        var offset = 0
+        while (true) {
+            val page = dao.getSharedChannelsPage(SYNC_PAGE_SIZE, offset)
+            if (page.isEmpty()) break
+            page.forEach { channel ->
+                val values = ContentValues().apply {
+                    put(TvContract.Channels.COLUMN_INPUT_ID, inputId)
+                    put(TvContract.Channels.COLUMN_DISPLAY_NUMBER, (synced + 1).toString())
+                    put(TvContract.Channels.COLUMN_DISPLAY_NAME, channel.displayName)
+                    put(TvContract.Channels.COLUMN_TYPE, TvContract.Channels.TYPE_OTHER)
+                    put(
+                        TvContract.Channels.COLUMN_SERVICE_TYPE,
+                        TvContract.Channels.SERVICE_TYPE_AUDIO_VIDEO,
+                    )
+                    put(TvContract.Channels.COLUMN_SEARCHABLE, 1)
+                    put(
+                        TvContract.Channels.COLUMN_INTERNAL_PROVIDER_ID,
+                        IptvInputChannelMetadata.PROVIDER_ID_PREFIX + channel.sourceKey,
+                    )
+                    put(
+                        TvContract.Channels.COLUMN_INTERNAL_PROVIDER_DATA,
+                        IptvInputChannelMetadata.from(channel).encode(),
+                    )
+                }
+                val channelId = existing.remove(channel.sourceKey)
+                if (channelId == null) {
+                    resolver.insert(TvContract.Channels.CONTENT_URI, values)
+                } else {
+                    resolver.update(
+                        ContentUris.withAppendedId(TvContract.Channels.CONTENT_URI, channelId),
+                        values,
+                        null,
+                        null,
+                    )
+                }
+                synced++
             }
-            val channelId = existing.remove(channel.sourceKey)
-            if (channelId == null) {
-                resolver.insert(TvContract.Channels.CONTENT_URI, values)
-            } else {
-                resolver.update(
-                    ContentUris.withAppendedId(TvContract.Channels.CONTENT_URI, channelId),
-                    values,
-                    null,
-                    null,
-                )
-            }
+            offset += page.size
         }
         existing.values.forEach { channelId ->
             resolver.delete(
@@ -72,6 +80,10 @@ class IptvInputChannelSyncRepository(context: Context) {
                 null,
             )
         }
-        return IptvInputSyncResult(desired.size, existing.size)
+        return IptvInputSyncResult(synced, existing.size)
+    }
+
+    private companion object {
+        const val SYNC_PAGE_SIZE = 500
     }
 }

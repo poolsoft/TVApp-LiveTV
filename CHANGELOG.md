@@ -7,6 +7,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Büyük veri performans testi
+* IPTV yedek dışa/içe aktarma, tüm kataloğu tek bir `JSONObject`, `ByteArray` veya liste halinde belleğe almak yerine akışlı JSON ve 500 satırlık Room parçalarıyla çalışıyor. İçe aktarma önce dosyanın tamamını doğruluyor; veritabanı değişiklikleri tek transaction içinde yapıldığı için bozuk veya yarım dosya mevcut veriyi silmiyor.
+* Xtream Codes ve Stalker Portal kanal katalogları ağ yanıtından akışlı ayrıştırılıyor; 15.000+ kayıtta dev JSON dizisi ve kanal listesi bellekte tutulmuyor.
+* TVApp TIF kanal yayını seçili IPTV kanallarını 500 satırlık sayfalarla işliyor. Kullanılmayan tam katalog DAO/repository yolları kaldırıldı; TIF ve XMLTV/EPG veri yolları kaynak ayrımı korunarak devam ediyor.
 * M3U/M3U8, Xtream ve Stalker kaynak yenilemeleri kalıcı staging tablo + atomik diff modeline geçirildi. Yeni katalog tamamen ayrıştırılıp doğrulanmadan çalışan kaynak değişmiyor; hata veya iptalde eski kanal listesi korunuyor.
 * Yenileme yalnız eklenen, değişen ve kaldırılan IPTV kayıtlarını işler. Değişmeyen satırlar ile FTS kayıtları yeniden yazılmaz; kanal seçimi ve Room'daki özel sıra, ad ve EPG override bilgileri kararlı kanal kimliği üzerinden korunur.
 * Dosya, Xtream ve Stalker kaynaklarının Yenile işlemi artık mevcut kaynak kimliğini açıkça kullanıyor; yarım kalan staging oturumları otomatik temizleniyor.

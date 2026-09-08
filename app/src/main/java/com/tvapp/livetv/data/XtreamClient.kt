@@ -37,11 +37,11 @@ internal class XtreamClient(
         }
     }
 
-    fun channels(): List<ParsedIptvChannel> = buildList {
+    fun channels(): Sequence<ParsedIptvChannel> = sequence {
         val liveCategories = categories("get_live_categories")
-        readStreams("get_live_streams") { item ->
-            val id = item.id ?: return@readStreams
-            add(
+        for (item in streams("get_live_streams")) {
+            val id = item.id ?: continue
+            yield(
                 ParsedIptvChannel(
                     name = item.name.ifBlank { "Kanal $id" },
                     streamUrl = "$baseUrl/live/${encodePath(username)}/${encodePath(password)}/$id.ts",
@@ -55,10 +55,10 @@ internal class XtreamClient(
         }
 
         val vodCategories = categories("get_vod_categories")
-        readStreams("get_vod_streams") { item ->
-            val id = item.id ?: return@readStreams
+        for (item in streams("get_vod_streams")) {
+            val id = item.id ?: continue
             val extension = item.extension?.trim()?.trimStart('.')?.takeIf(String::isNotBlank) ?: "mp4"
-            add(
+            yield(
                 ParsedIptvChannel(
                     name = item.name.ifBlank { "Film $id" },
                     streamUrl = "$baseUrl/movie/${encodePath(username)}/${encodePath(password)}/$id.$extension",
@@ -96,7 +96,7 @@ internal class XtreamClient(
         return result
     }
 
-    private fun readStreams(action: String, emit: (StreamItem) -> Unit) {
+    private fun streams(action: String): Sequence<StreamItem> = sequence {
         open(action).useConnection { connection ->
             JsonReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { reader ->
                 reader.beginArray()
@@ -120,7 +120,7 @@ internal class XtreamClient(
                         }
                     }
                     reader.endObject()
-                    emit(StreamItem(id, name, icon, categoryId, epgId, extension))
+                    yield(StreamItem(id, name, icon, categoryId, epgId, extension))
                 }
                 reader.endArray()
             }

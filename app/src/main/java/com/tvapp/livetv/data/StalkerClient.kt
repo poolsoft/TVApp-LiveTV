@@ -1,7 +1,10 @@
 package com.tvapp.livetv.data
 
+import android.util.JsonReader
+import android.util.JsonToken
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -12,28 +15,93 @@ internal class StalkerClient(
 ) {
     val endpoint = normalizeEndpoint(portalUrl)
 
-    fun channels(): List<ParsedIptvChannel> = buildList {
+    fun channels(): Sequence<ParsedIptvChannel> = sequence {
         val token = handshake()
         runCatching { request(token, "stb", "get_profile") }
         val genres = responseArray(request(token, "itv", "get_genres"))
             .associate { item -> item.optString("id") to item.optString("title") }
-        val channels = responseArray(request(token, "itv", "get_all_channels"))
-        for ((index, item) in channels.withIndex()) {
-            val cmd = item.optString("cmd").removePrefix("ffmpeg ").trim()
+        for ((index, item) in channelItems(token).withIndex()) {
+            val cmd = item.cmd.removePrefix("ffmpeg ").trim()
             if (cmd.isBlank()) continue
-            val id = item.optString("id", index.toString())
-            add(
+            val id = item.id.ifBlank { index.toString() }
+            yield(
                 ParsedIptvChannel(
-                    name = item.optString("name").ifBlank { "Kanal $id" },
+                    name = item.name.ifBlank { "Kanal $id" },
                     streamUrl = StalkerStreamUri.create(endpoint, macAddress, cmd),
-                    tvgId = item.optString("xmltv_id").takeIf(String::isNotBlank),
-                    tvgName = item.optString("name").takeIf(String::isNotBlank),
-                    logoUrl = item.optString("logo").takeIf(String::isNotBlank),
-                    groupTitle = genres[item.optString("tv_genre_id")],
+                    tvgId = item.xmlTvId.takeIf(String::isNotBlank),
+                    tvgName = item.name.takeIf(String::isNotBlank),
+                    logoUrl = item.logo.takeIf(String::isNotBlank),
+                    groupTitle = genres[item.genreId],
                     contentType = "LIVE",
                 ),
             )
         }
+    }
+
+    private fun channelItems(token: String): Sequence<ChannelItem> = sequence {
+        val connection = open(token, "itv", "get_all_channels")
+        try {
+            connection.connect()
+            check(connection.responseCode in 200..299) {
+                "Stalker HTTP ${connection.responseCode} ${connection.responseMessage}"
+            }
+            JsonReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { reader ->
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    if (reader.nextName() == "js") {
+                        when (reader.peek()) {
+                            JsonToken.BEGIN_ARRAY -> reader.readChannelArray { yield(it) }
+                            JsonToken.BEGIN_OBJECT -> {
+                                reader.beginObject()
+                                while (reader.hasNext()) {
+                                    if (reader.nextName() == "data" &&
+                                        reader.peek() == JsonToken.BEGIN_ARRAY
+                                    ) {
+                                        reader.readChannelArray { yield(it) }
+                                    } else {
+                                        reader.skipValue()
+                                    }
+                                }
+                                reader.endObject()
+                            }
+                            else -> reader.skipValue()
+                        }
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                reader.endObject()
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private inline fun JsonReader.readChannelArray(emit: (ChannelItem) -> Unit) {
+        beginArray()
+        while (hasNext()) {
+            var id = ""
+            var name = ""
+            var cmd = ""
+            var xmlTvId = ""
+            var logo = ""
+            var genreId = ""
+            beginObject()
+            while (hasNext()) {
+                when (nextName()) {
+                    "id" -> id = scalarString().orEmpty()
+                    "name" -> name = scalarString().orEmpty()
+                    "cmd" -> cmd = scalarString().orEmpty()
+                    "xmltv_id" -> xmlTvId = scalarString().orEmpty()
+                    "logo" -> logo = scalarString().orEmpty()
+                    "tv_genre_id" -> genreId = scalarString().orEmpty()
+                    else -> skipValue()
+                }
+            }
+            endObject()
+            emit(ChannelItem(id, name, cmd, xmlTvId, logo, genreId))
+        }
+        endArray()
     }
 
     fun resolve(cmd: String): String {
@@ -69,6 +137,25 @@ internal class StalkerClient(
         action: String,
         extras: Map<String, String> = emptyMap(),
     ): JSONObject {
+        val connection = open(token, type, action, extras)
+        return try {
+            connection.connect()
+            check(connection.responseCode in 200..299) {
+                "Stalker HTTP ${connection.responseCode} ${connection.responseMessage}"
+            }
+            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            JSONObject(body)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun open(
+        token: String?,
+        type: String,
+        action: String,
+        extras: Map<String, String> = emptyMap(),
+    ): HttpURLConnection {
         val parameters = linkedMapOf("type" to type, "action" to action).apply {
             putAll(extras)
             put("JsHttpRequest", "1-xml")
@@ -82,17 +169,24 @@ internal class StalkerClient(
         connection.setRequestProperty("X-User-Agent", "Model: MAG254; Link: Ethernet")
         connection.setRequestProperty("Cookie", "mac=${encode(macAddress)}; stb_lang=en; timezone=UTC")
         token?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
-        return try {
-            connection.connect()
-            check(connection.responseCode in 200..299) {
-                "Stalker HTTP ${connection.responseCode} ${connection.responseMessage}"
-            }
-            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            JSONObject(body)
-        } finally {
-            connection.disconnect()
-        }
+        return connection
     }
+
+    private fun JsonReader.scalarString(): String? = when (peek()) {
+        JsonToken.NULL -> { nextNull(); null }
+        JsonToken.STRING, JsonToken.NUMBER -> nextString()
+        JsonToken.BOOLEAN -> nextBoolean().toString()
+        else -> { skipValue(); null }
+    }
+
+    private data class ChannelItem(
+        val id: String,
+        val name: String,
+        val cmd: String,
+        val xmlTvId: String,
+        val logo: String,
+        val genreId: String,
+    )
 
     private fun responseArray(response: JSONObject): List<JSONObject> {
         val js = response.opt("js")

@@ -77,7 +77,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   bilgilerini koru.
   **Kabul:** Başarısız yenileme çalışan eski listeyi silmez; işlem iptal edilebilir.
 
-- [ ] **DATA-006 (P1): Ağır toplu metotları sınırla**
+- [x] **DATA-006 (P1): Ağır toplu metotları sınırla**
   `libraryChannels(null)`, `getAllEnabledLibraryChannels` ve benzeri tam katalog rotalarını UI
   kullanımından çıkar; yedeklemede akış/chunk kullan.
   **Kabul:** Heap içinde 15.000 satırlık katalog listesi tutulmaz.

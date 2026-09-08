@@ -21,9 +21,10 @@ interface IptvDao {
             "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
             "LEFT JOIN user_channels u ON u.sourceKey = c.sourceKey " +
             "WHERE s.enabled = 1 AND c.selected = 1 AND COALESCE(u.hidden, 0) = 0 " +
-            "ORDER BY COALESCE(u.sortOrder, 2147483647), s.name, c.originalIndex",
+            "ORDER BY COALESCE(u.sortOrder, 2147483647), s.name, c.originalIndex " +
+            "LIMIT :limit OFFSET :offset",
     )
-    fun getSharedChannels(): List<SharedIptvInputChannel>
+    fun getSharedChannelsPage(limit: Int, offset: Int): List<SharedIptvInputChannel>
 
     @Query("SELECT * FROM iptv_sources ORDER BY name")
     suspend fun getSources(): List<IptvSourceEntity>
@@ -52,11 +53,21 @@ interface IptvDao {
     @Query("SELECT COUNT(*) FROM iptv_channels WHERE sourceId = :sourceId AND selected = 1")
     suspend fun selectedChannelCount(sourceId: Long): Int
 
-    @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId ORDER BY originalIndex")
-    suspend fun getChannelsForSource(sourceId: Long): List<IptvChannelEntity>
-
     @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId AND selected = 1")
     suspend fun getSelectedChannelsForSource(sourceId: Long): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels WHERE sourceId = :sourceId AND " +
+            "(originalIndex > :anchorIndex OR " +
+            "(originalIndex = :anchorIndex AND sourceKey > :anchorKey)) " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit",
+    )
+    suspend fun getBackupPageAfter(
+        sourceId: Long,
+        anchorIndex: Int,
+        anchorKey: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
 
     @Query(
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
@@ -302,13 +313,6 @@ interface IptvDao {
             "AND TRIM(groupTitle) != '' ORDER BY TRIM(groupTitle) COLLATE NOCASE",
     )
     suspend fun getCategoriesForSource(sourceId: Long): List<String>
-
-    @Query(
-        "SELECT c.* FROM iptv_channels c " +
-            "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
-            "WHERE s.enabled = 1 ORDER BY s.name, c.originalIndex",
-    )
-    suspend fun getAllEnabledLibraryChannels(): List<IptvChannelEntity>
 
     @Query("SELECT * FROM iptv_channels WHERE sourceKey = :sourceKey LIMIT 1")
     suspend fun getChannel(sourceKey: String): IptvChannelEntity?
