@@ -47,6 +47,8 @@ class ProgramGuideActivity : AppCompatActivity() {
     private var focusedChannel: LiveChannel? = null
     private var programs: List<ProgramSummary> = emptyList()
     private var focusJob: Job? = null
+    private var currentProgramsJob: Job? = null
+    private var currentProgramsRequestId = 0L
     private var focusedChannelIndex = 0
     private var focusedProgramIndex = 0
     private lateinit var reminderStore: ProgramReminderStore
@@ -382,15 +384,24 @@ class ProgramGuideActivity : AppCompatActivity() {
         if (channels.isEmpty()) return
         val from = (focusedChannelIndex - GUIDE_CHANNEL_RADIUS).coerceAtLeast(0)
         val to = (focusedChannelIndex + GUIDE_CHANNEL_RADIUS + 1).coerceAtMost(channels.size)
-        val window = channels.subList(from, to)
-        lifecycleScope.launch {
+        val centerSourceKey = focusedChannel?.sourceKey
+            ?: channels.getOrNull(focusedChannelIndex)?.sourceKey
+            ?: return
+        val window = channels.subList(from, to).sortedByDescending {
+            it.sourceKey == centerSourceKey
+        }
+        val requestedMode = epgSourceMode
+        val requestId = ++currentProgramsRequestId
+        currentProgramsJob?.cancel()
+        currentProgramsJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val now = System.currentTimeMillis()
-                    when (epgSourceMode) {
-                        EpgSourceMode.MERGED -> programRepository.currentProgramsForChannels(window)
+                    when (requestedMode) {
+                        EpgSourceMode.MERGED ->
+                            programRepository.currentProgramsForListWindow(window, now)
                         else -> window.mapNotNull { channel ->
-                            val items = when (epgSourceMode) {
+                            val items = when (requestedMode) {
                                 EpgSourceMode.TIF -> programRepository.tifProgramsForChannel(
                                     channel, now - PAST_WINDOW_MS, now + GUIDE_WINDOW_MS,
                                 )
@@ -405,9 +416,18 @@ class ProgramGuideActivity : AppCompatActivity() {
                     }
                 }
             }
+            if (
+                requestId != currentProgramsRequestId ||
+                epgSourceMode != requestedMode ||
+                (focusedChannel?.sourceKey
+                    ?: channels.getOrNull(focusedChannelIndex)?.sourceKey) != centerSourceKey
+            ) return@launch
             val fresh = result.getOrNull() ?: return@launch
-            currentPrograms = currentPrograms.filterKeys { key ->
-                window.none { it.sourceKey == key }
+            val now = System.currentTimeMillis()
+            val windowKeys = window.mapTo(mutableSetOf(), LiveChannel::sourceKey)
+            currentPrograms = currentPrograms.filter { (key, program) ->
+                key !in windowKeys || key in fresh ||
+                    now in program.startTimeMillis until program.endTimeMillis
             } + fresh
             channelAdapter.submitPrograms(currentPrograms)
         }
@@ -486,6 +506,7 @@ class ProgramGuideActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         focusJob?.cancel()
+        currentProgramsJob?.cancel()
         super.onDestroy()
     }
 

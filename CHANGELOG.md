@@ -10,6 +10,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Kanal Sistem Bilgileri, `internal_provider_data` alanını ham hex, UTF-8, UTF-16LE ve okunabilir metin olarak gösteriyor; MediaTek blobunda bulunabilen frekans, sembol oranı, polarizasyon, uydu/transponder, frontend, LNB ve servis anahtarları ayrıca ayrıştırılıp debug loguna yazılıyor.
 * XMLTV eşleştirmesi kalite eklerini kesin karşılaştırmada koruyor; `HD`, `SD`, `FHD` ve `4K` farklarını yok sayan gevşek eşleşme yalnız tek bir aday bulunduğunda kullanılıyor. Büyük EPG tablolarını açılışta kilitleyen toplu yeniden indeksleme kaldırıldı.
 * Infobar EPG ilerleme çubuğuna dar alanlarda kaybolmaması için asgari genişlik verildi ve yatay boşluğu azaltıldı.
+* MediaTek TIF sağlayıcısında kanal listesi ve Program Rehberi, güvenilmez global program sorgusu yerine kanal URI'si üzerinden tekil sorgu kullanıyor. Odaktaki kanal önce yükleniyor, geçici boş sonuç cache'i 2 saniyeye indirildi ve geciken eski gezinme sorgularının yeni odağı ezmesi engellendi.
 
 ### Mobil test varyantı
 * `mobileDebug`, TV dağıtım paketlerinden ayrı `com.tvapp.livetv.mobile` kimliğiyle eklendi. Telefonlarda normal başlatıcıdan açılır; TIF bulunmayan cihazlarda DVB izin ve kanal sorgusunu atlayarak IPTV/VOD testlerine devam eder.

@@ -220,6 +220,7 @@ class MainActivity : AppCompatActivity() {
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
     private var visibleProgramsJob: Job? = null
+    private var visibleProgramsRequestId = 0L
     private var epgRefreshJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var iptvControlsJob: Job? = null
@@ -1073,6 +1074,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadProgramWindow(centerSourceKey: String, debounceMillis: Long) {
         visibleProgramsJob?.cancel()
+        val requestId = ++visibleProgramsRequestId
         visibleProgramsJob = lifecycleScope.launch {
             if (debounceMillis > 0L) delay(debounceMillis)
             if (
@@ -1080,6 +1082,9 @@ class MainActivity : AppCompatActivity() {
                 (debounceMillis > 0L && focusedListSourceKey != centerSourceKey)
             ) return@launch
             val window = programWindow(centerSourceKey)
+            val prioritizedWindow = window.sortedByDescending {
+                it.sourceKey == centerSourceKey
+            }
             val now = System.currentTimeMillis()
             val missing = window.filter { channel ->
                 currentPrograms[channel.sourceKey]?.let {
@@ -1088,8 +1093,19 @@ class MainActivity : AppCompatActivity() {
             }
             if (missing.isEmpty()) return@launch
             val result = withContext(Dispatchers.IO) {
-                runCatching { programRepository.currentProgramsForListWindow(missing) }
+                runCatching {
+                    programRepository.currentProgramsForListWindow(
+                        prioritizedWindow.filter { candidate ->
+                            missing.any { it.sourceKey == candidate.sourceKey }
+                        },
+                    )
+                }
             }
+            if (
+                requestId != visibleProgramsRequestId ||
+                binding.channelPanel.visibility != View.VISIBLE ||
+                focusedListSourceKey != centerSourceKey
+            ) return@launch
             val programs = result.getOrNull() ?: return@launch
             debugLog.recordDebug(
                 "EPG_LIST_WINDOW_RESULT | center=$centerSourceKey, " +
@@ -1113,6 +1129,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCachedProgram(sourceKey: String, program: ProgramSummary?) {
         if (program == null || program.title.isBlank()) {
+            val now = System.currentTimeMillis()
+            if (currentPrograms[sourceKey]?.let { now in it.startTimeMillis until it.endTimeMillis } == true) {
+                return
+            }
             currentPrograms.remove(sourceKey)
         } else {
             currentPrograms[sourceKey] = program
@@ -1141,10 +1161,17 @@ class MainActivity : AppCompatActivity() {
     private suspend fun refreshCurrentPrograms() {
         val selected = currentChannel ?: return
         if (binding.channelPanel.visibility == View.VISIBLE) {
-            val window = programWindow(focusedListSourceKey ?: selected.sourceKey)
+            val centerSourceKey = focusedListSourceKey ?: selected.sourceKey
+            val window = programWindow(centerSourceKey).sortedByDescending {
+                it.sourceKey == centerSourceKey
+            }
             val result = withContext(Dispatchers.IO) {
                 runCatching { programRepository.currentProgramsForListWindow(window) }
             }
+            if (
+                binding.channelPanel.visibility != View.VISIBLE ||
+                (focusedListSourceKey != null && focusedListSourceKey != centerSourceKey)
+            ) return
             result.getOrNull()?.let { fresh ->
                 updateCachedPrograms(window, fresh)
                 window.forEach { channel ->

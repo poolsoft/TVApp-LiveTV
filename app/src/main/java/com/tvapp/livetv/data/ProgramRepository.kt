@@ -41,10 +41,12 @@ class ProgramRepository(context: Context) {
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
         else NowNextPrograms(null, null)
         val fallback = xmlTvRepository.nowAndNext(channel, now)
-        return NowNextPrograms(
+        val resolved = NowNextPrograms(
             current = tif.current ?: fallback.current,
             next = tif.next ?: fallback.next,
         )
+        cacheCurrent(channel.sourceKey, resolved.current, now)
+        return resolved
     }
 
     fun programsForChannel(channel: LiveChannel, startTimeMillis: Long, endTimeMillis: Long): List<ProgramSummary> {
@@ -370,7 +372,7 @@ class ProgramRepository(context: Context) {
         const val MAX_PROGRAMS = 32
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
-        const val NEGATIVE_CACHE_MS = 20_000L
+        const val NEGATIVE_CACHE_MS = 2_000L
         const val MINIMUM_CACHE_MS = 5_000L
         const val POSITIVE_CACHE_MAX_MS = 5 * 60_000L
         const val MAX_LIST_WINDOW_CACHE_ENTRIES = 160
