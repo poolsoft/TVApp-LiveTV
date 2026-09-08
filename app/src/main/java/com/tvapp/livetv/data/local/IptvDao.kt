@@ -59,7 +59,8 @@ interface IptvDao {
     suspend fun getSelectedChannelsForSource(sourceId: Long): List<IptvChannelEntity>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
@@ -69,10 +70,11 @@ interface IptvDao {
         category: String?,
         limit: Int,
         offset: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -84,10 +86,11 @@ interface IptvDao {
         contentType: String,
         limit: Int,
         offset: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -102,10 +105,11 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -120,10 +124,11 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -134,10 +139,11 @@ interface IptvDao {
         category: String?,
         contentType: String,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -150,7 +156,7 @@ interface IptvDao {
         contentType: String,
         targetIndex: Int,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
         "SELECT COUNT(*) FROM iptv_channels " +
@@ -161,7 +167,8 @@ interface IptvDao {
     suspend fun libraryCount(sourceId: Long, category: String?, contentType: String): Int
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
@@ -176,10 +183,11 @@ interface IptvDao {
         selectedOnly: Boolean,
         limit: Int,
         offset: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
@@ -197,10 +205,11 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
@@ -218,10 +227,11 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
@@ -235,10 +245,11 @@ interface IptvDao {
         query: String,
         selectedOnly: Boolean,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
-        "SELECT * FROM iptv_channels " +
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
@@ -254,7 +265,7 @@ interface IptvDao {
         selectedOnly: Boolean,
         targetIndex: Int,
         limit: Int,
-    ): List<IptvChannelEntity>
+    ): List<IptvChannelListProjection>
 
     @Query(
         "SELECT COUNT(*) FROM iptv_channels " +

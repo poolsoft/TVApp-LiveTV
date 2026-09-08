@@ -379,7 +379,8 @@
     <string name="iptv_filtered_selection_count">%1$d / %2$d kanal seçili · Filtrede %3$d kanal · OK: Seç/Kaldır · Yeşil: Kaydet</string>
     <string name="iptv_category_filter">Kategori</string>
     <string name="iptv_search_hint">Kanal veya kategori ara</string>
-    <string name="selected_iptv_only">Seçililer</string>
+    <string name="selected_iptv_only">Yalnız seçilileri göster</string>
+    <string name="show_all_iptv_channels">Tümünü göster</string>
     <string name="iptv_selection_page_count">%1$d seçili · %2$d / %3$d gösteriliyor</string>
     <string name="iptv_library_loaded_count">%1$d / %2$d içerik</string>
     <string name="iptv_selection_jump">%1$s. içeriğe git</string>

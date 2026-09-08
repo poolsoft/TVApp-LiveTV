@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.IptvChannelEntity
+import com.tvapp.livetv.data.local.IptvChannelListProjection
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.model.LiveChannel
@@ -86,7 +87,7 @@ class IptvRepository(context: Context) {
         selectedOnly: Boolean,
         limit: Int,
         offset: Int,
-    ): List<IptvChannelEntity> = dao.getSelectionPage(
+    ): List<IptvChannelListProjection> = dao.getSelectionPage(
         sourceId,
         category,
         query,
@@ -104,7 +105,7 @@ class IptvRepository(context: Context) {
         direction: IptvPageDirection,
         anchor: IptvPageAnchor? = null,
         targetIndex: Int = 0,
-    ): List<IptvChannelEntity> = when (direction) {
+    ): List<IptvChannelListProjection> = when (direction) {
         IptvPageDirection.FIRST -> dao.getSelectionPage(
             sourceId, category, query, selectedOnly, limit, 0,
         )
@@ -276,7 +277,26 @@ class IptvRepository(context: Context) {
             inMainList = selected,
         )
 
+    private fun IptvChannelListProjection.toLiveChannel() =
+        LiveChannel(
+            id = stableLongId(sourceKey),
+            sourceKey = sourceKey,
+            inputId = "iptv:$sourceId",
+            displayNumber = (originalIndex + 1).toString(),
+            displayName = displayName,
+            uri = "",
+            source = LiveChannel.Source.IPTV,
+            logoUrl = logoUrl,
+            groupTitle = groupTitle,
+            epgId = tvgId?.takeIf(String::isNotBlank)
+                ?: tvgName?.takeIf(String::isNotBlank),
+            iptvContentType = contentType,
+            inMainList = selected,
+        )
+
     private fun IptvChannelEntity.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
+
+    private fun IptvChannelListProjection.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
 
     suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
         return importUrlInternal(location, nameOverride, null)

@@ -225,6 +225,7 @@ class MainActivity : TvRemoteActivity() {
     private var numberInput = ""
     private var numberInputJob: Job? = null
     private var focusedTuneJob: Job? = null
+    private var channelResolutionGeneration = 0
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
@@ -706,6 +707,32 @@ class MainActivity : TvRemoteActivity() {
     private fun selectChannel(channel: LiveChannel) = selectChannel(channel, recordHistory = true)
 
     private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
+        val generation = ++channelResolutionGeneration
+        if (channel.source == LiveChannel.Source.IPTV && channel.uri.isBlank()) {
+            lifecycleScope.launch {
+                val resolved = withContext(Dispatchers.IO) {
+                    iptvRepository.channel(channel.sourceKey)
+                }
+                if (generation != channelResolutionGeneration) return@launch
+                if (resolved == null) {
+                    debugLog.recordDebug("IPTV_CHANNEL_RESOLVE_MISSING | key=${channel.sourceKey}")
+                    showIptvNotice(R.string.channel_not_found)
+                    return@launch
+                }
+                selectResolvedChannel(
+                    resolved.copy(
+                        displayNumber = channel.displayNumber,
+                        inMainList = channel.inMainList,
+                    ),
+                    recordHistory,
+                )
+            }
+            return
+        }
+        selectResolvedChannel(channel, recordHistory)
+    }
+
+    private fun selectResolvedChannel(channel: LiveChannel, recordHistory: Boolean) {
         if (parentalControlStore.isLocked(channel.sourceKey) && channel.sourceKey !in unlockedChannels) {
             showLockedChannel(channel, recordHistory)
             return
@@ -3286,16 +3313,28 @@ class MainActivity : TvRemoteActivity() {
         focusedAutoTunePreviousChannel = null
         focusedAutoTuneTargetKey = null
         lifecycleScope.launch {
-            val (favorite, inMainList) = withContext(Dispatchers.IO) {
-                repository.isFavorite(channel.sourceKey) to if (
-                    channel.source == LiveChannel.Source.IPTV
+            val (resolvedChannel, state) = withContext(Dispatchers.IO) {
+                val resolved = if (
+                    channel.source == LiveChannel.Source.IPTV && channel.uri.isBlank()
                 ) {
-                    iptvRepository.isChannelSelected(channel.sourceKey)
+                    iptvRepository.channel(channel.sourceKey)?.copy(
+                        displayNumber = channel.displayNumber,
+                        inMainList = channel.inMainList,
+                    ) ?: channel
                 } else {
-                    true
+                    channel
                 }
+                resolved to (
+                    repository.isFavorite(channel.sourceKey) to if (
+                        channel.source == LiveChannel.Source.IPTV
+                    ) {
+                        iptvRepository.isChannelSelected(channel.sourceKey)
+                    } else {
+                        true
+                    }
+                )
             }
-            showChannelManagementDialog(channel, favorite, inMainList)
+            showChannelManagementDialog(resolvedChannel, state.first, state.second)
         }
     }
 

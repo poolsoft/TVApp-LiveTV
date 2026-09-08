@@ -7,6 +7,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Büyük veri performans testi
+* IPTV kütüphanesi ve kanal seçim sayfaları hafif Room projection'larına geçirildi. Liste satırları artık yayın URL'si, User-Agent, referrer ve altyazı adresini taşımaz; tam kayıt yalnız önizleme, oynatma veya kanal işlem menüsü açılırken alınır. XMLTV eşleştirmesi için gereken `tvg-id/tvg-name` korunur ve TIF yolu değişmez.
+* IPTV kanal seçimindeki belirsiz `Seçililer` kontrolü `Yalnız seçilileri göster` olarak netleştirildi; filtre açıkken `Tümünü göster` yazar. `Seçimi temizle` sonrasında seçili filtresi kapanır ve boş ekran yerine tüm filtrelenmiş kanallar yeniden görünür.
 * Tam IPTV kütüphanesi ve IPTV kanal seçim ekranı yüksek `OFFSET` yerine `(originalIndex, sourceKey)` çıpalı ileri/geri pencerelere geçirildi. Ekranlar en fazla tek sayfa tutuyor; ilk/son sarma, CH+/CH- ve sayı ile sıçrama tüm kataloğu belleğe almadan çalışıyor.
 * IPTV filtreleri değişirken eski sayfa yanıtları nesil kimliğiyle reddediliyor; her yeni pencere odaklandıktan sonra EPG yalnız görünür kanal çevresi için yükleniyor.
 * Debug sorgu analizine 14.000'inci kayıt çevresinde ileri ve geri keyset ölçümleri eklendi; kanal listesi EPG logu TIF/IPTV istek sayılarını ve toplam sorgu süresini ayrı gösteriyor.

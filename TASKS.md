@@ -64,7 +64,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   pencere getir. Odağı ve filtreyi async yükleme sırasında koru.
   **Kabul:** İlk/son ve CH+/CH- gezinimi çalışır; hiçbir UI rotası tüm kataloğu yüklemez.
 
-- [ ] **DATA-003 (P0): Hafif liste projection'ları**
+- [x] **DATA-003 (P0): Hafif liste projection'ları**
   Liste satırları için yalnız kimlik, ad, sıra, logo, tür, kategori ve seçim bilgisini sorgula.
   **Kabul:** Görünür liste oluştururken stream kimlik bilgileri ve kullanılmayan sütunlar taşınmaz.
 

@@ -11,7 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.IptvPageAnchor
 import com.tvapp.livetv.data.IptvPageDirection
-import com.tvapp.livetv.data.local.IptvChannelEntity
+import com.tvapp.livetv.data.local.IptvChannelListProjection
 import com.tvapp.livetv.databinding.ActivityIptvChannelSelectionBinding
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
@@ -27,7 +27,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     private lateinit var preview: IptvPlaybackController
     private lateinit var channelListAdapter: ArrayAdapter<String>
     private var sourceId = -1L
-    private var channels: List<IptvChannelEntity> = emptyList()
+    private var channels: List<IptvChannelListProjection> = emptyList()
     private var categories: List<String> = emptyList()
     private var selectedCategory: String? = null
     private var searchQuery = ""
@@ -61,6 +61,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         configureList()
         configureFilters()
         configureActions()
+        updateSelectedFilterUi()
         optimizeMobileColorActions()
         loadInitialData()
     }
@@ -173,7 +174,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             lifecycleScope.launch {
                 flushSelectionOverrides()
                 selectedOnly = !selectedOnly
-                binding.selectedFilterButton.isSelected = selectedOnly
+                updateSelectedFilterUi()
                 reloadFromStart(requestFocus = true)
             }
         }
@@ -204,6 +205,8 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             binding.selectAllButton.isEnabled = true
             result.onSuccess { changed ->
                 selectionOverrides.clear()
+                if (!selected) selectedOnly = false
+                updateSelectedFilterUi()
                 setResult(RESULT_OK)
                 binding.status.text = getString(R.string.iptv_bulk_selection_complete, changed)
                 reloadFromStart(requestFocus = true)
@@ -211,6 +214,13 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                 binding.status.text = error.message ?: error.javaClass.simpleName
             }
         }
+    }
+
+    private fun updateSelectedFilterUi() {
+        binding.selectedFilterButton.isSelected = selectedOnly
+        binding.selectedFilterLabel.setText(
+            if (selectedOnly) R.string.show_all_iptv_channels else R.string.selected_iptv_only,
+        )
     }
 
     private fun loadInitialData() {
@@ -344,12 +354,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         updateStatus()
     }
 
-    private fun channelLabel(channel: IptvChannelEntity): String = listOfNotNull(
+    private fun channelLabel(channel: IptvChannelListProjection): String = listOfNotNull(
         channel.displayName,
         channel.groupTitle?.takeIf(String::isNotBlank),
     ).joinToString("  ·  ")
 
-    private fun isSelected(channel: IptvChannelEntity): Boolean =
+    private fun isSelected(channel: IptvChannelListProjection): Boolean =
         selectionOverrides[channel.sourceKey] ?: channel.selected
 
     private fun updateStatus() {
@@ -401,7 +411,16 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         previewJob?.cancel()
         previewJob = lifecycleScope.launch {
             delay(PREVIEW_DELAY_MS)
-            runCatching { preview.play(channel.toLiveChannel()) }
+            val previewChannel = withContext(Dispatchers.IO) {
+                repository.channel(channel.sourceKey)
+            }
+            if (channels.getOrNull(focusedPosition)?.sourceKey != channel.sourceKey) {
+                return@launch
+            }
+            runCatching {
+                requireNotNull(previewChannel) { getString(R.string.channel_not_found) }
+                preview.play(previewChannel)
+            }
                 .onFailure { error ->
                     binding.previewState.visibility = View.VISIBLE
                     binding.previewState.text = getString(
@@ -411,23 +430,6 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                 }
         }
     }
-
-    private fun IptvChannelEntity.toLiveChannel() = LiveChannel(
-        id = sourceKey.hashCode().toLong(),
-        sourceKey = sourceKey,
-        inputId = "iptv:$sourceId",
-        displayNumber = (originalIndex + 1).toString(),
-        displayName = displayName,
-        uri = streamUrl,
-        logoUrl = logoUrl,
-        groupTitle = groupTitle,
-        epgId = tvgId?.takeIf(String::isNotBlank)
-            ?: tvgName?.takeIf(String::isNotBlank),
-        userAgent = userAgent,
-        referrer = referrer,
-        subtitleUrl = subtitleUrl,
-        source = LiveChannel.Source.IPTV,
-    )
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
         KeyEvent.KEYCODE_PROG_RED -> binding.clearButton.performClick().let { true }
@@ -533,7 +535,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         )
     }
 
-    private fun IptvChannelEntity.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
+    private fun IptvChannelListProjection.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
 
     private fun digitForKeyCode(keyCode: Int): Int? = when (keyCode) {
         in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
