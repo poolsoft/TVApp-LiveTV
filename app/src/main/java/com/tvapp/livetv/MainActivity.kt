@@ -4756,6 +4756,37 @@ class MainActivity : AppCompatActivity() {
         }
         val isIptv = currentChannel?.source == LiveChannel.Source.IPTV
         val isChannelPanelClosed = binding.channelPanel.visibility != View.VISIBLE
+        val hasNoPlaybackOsd = isChannelPanelClosed &&
+            binding.infoBar.visibility != View.VISIBLE &&
+            binding.statusPanel.visibility != View.VISIBLE &&
+            binding.recentChannelsPanel.visibility != View.VISIBLE &&
+            binding.parentalLockPanel.visibility != View.VISIBLE &&
+            numberInput.isEmpty()
+
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.repeatCount == 0 &&
+            isIptv &&
+            currentIptvContentKind == IptvContentKind.VOD &&
+            hasNoPlaybackOsd &&
+            event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
+        ) {
+            iptvControlRow = IptvControlRow.TIMELINE
+            showIptvPlaybackControls(activateControls = true)
+            val offset = if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                -IPTV_VOD_SEEK_STEP_MS
+            } else {
+                IPTV_VOD_SEEK_STEP_MS
+            }
+            iptvPlayback.seekBy(offset)
+            updateIptvPlaybackControls()
+            renderIptvControlSelection()
+            debugLog.recordDebug(
+                "IPTV_VOD_QUICK_SEEK | direction=${if (offset < 0) "back" else "forward"}, " +
+                    "offsetMs=$offset, channel=${currentChannel?.sourceKey}",
+            )
+            return true
+        }
 
         if (
             event.action == KeyEvent.ACTION_DOWN &&

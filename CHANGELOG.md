@@ -42,6 +42,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * URL yenilenirken kullanıcının verdiği XMLTV kaynak adının sıfırlanması engellendi.
 
 ### IPTV medya tuşu kontrol modu
+* IPTV VOD oynatılırken ekranda OSD yoksa Sol/Sağ, seekbarı doğrudan etkileşimli olarak açıp seçilen yönde 30 saniye sarıyor. Canlı IPTV, kanal listesi ve diğer açık OSD'lerin yön tuşu davranışları değişmiyor.
 * IPTV kontrol düğmeleri eşit sütunlara yayılmak yerine içerik genişliğinde ve soldan başlayan kompakt bir grup haline getirildi.
 * Kontrol simgeleri metinlerine yaklaştırıldı; kanal değişimi veya infobar zaman aşımında medya kontrolleri pasif duruma dönüyor ve gereksiz mavi odak çerçeveleri temizleniyor.
 
