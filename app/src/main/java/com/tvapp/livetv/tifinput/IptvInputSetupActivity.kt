@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.media.tv.TvInputInfo
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
+import com.tvapp.livetv.TvRemoteActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.R
 import com.tvapp.livetv.databinding.ActivityIptvInputSetupBinding
@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class IptvInputSetupActivity : AppCompatActivity() {
+class IptvInputSetupActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityIptvInputSetupBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {

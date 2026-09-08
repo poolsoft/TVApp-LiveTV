@@ -195,9 +195,11 @@ arayüz/fokus testlerinde kullanılabilir. Emülatör çalışırken `tools/TVAp
 masaüstü kumanda panelini açar. Panel; renk, medya, TV, kanal, sayı ve gezinme tuşlarını ADB
 üzerinden gönderir. `Sonraki tusa uzun bas` seçeneği bağlamsal menüleri sınamak içindir.
 
-Panel odaktayken yön tuşları, Enter ve Esc gezinme kumandasıdır; F5-F8 sırasıyla kırmızı,
-yeşil, sarı ve mavi; PageUp/PageDown ise CH+/CH- gönderir. Emülatör vendor MediaTek tuner
-sağlamadığı için TIF/DVB sinyal ve track callback testleri gerçek Google TV cihazında yapılır.
+Uygulama veya panel odaktayken yön tuşları, Enter ve Esc gezinme kumandasıdır. F1-F4 sırasıyla
+Info, Rehber, Menü ve Ayarlar; F5-F8 kırmızı, yeşil, sarı ve mavi; F9 Giriş, F10 Son Kanal,
+F11/F12 ise CH-/CH+ gönderir. PageUp/PageDown da CH+/CH- olarak kullanılabilir. Emülatör vendor
+MediaTek tuner sağlamadığı için TIF/DVB sinyal ve track callback testleri gerçek Google TV
+cihazında yapılır.
 
 ## GitHub Actions ve uygulama içi güncelleme
 

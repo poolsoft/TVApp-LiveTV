@@ -12,7 +12,6 @@ import android.widget.LinearLayout
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tvapp.livetv.data.ChannelRepository
@@ -38,7 +37,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ChannelEditorActivity : AppCompatActivity() {
+class ChannelEditorActivity : TvRemoteActivity() {
     private enum class Mode { NORMAL, MULTI_SELECT, MOVE }
 
     private lateinit var binding: ActivityChannelEditorBinding
@@ -1012,7 +1011,8 @@ class ChannelEditorActivity : AppCompatActivity() {
             .show()
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (operationInProgress) return true
         val editorColor = editorColorFor(event.keyCode)
         val handlesMoveDirection = mode == Mode.MOVE &&

@@ -5,7 +5,6 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.data.IptvRepository
@@ -14,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-class InformationActivity : AppCompatActivity() {
+class InformationActivity : TvRemoteActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_information)

@@ -188,7 +188,7 @@ $numberSection.Controls.Add((New-KeyButton '0' 7))
 $main.Controls.Add($numberSection)
 
 $hint = New-Object System.Windows.Forms.Label
-$hint.Text = "Klavye: Yonler/Enter/Esc | F5-F8: Renkler | PageUp/PageDown: Kanal"
+$hint.Text = "F1 Info | F2 Rehber | F3 Menu | F4 Ayarlar`nF5-F8 Renkler | F9 Giris | F10 Son | F11/F12 Kanal"
 $hint.Width = 310
 $hint.Height = 42
 $hint.Margin = New-Object System.Windows.Forms.Padding(15, 6, 10, 8)
@@ -206,10 +206,18 @@ $form.Add_KeyDown({
         ([System.Windows.Forms.Keys]::Escape) = 4
         ([System.Windows.Forms.Keys]::PageUp) = 166
         ([System.Windows.Forms.Keys]::PageDown) = 167
+        ([System.Windows.Forms.Keys]::F1) = 165
+        ([System.Windows.Forms.Keys]::F2) = 172
+        ([System.Windows.Forms.Keys]::F3) = 82
+        ([System.Windows.Forms.Keys]::F4) = 176
         ([System.Windows.Forms.Keys]::F5) = 183
         ([System.Windows.Forms.Keys]::F6) = 184
         ([System.Windows.Forms.Keys]::F7) = 185
         ([System.Windows.Forms.Keys]::F8) = 186
+        ([System.Windows.Forms.Keys]::F9) = 178
+        ([System.Windows.Forms.Keys]::F10) = 229
+        ([System.Windows.Forms.Keys]::F11) = 167
+        ([System.Windows.Forms.Keys]::F12) = 166
     }
     if ($mapping.ContainsKey($event.KeyCode)) {
         Send-TvKey $mapping[$event.KeyCode]

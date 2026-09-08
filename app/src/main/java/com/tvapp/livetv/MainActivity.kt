@@ -38,7 +38,6 @@ import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -94,7 +93,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : TvRemoteActivity() {
     companion object {
         private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
         private const val MAX_CHANNEL_DIGITS = 5
@@ -4597,7 +4596,8 @@ class MainActivity : AppCompatActivity() {
         binding.recentChannelsContainer.removeAllViews()
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (
             BuildConfig.DEBUG &&
             displayPreferences.verboseRemoteKeyLogging &&

@@ -5,7 +5,6 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -25,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class XmlTvEpgEditorActivity : AppCompatActivity() {
+class XmlTvEpgEditorActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityXmltvEpgEditorBinding
     private val channelRepository by lazy { ChannelRepository(this) }
     private val xmlTvRepository by lazy { XmlTvRepository(this) }

@@ -18,7 +18,6 @@ import android.view.Gravity
 import android.view.ContextThemeWrapper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.IptvSourceSummary
@@ -32,7 +31,7 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
-class IptvSourcesActivity : AppCompatActivity() {
+class IptvSourcesActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityIptvSourcesBinding
     private lateinit var repository: IptvRepository
     private lateinit var debugLog: CrashReportStore
@@ -538,7 +537,8 @@ class IptvSourcesActivity : AppCompatActivity() {
 
     private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (binding.sourceList.hasFocus()) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER,

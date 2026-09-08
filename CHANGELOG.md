@@ -10,6 +10,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Ayarlar OSD'si Görünüm, Kanallar, IPTV ve EPG, Sistem sekmelerine ayrıldı. Sekmeler arasında Sol/Sağ ile geçiliyor; Aşağı içerikteki ilk ayara giriyor, içerikte Sol/Sağ veya OK değeri değiştiriyor.
 * IPTV liste yönetimi ve XMLTV EPG yönetimi, IPTV ve EPG sekmesinden doğrudan açılabiliyor.
 * `tools/TVAppRemote.cmd`, emülatör testleri için D-pad, TV, medya, sayı, renk tuşları ve uzun basış gönderen masaüstü kumanda panelini açıyor.
+* Fiziksel klavyede Esc, F1-F12 ve PageUp/PageDown tuşları uygulama genelinde Back, TV işlevleri, renk tuşları ve kanal değiştirme komutlarına eşleniyor.
 
 ### TIF ve EPG tanılama
 * Kanal Sistem Bilgileri, `internal_provider_data` alanını ham hex, UTF-8, UTF-16LE ve okunabilir metin olarak gösteriyor; MediaTek blobunda bulunabilen frekans, sembol oranı, polarizasyon, uydu/transponder, frontend, LNB ve servis anahtarları ayrıca ayrıştırılıp debug loguna yazılıyor.

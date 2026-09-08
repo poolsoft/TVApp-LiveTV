@@ -20,7 +20,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.os.LocaleListCompat
@@ -48,7 +47,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
-class DisplaySettingsActivity : AppCompatActivity() {
+class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var content: LinearLayout
     private lateinit var tabs: LinearLayout
     private lateinit var displayStore: DisplayPreferencesStore
@@ -890,7 +889,8 @@ class DisplaySettingsActivity : AppCompatActivity() {
         setResult(Activity.RESULT_OK)
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (
             event.action == KeyEvent.ACTION_DOWN &&
             event.keyCode == KeyEvent.KEYCODE_DPAD_UP &&

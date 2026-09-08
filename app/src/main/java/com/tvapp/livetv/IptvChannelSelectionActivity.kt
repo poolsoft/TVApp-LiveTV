@@ -8,7 +8,6 @@ import android.view.View
 import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.local.IptvChannelEntity
@@ -21,7 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class IptvChannelSelectionActivity : AppCompatActivity() {
+class IptvChannelSelectionActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityIptvChannelSelectionBinding
     private lateinit var repository: IptvRepository
     private lateinit var preview: IptvPlaybackController
@@ -403,7 +402,8 @@ class IptvChannelSelectionActivity : AppCompatActivity() {
         return true
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (event.action == KeyEvent.ACTION_DOWN && binding.channelList.hasFocus()) {
             digitForKeyCode(event.keyCode)?.let { digit ->
                 appendNumberDigit(digit)

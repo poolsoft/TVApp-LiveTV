@@ -13,7 +13,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.EpgDiagnosticStep
@@ -28,7 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class EpgDiagnosticsActivity : AppCompatActivity() {
+class EpgDiagnosticsActivity : TvRemoteActivity() {
     private lateinit var channel: LiveChannel
     private lateinit var results: LinearLayout
     private lateinit var runButton: Button

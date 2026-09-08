@@ -12,7 +12,6 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -36,7 +35,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ProgramGuideActivity : AppCompatActivity() {
+class ProgramGuideActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityProgramGuideBinding
     private lateinit var channelRepository: ChannelRepository
     private lateinit var programRepository: ProgramRepository
@@ -453,7 +452,8 @@ class ProgramGuideActivity : AppCompatActivity() {
         )
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val event = rawEvent.asTvRemoteEvent()
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> when {

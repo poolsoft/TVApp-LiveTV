@@ -14,7 +14,6 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.data.XmlTvSourceSummary
@@ -24,7 +23,7 @@ import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
-class XmlTvSourcesActivity : AppCompatActivity() {
+class XmlTvSourcesActivity : TvRemoteActivity() {
     private val repository by lazy { XmlTvRepository(this) }
     private lateinit var sourceList: ListView
     private lateinit var status: TextView
