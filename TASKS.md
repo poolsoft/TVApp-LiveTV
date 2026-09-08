@@ -68,7 +68,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Liste satırları için yalnız kimlik, ad, sıra, logo, tür, kategori ve seçim bilgisini sorgula.
   **Kabul:** Görünür liste oluştururken stream kimlik bilgileri ve kullanılmayan sütunlar taşınmaz.
 
-- [ ] **DATA-004 (P0): Room FTS araması**
+- [x] **DATA-004 (P0): Room FTS araması**
   Kanal adı, `tvg-name` ve kategori için FTS tablosu ve migration ekle.
   **Kabul:** 15.000 kayıtta arama p95 300 ms altında ve seçim/filtre değişiminde odak stabildir.
 

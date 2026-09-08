@@ -13,11 +13,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelGroupEntity::class,
         IptvSourceEntity::class,
         IptvChannelEntity::class,
+        IptvChannelSearchEntity::class,
         XmlTvProgramEntity::class,
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -48,7 +49,9 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_10_11,
                 MIGRATION_11_12,
                 MIGRATION_12_13,
+                MIGRATION_13_14,
             )
+                .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
                 .also { instance = it }
         }
@@ -245,6 +248,60 @@ abstract class TVAppDatabase : RoomDatabase() {
                 )
                 db.execSQL("ALTER TABLE `xmltv_sources` ADD COLUMN `lastError` TEXT")
             }
+        }
+
+        internal val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `iptv_channel_search` USING FTS4(" +
+                        "`sourceKey` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                        "`tvgName` TEXT NOT NULL, `groupTitle` TEXT NOT NULL, " +
+                        "tokenize=unicode61 `remove_diacritics=2`, notindexed=`sourceKey`)",
+                )
+                db.execSQL(
+                    "INSERT INTO `iptv_channel_search` " +
+                        "(`sourceKey`, `displayName`, `tvgName`, `groupTitle`) " +
+                        "SELECT `sourceKey`, `displayName`, COALESCE(`tvgName`, ''), " +
+                        "COALESCE(`groupTitle`, '') FROM `iptv_channels`",
+                )
+                createIptvSearchTriggers(db)
+            }
+        }
+
+        internal val IPTV_SEARCH_CALLBACK = object : Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                createIptvSearchTriggers(db)
+            }
+
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                createIptvSearchTriggers(db)
+            }
+        }
+
+        private fun createIptvSearchTriggers(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `iptv_channel_search_insert` " +
+                    "AFTER INSERT ON `iptv_channels` BEGIN " +
+                    "INSERT INTO `iptv_channel_search` " +
+                    "(`sourceKey`, `displayName`, `tvgName`, `groupTitle`) VALUES " +
+                    "(new.`sourceKey`, new.`displayName`, COALESCE(new.`tvgName`, ''), " +
+                    "COALESCE(new.`groupTitle`, '')); END",
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `iptv_channel_search_delete` " +
+                    "AFTER DELETE ON `iptv_channels` BEGIN " +
+                    "DELETE FROM `iptv_channel_search` WHERE `sourceKey` = old.`sourceKey`; END",
+            )
+            db.execSQL(
+                "CREATE TRIGGER IF NOT EXISTS `iptv_channel_search_update` " +
+                    "AFTER UPDATE OF `sourceKey`, `displayName`, `tvgName`, `groupTitle` " +
+                    "ON `iptv_channels` BEGIN " +
+                    "DELETE FROM `iptv_channel_search` WHERE `sourceKey` = old.`sourceKey`; " +
+                    "INSERT INTO `iptv_channel_search` " +
+                    "(`sourceKey`, `displayName`, `tvgName`, `groupTitle`) VALUES " +
+                    "(new.`sourceKey`, new.`displayName`, COALESCE(new.`tvgName`, ''), " +
+                    "COALESCE(new.`groupTitle`, '')); END",
+            )
         }
     }
 }

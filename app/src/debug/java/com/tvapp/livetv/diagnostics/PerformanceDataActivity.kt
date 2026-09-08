@@ -107,7 +107,9 @@ class PerformanceDataActivity : AppCompatActivity() {
             applicationContext,
             TVAppDatabase::class.java,
             PERFORMANCE_DATABASE,
-        ).build()
+        ).addMigrations(TVAppDatabase.MIGRATION_13_14)
+            .addCallback(TVAppDatabase.IPTV_SEARCH_CALLBACK)
+            .build()
         return try {
             var generatedSourceId = -1L
             database.withTransaction {
@@ -204,7 +206,9 @@ class PerformanceDataActivity : AppCompatActivity() {
             applicationContext,
             TVAppDatabase::class.java,
             PERFORMANCE_DATABASE,
-        ).build()
+        ).addMigrations(TVAppDatabase.MIGRATION_13_14)
+            .addCallback(TVAppDatabase.IPTV_SEARCH_CALLBACK)
+            .build()
         return try {
             val sourceId = database.iptvDao().getSources().firstOrNull()?.id
                 ?: error("Performance IPTV source is missing")
@@ -291,11 +295,12 @@ class PerformanceDataActivity : AppCompatActivity() {
             ),
             QueryCase(
                 "iptv_search",
-                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
-                    "AND (displayName LIKE ? COLLATE NOCASE OR groupTitle LIKE ? COLLATE NOCASE) " +
+                "SELECT sourceKey, displayName, logoUrl, groupTitle, originalIndex, " +
+                    "contentType, selected FROM iptv_channels WHERE sourceId = ? " +
+                    "AND sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+                    "WHERE iptv_channel_search MATCH ?) " +
                     "ORDER BY originalIndex LIMIT 120",
-                arrayOf(sourceId, "%Channel 149%", "%Channel 149%"),
-                "Leading-wildcard LIKE scans the source range; replace with Room FTS.",
+                arrayOf(sourceId, "Channel* 149*"),
             ),
             QueryCase(
                 "iptv_categories",

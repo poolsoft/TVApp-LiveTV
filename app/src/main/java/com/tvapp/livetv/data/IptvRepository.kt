@@ -90,7 +90,7 @@ class IptvRepository(context: Context) {
     ): List<IptvChannelListProjection> = dao.getSelectionPage(
         sourceId,
         category,
-        query,
+        IptvFtsQuery.from(query),
         selectedOnly,
         limit,
         offset,
@@ -105,28 +105,31 @@ class IptvRepository(context: Context) {
         direction: IptvPageDirection,
         anchor: IptvPageAnchor? = null,
         targetIndex: Int = 0,
-    ): List<IptvChannelListProjection> = when (direction) {
-        IptvPageDirection.FIRST -> dao.getSelectionPage(
-            sourceId, category, query, selectedOnly, limit, 0,
-        )
-        IptvPageDirection.NEXT -> requireNotNull(anchor).let {
-            dao.getSelectionPageAfter(
-                sourceId, category, query, selectedOnly,
-                it.originalIndex, it.sourceKey, limit,
+    ): List<IptvChannelListProjection> {
+        val ftsQuery = IptvFtsQuery.from(query)
+        return when (direction) {
+            IptvPageDirection.FIRST -> dao.getSelectionPage(
+                sourceId, category, ftsQuery, selectedOnly, limit, 0,
+            )
+            IptvPageDirection.NEXT -> requireNotNull(anchor).let {
+                dao.getSelectionPageAfter(
+                    sourceId, category, ftsQuery, selectedOnly,
+                    it.originalIndex, it.sourceKey, limit,
+                )
+            }
+            IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
+                dao.getSelectionPageBefore(
+                    sourceId, category, ftsQuery, selectedOnly,
+                    it.originalIndex, it.sourceKey, limit,
+                ).asReversed()
+            }
+            IptvPageDirection.LAST -> dao.getSelectionLastPage(
+                sourceId, category, ftsQuery, selectedOnly, limit,
+            ).asReversed()
+            IptvPageDirection.AT_INDEX -> dao.getSelectionPageAtOrAfter(
+                sourceId, category, ftsQuery, selectedOnly, targetIndex, limit,
             )
         }
-        IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
-            dao.getSelectionPageBefore(
-                sourceId, category, query, selectedOnly,
-                it.originalIndex, it.sourceKey, limit,
-            ).asReversed()
-        }
-        IptvPageDirection.LAST -> dao.getSelectionLastPage(
-            sourceId, category, query, selectedOnly, limit,
-        ).asReversed()
-        IptvPageDirection.AT_INDEX -> dao.getSelectionPageAtOrAfter(
-            sourceId, category, query, selectedOnly, targetIndex, limit,
-        )
     }
 
     suspend fun selectionCount(
@@ -134,7 +137,12 @@ class IptvRepository(context: Context) {
         category: String?,
         query: String,
         selectedOnly: Boolean,
-    ): Int = dao.selectionCount(sourceId, category, query, selectedOnly)
+    ): Int = dao.selectionCount(
+        sourceId,
+        category,
+        IptvFtsQuery.from(query),
+        selectedOnly,
+    )
 
     suspend fun selectedChannelCount(sourceId: Long): Int = dao.selectedChannelCount(sourceId)
 
@@ -144,7 +152,12 @@ class IptvRepository(context: Context) {
         query: String,
         selected: Boolean,
     ): Int {
-        val changed = dao.setFilteredChannelsSelected(sourceId, category, query, selected)
+        val changed = dao.setFilteredChannelsSelected(
+            sourceId,
+            category,
+            IptvFtsQuery.from(query),
+            selected,
+        )
         if (changed > 0) {
             notifySharedChannelsChanged()
             if (selected) xmlTvRepository.requestXtreamRefresh(force = true)

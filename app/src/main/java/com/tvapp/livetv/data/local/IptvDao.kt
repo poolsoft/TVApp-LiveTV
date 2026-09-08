@@ -171,8 +171,8 @@ interface IptvDao {
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
             "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
     )
@@ -190,8 +190,8 @@ interface IptvDao {
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
             "AND (originalIndex > :anchorIndex " +
             "OR (originalIndex = :anchorIndex AND sourceKey > :anchorKey)) " +
@@ -212,8 +212,8 @@ interface IptvDao {
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
             "AND (originalIndex < :anchorIndex " +
             "OR (originalIndex = :anchorIndex AND sourceKey < :anchorKey)) " +
@@ -234,8 +234,8 @@ interface IptvDao {
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
             "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
     )
@@ -252,8 +252,8 @@ interface IptvDao {
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
             "AND originalIndex >= :targetIndex " +
             "ORDER BY originalIndex, sourceKey LIMIT :limit",
@@ -271,8 +271,8 @@ interface IptvDao {
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1)",
     )
     suspend fun selectionCount(
@@ -286,8 +286,8 @@ interface IptvDao {
         "UPDATE iptv_channels SET selected = :selected " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
-            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE)",
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query))",
     )
     suspend fun setFilteredChannelsSelected(
         sourceId: Long,
