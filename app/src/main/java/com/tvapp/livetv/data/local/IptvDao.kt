@@ -354,4 +354,135 @@ interface IptvDao {
 
     @Upsert
     suspend fun upsertChannels(channels: List<IptvChannelEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStagedChannels(channels: List<IptvChannelStagingEntity>)
+
+    @Query("DELETE FROM iptv_channel_staging WHERE sessionId = :sessionId")
+    suspend fun deleteStagingSession(sessionId: String)
+
+    @Query("DELETE FROM iptv_channel_staging WHERE createdAt < :cutoff")
+    suspend fun deleteStaleStaging(cutoff: Long)
+
+    @Query("SELECT COUNT(*) FROM iptv_channel_staging WHERE sessionId = :sessionId")
+    suspend fun stagingCount(sessionId: String): Int
+
+    @Query(
+        "UPDATE iptv_channel_staging SET resolvedSourceKey = CASE " +
+            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.sourceKey = 'iptv:' || :sourceId || ':' || " +
+            "iptv_channel_staging.identityHash) " +
+            "THEN 'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash " +
+            "WHEN TRIM(COALESCE(iptv_channel_staging.tvgId, '')) != '' " +
+            "AND EXISTS (SELECT 1 FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.tvgId = iptv_channel_staging.tvgId) " +
+            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.tvgId = iptv_channel_staging.tvgId " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
+            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
+            "AND TRIM(COALESCE(old.groupTitle, '')) = " +
+            "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE) " +
+            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
+            "AND TRIM(COALESCE(old.groupTitle, '')) = " +
+            "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
+            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.matchKey = iptv_channel_staging.matchKey) " +
+            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.matchKey = iptv_channel_staging.matchKey " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
+            "ELSE 'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash END " +
+            "WHERE sessionId = :sessionId",
+    )
+    suspend fun resolveStagedSourceKeys(sessionId: String, sourceId: Long)
+
+    @Query(
+        "DELETE FROM iptv_channel_staging WHERE sessionId = :sessionId AND EXISTS " +
+            "(SELECT 1 FROM iptv_channel_staging newer " +
+            "WHERE newer.sessionId = :sessionId " +
+            "AND newer.resolvedSourceKey = iptv_channel_staging.resolvedSourceKey " +
+            "AND newer.originalIndex > iptv_channel_staging.originalIndex)",
+    )
+    suspend fun discardSupersededStagedDuplicates(sessionId: String)
+
+    @Query(
+        "UPDATE iptv_channels SET " +
+            "tvgId = (SELECT staged.tvgId FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "tvgName = (SELECT staged.tvgName FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "displayName = (SELECT staged.displayName FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "streamUrl = (SELECT staged.streamUrl FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "logoUrl = (SELECT staged.logoUrl FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "groupTitle = (SELECT staged.groupTitle FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "userAgent = (SELECT staged.userAgent FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "referrer = (SELECT staged.referrer FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "subtitleUrl = (SELECT staged.subtitleUrl FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "originalIndex = (SELECT staged.originalIndex FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "contentType = (SELECT staged.contentType FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "matchKey = (SELECT staged.matchKey FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey) " +
+            "WHERE sourceId = :sourceId AND EXISTS (SELECT 1 FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey " +
+            "AND (iptv_channels.tvgId IS NOT staged.tvgId " +
+            "OR iptv_channels.tvgName IS NOT staged.tvgName " +
+            "OR iptv_channels.displayName IS NOT staged.displayName " +
+            "OR iptv_channels.streamUrl IS NOT staged.streamUrl " +
+            "OR iptv_channels.logoUrl IS NOT staged.logoUrl " +
+            "OR iptv_channels.groupTitle IS NOT staged.groupTitle " +
+            "OR iptv_channels.userAgent IS NOT staged.userAgent " +
+            "OR iptv_channels.referrer IS NOT staged.referrer " +
+            "OR iptv_channels.subtitleUrl IS NOT staged.subtitleUrl " +
+            "OR iptv_channels.originalIndex IS NOT staged.originalIndex " +
+            "OR iptv_channels.contentType IS NOT staged.contentType " +
+            "OR iptv_channels.matchKey IS NOT staged.matchKey))",
+    )
+    suspend fun updateChangedStagedChannels(sessionId: String, sourceId: Long): Int
+
+    @Query(
+        "UPDATE iptv_channels SET lastSeenAt = :lastSeenAt " +
+            "WHERE sourceId = :sourceId AND sourceKey IN " +
+            "(SELECT resolvedSourceKey FROM iptv_channel_staging WHERE sessionId = :sessionId)",
+    )
+    suspend fun touchStagedChannels(sessionId: String, sourceId: Long, lastSeenAt: Long)
+
+    @Query(
+        "INSERT INTO iptv_channels " +
+            "(sourceKey, sourceId, tvgId, tvgName, displayName, streamUrl, logoUrl, " +
+            "groupTitle, userAgent, referrer, subtitleUrl, originalIndex, contentType, " +
+            "selected, lastSeenAt, matchKey) " +
+            "SELECT staged.resolvedSourceKey, :sourceId, staged.tvgId, staged.tvgName, " +
+            "staged.displayName, staged.streamUrl, staged.logoUrl, staged.groupTitle, " +
+            "staged.userAgent, staged.referrer, staged.subtitleUrl, staged.originalIndex, " +
+            "staged.contentType, 0, :lastSeenAt, staged.matchKey " +
+            "FROM iptv_channel_staging staged WHERE staged.sessionId = :sessionId " +
+            "AND staged.resolvedSourceKey IS NOT NULL AND NOT EXISTS " +
+            "(SELECT 1 FROM iptv_channels old WHERE old.sourceKey = staged.resolvedSourceKey)",
+    )
+    suspend fun insertNewStagedChannels(sessionId: String, sourceId: Long, lastSeenAt: Long): Long
+
+    @Query(
+        "DELETE FROM iptv_channels WHERE sourceId = :sourceId AND sourceKey NOT IN " +
+            "(SELECT resolvedSourceKey FROM iptv_channel_staging " +
+            "WHERE sessionId = :sessionId AND resolvedSourceKey IS NOT NULL)",
+    )
+    suspend fun deleteChannelsMissingFromStaging(sourceId: Long, sessionId: String)
 }

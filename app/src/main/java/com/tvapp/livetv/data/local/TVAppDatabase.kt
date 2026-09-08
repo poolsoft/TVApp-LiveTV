@@ -13,12 +13,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChannelGroupEntity::class,
         IptvSourceEntity::class,
         IptvChannelEntity::class,
+        IptvChannelStagingEntity::class,
         IptvChannelSearchEntity::class,
         XmlTvProgramEntity::class,
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -50,6 +51,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_11_12,
                 MIGRATION_12_13,
                 MIGRATION_13_14,
+                MIGRATION_14_15,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
@@ -265,6 +267,43 @@ abstract class TVAppDatabase : RoomDatabase() {
                         "COALESCE(`groupTitle`, '') FROM `iptv_channels`",
                 )
                 createIptvSearchTriggers(db)
+            }
+        }
+
+        internal val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `iptv_channels` " +
+                        "ADD COLUMN `matchKey` TEXT NOT NULL DEFAULT ''",
+                )
+                db.execSQL(
+                    "UPDATE `iptv_channels` SET `matchKey` = " +
+                        "LOWER(TRIM(COALESCE(`groupTitle`, ''))) || '|' || " +
+                        "LOWER(TRIM(`displayName`))",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_matchKey` " +
+                        "ON `iptv_channels` (`sourceId`, `matchKey`)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `iptv_channel_staging` (" +
+                        "`sessionId` TEXT NOT NULL, `originalIndex` INTEGER NOT NULL, " +
+                        "`identityHash` TEXT NOT NULL, `resolvedSourceKey` TEXT, " +
+                        "`tvgId` TEXT, `tvgName` TEXT, " +
+                        "`displayName` TEXT NOT NULL, `streamUrl` TEXT NOT NULL, " +
+                        "`logoUrl` TEXT, `groupTitle` TEXT, `userAgent` TEXT, " +
+                        "`referrer` TEXT, `subtitleUrl` TEXT, `contentType` TEXT NOT NULL, " +
+                        "`matchKey` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`sessionId`, `originalIndex`))",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_iptv_channel_staging_sessionId` " +
+                        "ON `iptv_channel_staging` (`sessionId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_iptv_channel_staging_createdAt` " +
+                        "ON `iptv_channel_staging` (`createdAt`)",
+                )
             }
         }
 

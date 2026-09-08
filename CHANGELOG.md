@@ -7,6 +7,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Büyük veri performans testi
+* M3U/M3U8, Xtream ve Stalker kaynak yenilemeleri kalıcı staging tablo + atomik diff modeline geçirildi. Yeni katalog tamamen ayrıştırılıp doğrulanmadan çalışan kaynak değişmiyor; hata veya iptalde eski kanal listesi korunuyor.
+* Yenileme yalnız eklenen, değişen ve kaldırılan IPTV kayıtlarını işler. Değişmeyen satırlar ile FTS kayıtları yeniden yazılmaz; kanal seçimi ve Room'daki özel sıra, ad ve EPG override bilgileri kararlı kanal kimliği üzerinden korunur.
+* Dosya, Xtream ve Stalker kaynaklarının Yenile işlemi artık mevcut kaynak kimliğini açıkça kullanıyor; yarım kalan staging oturumları otomatik temizleniyor.
 * IPTV kanal adı, `tvg-name` ve kategori araması, başında joker bulunan `LIKE` taramasından Unicode Room FTS4 indeksine taşındı. Room 13→14 migration mevcut kanalları indekse alır; ekleme, yenileme, yedekten geri yükleme ve silme işlemleri SQLite tetikleyicileriyle indeksi güncel tutar.
 * Arama metni FTS sözdizimi enjekte edemeyecek şekilde harf/rakam terimlerine ayrılıyor ve kelime öneki olarak aranıyor. 15.000 satırlık test veritabanında 100 tekrarlı ölçümde arama p95 değeri 25,2 ms oldu.
 * IPTV kütüphanesi ve kanal seçim sayfaları hafif Room projection'larına geçirildi. Liste satırları artık yayın URL'si, User-Agent, referrer ve altyazı adresini taşımaz; tam kayıt yalnız önizleme, oynatma veya kanal işlem menüsü açılırken alınır. XMLTV eşleştirmesi için gereken `tvg-id/tvg-name` korunur ve TIF yolu değişmez.

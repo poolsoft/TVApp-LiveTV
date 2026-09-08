@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.IptvChannelListProjection
+import com.tvapp.livetv.data.local.IptvChannelStagingEntity
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.model.LiveChannel
@@ -14,7 +15,15 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.util.Locale
+import java.util.UUID
 import java.util.zip.GZIPInputStream
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 data class IptvSourceSummary(
     val source: IptvSourceEntity,
@@ -358,11 +367,17 @@ class IptvRepository(context: Context) {
         }
     }
 
-    suspend fun importDocument(uri: Uri, name: String): IptvImportResult {
+    suspend fun importDocument(
+        uri: Uri,
+        name: String,
+        replacementSource: IptvSourceEntity? = null,
+    ): IptvImportResult {
         val input = checkNotNull(appContext.contentResolver.openInputStream(uri))
         val compressed = uri.lastPathSegment?.endsWith(".gz", ignoreCase = true) == true
         val decoded = if (compressed) GZIPInputStream(input) else input
-        return decoded.use { importStream(uri.toString(), KIND_DOCUMENT, name, it) }
+        return decoded.use {
+            importStream(uri.toString(), KIND_DOCUMENT, name, it, replacementSource)
+        }
     }
 
     suspend fun importXtream(
@@ -370,6 +385,7 @@ class IptvRepository(context: Context) {
         username: String,
         password: String,
         name: String,
+        replacementSource: IptvSourceEntity? = null,
     ): IptvImportResult {
         require(username.isNotBlank() && password.isNotBlank()) {
             "Xtream kullanıcı adı ve parola gereklidir."
@@ -383,6 +399,7 @@ class IptvRepository(context: Context) {
             serverUrl = client.baseUrl,
             username = username.trim(),
             password = password,
+            replacementSource = replacementSource,
         ) { client.channels() }
         xmlTvRepository.ensurePeriodicRefresh()
         xmlTvRepository.requestXtreamRefresh(force = true)
@@ -393,6 +410,7 @@ class IptvRepository(context: Context) {
         portalUrl: String,
         macAddress: String,
         name: String,
+        replacementSource: IptvSourceEntity? = null,
     ): IptvImportResult {
         val normalizedMac = normalizeMac(macAddress)
         val client = StalkerClient(portalUrl, normalizedMac)
@@ -402,22 +420,25 @@ class IptvRepository(context: Context) {
             name = name,
             serverUrl = client.endpoint,
             macAddress = normalizedMac,
+            replacementSource = replacementSource,
         ) { client.channels() }
     }
 
     suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
         KIND_URL -> importUrlInternal(source.location, source.name, source)
-        KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name)
+        KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name, source)
         KIND_XTREAM -> importXtream(
             checkNotNull(source.serverUrl),
             checkNotNull(source.username),
             checkNotNull(source.password),
             source.name,
+            source,
         )
         KIND_STALKER -> importStalker(
             checkNotNull(source.serverUrl),
             checkNotNull(source.macAddress),
             source.name,
+            source,
         )
         else -> error("Bilinmeyen IPTV kaynak türü: ${source.kind}")
     }
@@ -448,91 +469,93 @@ class IptvRepository(context: Context) {
         replacementSource: IptvSourceEntity? = null,
         produce: () -> Iterable<ParsedIptvChannel>,
     ): IptvImportResult {
-        val now = System.currentTimeMillis()
-        val result = database.withTransaction {
-            val existing = replacementSource ?: dao.getSourceByLocation(location)
-            val sourceId = existing?.id ?: dao.insertSource(
-                IptvSourceEntity(
-                    name = name,
-                    location = location,
-                    kind = kind,
-                    serverUrl = serverUrl,
-                    username = username,
-                    password = password,
-                    macAddress = macAddress,
-                ),
-            )
-            check(sourceId > 0) { "IPTV kaynağı kaydedilemedi." }
-            val selectedChannels = if (existing == null) {
-                emptyList()
-            } else {
-                dao.getSelectedChannelsForSource(sourceId)
-            }
-            val selectedKeys = selectedChannels.mapTo(mutableSetOf()) { it.sourceKey }
-            val selectedTvgIds = selectedChannels.mapNotNullTo(mutableSetOf()) {
-                it.tvgId?.trim()?.takeIf(String::isNotBlank)
-            }
-            val selectedNames = selectedChannels.asSequence()
-                .filter { it.tvgId.isNullOrBlank() }
-                .mapTo(mutableSetOf()) { selectionName(it.displayName, it.groupTitle) }
-            val source = (existing ?: IptvSourceEntity(
-                id = sourceId,
-                name = name,
-                location = location,
-                kind = kind,
-            )).copy(
-                name = name,
-                location = location,
-                kind = kind,
-                enabled = true,
-                lastUpdatedAt = now,
-                serverUrl = serverUrl,
-                username = username,
-                password = password,
-                macAddress = macAddress,
-            )
-            dao.updateSource(source)
-            dao.deleteChannelsForSource(sourceId)
-            val batch = ArrayList<IptvChannelEntity>(IMPORT_BATCH_SIZE)
-            var channelCount = 0
-            fun entity(index: Int, item: ParsedIptvChannel): IptvChannelEntity {
-                val tvgId = item.tvgId?.trim()?.takeIf(String::isNotBlank)
-                val identity = tvgId?.let { "id:$it" } ?: listOf(
-                    "name:${selectionName(item.name, item.groupTitle)}",
-                    item.streamUrl.substringBefore('?'),
-                ).joinToString("|")
-                val sourceKey = "iptv:$sourceId:${sha256(identity).take(24)}"
-                return IptvChannelEntity(
-                    sourceKey = sourceKey,
-                    sourceId = sourceId,
-                    tvgId = item.tvgId,
-                    tvgName = item.tvgName,
-                    displayName = item.name,
-                    streamUrl = item.streamUrl,
-                    logoUrl = item.logoUrl,
-                    groupTitle = item.groupTitle,
-                    userAgent = item.userAgent,
-                    referrer = item.referrer,
-                    subtitleUrl = item.subtitleUrl,
-                    originalIndex = index,
-                    contentType = item.contentType,
-                    selected = sourceKey in selectedKeys ||
-                        tvgId != null && tvgId in selectedTvgIds ||
-                        tvgId == null && selectionName(item.name, item.groupTitle) in selectedNames,
-                    lastSeenAt = now,
-                )
-            }
-            for (item in produce()) {
-                batch += entity(channelCount, item)
-                channelCount++
-                if (batch.size >= IMPORT_BATCH_SIZE) {
-                    dao.upsertChannels(batch.toList())
-                    batch.clear()
+        val result = IMPORT_MUTEX.withLock {
+            val sessionId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            try {
+                dao.deleteStaleStaging(now - STAGING_MAX_AGE_MS)
+                val batch = ArrayList<IptvChannelStagingEntity>(IMPORT_BATCH_SIZE)
+                var channelCount = 0
+                for (item in produce()) {
+                    coroutineContext.ensureActive()
+                    val tvgId = item.tvgId?.trim()?.takeIf(String::isNotBlank)
+                    val matchKey = selectionName(item.name, item.groupTitle)
+                    val identity = tvgId?.let { "id:$it" } ?: listOf(
+                        "name:$matchKey",
+                        item.streamUrl.substringBefore('?'),
+                    ).joinToString("|")
+                    batch += IptvChannelStagingEntity(
+                        sessionId = sessionId,
+                        originalIndex = channelCount,
+                        identityHash = sha256(identity).take(24),
+                        tvgId = tvgId,
+                        tvgName = item.tvgName,
+                        displayName = item.name,
+                        streamUrl = item.streamUrl,
+                        logoUrl = item.logoUrl,
+                        groupTitle = item.groupTitle,
+                        userAgent = item.userAgent,
+                        referrer = item.referrer,
+                        subtitleUrl = item.subtitleUrl,
+                        contentType = item.contentType,
+                        matchKey = matchKey,
+                        createdAt = now,
+                    )
+                    channelCount++
+                    if (batch.size >= IMPORT_BATCH_SIZE) {
+                        dao.insertStagedChannels(batch.toList())
+                        batch.clear()
+                    }
+                }
+                if (batch.isNotEmpty()) dao.insertStagedChannels(batch)
+                require(channelCount > 0 && dao.stagingCount(sessionId) > 0) {
+                    "Listede oynatılabilir IPTV kanalı bulunamadı."
+                }
+
+                database.withTransaction {
+                    val existing = replacementSource ?: dao.getSourceByLocation(location)
+                    val sourceId = existing?.id ?: dao.insertSource(
+                        IptvSourceEntity(
+                            name = name,
+                            location = location,
+                            kind = kind,
+                            serverUrl = serverUrl,
+                            username = username,
+                            password = password,
+                            macAddress = macAddress,
+                        ),
+                    )
+                    check(sourceId > 0) { "IPTV kaynağı kaydedilemedi." }
+                    val source = (existing ?: IptvSourceEntity(
+                        id = sourceId,
+                        name = name,
+                        location = location,
+                        kind = kind,
+                    )).copy(
+                        name = name,
+                        location = location,
+                        kind = kind,
+                        enabled = true,
+                        lastUpdatedAt = now,
+                        serverUrl = serverUrl,
+                        username = username,
+                        password = password,
+                        macAddress = macAddress,
+                    )
+                    dao.updateSource(source)
+                    dao.resolveStagedSourceKeys(sessionId, sourceId)
+                    dao.discardSupersededStagedDuplicates(sessionId)
+                    dao.updateChangedStagedChannels(sessionId, sourceId)
+                    dao.touchStagedChannels(sessionId, sourceId, now)
+                    dao.insertNewStagedChannels(sessionId, sourceId, now)
+                    dao.deleteChannelsMissingFromStaging(sourceId, sessionId)
+                    IptvImportResult(sourceId, source.name, dao.channelCount(sourceId))
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    runCatching { dao.deleteStagingSession(sessionId) }
                 }
             }
-            if (batch.isNotEmpty()) dao.upsertChannels(batch)
-            require(channelCount > 0) { "Listede oynatılabilir IPTV kanalı bulunamadı." }
-            IptvImportResult(sourceId, source.name, channelCount)
         }
         notifySharedChannelsChanged()
         return result
@@ -564,7 +587,8 @@ class IptvRepository(context: Context) {
     }
 
     private fun selectionName(name: String, group: String?): String =
-        "${group.orEmpty().trim().lowercase()}|${name.trim().lowercase()}"
+        "${group.orEmpty().trim().lowercase(Locale.ROOT)}|" +
+            name.trim().lowercase(Locale.ROOT)
 
     companion object {
         const val KIND_URL = "URL"
@@ -576,5 +600,7 @@ class IptvRepository(context: Context) {
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
         private const val IMPORT_BATCH_SIZE = 500
+        private const val STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
+        private val IMPORT_MUTEX = Mutex()
     }
 }

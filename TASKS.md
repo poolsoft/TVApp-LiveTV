@@ -72,7 +72,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Kanal adı, `tvg-name` ve kategori için FTS tablosu ve migration ekle.
   **Kabul:** 15.000 kayıtta arama p95 300 ms altında ve seçim/filtre değişiminde odak stabildir.
 
-- [ ] **DATA-005 (P1): Güvenli kaynak yenileme**
+- [x] **DATA-005 (P1): Güvenli kaynak yenileme**
   M3U/Xtream/Stalker yenilemeyi staging + diff ile yap; seçim, özel sıra, özel ad ve EPG override
   bilgilerini koru.
   **Kabul:** Başarısız yenileme çalışan eski listeyi silmez; işlem iptal edilebilir.
