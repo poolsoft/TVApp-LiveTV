@@ -33,6 +33,16 @@ data class IptvStatistics(
     val selectedChannelCount: Int,
 )
 
+enum class IptvPageDirection { FIRST, NEXT, PREVIOUS, LAST, AT_INDEX }
+
+data class IptvPageAnchor(val originalIndex: Int, val sourceKey: String)
+
+data class IptvLibraryPage(
+    val channels: List<LiveChannel>,
+    val firstAnchor: IptvPageAnchor?,
+    val lastAnchor: IptvPageAnchor?,
+)
+
 class IptvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val database = TVAppDatabase.getInstance(appContext)
@@ -85,6 +95,39 @@ class IptvRepository(context: Context) {
         offset,
     )
 
+    suspend fun selectionWindow(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        limit: Int,
+        direction: IptvPageDirection,
+        anchor: IptvPageAnchor? = null,
+        targetIndex: Int = 0,
+    ): List<IptvChannelEntity> = when (direction) {
+        IptvPageDirection.FIRST -> dao.getSelectionPage(
+            sourceId, category, query, selectedOnly, limit, 0,
+        )
+        IptvPageDirection.NEXT -> requireNotNull(anchor).let {
+            dao.getSelectionPageAfter(
+                sourceId, category, query, selectedOnly,
+                it.originalIndex, it.sourceKey, limit,
+            )
+        }
+        IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
+            dao.getSelectionPageBefore(
+                sourceId, category, query, selectedOnly,
+                it.originalIndex, it.sourceKey, limit,
+            ).asReversed()
+        }
+        IptvPageDirection.LAST -> dao.getSelectionLastPage(
+            sourceId, category, query, selectedOnly, limit,
+        ).asReversed()
+        IptvPageDirection.AT_INDEX -> dao.getSelectionPageAtOrAfter(
+            sourceId, category, query, selectedOnly, targetIndex, limit,
+        )
+    }
+
     suspend fun selectionCount(
         sourceId: Long,
         category: String?,
@@ -93,6 +136,20 @@ class IptvRepository(context: Context) {
     ): Int = dao.selectionCount(sourceId, category, query, selectedOnly)
 
     suspend fun selectedChannelCount(sourceId: Long): Int = dao.selectedChannelCount(sourceId)
+
+    suspend fun setFilteredChannelsSelected(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selected: Boolean,
+    ): Int {
+        val changed = dao.setFilteredChannelsSelected(sourceId, category, query, selected)
+        if (changed > 0) {
+            notifySharedChannelsChanged()
+            if (selected) xmlTvRepository.requestXtreamRefresh(force = true)
+        }
+        return changed
+    }
 
     suspend fun isChannelSelected(sourceKey: String): Boolean =
         dao.getChannel(sourceKey)?.selected == true
@@ -121,6 +178,45 @@ class IptvRepository(context: Context) {
         offset: Int,
     ): List<LiveChannel> = dao.getLibraryPage(sourceId, category, contentType, limit, offset)
         .map { it.toLiveChannel() }
+
+    suspend fun libraryLiveChannelsWindow(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        limit: Int,
+        direction: IptvPageDirection,
+        anchor: IptvPageAnchor? = null,
+        targetIndex: Int = 0,
+    ): IptvLibraryPage {
+        val entities = when (direction) {
+            IptvPageDirection.FIRST -> dao.getLibraryPage(
+                sourceId, category, contentType, limit, 0,
+            )
+            IptvPageDirection.NEXT -> requireNotNull(anchor).let {
+                dao.getLibraryPageAfter(
+                    sourceId, category, contentType,
+                    it.originalIndex, it.sourceKey, limit,
+                )
+            }
+            IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
+                dao.getLibraryPageBefore(
+                    sourceId, category, contentType,
+                    it.originalIndex, it.sourceKey, limit,
+                ).asReversed()
+            }
+            IptvPageDirection.LAST -> dao.getLibraryLastPage(
+                sourceId, category, contentType, limit,
+            ).asReversed()
+            IptvPageDirection.AT_INDEX -> dao.getLibraryPageAtOrAfter(
+                sourceId, category, contentType, targetIndex, limit,
+            )
+        }
+        return IptvLibraryPage(
+            channels = entities.map { it.toLiveChannel() },
+            firstAnchor = entities.firstOrNull()?.pageAnchor(),
+            lastAnchor = entities.lastOrNull()?.pageAnchor(),
+        )
+    }
 
     suspend fun libraryChannelCount(
         sourceId: Long,
@@ -179,6 +275,8 @@ class IptvRepository(context: Context) {
             iptvContentType = contentType,
             inMainList = selected,
         )
+
+    private fun IptvChannelEntity.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
 
     suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
         return importUrlInternal(location, nameOverride, null)

@@ -5,11 +5,12 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
 import android.view.View
-import android.widget.AbsListView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.IptvRepository
+import com.tvapp.livetv.data.IptvPageAnchor
+import com.tvapp.livetv.data.IptvPageDirection
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.databinding.ActivityIptvChannelSelectionBinding
 import com.tvapp.livetv.model.LiveChannel
@@ -33,8 +34,9 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     private var selectedOnly = false
     private var selectedCount = 0
     private var filteredCount = 0
-    private var offset = 0
-    private var exhausted = true
+    private var windowStart = 0
+    private var hasPreviousPage = false
+    private var hasNextPage = false
     private var loading = false
     private var filterGeneration = 0
     private val selectionOverrides = linkedMapOf<String, Boolean>()
@@ -68,6 +70,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         val minimum = (48 * resources.displayMetrics.density).toInt()
         listOf(
             binding.clearButton,
+            binding.selectAllButton,
             binding.categoryButton,
             binding.selectedFilterButton,
             binding.saveButton,
@@ -106,7 +109,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
             binding.channelList.setItemChecked(position, selected)
             updateStatus()
-            if (selectedOnly && !selected) reloadFromStart(requestFocus = true)
+            if (selectedOnly && !selected) {
+                lifecycleScope.launch {
+                    flushSelectionOverrides()
+                    reloadFromStart(requestFocus = true)
+                }
+            }
         }
         binding.channelList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -121,21 +129,6 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
 
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
         }
-        binding.channelList.setOnScrollListener(object : AbsListView.OnScrollListener {
-            override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) = Unit
-
-            override fun onScroll(
-                view: AbsListView?,
-                firstVisibleItem: Int,
-                visibleItemCount: Int,
-                totalItemCount: Int,
-            ) {
-                if (
-                    totalItemCount > 0 &&
-                    firstVisibleItem + visibleItemCount >= totalItemCount - PREFETCH_DISTANCE
-                ) loadNextPage()
-            }
-        })
     }
 
     private fun configureFilters() {
@@ -170,15 +163,8 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     }
 
     private fun configureActions() {
-        binding.clearButton.setOnClickListener {
-            val selectedVisible = channels.filter(::isSelected)
-            selectedVisible.forEach { selectionOverrides[it.sourceKey] = false }
-            selectedCount = (selectedCount - selectedVisible.size).coerceAtLeast(0)
-            channels = channels.map { it.copy(selected = false) }
-            channels.indices.forEach { binding.channelList.setItemChecked(it, false) }
-            updateStatus()
-            if (selectedOnly) reloadFromStart(requestFocus = true)
-        }
+        binding.clearButton.setOnClickListener { applyBulkSelection(selected = false) }
+        binding.selectAllButton.setOnClickListener { applyBulkSelection(selected = true) }
         binding.categoryButton.setOnClickListener {
             binding.categoryFilter.requestFocus()
             binding.categoryFilter.performClick()
@@ -192,6 +178,39 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.saveButton.setOnClickListener { saveSelection() }
+    }
+
+    private fun applyBulkSelection(selected: Boolean) {
+        if (sourceId < 0) return
+        binding.clearButton.isEnabled = false
+        binding.selectAllButton.isEnabled = false
+        lifecycleScope.launch {
+            val result = runCatching {
+                flushSelectionOverrides()
+                val changed = withContext(Dispatchers.IO) {
+                    repository.setFilteredChannelsSelected(
+                        sourceId,
+                        selectedCategory,
+                        searchQuery,
+                        selected,
+                    )
+                }
+                selectedCount = withContext(Dispatchers.IO) {
+                    repository.selectedChannelCount(sourceId)
+                }
+                changed
+            }
+            binding.clearButton.isEnabled = true
+            binding.selectAllButton.isEnabled = true
+            result.onSuccess { changed ->
+                selectionOverrides.clear()
+                setResult(RESULT_OK)
+                binding.status.text = getString(R.string.iptv_bulk_selection_complete, changed)
+                reloadFromStart(requestFocus = true)
+            }.onFailure { error ->
+                binding.status.text = error.message ?: error.javaClass.simpleName
+            }
+        }
     }
 
     private fun loadInitialData() {
@@ -227,21 +246,33 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         previewJob?.cancel()
         preview.stop()
         channels = emptyList()
-        offset = 0
+        windowStart = 0
         filteredCount = 0
-        exhausted = false
+        hasPreviousPage = false
+        hasNextPage = false
         loading = false
         focusedPosition = 0
         channelListAdapter.clear()
         channelListAdapter.notifyDataSetChanged()
-        loadNextPage(requestFocus)
+        loadWindow(IptvPageDirection.FIRST, requestFocus)
     }
 
-    private fun loadNextPage(requestFocus: Boolean = false) {
-        if (loading || exhausted || sourceId < 0) return
+    private fun loadWindow(
+        direction: IptvPageDirection,
+        requestFocus: Boolean = false,
+        targetIndex: Int = 0,
+    ) {
+        if (loading || sourceId < 0) return
+        val anchor = when (direction) {
+            IptvPageDirection.NEXT -> channels.lastOrNull()?.pageAnchor()
+            IptvPageDirection.PREVIOUS -> channels.firstOrNull()?.pageAnchor()
+            else -> null
+        }
+        if ((direction == IptvPageDirection.NEXT || direction == IptvPageDirection.PREVIOUS) &&
+            anchor == null
+        ) return
         loading = true
         val generation = filterGeneration
-        val pageOffset = offset
         pageJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -251,13 +282,15 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                         searchQuery,
                         selectedOnly,
                     )
-                    val page = repository.selectionPage(
+                    val page = repository.selectionWindow(
                         sourceId,
                         selectedCategory,
                         searchQuery,
                         selectedOnly,
                         PAGE_SIZE,
-                        pageOffset,
+                        direction,
+                        anchor,
+                        targetIndex,
                     )
                     total to page
                 }
@@ -266,15 +299,29 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             loading = false
             result.onSuccess { (total, loaded) ->
                 filteredCount = total
-                offset += loaded.size
-                exhausted = offset >= total || loaded.size < PAGE_SIZE
                 val effective = loaded.map { channel ->
                     channel.copy(selected = selectionOverrides[channel.sourceKey] ?: channel.selected)
                 }.filter { !selectedOnly || it.selected }
-                channels = channels + effective
-                renderChannels(requestFocus && pageOffset == 0)
+                windowStart = when (direction) {
+                    IptvPageDirection.FIRST -> 0
+                    IptvPageDirection.NEXT -> windowStart + channels.size
+                    IptvPageDirection.PREVIOUS -> (windowStart - effective.size).coerceAtLeast(0)
+                    IptvPageDirection.LAST -> (total - effective.size).coerceAtLeast(0)
+                    IptvPageDirection.AT_INDEX -> targetIndex.coerceIn(
+                        0,
+                        (total - effective.size).coerceAtLeast(0),
+                    )
+                }
+                channels = effective
+                hasPreviousPage = windowStart > 0
+                hasNextPage = windowStart + effective.size < total
+                focusedPosition = when (direction) {
+                    IptvPageDirection.PREVIOUS, IptvPageDirection.LAST ->
+                        effective.lastIndex.coerceAtLeast(0)
+                    else -> 0
+                }
+                renderChannels(requestFocus)
             }.onFailure { error ->
-                exhausted = true
                 binding.status.text = error.message ?: error.javaClass.simpleName
             }
         }
@@ -395,10 +442,17 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     private fun pageList(direction: Int): Boolean {
         if (channels.isEmpty()) return true
         val visible = binding.channelList.lastVisiblePosition - binding.channelList.firstVisiblePosition
-        val target = (binding.channelList.selectedItemPosition + direction * visible.coerceAtLeast(1))
-            .coerceIn(0, channels.lastIndex)
+        val rawTarget = binding.channelList.selectedItemPosition + direction * visible.coerceAtLeast(1)
+        if (direction < 0 && rawTarget < 0 && hasPreviousPage) {
+            loadWindow(IptvPageDirection.PREVIOUS, requestFocus = true)
+            return true
+        }
+        if (direction > 0 && rawTarget > channels.lastIndex && hasNextPage) {
+            loadWindow(IptvPageDirection.NEXT, requestFocus = true)
+            return true
+        }
+        val target = rawTarget.coerceIn(0, channels.lastIndex)
         binding.channelList.setSelection(target)
-        if (direction > 0 && target >= channels.lastIndex - PREFETCH_DISTANCE) loadNextPage()
         return true
     }
 
@@ -411,13 +465,21 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> if (binding.channelList.selectedItemPosition <= 0) {
-                    jumpToFilteredIndex(filteredCount - 1)
+                    if (hasPreviousPage) {
+                        loadWindow(IptvPageDirection.PREVIOUS, requestFocus = true)
+                    } else {
+                        loadWindow(IptvPageDirection.LAST, requestFocus = true)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> if (
-                    exhausted && binding.channelList.selectedItemPosition >= channels.lastIndex
+                    binding.channelList.selectedItemPosition >= channels.lastIndex
                 ) {
-                    jumpToFilteredIndex(0)
+                    if (hasNextPage) {
+                        loadWindow(IptvPageDirection.NEXT, requestFocus = true)
+                    } else {
+                        loadWindow(IptvPageDirection.FIRST, requestFocus = true)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -456,16 +518,22 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         pageJob?.cancel()
         previewJob?.cancel()
         preview.stop()
-        val pageStart = (index / PAGE_SIZE) * PAGE_SIZE
         channels = emptyList()
-        offset = pageStart
-        exhausted = false
+        windowStart = index
+        hasPreviousPage = index > 0
+        hasNextPage = false
         loading = false
-        focusedPosition = index - pageStart
+        focusedPosition = 0
         channelListAdapter.clear()
         channelListAdapter.notifyDataSetChanged()
-        loadNextPage(requestFocus = true)
+        loadWindow(
+            IptvPageDirection.AT_INDEX,
+            requestFocus = true,
+            targetIndex = index,
+        )
     }
+
+    private fun IptvChannelEntity.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
 
     private fun digitForKeyCode(keyCode: Int): Int? = when (keyCode) {
         in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
@@ -487,7 +555,6 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         const val EXTRA_SOURCE_ID = "source_id"
         const val EXTRA_SOURCE_NAME = "source_name"
         private const val PAGE_SIZE = 200
-        private const val PREFETCH_DISTANCE = 20
         private const val SEARCH_DELAY_MS = 350L
         private const val PREVIEW_DELAY_MS = 900L
         private const val NUMBER_ENTRY_DELAY_MS = 1_000L

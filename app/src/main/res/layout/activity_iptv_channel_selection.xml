@@ -184,6 +184,35 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/select_all_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_focusable"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:nextFocusUp="@id/channel_list"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_playlist_added"
+                app:tint="@color/accent" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:text="@string/select_all_iptv_selection"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/category_button"
             android:layout_width="wrap_content"
             android:layout_height="40dp"

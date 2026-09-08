@@ -394,7 +394,9 @@
     <string name="iptv_input_not_found">TVApp IPTV sistem girişi bulunamadı.</string>
     <string name="done">Tamam</string>
     <string name="all_iptv_categories">Tüm kategoriler</string>
-    <string name="clear_visible_iptv_selection">Görünenleri temizle</string>
+    <string name="clear_visible_iptv_selection">Seçimi temizle</string>
+    <string name="select_all_iptv_selection">Tümünü seç</string>
+    <string name="iptv_bulk_selection_complete">%1$d kanal güncellendi</string>
     <string name="clear_iptv_selection">Kırmızı · Temizle</string>
     <string name="save_iptv_selection">Yeşil · Kaydet</string>
     <string name="iptv_selection_ok_hint">OK · Seç / Kaldır</string>

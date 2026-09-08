@@ -381,7 +381,9 @@
     <string name="iptv_input_not_found">TVApp IPTV system input was not found.</string>
     <string name="done">Done</string>
     <string name="all_iptv_categories">All categories</string>
-    <string name="clear_visible_iptv_selection">Clear visible selection</string>
+    <string name="clear_visible_iptv_selection">Clear selection</string>
+    <string name="select_all_iptv_selection">Select all</string>
+    <string name="iptv_bulk_selection_complete">%1$d channels updated</string>
     <string name="clear_iptv_selection">Red - Clear</string>
     <string name="save_iptv_selection">Green - Save</string>
     <string name="iptv_selection_ok_hint">OK - Select / Deselect</string>

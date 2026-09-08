@@ -7,6 +7,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### Büyük veri performans testi
+* Tam IPTV kütüphanesi ve IPTV kanal seçim ekranı yüksek `OFFSET` yerine `(originalIndex, sourceKey)` çıpalı ileri/geri pencerelere geçirildi. Ekranlar en fazla tek sayfa tutuyor; ilk/son sarma, CH+/CH- ve sayı ile sıçrama tüm kataloğu belleğe almadan çalışıyor.
+* IPTV filtreleri değişirken eski sayfa yanıtları nesil kimliğiyle reddediliyor; her yeni pencere odaklandıktan sonra EPG yalnız görünür kanal çevresi için yükleniyor.
+* Debug sorgu analizine 14.000'inci kayıt çevresinde ileri ve geri keyset ölçümleri eklendi; kanal listesi EPG logu TIF/IPTV istek sayılarını ve toplam sorgu süresini ayrı gösteriyor.
+* Kayıtlı IPTV listesinin kanal seçim ekranına, etkin kategori ve arama filtresinin tamamını veritabanında işleyen `Tümünü seç` ve `Seçimi temizle` kontrolleri eklendi; işlem için bütün katalog belleğe yüklenmiyor.
 * Debug araçlarına gerçek kullanıcı veritabanından tamamen ayrı çalışan performans veri üreticisi eklendi.
 * Emülatör ve fiziksel cihazlarda aynı şekilde tekrarlanabilen 500, 15.000 ve 50.000 IPTV kanalı ile XMLTV programı senaryoları eklendi.
 * Büyük veri setleri bellekte topluca kurulmadan 500 kayıtlık parçalarla yazılıyor; üretim süresi debug loguna kaydediliyor ve test verisi tek eylemle güvenle temizlenebiliyor.

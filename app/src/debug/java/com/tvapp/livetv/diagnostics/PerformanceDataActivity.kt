@@ -262,6 +262,20 @@ class PerformanceDataActivity : AppCompatActivity() {
                 "Replace high OFFSET paging with sourceId/originalIndex keyset paging.",
             ),
             QueryCase(
+                "iptv_keyset_forward",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "AND (originalIndex > ? OR (originalIndex = ? AND sourceKey > ?)) " +
+                    "ORDER BY originalIndex, sourceKey LIMIT 120",
+                arrayOf(sourceId, 14000, 14000, "perf:$sourceId:14000"),
+            ),
+            QueryCase(
+                "iptv_keyset_backward",
+                "SELECT * FROM iptv_channels WHERE sourceId = ? " +
+                    "AND (originalIndex < ? OR (originalIndex = ? AND sourceKey < ?)) " +
+                    "ORDER BY originalIndex DESC, sourceKey DESC LIMIT 120",
+                arrayOf(sourceId, 14000, 14000, "perf:$sourceId:14000"),
+            ),
+            QueryCase(
                 "iptv_live_category",
                 "SELECT * FROM iptv_channels WHERE sourceId = ? " +
                     "AND contentType = 'LIVE' AND groupTitle = ? " +

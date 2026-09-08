@@ -59,7 +59,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   IPTV/EPG DAO sorgularını `EXPLAIN QUERY PLAN` ile 15.000 ve 50.000 kayıtta ölç.
   **Kabul:** Tam tarama yapan ekran sorguları ve gerekli composite indeksler raporlanır.
 
-- [ ] **DATA-002 (P0): Focus-aware keyset pager**
+- [x] **DATA-002 (P0): Focus-aware keyset pager**
   Büyük IPTV ekranlarında yüksek `OFFSET` yerine `originalIndex/sourceKey` tabanlı ileri/geri
   pencere getir. Odağı ve filtreyi async yükleme sırasında koru.
   **Kabul:** İlk/son ve CH+/CH- gezinimi çalışır; hiçbir UI rotası tüm kataloğu yüklemez.
@@ -92,7 +92,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Infobar, kanal listesi ve rehber için tek now/next veri kaynağı kur.
   **Kabul:** Aynı anda aynı kanal için farklı EPG gösterilmez.
 
-- [ ] **EPG-002 (P0): Odak öncelikli prefetch**
+- [x] **EPG-002 (P0): Odak öncelikli prefetch**
   Odaktaki kanalı hemen, komşuları debounce ile getir; stale async yanıtları reddet.
   **Kabul:** Hızlı tuş basılı gezinmede ağ/DB kuyruğu büyümez ve eski EPG yeni satıra yazılmaz.
 

@@ -87,6 +87,72 @@ interface IptvDao {
     ): List<IptvChannelEntity>
 
     @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (originalIndex > :anchorIndex " +
+            "OR (originalIndex = :anchorIndex AND sourceKey > :anchorKey)) " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit",
+    )
+    suspend fun getLibraryPageAfter(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        anchorIndex: Int,
+        anchorKey: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (originalIndex < :anchorIndex " +
+            "OR (originalIndex = :anchorIndex AND sourceKey < :anchorKey)) " +
+            "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
+    )
+    suspend fun getLibraryPageBefore(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        anchorIndex: Int,
+        anchorKey: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
+    )
+    suspend fun getLibraryLastPage(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND originalIndex >= :targetIndex " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit",
+    )
+    suspend fun getLibraryPageAtOrAfter(
+        sourceId: Long,
+        category: String?,
+        contentType: String,
+        targetIndex: Int,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
@@ -113,6 +179,84 @@ interface IptvDao {
     ): List<IptvChannelEntity>
 
     @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1) " +
+            "AND (originalIndex > :anchorIndex " +
+            "OR (originalIndex = :anchorIndex AND sourceKey > :anchorKey)) " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit",
+    )
+    suspend fun getSelectionPageAfter(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        anchorIndex: Int,
+        anchorKey: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1) " +
+            "AND (originalIndex < :anchorIndex " +
+            "OR (originalIndex = :anchorIndex AND sourceKey < :anchorKey)) " +
+            "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
+    )
+    suspend fun getSelectionPageBefore(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        anchorIndex: Int,
+        anchorKey: String,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1) " +
+            "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
+    )
+    suspend fun getSelectionLastPage(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
+        "SELECT * FROM iptv_channels " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE) " +
+            "AND (:selectedOnly = 0 OR selected = 1) " +
+            "AND originalIndex >= :targetIndex " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit",
+    )
+    suspend fun getSelectionPageAtOrAfter(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selectedOnly: Boolean,
+        targetIndex: Int,
+        limit: Int,
+    ): List<IptvChannelEntity>
+
+    @Query(
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
@@ -125,6 +269,20 @@ interface IptvDao {
         category: String?,
         query: String,
         selectedOnly: Boolean,
+    ): Int
+
+    @Query(
+        "UPDATE iptv_channels SET selected = :selected " +
+            "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:query = '' OR displayName LIKE '%' || :query || '%' COLLATE NOCASE " +
+            "OR COALESCE(groupTitle, '') LIKE '%' || :query || '%' COLLATE NOCASE)",
+    )
+    suspend fun setFilteredChannelsSelected(
+        sourceId: Long,
+        category: String?,
+        query: String,
+        selected: Boolean,
     ): Int
 
     @Query(

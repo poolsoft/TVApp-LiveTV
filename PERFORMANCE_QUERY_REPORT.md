@@ -4,6 +4,12 @@ This report records the first `DATA-001` baseline. Emulator timings are relative
 signals, not physical TV targets. Re-run the debug performance analyzer on low-end hardware
 before setting absolute budgets.
 
+The full IPTV library and IPTV selection manager now retain one bounded page and move with the
+`(originalIndex, sourceKey)` anchor. Forward and backward debug cases are included alongside the
+old 14,000-row OFFSET baseline. Vendor TIF channels remain a bounded stable snapshot; list EPG is
+fetched by channel URI only for the focused channel and its visible neighbours, with XMLTV used
+as the shared fallback.
+
 ## Covered paths
 
 | Query | Current plan | 15,000-row emulator baseline | Finding |
@@ -18,10 +24,9 @@ before setting absolute budgets.
 
 ## Next data changes
 
-1. Implement focus-aware `originalIndex/sourceKey` keyset paging before changing indexes.
-2. Use a lightweight row projection and add `(sourceId, selected, originalIndex)` for selected rows.
-3. Add Room FTS for display name, `tvg-name`, and category search.
-4. Store a normalized category value if category enumeration remains a measurable cost.
+1. Use a lightweight row projection and add `(sourceId, selected, originalIndex)` for selected rows.
+2. Add Room FTS for display name, `tvg-name`, and category search.
+3. Store a normalized category value if category enumeration remains a measurable cost.
 
 The complete `EXPLAIN QUERY PLAN` output, measured row count, duration, full-scan flag, and
 recommendation are written as `QUERY_PLAN` records in the debug log.
