@@ -10,6 +10,7 @@ import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
 import android.media.tv.TvTrackInfo
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
@@ -65,6 +66,10 @@ import com.tvapp.livetv.playback.IptvAspectMode
 import com.tvapp.livetv.playback.IptvViewPreferencesStore
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
+import com.tvapp.livetv.platform.DeviceCapabilities
+import com.tvapp.livetv.platform.DeviceCapabilitiesDetector
+import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.resolveExperienceMode
 import com.tvapp.livetv.settings.ChannelPanelSide
 import com.tvapp.livetv.settings.ChannelListFilterStore
 import com.tvapp.livetv.settings.ChannelTrackPreferenceStore
@@ -137,8 +142,14 @@ class MainActivity : TvRemoteActivity() {
     private enum class IptvLibraryContentType { ALL, LIVE, VOD, CONTINUE }
     private enum class IptvControlRow { TIMELINE, BUTTONS }
     private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE }
+    private data class ChannelListModeOption(
+        val label: String,
+        val selected: Boolean,
+        val apply: () -> Unit,
+    )
 
     private lateinit var binding: ActivityMainBinding
+    private val activityStartAt = SystemClock.elapsedRealtime()
     private lateinit var repository: ChannelRepository
     private lateinit var iptvRepository: IptvRepository
     private lateinit var programRepository: ProgramRepository
@@ -156,6 +167,8 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var iptvViewPreferencesStore: IptvViewPreferencesStore
     private lateinit var homeRecentChannelsPublisher: HomeRecentChannelsPublisher
     private lateinit var debugLog: CrashReportStore
+    private lateinit var deviceCapabilities: DeviceCapabilities
+    private var experienceMode = ExperienceMode.IPTV_ONLY_TV
     private lateinit var adapter: ChannelAdapter
     private var lastTifTrackLogSignature: String? = null
     private var lastTifCallbackLogSignature: String? = null
@@ -311,6 +324,12 @@ class MainActivity : TvRemoteActivity() {
         repository = ChannelRepository(this)
         iptvRepository = IptvRepository(this)
         programRepository = ProgramRepository(this)
+        debugLog = CrashReportStore(this)
+        deviceCapabilities = DeviceCapabilitiesDetector(this).detect()
+        experienceMode = resolveExperienceMode(
+            deviceCapabilities,
+            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+        )
         playback = TifPlaybackController(binding.tvView)
         iptvPlayback = IptvPlaybackController(this, binding.iptvPlayerView)
         secondaryPlayback = TifPlaybackController(binding.secondaryTvView)
@@ -340,10 +359,19 @@ class MainActivity : TvRemoteActivity() {
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
-        debugLog = CrashReportStore(this)
         prepareIptvGrid()
         setupIptvControls()
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
+        debugLog.recordDebug(
+            "DEVICE_CAPABILITIES | mode=$experienceMode, " +
+                "leanback=${deviceCapabilities.isLeanbackDevice}, " +
+                "liveTvFeature=${deviceCapabilities.reportsLiveTvFeature}, " +
+                "tvInputManager=${deviceCapabilities.hasTvInputManager}, " +
+                "vendorTuners=${deviceCapabilities.vendorTunerInputCount}, " +
+                "tvPermission=${deviceCapabilities.hasTvListingsPermission}, " +
+                "pip=${deviceCapabilities.supportsPictureInPicture}, " +
+                "lowRam=${deviceCapabilities.isLowRamDevice}",
+        )
         if (intent.getBooleanExtra(BootLaunchReceiver.EXTRA_STARTED_AFTER_BOOT, false)) {
             debugLog.recordDebug("MAIN_STARTED_AFTER_BOOT")
         }
@@ -478,6 +506,7 @@ class MainActivity : TvRemoteActivity() {
         startClock()
         scheduleSleepTimer()
         ensurePermissionAndLoad()
+        recordPerformance("activity_create", activityStartAt, "mode=$experienceMode")
     }
 
     private fun scheduleSleepTimer() {
@@ -527,8 +556,8 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun ensurePermissionAndLoad() {
-        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
-            debugLog.recordDebug("TIF_UNAVAILABLE | loading IPTV-only channel data")
+        if (experienceMode != ExperienceMode.HYBRID_TV) {
+            debugLog.recordDebug("TIF_SKIPPED | mode=$experienceMode, loading IPTV-only data")
             loadChannels()
             return
         }
@@ -554,7 +583,9 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun loadChannels(preserveCurrentPlayback: Boolean = false) {
-        val inputs = repository.tunerInputs()
+        val loadStartedAt = SystemClock.elapsedRealtime()
+        val includeTif = experienceMode == ExperienceMode.HYBRID_TV
+        val inputs = if (includeTif) repository.tunerInputs() else emptyList()
         binding.inputSummary.text = resources.getQuantityString(
             R.plurals.input_count,
             inputs.size,
@@ -563,10 +594,17 @@ class MainActivity : TvRemoteActivity() {
 
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { repository.channels() }
+            val result = withContext(Dispatchers.IO) {
+                repository.channels(includeTif = includeTif)
+            }
             result.fold(
                 onSuccess = { loaded ->
                     debugLog.recordDebug("CHANNEL_LOAD_SUCCESS | count=${loaded.size}")
+                    recordPerformance(
+                        "channel_load",
+                        loadStartedAt,
+                        "count=${loaded.size}, includeTif=$includeTif",
+                    )
                     val currentKey = currentChannel?.sourceKey
                     val playingChannel = currentChannel
                     channels = loaded
@@ -602,6 +640,11 @@ class MainActivity : TvRemoteActivity() {
                     }
                 },
                 onFailure = {
+                    recordPerformance(
+                        "channel_load_failed",
+                        loadStartedAt,
+                        "includeTif=$includeTif, error=${it.javaClass.simpleName}",
+                    )
                     debugLog.recordDebug(
                         "CHANNEL_LOAD_FAILURE | ${it.javaClass.name}: ${it.message}",
                     )
@@ -613,11 +656,26 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showChannels(loaded: List<LiveChannel>) {
         statusRetryAction = null
+        binding.retryButton.setText(R.string.retry)
+        binding.closeButton.visibility = View.VISIBLE
         binding.statusPanel.visibility = View.GONE
         updateChannelCount(panelChannels().size)
     }
 
     private fun showEmptyState(inputs: List<TvInputInfo>) {
+        if (experienceMode != ExperienceMode.HYBRID_TV) {
+            statusRetryAction = ::openIptvEditor
+            binding.statusPanel.visibility = View.VISIBLE
+            binding.statusTitle.setText(R.string.no_channels_title)
+            binding.statusMessage.setText(R.string.iptv_only_empty_message)
+            binding.retryButton.setText(R.string.manage_iptv_sources)
+            binding.closeButton.visibility = View.VISIBLE
+            binding.retryButton.requestFocus()
+            return
+        }
+        statusRetryAction = null
+        binding.retryButton.setText(R.string.retry)
+        binding.closeButton.visibility = View.VISIBLE
         binding.statusPanel.visibility = View.VISIBLE
         binding.statusTitle.setText(R.string.no_channels_title)
         binding.statusMessage.text = if (inputs.isEmpty()) {
@@ -4247,6 +4305,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showChannelPanel(expanded: Boolean) {
+        val openedAt = SystemClock.elapsedRealtime()
         if (binding.channelPanel.visibility != View.VISIBLE) {
             focusedAutoTunePreviousChannel = null
             focusedAutoTuneTargetKey = null
@@ -4271,7 +4330,14 @@ class MainActivity : TvRemoteActivity() {
         applyPanelGeometry()
         showInfoBar()
         focusCurrentListChannel()
-        binding.channelList.post(::loadVisiblePrograms)
+        binding.channelList.post {
+            loadVisiblePrograms()
+            recordPerformance(
+                "channel_panel_open",
+                openedAt,
+                "count=${adapter.itemCount}, content=$channelPanelContent",
+            )
+        }
         scheduleChannelPanelClose()
     }
 
@@ -4426,6 +4492,14 @@ class MainActivity : TvRemoteActivity() {
 
     private fun cycleChannelListMode() {
         focusedTuneJob?.cancel()
+        if (experienceMode != ExperienceMode.HYBRID_TV) {
+            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+                applyChannelFilter(showFavorites = false, source = ChannelSourceFilter.ALL)
+            } else {
+                openSavedIptvLibrary()
+            }
+            return
+        }
         when {
             channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> applyChannelFilter(
                 showFavorites = false,
@@ -4448,37 +4522,66 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showChannelListModeDialog() {
-        val labels = arrayOf(
-            getString(R.string.all_channels),
-            getString(R.string.satellite_channels),
-            getString(R.string.radio_channels),
-            getString(R.string.iptv_filter),
-            getString(R.string.iptv_library),
-        )
-        val checked = when {
-            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> 4
-            sourceFilter == ChannelSourceFilter.SATELLITE -> 1
-            sourceFilter == ChannelSourceFilter.RADIO -> 2
-            sourceFilter == ChannelSourceFilter.IPTV -> 3
-            else -> 0
+        val options = buildList {
+            add(
+                ChannelListModeOption(
+                    label = getString(R.string.all_channels),
+                    selected = channelPanelContent == ChannelPanelContent.NORMAL &&
+                        sourceFilter == ChannelSourceFilter.ALL,
+                    apply = { applyChannelFilter(false, ChannelSourceFilter.ALL) },
+                ),
+            )
+            if (experienceMode == ExperienceMode.HYBRID_TV) {
+                add(
+                    ChannelListModeOption(
+                        getString(R.string.satellite_channels),
+                        channelPanelContent == ChannelPanelContent.NORMAL &&
+                            sourceFilter == ChannelSourceFilter.SATELLITE,
+                    ) { applyChannelFilter(false, ChannelSourceFilter.SATELLITE) },
+                )
+                add(
+                    ChannelListModeOption(
+                        getString(R.string.radio_channels),
+                        channelPanelContent == ChannelPanelContent.NORMAL &&
+                            sourceFilter == ChannelSourceFilter.RADIO,
+                    ) { applyChannelFilter(false, ChannelSourceFilter.RADIO) },
+                )
+                add(
+                    ChannelListModeOption(
+                        getString(R.string.iptv_filter),
+                        channelPanelContent == ChannelPanelContent.NORMAL &&
+                            sourceFilter == ChannelSourceFilter.IPTV,
+                    ) { applyChannelFilter(false, ChannelSourceFilter.IPTV) },
+                )
+            }
+            add(
+                ChannelListModeOption(
+                    getString(R.string.iptv_library),
+                    channelPanelContent == ChannelPanelContent.IPTV_LIBRARY,
+                    ::openSavedIptvLibrary,
+                ),
+            )
         }
+        val labels = options.map(ChannelListModeOption::label).toTypedArray()
+        val checked = options.indexOfFirst(ChannelListModeOption::selected).coerceAtLeast(0)
         AlertDialog.Builder(this)
             .setTitle(R.string.choose_channel_source)
             .setSingleChoiceItems(labels, checked) { dialog, which ->
                 focusedTuneJob?.cancel()
-                when (which) {
-                    0 -> applyChannelFilter(false, ChannelSourceFilter.ALL)
-                    1 -> applyChannelFilter(false, ChannelSourceFilter.SATELLITE)
-                    2 -> applyChannelFilter(false, ChannelSourceFilter.RADIO)
-                    3 -> applyChannelFilter(false, ChannelSourceFilter.IPTV)
-                    4 -> openSavedIptvLibrary()
-                }
+                options[which].apply()
                 dialog.dismiss()
                 if (binding.channelPanel.visibility != View.VISIBLE) showChannelPanel(false)
                 scheduleChannelPanelClose()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun recordPerformance(operation: String, startedAt: Long, detail: String) {
+        if (!BuildConfig.DIAGNOSTICS_ENABLED && !BuildConfig.DEBUG) return
+        debugLog.recordDebug(
+            "PERF | operation=$operation, durationMs=${SystemClock.elapsedRealtime() - startedAt}, $detail",
+        )
     }
 
     private fun pageChannelList(direction: Int) {

@@ -1,6 +1,7 @@
 package com.tvapp.livetv.data
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.database.Cursor
 import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
@@ -27,7 +28,15 @@ class TifRepository(context: Context) {
     fun tunerInputs(): List<TvInputInfo> = physicalInputs().filter { input ->
         input.type == TvInputInfo.TYPE_TUNER &&
             !input.isPassthroughInput &&
-            "/HW" in input.id
+            input.isLikelyVendorTuner()
+    }
+
+    private fun TvInputInfo.isLikelyVendorTuner(): Boolean {
+        val flags = serviceInfo.applicationInfo.flags
+        val systemApp = flags and (
+            ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP
+            ) != 0
+        return systemApp || "/HW" in id
     }
 
     fun channelRawValues(channelId: Long): Result<List<Pair<String, String>>> = runCatching {

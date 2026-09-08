@@ -30,14 +30,19 @@ class ChannelRepository(context: Context) {
     suspend fun channels(
         includeHidden: Boolean = false,
         refreshSources: Boolean = false,
+        includeTif: Boolean = true,
     ): Result<List<LiveChannel>> = runCatching {
         val startedAt = SystemClock.elapsedRealtime()
         val iptvChannels = iptvRepository.channels()
         val afterIptv = SystemClock.elapsedRealtime()
-        val tifResult = tifRepository.channels(forceRefresh = refreshSources)
-        val source = tifResult.getOrElse { error ->
-            if (iptvChannels.isEmpty()) throw error else emptyList()
-        } + iptvChannels
+        val tifChannels = if (includeTif) {
+            tifRepository.channels(forceRefresh = refreshSources).getOrElse { error ->
+                if (iptvChannels.isEmpty()) throw error else emptyList()
+            }
+        } else {
+            emptyList()
+        }
+        val source = tifChannels + iptvChannels
         val afterTif = SystemClock.elapsedRealtime()
         val merged = database.withTransaction {
             val now = System.currentTimeMillis()
@@ -77,8 +82,10 @@ class ChannelRepository(context: Context) {
         val finishedAt = SystemClock.elapsedRealtime()
         debugLog.recordDebug(
             "CHANNEL_LOAD_TIMING | iptv=${afterIptv - startedAt}ms, " +
-                "tif=${afterTif - afterIptv}ms, roomMerge=${finishedAt - afterTif}ms, " +
-                "total=${finishedAt - startedAt}ms, count=${merged.size}, refresh=$refreshSources",
+                "tif=${if (includeTif) "${afterTif - afterIptv}ms" else "skipped"}, " +
+                "roomMerge=${finishedAt - afterTif}ms, " +
+                "total=${finishedAt - startedAt}ms, count=${merged.size}, " +
+                "refresh=$refreshSources, includeTif=$includeTif",
         )
         merged
     }

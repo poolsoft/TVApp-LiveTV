@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Cihaz yetenekleri ve IPTV-only çalışma
+* Uygulama artık yalnız `FEATURE_LIVE_TV` değerine güvenmiyor; kullanılabilir sistem/vendor tuner girişlerini ölçerek Hibrit TV, IPTV-only TV veya Mobil Test çalışma modunu seçiyor.
+* Tuner bulunmayan TV stick/box ve emülatörlerde TIF sorgusu ile tuner izin akışı atlanıyor; kayıtlı IPTV kanalları doğrudan yükleniyor ve boş durumda IPTV liste yönetimine erişim sunuluyor.
+* IPTV-only modda kanal kaynak seçimi Tümü ve tam IPTV kütüphanesi arasında çalışıyor; geçersiz Uydu/Radio seçenekleri gösterilmiyor.
+* Açılış, kanal yükleme ve kanal paneli süreleri çalışma modu ve kayıt sayısıyla birlikte debug performans loguna yazılıyor.
+
 ### Sekmeli ayarlar
 * Ayarlar OSD'si Görünüm, Kanallar, IPTV ve EPG, Sistem sekmelerine ayrıldı. Sekmeler arasında Sol/Sağ ile geçiliyor; Aşağı içerikteki ilk ayara giriyor, içerikte Sol/Sağ veya OK değeri değiştiriyor.
 * IPTV liste yönetimi ve XMLTV EPG yönetimi, IPTV ve EPG sekmesinden doğrudan açılabiliyor.

@@ -419,6 +419,8 @@
     <string name="iptv_library_vod">VOD</string>
     <string name="iptv_library_continue">İzlemeye devam et</string>
     <string name="iptv_library_empty">Önce bir IPTV listesi ekleyin.</string>
+    <string name="iptv_only_empty_message">Bu cihazda kullanılabilir TV tuneri bulunmadı. IPTV listelerinizi ekleyebilir veya ana listeye alınacak IPTV kanallarını seçebilirsiniz.</string>
+    <string name="manage_iptv_sources">IPTV listelerini yönet</string>
     <string name="main_channel_list">Ana liste</string>
     <string name="apply">Uygula</string>
     <string name="delete">Sil</string>

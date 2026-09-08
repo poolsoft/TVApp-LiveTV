@@ -406,6 +406,8 @@
     <string name="iptv_library_vod">VOD</string>
     <string name="iptv_library_continue">Continue watching</string>
     <string name="iptv_library_empty">Add an IPTV list first.</string>
+    <string name="iptv_only_empty_message">No usable TV tuner was found on this device. Add an IPTV playlist or select the IPTV channels to include in the main list.</string>
+    <string name="manage_iptv_sources">Manage IPTV lists</string>
     <string name="main_channel_list">Main list</string>
     <string name="apply">Apply</string>
     <string name="delete">Delete</string>

@@ -5,7 +5,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic PERF - Ölçüm ve performans tabanı
 
-- [ ] **PERF-001 (P0): Performans ölçüm altyapısı**
+- [~] **PERF-001 (P0): Performans ölçüm altyapısı**
   Startup, kanal yükleme, liste açma, sayfa sorgusu, arama, EPG ve tune sürelerini debug loguna
   yapılandırılmış biçimde yaz. Release'te hassas URL veya kimlik kaydetme.
   **Kabul:** Her işlemde süre, kayıt sayısı ve cihaz çalışma modu görülebilir.
@@ -30,16 +30,16 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic PLATFORM - TIF ve IPTV-only cihaz desteği
 
-- [ ] **PLATFORM-001 (P0): DeviceCapabilities modeli**
+- [~] **PLATFORM-001 (P0): DeviceCapabilities modeli**
   Leanback, TIF özelliği, TvInputManager, kullanılabilir vendor tuner, kanal erişimi, PiP,
   decoder ve düşük RAM sonuçlarını tek modelde topla.
   **Kabul:** TVApp'in kendi TIF input'u vendor tuner sayılmaz; başarısız sorgu crash üretmez.
 
-- [ ] **PLATFORM-002 (P0): ExperienceModeResolver**
+- [x] **PLATFORM-002 (P0): ExperienceModeResolver**
   `HYBRID_TV`, `IPTV_ONLY_TV`, `MOBILE_TEST` modlarını üret ve sonucu oturum boyunca sabitle.
   **Kabul:** Marka/model kontrolü yoktur; aynı karar UI ve repository tarafından kullanılır.
 
-- [ ] **PLATFORM-003 (P0): IPTV-only açılış akışı**
+- [~] **PLATFORM-003 (P0): IPTV-only açılış akışı**
   Tuner bulunmayan TV stick/box cihazında TIF izin ve hata dialoglarını atla. Kayıtlı IPTV varsa
   son geçerli IPTV görünümünü aç; kaynak yoksa IPTV kaynak yönetimini öner.
   **Kabul:** TIF'siz cihazda uygulama siyah/hata ekranında kalmadan tamamen kullanılabilir.

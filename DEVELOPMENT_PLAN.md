@@ -39,6 +39,12 @@ Hedefler düşük donanımlı, 2 GB RAM'li TV stick sınıfı cihazlar esas alı
 Bu değerler tahmin olarak bırakılmayacak; başlangıç, liste açma, sorgu, adapter güncelleme,
 EPG ve tune süreleri debug ölçüm kaydına yazılacaktır.
 
+Emülatör sonuçları yalnız aynı AVD üzerinde değişiklik öncesi/sonrası regresyon karşılaştırması
+için kullanılır. Emülatör süreleri fiziksel TV veya TV stick performansı olarak kabul edilmez.
+Gerçek düşük donanımlı cihaz edinildiğinde hedefler aynı test verileriyle yeniden kalibre edilir;
+o zamana kadar sorgu sayısı, UI thread bloklaması, frame gecikmesi ve göreli süre değişimi esas
+alınır.
+
 ## 3. Mimari yön
 
 ### Yetenek tabanlı çalışma
