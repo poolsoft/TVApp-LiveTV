@@ -550,7 +550,4 @@
     <string name="reminder_needs_notification_permission">Hatırlatıcı için bildirim izni gerekli</string>
     <string name="reminder_badge_description">Bu program için hatırlatıcı kurulu</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d dk · Bitmesine %4$d dk)</string>
-    <string name="settings_live_preview">Canlı görünüm önizlemesi</string>
-    <string name="settings_preview_channel">Örnek Kanal HD</string>
-    <string name="settings_preview_program">Şu anki program</string>
 </resources>

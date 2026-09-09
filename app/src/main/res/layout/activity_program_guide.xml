@@ -100,20 +100,33 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:id="@+id/timeline_ruler"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
-                    android:background="#26000000"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="6dp">
+                    android:background="#26000000">
 
-                    <TextView android:id="@+id/timeline_time_0" style="@style/GuideTimelineTime" />
-                    <TextView android:id="@+id/timeline_time_1" style="@style/GuideTimelineTime" />
-                    <TextView android:id="@+id/timeline_time_2" style="@style/GuideTimelineTime" />
-                    <TextView android:id="@+id/timeline_time_3" style="@style/GuideTimelineTime" />
-                </LinearLayout>
+                    <LinearLayout
+                        android:id="@+id/timeline_ruler"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="6dp">
+
+                        <TextView android:id="@+id/timeline_time_0" style="@style/GuideTimelineTime" />
+                        <TextView android:id="@+id/timeline_time_1" style="@style/GuideTimelineTime" />
+                        <TextView android:id="@+id/timeline_time_2" style="@style/GuideTimelineTime" />
+                        <TextView android:id="@+id/timeline_time_3" style="@style/GuideTimelineTime" />
+                    </LinearLayout>
+
+                    <View
+                        android:id="@+id/current_time_header_line"
+                        android:layout_width="2dp"
+                        android:layout_height="match_parent"
+                        android:background="@color/accent"
+                        android:elevation="6dp"
+                        android:visibility="gone" />
+                </FrameLayout>
             </LinearLayout>
         </LinearLayout>
 
@@ -168,6 +181,14 @@
                     android:text="@string/no_epg_data"
                     android:textColor="@color/text_secondary"
                     android:textSize="15sp"
+                    android:visibility="gone" />
+
+                <View
+                    android:id="@+id/current_time_grid_line"
+                    android:layout_width="2dp"
+                    android:layout_height="match_parent"
+                    android:background="@color/accent"
+                    android:elevation="6dp"
                     android:visibility="gone" />
             </FrameLayout>
         </LinearLayout>

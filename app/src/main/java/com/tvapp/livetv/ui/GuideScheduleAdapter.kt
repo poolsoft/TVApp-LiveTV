@@ -84,6 +84,13 @@ class GuideScheduleAdapter(
         }
     }
 
+    fun refreshLiveState(recyclerView: RecyclerView) {
+        (0 until recyclerView.childCount).forEach { index ->
+            (recyclerView.getChildViewHolder(recyclerView.getChildAt(index)) as? ViewHolder)
+                ?.refreshLiveState()
+        }
+    }
+
     override fun getItemId(position: Int): Long = channels[position].sourceKey.hashCode().toLong()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder = ViewHolder(
@@ -133,6 +140,17 @@ class GuideScheduleAdapter(
                 cursor = maxOf(cursor, clippedEnd)
             }
             if (cursor < windowEndMillis) addSpacer(windowEndMillis - cursor)
+            refreshLiveState()
+        }
+
+        fun refreshLiveState() {
+            val now = System.currentTimeMillis()
+            programViews.forEach { (program, view) ->
+                val textView = view as TextView
+                val isLive = now in program.startTimeMillis until program.endTimeMillis
+                textView.isActivated = isLive
+                textView.setTypeface(null, if (isLive) Typeface.BOLD else Typeface.NORMAL)
+            }
         }
 
         fun focusNearestProgram(preferredTimeMillis: Long): Boolean {
@@ -166,7 +184,7 @@ class GuideScheduleAdapter(
 
         private fun programCell(channel: LiveChannel, program: ProgramSummary, row: Int): TextView =
             TextView(binding.root.context).apply {
-                background = ContextCompat.getDrawable(context, R.drawable.bg_guide_item)
+                background = ContextCompat.getDrawable(context, R.drawable.bg_guide_program_cell)
                 gravity = Gravity.CENTER_VERTICAL
                 isClickable = true
                 isFocusable = true
@@ -175,9 +193,6 @@ class GuideScheduleAdapter(
                 text = program.title.ifBlank { context.getString(R.string.untitled_program) }
                 setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 textSize = 13f
-                if (System.currentTimeMillis() in program.startTimeMillis until program.endTimeMillis) {
-                    setTypeface(typeface, Typeface.BOLD)
-                }
                 if (program.startTimeMillis in reminders[channel.sourceKey].orEmpty()) {
                     setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_clock_small, 0)
                     compoundDrawablePadding = dp(5)

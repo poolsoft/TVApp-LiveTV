@@ -48,6 +48,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Açılış, kanal yükleme ve kanal paneli süreleri çalışma modu ve kayıt sayısıyla birlikte debug performans loguna yazılıyor.
 
 ### Sekmeli ayarlar
+* Görünüm ve Kanallar sekmelerindeki temsili canlı önizleme kaldırıldı; ayar listesi daha fazla gerçek seçeneği aynı anda gösterecek şekilde sadeleştirildi.
 * Ayarlar OSD'si Görünüm, Kanallar, IPTV ve EPG, Sistem sekmelerine ayrıldı. Sekmeler arasında Sol/Sağ ile geçiliyor; Aşağı içerikteki ilk ayara giriyor, içerikte Sol/Sağ veya OK değeri değiştiriyor.
 * IPTV liste yönetimi ve XMLTV EPG yönetimi, IPTV ve EPG sekmesinden doğrudan açılabiliyor.
 * `tools/TVAppRemote.cmd`, emülatör testleri için D-pad, TV, medya, sayı, renk tuşları ve uzun basış gönderen masaüstü kumanda panelini açıyor.
@@ -55,6 +56,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * OSD kapalıyken Sol ok artık kanal değiştirmiyor; Back son kanallar kartını açıyor. Last Channel kısa basışta önceki kanala geçiyor, uzun basışta son kanallar kartını açıyor.
 
 ### TIF ve EPG tanılama
+* Program Rehberine ortak zaman cetveli ve kanal satırları boyunca uzanan canlı saat çizgisi eklendi; şu anda yayınlanan program hücresi ayrı renkle vurgulanıyor.
 * Program Rehberi bütün kanalları solda, süreyle orantılı programları ortak saat cetvelinde sağda gösteren çok kanallı grid düzenine geçirildi. Seçili programın tam açıklaması alttaki kaydırılabilir panelde gösteriliyor.
 * Rehber yalnız odak çevresindeki kanal penceresinin programlarını yükler; hızlı gezinmede eski EPG isteği iptal edilir ve boş bir kanalın sonucu diğer kanal satırlarını kapatmaz.
 * Infobar, kanal listesi ve rehber aynı süreç geneli EPG snapshot önbelleğini kullanıyor. Bulunan program bitiş sınırına kadar, boş sonuç iki saniye saklanıyor; TIF/XMLTV sorgu süreleri ve cache isabetleri debug performans loguna yazılıyor.

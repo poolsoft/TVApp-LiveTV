@@ -48,7 +48,6 @@ import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
-import com.tvapp.livetv.ui.SettingsPreviewView
 import com.tvapp.livetv.ui.TvUiComponents
 import com.tvapp.livetv.ui.TvUiMetrics
 import kotlinx.coroutines.launch
@@ -74,7 +73,6 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private var xmlTvSettingRow: SettingRow? = null
     private var selectedPage = SettingsPage.APPEARANCE
     private var firstContentFocusable: View? = null
-    private var livePreview: SettingsPreviewView? = null
     private val tabViews = mutableListOf<TextView>()
     private val manageIptvSources = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -187,27 +185,12 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun buildSettings(page: SettingsPage) {
         content.removeAllViews()
         firstContentFocusable = null
-        livePreview = null
         xmlTvSettingRow = null
-        if (page == SettingsPage.APPEARANCE || page == SettingsPage.CHANNELS) addLivePreview()
         when (page) {
             SettingsPage.APPEARANCE -> buildAppearanceSettings()
             SettingsPage.CHANNELS -> buildChannelSettings()
             SettingsPage.IPTV_EPG -> buildIptvEpgSettings()
             SettingsPage.SYSTEM -> buildSystemSettings()
-        }
-    }
-
-    private fun addLivePreview() {
-        livePreview = SettingsPreviewView(this).also { preview ->
-            preview.preferences = current
-            preview.contentDescription = getString(R.string.settings_live_preview)
-            content.addView(
-                preview,
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(132)).apply {
-                    setMargins(dp(10), dp(8), dp(10), dp(2))
-                },
-            )
         }
     }
 
@@ -950,7 +933,6 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun update(transform: DisplayPreferences.() -> DisplayPreferences) {
         current = current.transform()
         displayStore.save(current)
-        livePreview?.preferences = current
         markChanged()
     }
 

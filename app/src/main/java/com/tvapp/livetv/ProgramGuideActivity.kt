@@ -61,6 +61,8 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private val programGuideRefresh = object : Runnable {
         override fun run() {
             refreshCurrentPrograms()
+            updateCurrentTimeIndicator()
+            scheduleAdapter.refreshLiveState(binding.programList)
             programGuideHandler.postDelayed(this, GUIDE_REFRESH_INTERVAL_MS)
         }
     }
@@ -119,6 +121,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         }
         updateEpgSourceLabel()
         updateTimelineRuler(timelineWindowStartMillis)
+        binding.timelineRuler.post(::updateCurrentTimeIndicator)
         loadChannels()
     }
 
@@ -342,6 +345,23 @@ class ProgramGuideActivity : TvRemoteActivity() {
         ).forEachIndexed { index, label ->
             label.text = format.format(Date(startMillis + index * TIMELINE_STEP_MS))
         }
+        updateCurrentTimeIndicator()
+    }
+
+    private fun updateCurrentTimeIndicator() {
+        val now = System.currentTimeMillis()
+        val windowEnd = timelineWindowStartMillis + TIMELINE_WINDOW_MS
+        val visible = now in timelineWindowStartMillis..windowEnd
+        listOf(binding.currentTimeHeaderLine, binding.currentTimeGridLine).forEach { line ->
+            line.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+        if (!visible || binding.timelineRuler.width <= 0 || binding.programList.width <= 0) return
+        val fraction = ((now - timelineWindowStartMillis).toFloat() / TIMELINE_WINDOW_MS)
+            .coerceIn(0f, 1f)
+        binding.currentTimeHeaderLine.x =
+            (binding.timelineRuler.width - binding.currentTimeHeaderLine.width) * fraction
+        binding.currentTimeGridLine.x =
+            (binding.programList.width - binding.currentTimeGridLine.width) * fraction
     }
 
     private fun openChannel(channel: LiveChannel) {
