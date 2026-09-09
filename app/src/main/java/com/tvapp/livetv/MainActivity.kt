@@ -153,6 +153,7 @@ class MainActivity : TvRemoteActivity() {
         private const val IPTV_LIBRARY_PAGE_SIZE = 250
         private const val MULTIVIEW_TIF_RECOVERY_DELAY_MS = 350L
         private const val MOBILE_SWIPE_DISTANCE_DP = 56
+        private val SEARCH_COMBINING_MARKS = Regex("\\p{M}+")
     }
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
@@ -194,6 +195,7 @@ class MainActivity : TvRemoteActivity() {
     private var lastIptvHealthLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
     private var channels: List<LiveChannel> = emptyList()
+    private var normalPanelChannels: List<LiveChannel> = emptyList()
     private val currentPrograms = mutableMapOf<String, ProgramSummary>()
     private var currentChannel: LiveChannel? = null
     private var pendingTuneStartedAt = 0L
@@ -206,6 +208,7 @@ class MainActivity : TvRemoteActivity() {
     private var iptvLibraryContentType = IptvLibraryContentType.ALL
     private var iptvLibraryCategory: String? = null
     private var channelSearchQuery = ""
+    private var normalizedChannelSearchQuery = ""
     private var iptvLibraryWindowStart = 0
     private var iptvLibraryTotalCount = 0
     private var iptvLibraryHasPrevious = false
@@ -230,6 +233,8 @@ class MainActivity : TvRemoteActivity() {
     private var gridLongPressJob: Job? = null
     private var yellowLongPressJob: Job? = null
     private var yellowLongPressHandled = false
+    private var greenLongPressJob: Job? = null
+    private var greenLongPressHandled = false
     private var settingsLongPressJob: Job? = null
     private var settingsLongPressHandled = false
     private var lastChannelLongPressJob: Job? = null
@@ -1205,14 +1210,11 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         touchTarget(binding.channelActionGreen) {
-            if (
-                channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ||
-                currentChannel?.source == LiveChannel.Source.IPTV
-            ) {
-                showIptvGridPicker()
-            } else {
-                showIptvPipPicker()
-            }
+            showIptvPipPicker()
+        }
+        binding.channelActionGreen.setOnLongClickListener {
+            showIptvGridPicker()
+            true
         }
         touchTarget(binding.channelActionYellow) {
             if (BuildConfig.MOBILE_UI_ENABLED) showIptvLibraryFilterDialog()
@@ -1226,6 +1228,8 @@ class MainActivity : TvRemoteActivity() {
         touchTarget(binding.channelActionBlue) {
             if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
                 showIptvLibraryFilterDialog()
+            } else {
+                showChannelSearchDialog()
             }
         }
         updateMobileChannelActionState()
@@ -1233,9 +1237,8 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateMobileChannelActionState() {
         if (!BuildConfig.MOBILE_UI_ENABLED) return
-        val filterAvailable = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
-        binding.channelActionBlue.isEnabled = filterAvailable
-        binding.channelActionBlue.alpha = if (filterAvailable) 1f else 0.42f
+        binding.channelActionBlue.isEnabled = true
+        binding.channelActionBlue.alpha = 1f
     }
 
     private fun openMobileChannelPanel() {
@@ -4394,6 +4397,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun applyChannelSearch(value: String) {
         channelSearchQuery = value.trim()
+        normalizedChannelSearchQuery = normalizeSearchText(channelSearchQuery)
         binding.channelSearchButton.isSelected = channelSearchQuery.isNotEmpty()
         if (channelPanelContent != ChannelPanelContent.IPTV_LIBRARY) {
             applyChannelFilter(requestFocus = true)
@@ -4442,7 +4446,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun matchesChannelSearch(channel: LiveChannel): Boolean {
-        val query = normalizeSearchText(channelSearchQuery)
+        val query = normalizedChannelSearchQuery
         if (query.isBlank()) return true
         return listOf(channel.displayNumber, channel.displayName, channel.groupTitle.orEmpty())
             .any { normalizeSearchText(it).contains(query) }
@@ -4450,7 +4454,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun normalizeSearchText(value: String): String = Normalizer
         .normalize(value, Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "")
+        .replace(SEARCH_COMBINING_MARKS, "")
         .lowercase(Locale.ROOT)
 
     private fun updateChannel(action: suspend () -> Unit) {
@@ -4464,6 +4468,10 @@ class MainActivity : TvRemoteActivity() {
         if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
             return iptvLibraryChannels
         }
+        return normalPanelChannels
+    }
+
+    private fun buildNormalPanelChannels(): List<LiveChannel> {
         return channels.asSequence()
         .filter { channel ->
             when (sourceFilter) {
@@ -4505,7 +4513,8 @@ class MainActivity : TvRemoteActivity() {
         binding.channelListTitle.setText(R.string.channel_list)
         updateChannelListModeIcon()
         updateChannelActionLabels()
-        val filtered = panelChannels()
+        normalPanelChannels = buildNormalPanelChannels()
+        val filtered = normalPanelChannels
         currentChannel = filtered.firstOrNull { it.sourceKey == currentChannel?.sourceKey }
             ?: currentChannel
         adapter.submitList(filtered)
@@ -4527,14 +4536,9 @@ class MainActivity : TvRemoteActivity() {
     private fun updateChannelActionLabels() {
         val library = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
         val red = R.string.edit_short
-        val green =
-            if (library || currentChannel?.source == LiveChannel.Source.IPTV) {
-                R.string.iptv_grid
-            } else {
-                R.string.iptv_pip
-            }
+        val green = R.string.iptv_pip_grid_short_long
         val yellow = R.string.channel_source_short
-        val blue = if (library) R.string.filter_short else R.string.empty_action
+        val blue = if (library) R.string.filter_short else R.string.search_short
         binding.redActionLabel.setText(red)
         binding.greenActionLabel.setText(green)
         binding.yellowActionLabel.setText(yellow)
@@ -4614,7 +4618,7 @@ class MainActivity : TvRemoteActivity() {
                 ),
             )
         }
-        action(R.color.remote_green, R.string.iptv_grid, ::showIptvGridPicker)
+        action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvPipPicker)
         action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
     }
 
@@ -5473,6 +5477,30 @@ class MainActivity : TvRemoteActivity() {
                 }
             }
         }
+        val greenOwnedByIptvControls = isIptv &&
+            isChannelPanelClosed &&
+            iptvControlsInteractive &&
+            binding.iptvPlaybackContainer.visibility == View.VISIBLE
+        if (event.keyCode == KeyEvent.KEYCODE_PROG_GREEN && !greenOwnedByIptvControls) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                greenLongPressHandled = false
+                greenLongPressJob?.cancel()
+                focusedTuneJob?.cancel()
+                greenLongPressJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    greenLongPressHandled = true
+                    showIptvGridPicker()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                greenLongPressJob?.cancel()
+                if (!greenLongPressHandled) {
+                    focusedTuneJob?.cancel()
+                    showIptvPipPicker()
+                }
+                greenLongPressHandled = false
+            }
+            return true
+        }
         if (
             event.keyCode == KeyEvent.KEYCODE_PROG_YELLOW &&
             binding.channelPanel.visibility == View.VISIBLE
@@ -5554,18 +5582,7 @@ class MainActivity : TvRemoteActivity() {
                         openChannelEditor()
                     }
                 }
-                KeyEvent.KEYCODE_PROG_GREEN -> {
-                    if (binding.channelPanel.visibility != View.VISIBLE) {
-                        showIptvGridPicker()
-                    } else if (
-                        channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ||
-                        currentChannel?.source == LiveChannel.Source.IPTV
-                    ) {
-                        showIptvGridPicker()
-                    } else {
-                        showIptvPipPicker()
-                    }
-                }
+                KeyEvent.KEYCODE_PROG_GREEN -> Unit
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility != View.VISIBLE) {
                     return super.dispatchKeyEvent(event)
                 }
@@ -5574,6 +5591,8 @@ class MainActivity : TvRemoteActivity() {
                 ) {
                     if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
                         showIptvLibraryFilterDialog()
+                    } else {
+                        showChannelSearchDialog()
                     }
                 } else {
                     openDisplaySettings()
@@ -5712,6 +5731,7 @@ class MainActivity : TvRemoteActivity() {
         sleepTimerJob?.cancel()
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
+        greenLongPressJob?.cancel()
         settingsLongPressJob?.cancel()
         clockJob?.cancel()
         playback.stop()

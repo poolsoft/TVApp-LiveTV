@@ -44,11 +44,11 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Xtream Codes hesaplarından canlı kanal ve film/VOD katalogları alınabilir.
 - Stalker Portal kaynakları MAC adresiyle eklenebilir; canlı bağlantı oynatma anında yenilenir.
 - Her IPTV kaynağından ana kanal listesine eklenecek kanallar ayrıca seçilebilir.
-- Mavi tuşla tam IPTV görünümüne geçilir; kayıtlı kaynak, Canlı/VOD ve kategori filtresi uygulanır.
+- Sarı kaynak seçimiyle tam IPTV görünümüne geçilir; kayıtlı kaynak, Canlı/VOD ve kategori filtresi uygulanır.
 - Tam IPTV görünümündeki gezinme ana izleme geçmişine yazılmaz ve kanal yalnızca `OK` ile açılır.
 - IPTV kaynak yönetimi, kategori filtresi, kanal önizleme ve Media3 oynatma desteği bulunur.
 - Büyük IPTV kaynakları ana kütüphanede 250, seçim yöneticisinde 200 öğelik Room sayfalarıyla yüklenir; binlerce kayıt aynı anda belleğe alınmaz.
-- Kanal panelinin başlığındaki arama simgesi veya kumandanın `SEARCH` tuşu; kanal adı, numarası ve kategori içinde arama yapar. Tam IPTV kütüphanesinde arama Room FTS ve sayfalama ile çalışır.
+- Kanal panelinin başlığındaki arama simgesi, kumandanın `SEARCH` tuşu veya normal kanal listesindeki `Mavi`; kanal adı, numarası ve kategori içinde arama yapar. Tam IPTV kütüphanesinde arama Room FTS ve sayfalama ile çalışır.
 - Seçim yöneticisinde kategori, arama, yalnız seçilenler filtresi, 1-4 haneli doğrudan sıra erişimi ve ilk/son arasında dolaşım bulunur.
 - M3U içe aktarma 500 kayıtta bir veritabanına yazılır; Canlı/VOD türü içe aktarım sırasında sınıflandırılıp indekslenir.
 - Canlı yayınlarda canlı noktaya dönme; VOD içeriklerinde oynat/duraklat, ileri/geri sarma, kaldığın yerden devam ve “İzlemeye devam et” görünümü vardır.
@@ -78,10 +78,11 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - `INPUT/SOURCE`: DTV/ATV ve HDMI/AV gibi fiziksel TV girişlerini açar.
 - Ana yayın ekranında `Kırmızı`: Kumanda `INPUT/SOURCE` tuşunu uygulamaya iletmiyorsa TV girişlerini açar.
 - Kanal listesinde `Kırmızı`: Kanal düzenleyiciyi açar.
-- Normal kanal listesinde `Mavi`: Son kullanılan filtreyle tam IPTV listesini açar.
+- Yayın ekranında ve kanal listesinde `Yeşil` kısa basış: IPTV PiP seçimini açar; uzun basış: IPTV Grid seçimini açar.
+- Normal kanal listesinde `Mavi`: Kanal aramasını açar.
 - Tam IPTV listesinde `Kırmızı`: IPTV kaynak yönetimini açar.
 - Tam IPTV listesinde `Sarı`: Kaynak, Canlı/VOD ve kategori seçimini açar.
-- Tam IPTV listesinde `Mavi`: Normal kanal listesine döner.
+- Tam IPTV listesinde `Mavi`: Kaynak, içerik türü ve kategori filtresini açar.
 
 Kumandaların Android tuş kodları üreticiye göre değişebilir. TVApp tanınmayan tuşları debug
 loguna yazar; farklı cihaz eşlemeleri bu kayıtlarla eklenebilir.

@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Kanal listesi gezinme ve renk tuşları
+* Arama boşken kanal listesi gezinmesinde her odak hareketinde yinelenen Unicode normalizasyonu kaldırıldı; normalize edilmiş sorgu yalnız arama değiştiğinde hesaplanıyor.
+* Normal kanal listesinde Mavi tuş kanal aramasını açıyor; tam IPTV kütüphanesinde mevcut filtre görevini koruyor.
+* Yeşil tuş yayın ekranı ve kanal listesinde tutarlı hale getirildi: kısa basış IPTV PiP, uzun basış IPTV Grid seçimini açıyor.
+
 ### IPTV yayın sağlığı
 * Media3 oynatma durumu; ilk kare süresi, oynatma ilerlemesi, buffer, bitrate, tahmini bant genişliği, çözünürlük, codec, atlanan kare, yeniden deneme ve son hata sınıfıyla ortak bir sağlık modelinde toplandı.
 * IPTV kanallarının Sistem Bilgileri ekranı bu sağlık anlık görüntüsünü talep üzerine gösteriyor; normal izleme arayüzüne ek yük bindirmiyor.

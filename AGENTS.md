@@ -97,11 +97,13 @@ still needs device verification.
   opens EPG.
 - `INPUT/SOURCE` owns physical input selection, including DTV/ATV and HDMI/AV when exposed by the
   device. Do not assign physical input selection to a color key.
-- On the unobstructed playback screen: Green opens IPTV Grid, Blue opens Settings, and Red/Yellow
-  are currently unassigned. The infobar hint must describe this context only.
+- On the unobstructed playback screen and in the channel list: short Green opens IPTV PiP selection
+  and long Green opens IPTV Grid selection. Blue opens Settings on unobstructed playback. The
+  infobar hint must describe this context only.
 - In the channel list: Red opens the relevant editor; Yellow short-press cycles list sources and
-  Yellow long-press opens direct source selection. IPTV-library Blue opens its filter. Keep the
-  list's own color hints separate from the playback-screen hints.
+  Yellow long-press opens direct source selection. Normal-list Blue opens channel search and
+  IPTV-library Blue opens its filter. Keep the list's own color hints separate from the
+  playback-screen hints.
 - CH+/CH- and page navigation must move both selection and scroll position. Lists wrap from first
   to last and last to first where that behavior is already established.
 - Long-press actions must cancel delayed auto-tune so merely opening a context menu never changes
