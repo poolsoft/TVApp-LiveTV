@@ -5,6 +5,11 @@ Google TV cihazlarına ve donanım tuner sunmayan TV stick/box cihazlarına uygu
 için hazırlanmıştır. İlk öncelik performans ve kararlılıktır. Yeni özellikler, ölçülebilir
 performans tabanı ve güvenilir kumanda akışı kurulduktan sonra eklenir.
 
+Ürün IPTV-only modda da öncelikle bir **televizyon uygulamasıdır**. Hedef Netflix/Prime benzeri
+ayrı ve ayrıntılı bir medya merkezi kurmak değil; canlı IPTV, VOD ve temel dizi akışlarının hızlı,
+kumandayla kolay ve hata karşısında dayanıklı çalışmasıdır. Zengin metadata, trend/keşif ekranları,
+çoklu profil, indirme ve kapsamlı tema seçenekleri ilk kararlı IPTV kapsamına dahil değildir.
+
 ## 1. Ürün çalışma modları
 
 Uygulama cihaz adından veya yalnız `FEATURE_LIVE_TV` değerinden karar vermemelidir. Açılışta
@@ -99,6 +104,30 @@ cache kullanmalıdır. Odaktaki kanal öncelikli, komşu kanallar gecikmeli pref
 Eski async sonuçlar yeni odağı ezmemeli; boş sonuçlar kısa, geçerli programlar bitiş zamanına
 kadar cache'lenmelidir. XMLTV eşleştirme sonucu ve kaynağı teşhis ekranından görülebilmelidir.
 
+### IPTV oynatma sağlamlığı
+
+Media3 için ilk kare, son kare, buffer, bitrate, codec, decoder ve hata sınıfını taşıyan ortak bir
+sağlık modeli kurulmalıdır. Görüntü hiç gelmemesi, oynatımın donması, ağ hatası ve decoder hatası
+aynı "yeniden bağlanıyor" durumu olarak ele alınmamalıdır. Watchdog ve retry işleri kanal değişimi,
+Back veya Activity kapanışında kesin olarak iptal edilmelidir.
+
+Kurtarma sırası tek bir durum makinesinde sınırlı ve gözlemlenebilir olmalıdır: kısa geri çekilme,
+aynı akışı yeniden hazırlama, varsa alternatif akışa geçme ve son olarak kullanıcıya müdahale
+seçeneği. TIF oynatma aynı teşhis sözleşmesine desteklediği verileri sağlayabilir, ancak IPTV
+kurtarma kararları vendor tuner oturumuna uygulanmamalıdır.
+
+Buffer, canlı gecikme, ABR/kalite, otomatik kurtarma ve ilerideki oynatıcı tercihi kaynak bazında
+saklanmalıdır. HLS, DASH ve MPEG-TS yanında M3U header/catch-up/DRM öznitelikleri kaybolmadan
+modellenmelidir. İkinci bir oynatıcı motoru ancak sorunlu akış uyumluluğu, APK/ABI boyutu, bellek,
+açılış ve lisans etkisi ölçüldikten sonra değerlendirilir.
+
+### IPTV içerik kapsamı
+
+Canlı yayın mevcut kanal listesi ve OSD davranışını korur. VOD için oynat/duraklat, seek, kaldığın
+yerden devam, ses/altyazı/kalite ve harici oynatıcı yeterli çekirdektir. Dizi desteği; sezon, bölüm,
+devam et ve sonraki bölümden oluşan sade, sayfalı bir akış olarak eklenir. TMDB veya ayrıntılı keşif
+ekranı dizi desteğinin ön koşulu değildir.
+
 ## 4. Uygulama aşamaları
 
 ### Aşama 0 - Ölçüm ve regresyon tabanı
@@ -127,16 +156,29 @@ testleri geçirilir. Sonrasında ortak odak, ikon, renk eylemi ve dialog bileşe
 ### Aşama 4 - Kullanıcı deneyimi
 
 Ana kanal listesine hızlı arama, gelişmiş EPG zaman çizelgesi, program açıklaması ve eşleştirme
-durumu eklenir. Ayarlar ekranında canlı önizleme sağlanır. 720p/1080p/4K ve ekran overscan
-alanları screenshot testleriyle doğrulanır.
+durumu eklenir. Ayarlar yayın kapanmadan OSD olarak çalışır; ayrı örnek önizleme kullanılmaz.
+720p/1080p/4K ve ekran overscan alanları screenshot testleriyle doğrulanır.
 
-### Aşama 5 - IPTV oynatıcı tamamlama
+### Aşama 5 - IPTV oynatma sağlamlığı
 
-Catch-up/arşiv, Xtream dizi-sezon-bölüm, sonraki bölüm, yayın sağlık bilgisi ve alternatif akış
-önceliği eklenir. Düşük RAM cihazlarda Grid/Multi View kanal sayısı decoder ve bellek
-yeteneklerine göre sınırlandırılır.
+Önce yayın sağlık modeli ve isteğe bağlı teşhis arayüzü kurulur. Ardından görüntü gelmeme/donma
+watchdog'u, sınırlı kurtarma durum makinesi ve alternatif akış önceliği tamamlanır. Kaynak bazlı
+buffer/ABR tercihleri, HTTP header ve DRM uyumluluğu bu temelin üzerine eklenir. Düşük RAM
+cihazlarda Grid/Multi View kanal sayısı decoder ve bellek yeteneklerine göre sınırlandırılır.
 
-### Aşama 6 - Mağaza hazırlığı
+### Aşama 6 - IPTV EPG ve sade içerik
+
+XMLTV yenileme akış halinde, sınırlı zaman penceresiyle ve eski çalışan veriyi koruyan atomik
+değişimle yapılır. Kaynak/kanal saat farkı ve EPG logosu tercihleri eklenir. Sonrasında Xtream
+dizi-sezon-bölüm, devam et ve sonraki bölüm akışı sayfalı ve kumanda odaklı biçimde tamamlanır.
+
+### Aşama 7 - Sistem entegrasyonu ve oynatıcı kararı
+
+MediaSession, audio focus ve isteğe bağlı kare hızı eşleme gerçek TV ve TV stick üzerinde
+doğrulanır. Media3'ün açamadığı örnek akışlar için ikinci motor prototipi hazırlanır; ölçümler
+olumlu değilse ürün koduna alınmaz.
+
+### Aşama 8 - Mağaza hazırlığı
 
 Gerçek Play Billing, sunucu doğrulaması, R8/resource shrinking, gizlilik metni, ilk kurulum
 akışı ve kullanıcı onaylı hata raporu tamamlanır. Paid ve local varyantların sınırları yeniden
@@ -150,3 +192,5 @@ doğrulanır.
   karşılaştırılması
 - OSD refactor'ının görünümü değiştirmeden yapılacağının screenshot tabanıyla sabitlenmesi
 - Catch-up için desteklenecek M3U ve Xtream biçimlerinin örnek kaynaklarla belirlenmesi
+- Donma/görüntü gelmeme eşiklerinin emülatör yerine gerçek IPTV örnekleriyle kalibre edilmesi
+- İkinci oynatıcı motorunun GPL, APK boyutu ve native ABI etkisinin üretim kararından önce yazılması

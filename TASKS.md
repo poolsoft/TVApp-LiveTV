@@ -128,9 +128,83 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   ortaklaştır.
   **Kabul:** İsteğe bağlı ikonlar satırı kaydırmaz; 720p/1080p/4K ekran görüntüleri tutarlıdır.
 
-- [x] **UIINPUT-005 (P2): Ayarlar canlı önizlemesi**
-  Infobar/panel konumu ve saydamlığı değişirken video üstünde örnek göster.
-  **Kabul:** Ayar uygulanmadan sonucu görülebilir; video kapanmaz.
+- [x] **UIINPUT-005 (P2): Ayarlar OSD yerleşimi**
+  Ayarları yayın kapanmadan video üzerinde OSD olarak göster; ayrı örnek önizleme oluşturma.
+  **Kabul:** Video arka planda sürer; ayar paneli kumandayla kullanılabilir ve gereksiz önizleme
+  oynatıcısı kaynak tüketmez.
+
+## Epic IPTVCORE - IPTV oynatma sağlamlığı
+
+Bu epic'in amacı TVApp'i TIF bulunmayan TV stick/box cihazlarında da güvenilir bir canlı TV
+uygulaması yapmaktır. Medya merkezi görünümü, zengin katalog süsleri ve çok sayıda ikincil özellik
+bu aşamanın kapsamında değildir. Her iş IPTV-only modu güçlendirirken Hibrit TV/TIF davranışını
+korumalıdır.
+
+- [ ] **IPTVCORE-001 (P0): Ortak oynatma sağlık modeli**
+  Media3 oynatma durumunu ilk kare süresi, son kare zamanı, buffer, bitrate, çözünürlük, codec,
+  dropped frame ve son hata sınıfıyla tek bir salt-okunur modelde topla. TIF tarafı desteklediği
+  alanları aynı teşhis sözleşmesine verir fakat IPTV kurtarma kararlarına dahil edilmez.
+  **Kabul:** Sistem bilgileri ve debug logu aynı anlık görüntüyü kullanır; kimlik bilgisi veya tam
+  özel URL yazılmaz; ölçüm UI thread'i bloke etmez.
+
+- [ ] **IPTVCORE-002 (P0): Donma ve görüntü gelmeme watchdog'u**
+  İlk video karesi gelmeyen, `READY` olduğu halde görüntü üretmeyen ve oynarken ilerlemesi duran
+  yayınları ayrı durumlar olarak algıla. Kanal değişimi, Back ve Activity kapanışı bekleyen bütün
+  retry/watchdog işlerini iptal etmelidir.
+  **Kabul:** Çalışan yayına eski timer müdahale etmez; sesli radyo yanlışlıkla görüntü hatası sayılmaz;
+  donan akış kontrollü kurtarılır veya kullanıcıya kısa, işlem yapılabilir durum gösterilir.
+
+- [ ] **IPTVCORE-003 (P0): Deterministik kurtarma durum makinesi**
+  Geçici ağ hatası, HTTP hata sınıfı, decoder hatası, canlı akış sonu ve kullanıcı yenilemesini
+  farklılaştır. Sınırlı geri çekilme, aynı akışı yeniden hazırlama ve varsa alternatif akışa geçme
+  sırasını tek noktadan yönet.
+  **Kabul:** Sonsuz yeniden bağlanma döngüsü oluşmaz; kanal/listesi ve izleme geçmişi değişmez;
+  her denemenin nedeni ve sonucu hassas veri olmadan teşhis kaydına düşer.
+
+- [ ] **IPTVCORE-004 (P1): Kaynak bazlı oynatma profili**
+  Her IPTV kaynağı için canlı buffer/gecikme, VOD buffer, ABR/kalite, otomatik kurtarma ve gelecekteki
+  oynatıcı tercihini sakla. Kanal bazlı istisna yalnız gerçekten gerektiğinde kullanılmalıdır.
+  **Kabul:** Varsayılanlar düşük RAM TV stick için güvenlidir; mevcut global ayarlar migration sonrası
+  korunur; kaynak yenileme tercihleri silmez.
+
+- [ ] **IPTVCORE-005 (P1): Protokol, header ve DRM uyumluluk matrisi**
+  HLS, DASH ve doğrudan MPEG-TS için User-Agent/Referrer/header aktarımını tamamla. M3U
+  `#EXTVLCOPT`, `#EXTHTTP`, URL sonu header'ları ve `#KODIPROP` Widevine/ClearKey alanlarını güvenli
+  biçimde modelle.
+  **Kabul:** Desteklenen alanlar kaynak yenilemede korunur; credential loglanmaz; örnek akışlarla
+  parser ve MediaItem üretim testleri bulunur.
+
+- [ ] **IPTVCORE-006 (P1): MediaSession, audio focus ve kare hızı eşleme**
+  Medya tuşlarını sistem MediaSession ile yayınla, bildirimlerde duraklatmak yerine uygun audio-focus
+  davranışını uygula ve isteğe bağlı içerik kare hızı eşlemeyi cihaz desteğine göre aç.
+  **Kabul:** Home/geri dönüş, PiP, Grid ve Multi View sonrasında ses odağı kaybolmaz; özellik
+  desteklenmeyen cihazda güvenli şekilde etkisiz kalır.
+
+- [ ] **IPTVCORE-007 (P2): İkinci oynatıcı motoru fizibilitesi**
+  libmpv veya başka bir FFmpeg tabanlı motoru yalnız Media3'ün açamadığı IPTV/VOD akışları için
+  prototiple. GPL yükümlülüğü, APK/ABI boyutu, açılış süresi, bellek ve decoder çatışmasını ölçmeden
+  üretime ekleme.
+  **Kabul:** En az 20 sorunlu ve çalışan akıştan anonim bir uyumluluk matrisi, boyut/perf ölçümü ve
+  devam/ret kararı belgelenir; bu görev doğrudan motor ekleme taahhüdü değildir.
+
+## Epic EPGNEXT - IPTV EPG dayanıklılığı
+
+- [ ] **EPGNEXT-001 (P1): Sınırlı ve atomik XMLTV yenileme**
+  Gzip destekli XMLTV'yi akış halinde ayrıştır; kanal başlıklarını eşleştirme için korurken programları
+  yalnız eşleşmiş/aday kanallar ve gerekli zaman penceresi için yaz. Yeni veri doğrulanmadan çalışan
+  EPG tablolarını değiştirme.
+  **Kabul:** Yarım indirme veya parse hatası eski rehberi silmez; catch-up süresi kadar geçmiş ve en
+  az 48 saat gelecek korunur; bellek dosya büyüklüğüyle doğrusal büyümez.
+
+- [ ] **EPGNEXT-002 (P1): Kaynak ve kanal bazlı EPG düzeltmeleri**
+  Global kaynak saat farkı, kanal bazlı saat farkı ve XMLTV kaynak logosunu kullanma tercihi ekle.
+  **Kabul:** Düzeltme infobar, kanal listesi ve rehbere aynı cache snapshot'ından yansır; elle eşleşme
+  bozulmaz ve kaynağın yenilenmesi tercihi silmez.
+
+- [ ] **EPGNEXT-003 (P2): EPG senkron teşhisi**
+  Kaynak indirme, parse, aday/eşleşen kanal, eklenen/elenen program ve pencere bilgilerini özetle.
+  **Kabul:** Kullanıcı tek ekranda neden bir kanalda EPG olmadığını anlayabilir; özel URL ve kaynak
+  kimlik bilgileri gösterilmez.
 
 ## Epic FEATURE - Sonraki kullanıcı özellikleri
 
@@ -142,18 +216,33 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   M3U catch-up öznitelikleri ve Xtream arşiv API'sini modelle, EPG programından oynat.
   **Kabul:** Arşivlenebilir program işaretlidir; canlıya dönüş tek eylemdir.
 
-- [ ] **FEATURE-003 (P2): Dizi/sezon/bölüm**
-  Xtream seri kataloğu, sezon-bölüm ekranı, devam et ve sonraki bölümü ekle.
-  **Kabul:** Bölümler canlı kanal gibi ana TV geçmişine karışmaz.
+- [ ] **FEATURE-003 (P2): Sade dizi/sezon/bölüm**
+  Xtream seri kataloğu, kumandayla hızlı sezon-bölüm seçimi, devam et ve sonraki bölümü ekle.
+  TMDB, oyuncu kadrosu, fragman veya ayrıntılı medya merkezi ana ekranı bu görevin parçası değildir.
+  **Kabul:** 15.000+ içerikte liste sayfalıdır; bölümler canlı kanal geçmişine karışmaz; kullanıcı
+  en fazla birkaç kumanda hareketiyle kaldığı bölüme dönebilir.
 
-- [ ] **FEATURE-004 (P2): Yayın sağlık bilgisi**
-  Codec, çözünürlük, bitrate, buffer, dropped frame ve son hata nedenini OSD/teşhiste göster.
-  **Kabul:** Hassas URL/credential loglanmaz; bilgi oynatmayı bloke etmez.
+- [ ] **FEATURE-004 (P2): Yayın sağlık bilgisi arayüzü**
+  `IPTVCORE-001` modelindeki codec, çözünürlük, bitrate, buffer, dropped frame ve hata nedenini
+  mevcut Sistem Bilgileri/teşhis görünümünde göster.
+  **Kabul:** Normal izleme arayüzünü kalabalıklaştırmaz; kullanıcı açmadıkça ek sorgu maliyeti yaratmaz.
 
 - [ ] **FEATURE-005 (P2): Alternatif akış önceliği**
   Kullanıcının alternatif stream sırasını düzenlemesine ve başarısız streami geçici atlamasına
   izin ver.
   **Kabul:** Failover kanal/listesini veya izleme geçmişini değiştirmez.
+
+## IPTV v1 kapsam sınırı
+
+IPTV-only cihaz desteğinin ilk kararlı sürümünde şu özellikler bilinçli olarak kapsam dışıdır:
+
+- Netflix/Prime benzeri ayrı bir keşif ana ekranı
+- TMDB oyuncu kadrosu, fragman, trend listeleri ve zengin metadata zorunluluğu
+- Çoklu kullanıcı profili ve cihazlar arası sosyal/hesap özellikleri
+- Film/bölüm indirme ve çevrimdışı katalog
+- Çok sayıda tema, arka plan fotoğrafı veya hava durumu gibi oynatmayla ilgisiz süsler
+
+Bu maddeler ileride kullanıcı talebi ve ölçülmüş fayda varsa ayrı epic olarak değerlendirilebilir.
 
 ## Epic STORE - Yayın ve güvenlik
 
@@ -169,15 +258,19 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Çalışma modu, IPTV kaynağı, EPG ve kumanda kontrolünü içeren kısa kurulum akışı oluştur.
   **Kabul:** Kullanıcı TIF olmayan cihazda neden yalnız IPTV gördüğünü anlayabilir.
 
-## Önerilen ilk sprint
+## Önerilen sıradaki sprintler
 
-İlk kodlama turunda yalnız şu görevler ele alınmalıdır:
+Tamamlanmış performans, platform, veri, EPG ve kumanda temeli korunarak geliştirme şu sırayla
+ilerlemelidir:
 
-1. `PERF-001` performans ölçüm altyapısı
-2. `PERF-002` büyük veri test üreticisi
-3. `PLATFORM-001` cihaz yetenek modeli
-4. `PLATFORM-002` çalışma modu çözücü
-5. `PLATFORM-003` IPTV-only açılış akışı
-6. `DATA-001` sorgu envanteri ve query planı
+1. **Sprint A - Gözlem:** `IPTVCORE-001` ve `FEATURE-004`
+2. **Sprint B - Kurtarma:** `IPTVCORE-002`, `IPTVCORE-003` ve `FEATURE-005`
+3. **Sprint C - Kaynak uyumluluğu:** `IPTVCORE-004` ve `IPTVCORE-005`
+4. **Sprint D - EPG sağlamlığı:** `EPGNEXT-001`, `EPGNEXT-002`, `EPGNEXT-003`
+5. **Sprint E - Sade içerik:** `FEATURE-003`
+6. **Sprint F - Sistem entegrasyonu:** `IPTVCORE-006`
+7. **Karar çalışması:** `IPTVCORE-007`
 
-Bu sprint mevcut TV görünümünü değiştirmeden ölçüm ve cihaz uyumluluğu temelini kurar.
+Her sprintte Hibrit TV için DVB/ATV kanal açma, kanal listesi, infobar, EPG, ses ve Back davranışı
+regresyon testinden geçirilmelidir. İkinci motor ve medya merkezi özellikleri bu çekirdek işler
+gerçek TV/TV stick üzerinde doğrulanmadan başlatılmamalıdır.
