@@ -97,7 +97,13 @@ import com.tvapp.livetv.ui.OsdCoordinator
 import com.tvapp.livetv.ui.PlaybackSurfaceMode
 import com.tvapp.livetv.ui.PlaybackUiState
 import com.tvapp.livetv.ui.PrimaryOsd
+import com.tvapp.livetv.ui.RemoteAction
+import com.tvapp.livetv.ui.RemoteActionRouter
+import com.tvapp.livetv.ui.RemoteKey
+import com.tvapp.livetv.ui.RemoteKeyPhase
+import com.tvapp.livetv.ui.RemoteUiContext
 import com.tvapp.livetv.ui.VideoQuality
+import com.tvapp.livetv.ui.TvUiComponents
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -4330,29 +4336,15 @@ class MainActivity : TvRemoteActivity() {
         }
         fun action(color: Int, label: Int, handler: () -> Unit) {
             if (BuildConfig.MOBILE_UI_ENABLED) {
-                binding.infoColorActions.addView(LinearLayout(this).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    orientation = LinearLayout.HORIZONTAL
-                    isClickable = true
-                    isFocusable = false
-                    foreground = ContextCompat.getDrawable(
-                        this@MainActivity,
-                        android.R.drawable.list_selector_background,
-                    )
-                    setPadding(dp(10), 0, dp(10), 0)
-                    minimumHeight = dp(48)
-                    addView(ImageView(this@MainActivity).apply {
-                        setImageResource(colorKeyDrawable(color))
-                        contentDescription = getString(label)
-                    }, LinearLayout.LayoutParams(dp(22), dp(22)))
-                    addView(TextView(this@MainActivity).apply {
-                        setText(label)
-                        setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
-                        textSize = 12f
-                        setPadding(dp(6), 0, 0, 0)
-                    })
-                    setOnClickListener { handler() }
-                })
+                binding.infoColorActions.addView(
+                    TvUiComponents.colorAction(
+                        this,
+                        colorKeyDrawable(color),
+                        getString(label),
+                        interactive = true,
+                        clicked = handler,
+                    ),
+                )
                 return
             }
             if (binding.infoColorActions.childCount > 0) {
@@ -4363,15 +4355,14 @@ class MainActivity : TvRemoteActivity() {
                     setPadding(dp(7), 0, dp(7), 0)
                 })
             }
-            binding.infoColorActions.addView(View(this).apply {
-                background = ContextCompat.getDrawable(this@MainActivity, colorKeyDrawable(color))
-            }, LinearLayout.LayoutParams(dp(17), dp(17)))
-            binding.infoColorActions.addView(TextView(this).apply {
-                setText(label)
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                textSize = 11f
-                setPadding(dp(5), 0, 0, 0)
-            })
+            binding.infoColorActions.addView(
+                TvUiComponents.colorAction(
+                    this,
+                    colorKeyDrawable(color),
+                    getString(label),
+                    interactive = false,
+                ),
+            )
         }
         action(R.color.remote_green, R.string.iptv_grid, ::showIptvGridPicker)
         action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
@@ -4819,28 +4810,46 @@ class MainActivity : TvRemoteActivity() {
         return true
     }
 
+    private val remoteActionRouter = RemoteActionRouter()
+
     private fun handleBackNavigation() {
-        when {
-            binding.recentChannelsPanel.visibility == View.VISIBLE -> hideRecentChannels()
-            binding.iptvPlaybackContainer.visibility == View.VISIBLE -> hideIptvPlaybackControls()
-            iptvGridActive -> stopIptvGrid(resumePrevious = true)
-            iptvOverlayActive -> stopIptvOverlay()
-            multiViewActive -> stopMultiView()
-            internalMiniPlayerActive -> toggleInternalMiniPlayer()
-            osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS -> {
-                osdCoordinator.hideStatus()
+        when (remoteActionRouter.route(remoteUiContext(), RemoteKey.BACK, RemoteKeyPhase.DOWN)) {
+            RemoteAction.DISMISS_RECENT_CHANNELS -> hideRecentChannels()
+            RemoteAction.HANDLE_IPTV_CONTROLS -> hideIptvPlaybackControls()
+            RemoteAction.HANDLE_GRID -> if (gridFullscreenIndex != null) {
+                gridFullscreenIndex = null
+                applyIptvGridLayout()
+                updateIptvGridFocus()
+            } else {
+                stopIptvGrid(resumePrevious = true)
             }
-            binding.channelPanel.visibility == View.VISIBLE && channelPanelExpanded -> {
+            RemoteAction.HANDLE_MULTI_VIEW -> stopMultiView()
+            RemoteAction.DISMISS_STATUS -> osdCoordinator.hideStatus()
+            RemoteAction.HANDLE_CHANNEL_PANEL -> if (channelPanelExpanded) {
                 showChannelPanel(expanded = false)
+            } else {
+                hideChannelPanel()
             }
-            binding.channelPanel.visibility == View.VISIBLE -> hideChannelPanel()
-            binding.infoBar.visibility == View.VISIBLE -> {
+            RemoteAction.HIDE_INFO_BAR -> {
                 infoBarJob?.cancel()
                 setInfoBarVisible(false)
             }
-            else -> showRecentChannels()
+            RemoteAction.SHOW_RECENT_CHANNELS -> when (osdCoordinator.state.playbackMode) {
+                PlaybackSurfaceMode.IPTV_OVERLAY -> stopIptvOverlay()
+                PlaybackSurfaceMode.INTERNAL_MINI_PLAYER -> toggleInternalMiniPlayer()
+                else -> showRecentChannels()
+            }
+            RemoteAction.HANDLE_PARENTAL_LOCK -> showRecentChannels()
+            else -> Unit
         }
     }
+
+    private fun remoteUiContext(): RemoteUiContext = RemoteUiContext(
+        playbackUiState = osdCoordinator.state,
+        dialogOwnsInput = currentFocus?.rootView != null &&
+            currentFocus?.rootView !== binding.root.rootView,
+        isIptv = currentChannel?.source == LiveChannel.Source.IPTV,
+    )
 
     private fun showRecentChannels() {
         val recent = playbackHistory.keys().asSequence()
@@ -4900,6 +4909,14 @@ class MainActivity : TvRemoteActivity() {
                     "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",
             )
         }
+        val routedAction = remoteActionRouter.route(
+            remoteUiContext(),
+            event.toRemoteKey(),
+            event.toRemoteKeyPhase(),
+        )
+        if (routedAction == RemoteAction.FORWARD_TO_DIALOG) {
+            return super.dispatchKeyEvent(event)
+        }
         val isSettingsKey = event.keyCode in setOf(
             KeyEvent.KEYCODE_SETTINGS,
             KeyEvent.KEYCODE_TV_CONTENTS_MENU,
@@ -4933,7 +4950,7 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
-        if (iptvGridActive) {
+        if (routedAction == RemoteAction.HANDLE_GRID) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER -> {
@@ -4970,7 +4987,7 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
-        if (multiViewActive) {
+        if (routedAction == RemoteAction.HANDLE_MULTI_VIEW) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> if (event.action == KeyEvent.ACTION_DOWN) {
                     multiViewLongPressJob?.cancel()
@@ -5014,7 +5031,9 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
-        if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS) {
+        if (routedAction == RemoteAction.DISMISS_STATUS ||
+            osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS
+        ) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     osdCoordinator.hideStatus()
@@ -5023,7 +5042,9 @@ class MainActivity : TvRemoteActivity() {
             }
             return super.dispatchKeyEvent(event)
         }
-        if (binding.recentChannelsPanel.visibility == View.VISIBLE) {
+        if (routedAction == RemoteAction.DISMISS_RECENT_CHANNELS ||
+            osdCoordinator.state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
+        ) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
                 hideRecentChannels()
                 return true
@@ -5324,6 +5345,42 @@ class MainActivity : TvRemoteActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun KeyEvent.toRemoteKeyPhase(): RemoteKeyPhase = when {
+        action == KeyEvent.ACTION_UP -> RemoteKeyPhase.UP
+        repeatCount > 0 -> RemoteKeyPhase.REPEAT
+        else -> RemoteKeyPhase.DOWN
+    }
+
+    private fun KeyEvent.toRemoteKey(): RemoteKey = when (keyCode) {
+        KeyEvent.KEYCODE_BACK -> RemoteKey.BACK
+        KeyEvent.KEYCODE_SETTINGS, KeyEvent.KEYCODE_TV_CONTENTS_MENU, 312 -> RemoteKey.SETTINGS
+        KeyEvent.KEYCODE_LAST_CHANNEL -> RemoteKey.LAST_CHANNEL
+        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+        KeyEvent.KEYCODE_MEDIA_PLAY,
+        KeyEvent.KEYCODE_MEDIA_PAUSE,
+        KeyEvent.KEYCODE_MEDIA_STOP,
+        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+        KeyEvent.KEYCODE_MEDIA_REWIND,
+        KeyEvent.KEYCODE_MEDIA_NEXT,
+        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> RemoteKey.MEDIA
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT,
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN -> RemoteKey.DIRECTION
+        KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN -> RemoteKey.CHANNEL
+        KeyEvent.KEYCODE_PROG_RED,
+        KeyEvent.KEYCODE_PROG_GREEN,
+        KeyEvent.KEYCODE_PROG_YELLOW,
+        KeyEvent.KEYCODE_PROG_BLUE -> RemoteKey.COLOR
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> RemoteKey.OK
+        in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> RemoteKey.NUMBER
+        KeyEvent.KEYCODE_INFO -> RemoteKey.INFO
+        KeyEvent.KEYCODE_GUIDE -> RemoteKey.GUIDE
+        KeyEvent.KEYCODE_TV_INPUT -> RemoteKey.INPUT
+        KeyEvent.KEYCODE_MENU -> RemoteKey.MENU
+        else -> RemoteKey.OTHER
     }
 
     private fun iptvPlaybackStateText(): Int = when (currentIptvContentKind) {

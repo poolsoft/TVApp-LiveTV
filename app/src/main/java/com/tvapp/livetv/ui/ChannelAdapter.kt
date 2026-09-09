@@ -175,9 +175,9 @@ class ChannelAdapter(
             )
             channelMainListMarker.visibility = if (
                 showIptvMembership && channel.source == LiveChannel.Source.IPTV && channel.inMainList
-            ) View.VISIBLE else View.GONE
+            ) View.VISIBLE else View.INVISIBLE
             val locked = channel.encrypted || channel.locked || isParentalLocked(channel)
-            channelEncryptedIcon.visibility = if (locked) View.VISIBLE else View.GONE
+            channelEncryptedIcon.visibility = if (locked) View.VISIBLE else View.INVISIBLE
             channelEncryptedIcon.contentDescription = root.context.getString(
                 if (isParentalLocked(channel)) R.string.locked_channel else R.string.encrypted_channel,
             )

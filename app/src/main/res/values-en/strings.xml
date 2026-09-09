@@ -550,4 +550,7 @@
     <string name="reminder_needs_notification_permission">Reminders need the notification permission</string>
     <string name="reminder_badge_description">A reminder is set for this program</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d min · %4$d min remaining)</string>
+    <string name="settings_live_preview">Live appearance preview</string>
+    <string name="settings_preview_channel">Sample Channel HD</string>
+    <string name="settings_preview_program">Current program</string>
 </resources>

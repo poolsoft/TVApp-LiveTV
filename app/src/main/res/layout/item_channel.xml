@@ -8,7 +8,7 @@
     android:focusable="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-        android:paddingHorizontal="10dp">
+    android:paddingHorizontal="10dp">
 
     <ImageView
         android:id="@+id/channel_logo"
@@ -65,7 +65,7 @@
 
             <ImageView
                 android:id="@+id/channel_main_list_marker"
-                android:layout_width="16dp"
+                android:layout_width="20dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="@string/in_main_channel_list"
@@ -74,14 +74,14 @@
 
             <ImageView
                 android:id="@+id/channel_type_icon"
-                android:layout_width="16dp"
+                android:layout_width="20dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="5dp"
                 android:contentDescription="@string/channel_type" />
 
             <ImageView
                 android:id="@+id/channel_encrypted_icon"
-                android:layout_width="16dp"
+                android:layout_width="20dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="5dp"
                 android:contentDescription="@string/encrypted_channel"

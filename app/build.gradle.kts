@@ -35,6 +35,7 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     flavorDimensions += "distribution"
@@ -131,6 +132,10 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 ksp {
@@ -164,4 +169,10 @@ tasks.configureEach {
     if (name == "assembleMobileDebug") {
         finalizedBy(exportNamedMobileDebugApk)
     }
+}
+
+tasks.register("connectedRemoteControlTest") {
+    group = "verification"
+    description = "Runs the non-destructive local-debug TV remote UiAutomator suite."
+    dependsOn("connectedLocalDebugAndroidTest")
 }

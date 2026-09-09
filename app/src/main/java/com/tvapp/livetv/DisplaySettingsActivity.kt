@@ -48,6 +48,9 @@ import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
+import com.tvapp.livetv.ui.SettingsPreviewView
+import com.tvapp.livetv.ui.TvUiComponents
+import com.tvapp.livetv.ui.TvUiMetrics
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,6 +74,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private var xmlTvSettingRow: SettingRow? = null
     private var selectedPage = SettingsPage.APPEARANCE
     private var firstContentFocusable: View? = null
+    private var livePreview: SettingsPreviewView? = null
     private val tabViews = mutableListOf<TextView>()
     private val manageIptvSources = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -115,11 +119,11 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         val metrics = resources.displayMetrics
         window.setGravity(Gravity.END or Gravity.CENTER_VERTICAL)
         window.setLayout(
-            (metrics.widthPixels * OSD_WIDTH_FRACTION).toInt(),
-            (metrics.heightPixels * OSD_HEIGHT_FRACTION).toInt(),
+            (metrics.widthPixels * TvUiMetrics.SETTINGS_PANEL_WIDTH_FRACTION).toInt(),
+            (metrics.heightPixels * TvUiMetrics.SETTINGS_PANEL_HEIGHT_FRACTION).toInt(),
         )
         window.attributes = window.attributes.apply {
-            x = (metrics.widthPixels * OSD_EDGE_GAP_FRACTION).toInt()
+            x = (metrics.widthPixels * TvUiMetrics.SAFE_EDGE_FRACTION).toInt()
             dimAmount = 0f
         }
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
@@ -183,12 +187,27 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun buildSettings(page: SettingsPage) {
         content.removeAllViews()
         firstContentFocusable = null
+        livePreview = null
         xmlTvSettingRow = null
+        if (page == SettingsPage.APPEARANCE || page == SettingsPage.CHANNELS) addLivePreview()
         when (page) {
             SettingsPage.APPEARANCE -> buildAppearanceSettings()
             SettingsPage.CHANNELS -> buildChannelSettings()
             SettingsPage.IPTV_EPG -> buildIptvEpgSettings()
             SettingsPage.SYSTEM -> buildSystemSettings()
+        }
+    }
+
+    private fun addLivePreview() {
+        livePreview = SettingsPreviewView(this).also { preview ->
+            preview.preferences = current
+            preview.contentDescription = getString(R.string.settings_live_preview)
+            content.addView(
+                preview,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(132)).apply {
+                    setMargins(dp(10), dp(8), dp(10), dp(2))
+                },
+            )
         }
     }
 
@@ -482,10 +501,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 layoutParams = LinearLayout.LayoutParams(dp(190), dp(62)).apply {
                     marginEnd = dp(8)
                 }
-                background = AppCompatResources.getDrawable(
-                    this@DisplaySettingsActivity,
-                    R.drawable.bg_settings_item,
-                )
+                TvUiComponents.applyFocusableRow(this)
                 gravity = Gravity.CENTER
                 isFocusable = true
                 isClickable = true
@@ -600,10 +616,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(58),
             ).apply { setMargins(dp(8), dp(2), dp(8), dp(2)) }
-            background = AppCompatResources.getDrawable(
-                this@DisplaySettingsActivity,
-                R.drawable.bg_settings_item,
-            )
+            TvUiComponents.applyFocusableRow(this)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             isFocusable = true
@@ -937,6 +950,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun update(transform: DisplayPreferences.() -> DisplayPreferences) {
         current = current.transform()
         displayStore.save(current)
+        livePreview?.preferences = current
         markChanged()
     }
 
@@ -1008,8 +1022,5 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     private companion object {
         const val STATE_PAGE = "settings_page"
-        const val OSD_WIDTH_FRACTION = 0.40f
-        const val OSD_HEIGHT_FRACTION = 0.94f
-        const val OSD_EDGE_GAP_FRACTION = 0.012f
     }
 }
