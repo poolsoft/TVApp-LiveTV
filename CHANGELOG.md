@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV liste içe aktarma
+* PHP tabanlı liste adreslerinin göreli adresler dahil HTTP 301/302/303/307/308 yönlendirmeleri sınırlı ve güvenli biçimde izleniyor.
+* Büyük dosya aktarımlarının son eşleştirme aşamasına bileşik hazırlama indeksi eklendi; 15.000 civarı kayıtta yinelenen tam tablo taramaları kaldırıldı.
+* IPTV içe aktarma tanılama kayıtlarından özel liste adresleri çıkarıldı.
+
 ### Kanal listesi gezinme ve renk tuşları
 * Arama boşken kanal listesi gezinmesinde her odak hareketinde yinelenen Unicode normalizasyonu kaldırıldı; normalize edilmiş sorgu yalnız arama değiştiğinde hesaplanıyor.
 * Normal kanal listesinde Mavi tuş kanal aramasını açıyor; tam IPTV kütüphanesinde mevcut filtre görevini koruyor.

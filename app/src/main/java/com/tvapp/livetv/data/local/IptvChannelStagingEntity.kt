@@ -9,6 +9,7 @@ import androidx.room.Index
     indices = [
         Index("sessionId"),
         Index("createdAt"),
+        Index(value = ["sessionId", "resolvedSourceKey"]),
     ],
 )
 data class IptvChannelStagingEntity(

@@ -374,20 +374,16 @@ class IptvRepository(context: Context) {
         require(conflicting == null || conflicting.id == replacementSource?.id) {
             "Bu adres zaten baska bir IPTV listesinde kayitli."
         }
-        val connection = URL(normalized).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECTION_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+        val opened = openPlaylistConnection(normalized)
+        val connection = opened.connection
         try {
-            connection.connect()
             check(connection.responseCode in 200..299) {
                 "HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
             val compressed = connection.contentEncoding.equals("gzip", ignoreCase = true) ||
-                normalized.substringBefore('?').endsWith(".gz", ignoreCase = true)
+                opened.finalUrl.path.endsWith(".gz", ignoreCase = true)
             val input = if (compressed) GZIPInputStream(connection.inputStream) else connection.inputStream
-            val derivedName = Uri.parse(normalized).lastPathSegment
+            val derivedName = Uri.parse(opened.finalUrl.toString()).lastPathSegment
                 ?.substringBeforeLast('.')
                 ?.takeIf(String::isNotBlank)
                 ?: Uri.parse(normalized).host
@@ -399,6 +395,50 @@ class IptvRepository(context: Context) {
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun openPlaylistConnection(location: String): OpenedPlaylistConnection {
+        var currentUrl = URL(location)
+        var cookieHeader: String? = null
+        val visited = linkedSetOf<String>()
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            require(currentUrl.protocol.equals("http", true) || currentUrl.protocol.equals("https", true)) {
+                "IPTV yönlendirmesi yalnız HTTP veya HTTPS adresine gidebilir."
+            }
+            check(visited.add(currentUrl.toExternalForm())) { "IPTV adresi yönlendirme döngüsüne girdi." }
+            val connection = (currentUrl.openConnection() as HttpURLConnection).apply {
+                connectTimeout = CONNECTION_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                instanceFollowRedirects = false
+                setRequestProperty("User-Agent", DEFAULT_USER_AGENT)
+                setRequestProperty("Accept", "application/x-mpegURL, audio/x-mpegurl, text/plain, */*")
+                cookieHeader?.let { setRequestProperty("Cookie", it) }
+            }
+            connection.connect()
+            if (connection.responseCode !in REDIRECT_STATUS_CODES) {
+                return OpenedPlaylistConnection(connection, currentUrl)
+            }
+            val redirectLocation = connection.getHeaderField("Location")
+            val responseCookies = connection.headerFields.entries
+                .firstOrNull { (name, _) -> name?.equals("Set-Cookie", true) == true }
+                ?.value
+                .orEmpty()
+                .map { it.substringBefore(';').trim() }
+                .filter(String::isNotBlank)
+            val nextUrl = try {
+                resolveHttpRedirect(currentUrl, redirectLocation)
+            } finally {
+                connection.disconnect()
+            }
+            cookieHeader = if (nextUrl.host.equals(currentUrl.host, ignoreCase = true)) {
+                responseCookies.takeIf(List<String>::isNotEmpty)?.joinToString("; ") ?: cookieHeader
+            } else {
+                null
+            }
+            check(redirectCount < MAX_REDIRECTS) { "IPTV adresi çok fazla yönlendirme yaptı." }
+            currentUrl = nextUrl
+        }
+        error("IPTV adresi yönlendirilemedi.")
     }
 
     suspend fun importDocument(
@@ -638,10 +678,32 @@ class IptvRepository(context: Context) {
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
         private const val IMPORT_BATCH_SIZE = 500
         private const val STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
+        private const val MAX_REDIRECTS = 5
         private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
         private val IMPORT_MUTEX = Mutex()
+        private val REDIRECT_STATUS_CODES = setOf(
+            HttpURLConnection.HTTP_MOVED_PERM,
+            HttpURLConnection.HTTP_MOVED_TEMP,
+            HttpURLConnection.HTTP_SEE_OTHER,
+            307,
+            308,
+        )
 
         private fun encodePath(value: String): String =
             URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+    }
+
+    private data class OpenedPlaylistConnection(
+        val connection: HttpURLConnection,
+        val finalUrl: URL,
+    )
+}
+
+internal fun resolveHttpRedirect(currentUrl: URL, location: String?): URL {
+    require(!location.isNullOrBlank()) { "HTTP yönlendirmesinde Location başlığı yok." }
+    return URL(currentUrl, location).also { resolved ->
+        require(resolved.protocol.equals("http", true) || resolved.protocol.equals("https", true)) {
+            "IPTV yönlendirmesi yalnız HTTP veya HTTPS adresine gidebilir."
+        }
     }
 }

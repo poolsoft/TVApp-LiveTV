@@ -149,7 +149,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         submit.isEnabled = false
                         status.visibility = View.VISIBLE
                         status.setText(R.string.iptv_importing)
-                        debugLog.recordDebug("IPTV_URL_IMPORT START | $enteredUrl")
+                        debugLog.recordDebug("IPTV_URL_IMPORT START")
                         lifecycleScope.launch {
                             val result = withContext(Dispatchers.IO) {
                                 runCatching { repository.importUrl(enteredUrl, enteredName) }
@@ -190,7 +190,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private fun importDocument(uri: Uri) {
         val defaultName = documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
         promptSourceName(defaultName) { name ->
-            runImport("IPTV_FILE_IMPORT", uri.toString(), openSelectionAfter = true) {
+            runImport("IPTV_FILE_IMPORT", openSelectionAfter = true) {
                 repository.importDocument(uri, name)
             }
         }
@@ -233,7 +233,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         showSourceDialog(R.string.add_xtream_title, listOf(name, server, username, password)) {
             val values = listOf(name, server, username, password).map { it.text.toString().trim() }
             if (values.any(String::isBlank)) return@showSourceDialog false
-            runImport("IPTV_XTREAM_IMPORT", values[1], openSelectionAfter = true) {
+            runImport("IPTV_XTREAM_IMPORT", openSelectionAfter = true) {
                 repository.importXtream(values[1], values[2], values[3], values[0])
             }
             true
@@ -247,7 +247,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         showSourceDialog(R.string.add_stalker_title, listOf(name, portal, mac)) {
             val values = listOf(name, portal, mac).map { it.text.toString().trim() }
             if (values.any(String::isBlank)) return@showSourceDialog false
-            runImport("IPTV_STALKER_IMPORT", values[1], openSelectionAfter = true) {
+            runImport("IPTV_STALKER_IMPORT", openSelectionAfter = true) {
                 repository.importStalker(values[1], values[2], values[0])
             }
             true
@@ -352,7 +352,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
         when (action) {
             SourceAction.SELECT -> openChannelSelection(summary.source.id, summary.source.name)
-            SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.location) {
+            SourceAction.REFRESH -> runImport("IPTV_REFRESH") {
                 repository.refresh(summary.source)
             }
             SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
@@ -382,7 +382,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     input.requestFocus()
                 } else {
                     dialog.dismiss()
-                    runImport("IPTV_URL_UPDATE", url) { repository.updateUrl(summary.source, url) }
+                    runImport("IPTV_URL_UPDATE") { repository.updateUrl(summary.source, url) }
                 }
             }
             input.requestFocus()
@@ -413,7 +413,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
             }
             setBusy(false)
             result.onSuccess {
-                debugLog.recordDebug("IPTV_SOURCE_DELETED | ${summary.source.location}")
+                debugLog.recordDebug(
+                    "IPTV_SOURCE_DELETED | source=${summary.source.id}, kind=${summary.source.kind}",
+                )
                 setResult(RESULT_OK)
                 binding.importStatus.setText(R.string.iptv_source_deleted)
                 loadSources()
@@ -423,13 +425,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun runImport(
         event: String,
-        detail: String,
         openSelectionAfter: Boolean = false,
         action: suspend () -> com.tvapp.livetv.data.IptvImportResult,
     ) {
         setBusy(true)
         binding.importStatus.setText(R.string.iptv_importing)
-        debugLog.recordDebug("$event START | $detail")
+        debugLog.recordDebug("$event START")
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { action() } }
             setBusy(false)
