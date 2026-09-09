@@ -25,7 +25,8 @@ class InformationActivity : TvRemoteActivity() {
 
         if (intent.getStringExtra(EXTRA_PAGE) == PAGE_GUIDE) {
             title.setText(R.string.user_guide)
-            body.setText(R.string.user_guide_content)
+            body.text = getString(R.string.user_guide_content) + "\n\n" +
+                getString(R.string.user_guide_search_archive)
         } else {
             title.setText(R.string.about)
             body.setText(R.string.loading)

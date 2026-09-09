@@ -111,6 +111,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.text.Normalizer
 import java.util.Date
 import java.util.Locale
 
@@ -202,6 +203,7 @@ class MainActivity : TvRemoteActivity() {
     private var iptvLibrarySourceId: Long? = null
     private var iptvLibraryContentType = IptvLibraryContentType.ALL
     private var iptvLibraryCategory: String? = null
+    private var channelSearchQuery = ""
     private var iptvLibraryWindowStart = 0
     private var iptvLibraryTotalCount = 0
     private var iptvLibraryHasPrevious = false
@@ -265,6 +267,7 @@ class MainActivity : TvRemoteActivity() {
     private var iptvNoticeJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
+    private var catchUpReturnChannel: LiveChannel? = null
     private var iptvManualTimeshift = false
     private var iptvPlaybackFailed = false
     private var iptvControlRow = IptvControlRow.TIMELINE
@@ -338,8 +341,27 @@ class MainActivity : TvRemoteActivity() {
         val sourceKey = result.data?.getStringExtra(
             ProgramGuideActivity.EXTRA_SELECTED_SOURCE_KEY,
         )
-        channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
-        if (sourceKey != null) hideChannelPanel()
+        val catchUpStart = result.data?.getLongExtra(ProgramGuideActivity.EXTRA_CATCHUP_START, 0L) ?: 0L
+        val catchUpEnd = result.data?.getLongExtra(ProgramGuideActivity.EXTRA_CATCHUP_END, 0L) ?: 0L
+        if (sourceKey != null && catchUpStart > 0L && catchUpEnd > catchUpStart) {
+            lifecycleScope.launch {
+                val liveChannel = channels.firstOrNull { it.sourceKey == sourceKey }
+                    ?: withContext(Dispatchers.IO) { iptvRepository.channel(sourceKey) }
+                val archived = withContext(Dispatchers.IO) {
+                    iptvRepository.catchUpChannel(sourceKey, catchUpStart, catchUpEnd)
+                }
+                if (liveChannel != null && archived != null) {
+                    catchUpReturnChannel = liveChannel
+                    selectChannel(archived, recordHistory = false)
+                    hideChannelPanel()
+                } else {
+                    Toast.makeText(this@MainActivity, R.string.catchup_unavailable, Toast.LENGTH_LONG).show()
+                }
+            }
+        } else {
+            channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel)
+            if (sourceKey != null) hideChannelPanel()
+        }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -367,7 +389,7 @@ class MainActivity : TvRemoteActivity() {
             IptvPlaybackProfile.SECONDARY,
         )
         secondaryIptvPlayback.onPlaybackError = { error ->
-            debugLog.recordDebug("MULTIVIEW_IPTV_FAILURE | ${error.errorCodeName}: ${error.message}")
+            debugLog.recordDebug("MULTIVIEW_IPTV_FAILURE | ${error.errorCodeName}")
             if (iptvOverlayActive) stopIptvOverlay() else stopMultiView()
         }
         secondaryIptvPlayback.onPlaybackReady = ::updateFocusedMultiViewIptvBadges
@@ -522,6 +544,7 @@ class MainActivity : TvRemoteActivity() {
         binding.favoriteFilter.setOnClickListener {
             applyChannelFilter(showFavorites = !favoriteFilter)
         }
+        binding.channelSearchButton.setOnClickListener { showChannelSearchDialog() }
         setupMobileTouchControls()
         setupMobileColorActions()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -816,6 +839,9 @@ class MainActivity : TvRemoteActivity() {
         activePassthroughInputId = null
         currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
+        if (!channel.iptvContentType.equals("CATCHUP", ignoreCase = true)) {
+            catchUpReturnChannel = null
+        }
         updateChannelActionLabels()
         currentIptvContentKind = IptvContentKind.UNKNOWN
         iptvManualTimeshift = false
@@ -912,7 +938,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun handleIptvPlaybackError(error: androidx.media3.common.PlaybackException) {
         val channel = currentChannel
-        debugLog.recordDebug("IPTV_PLAYBACK_FAILURE | ${error.errorCodeName}: ${error.message}")
+        debugLog.recordDebug("IPTV_PLAYBACK_FAILURE | ${error.errorCodeName}")
         if (channel?.source != LiveChannel.Source.IPTV) {
             showPlaybackError(channel, error.message ?: error.errorCodeName)
             return
@@ -2767,6 +2793,8 @@ class MainActivity : TvRemoteActivity() {
         iptvLibrarySourceId = sourceId
         iptvLibraryContentType = contentType
         iptvLibraryCategory = category
+        channelSearchQuery = ""
+        binding.channelSearchButton.isSelected = false
         iptvLibraryGeneration++
         iptvLibraryWindowStart = 0
         iptvLibraryTotalCount = 0
@@ -2825,6 +2853,7 @@ class MainActivity : TvRemoteActivity() {
                     sourceId,
                     category,
                     contentType.name,
+                    channelSearchQuery,
                 )
             }
             updateIptvLibraryCount()
@@ -2850,6 +2879,7 @@ class MainActivity : TvRemoteActivity() {
         val sourceId = iptvLibrarySourceId ?: return
         val category = iptvLibraryCategory
         val contentType = iptvLibraryContentType
+        val query = channelSearchQuery
         val generation = iptvLibraryGeneration
         val anchor = when (direction) {
             IptvPageDirection.NEXT -> iptvLibraryLastAnchor
@@ -2870,6 +2900,7 @@ class MainActivity : TvRemoteActivity() {
                     direction,
                     anchor,
                     targetIndex,
+                    query,
                 )
             }
             if (
@@ -2877,6 +2908,7 @@ class MainActivity : TvRemoteActivity() {
                 iptvLibrarySourceId != sourceId ||
                 iptvLibraryCategory != category ||
                 iptvLibraryContentType != contentType ||
+                channelSearchQuery != query ||
                 iptvLibraryGeneration != generation
             ) return@launch
             val previousSize = iptvLibraryChannels.size
@@ -2961,6 +2993,7 @@ class MainActivity : TvRemoteActivity() {
                     IPTV_LIBRARY_PAGE_SIZE,
                     IptvPageDirection.AT_INDEX,
                     targetIndex = index,
+                    query = channelSearchQuery,
                 )
             }
             val channel = page.channels.firstOrNull() ?: return@launch
@@ -3017,7 +3050,7 @@ class MainActivity : TvRemoteActivity() {
             ).apply {
                 onPlaybackError = { error ->
                     debugLog.recordDebug(
-                        "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}: ${error.message}",
+                        "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}",
                     )
                 }
             }
@@ -4218,6 +4251,95 @@ class MainActivity : TvRemoteActivity() {
             .show()
     }
 
+    private fun showChannelSearchDialog() {
+        focusedTuneJob?.cancel()
+        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+            hint = getString(R.string.channel_search_hint)
+            setText(channelSearchQuery)
+            selectAll()
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.search_channels)
+            .setView(input)
+            .setPositiveButton(R.string.apply, null)
+            .setNeutralButton(R.string.clear_search, null)
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                applyChannelSearch(input.text.toString())
+                dialog.dismiss()
+            }
+            dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                applyChannelSearch("")
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun applyChannelSearch(value: String) {
+        channelSearchQuery = value.trim()
+        binding.channelSearchButton.isSelected = channelSearchQuery.isNotEmpty()
+        if (channelPanelContent != ChannelPanelContent.IPTV_LIBRARY) {
+            applyChannelFilter(requestFocus = true)
+            return
+        }
+        val sourceId = iptvLibrarySourceId ?: return
+        if (iptvLibraryContentType == IptvLibraryContentType.CONTINUE) {
+            val generation = ++iptvLibraryGeneration
+            val query = channelSearchQuery
+            lifecycleScope.launch {
+                val sourceInputId = "iptv:$sourceId"
+                val filtered = withContext(Dispatchers.IO) {
+                    iptvResumeStore.entries().mapNotNull { iptvRepository.channel(it.sourceKey) }
+                        .filter { it.inputId == sourceInputId && it.iptvContentType == "VOD" }
+                        .filter(::matchesChannelSearch)
+                }.mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+                if (generation != iptvLibraryGeneration || query != channelSearchQuery) return@launch
+                iptvLibraryChannels = filtered
+                iptvLibraryTotalCount = filtered.size
+                adapter.submitList(filtered)
+                updateIptvLibraryCount()
+                focusIptvLibraryPosition(0)
+            }
+            return
+        }
+        iptvLibraryLoadJob?.cancel()
+        val generation = ++iptvLibraryGeneration
+        val query = channelSearchQuery
+        iptvLibraryChannels = emptyList()
+        iptvLibraryWindowStart = 0
+        iptvLibraryFirstAnchor = null
+        iptvLibraryLastAnchor = null
+        lifecycleScope.launch {
+            iptvLibraryTotalCount = withContext(Dispatchers.IO) {
+                iptvRepository.libraryChannelCount(
+                    sourceId,
+                    iptvLibraryCategory,
+                    iptvLibraryContentType.name,
+                    query,
+                )
+            }
+            if (generation != iptvLibraryGeneration || query != channelSearchQuery) return@launch
+            updateIptvLibraryCount()
+            loadIptvLibraryWindow(IptvPageDirection.FIRST)
+        }
+    }
+
+    private fun matchesChannelSearch(channel: LiveChannel): Boolean {
+        val query = normalizeSearchText(channelSearchQuery)
+        if (query.isBlank()) return true
+        return listOf(channel.displayNumber, channel.displayName, channel.groupTitle.orEmpty())
+            .any { normalizeSearchText(it).contains(query) }
+    }
+
+    private fun normalizeSearchText(value: String): String = Normalizer
+        .normalize(value, Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+        .lowercase(Locale.ROOT)
+
     private fun updateChannel(action: suspend () -> Unit) {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) { action() }
@@ -4240,6 +4362,7 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         .filter { channel -> !favoriteFilter || channel.favorite }
+        .filter(::matchesChannelSearch)
         .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
         .toList()
     }
@@ -4310,6 +4433,20 @@ class MainActivity : TvRemoteActivity() {
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
+            catchUpReturnChannel?.let { liveChannel ->
+                binding.infoColorActions.addView(
+                    TvUiComponents.colorAction(
+                        this,
+                        R.drawable.key_red,
+                        getString(R.string.catchup_return_live),
+                        interactive = BuildConfig.MOBILE_UI_ENABLED,
+                        clicked = {
+                            catchUpReturnChannel = null
+                            selectChannel(liveChannel)
+                        },
+                    ),
+                )
+            }
             val hints = if (iptvControlsInteractive) {
                 intArrayOf(
                     R.string.iptv_controls_up_down_hint,
@@ -4950,6 +5087,19 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
+        if (
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode == KeyEvent.KEYCODE_PROG_RED &&
+            binding.channelPanel.visibility != View.VISIBLE &&
+            !iptvGridActive &&
+            !multiViewActive
+        ) {
+            catchUpReturnChannel?.let { liveChannel ->
+                catchUpReturnChannel = null
+                selectChannel(liveChannel)
+                return true
+            }
+        }
         if (routedAction == RemoteAction.HANDLE_GRID) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER,
@@ -5124,7 +5274,11 @@ class MainActivity : TvRemoteActivity() {
         ) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_PROG_RED -> {
-                    if (iptvPlaybackFailed) {
+                    val liveChannel = catchUpReturnChannel
+                    if (liveChannel != null) {
+                        catchUpReturnChannel = null
+                        selectChannel(liveChannel)
+                    } else if (iptvPlaybackFailed) {
                         iptvPlayback.retry()
                     } else if (currentIptvContentKind == IptvContentKind.LIVE) {
                         iptvManualTimeshift = false
@@ -5319,6 +5473,10 @@ class MainActivity : TvRemoteActivity() {
                 175 -> showSubtitleTracks()
                 KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
                 KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
+                KeyEvent.KEYCODE_SEARCH -> {
+                    if (binding.channelPanel.visibility != View.VISIBLE) showChannelPanel(expanded = false)
+                    showChannelSearchDialog()
+                }
                 KeyEvent.KEYCODE_INFO -> if (binding.infoBar.visibility == View.VISIBLE) {
                     openProgramGuide()
                 } else {

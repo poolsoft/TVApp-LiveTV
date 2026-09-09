@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -52,6 +52,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
@@ -304,6 +305,17 @@ abstract class TVAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_iptv_channel_staging_createdAt` " +
                         "ON `iptv_channel_staging` (`createdAt`)",
                 )
+            }
+        }
+
+        internal val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `iptv_channels` ADD COLUMN `catchUpMode` TEXT")
+                db.execSQL("ALTER TABLE `iptv_channels` ADD COLUMN `catchUpSource` TEXT")
+                db.execSQL("ALTER TABLE `iptv_channels` ADD COLUMN `catchUpDays` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `iptv_channel_staging` ADD COLUMN `catchUpMode` TEXT")
+                db.execSQL("ALTER TABLE `iptv_channel_staging` ADD COLUMN `catchUpSource` TEXT")
+                db.execSQL("ALTER TABLE `iptv_channel_staging` ADD COLUMN `catchUpDays` INTEGER NOT NULL DEFAULT 0")
             }
         }
 

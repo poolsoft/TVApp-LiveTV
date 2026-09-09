@@ -550,4 +550,10 @@
     <string name="reminder_needs_notification_permission">Reminders need the notification permission</string>
     <string name="reminder_badge_description">A reminder is set for this program</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d min · %4$d min remaining)</string>
+    <string name="user_guide_search_archive">SEARCH AND CATCH-UP\nUse the search icon in the channel panel header or the SEARCH key to search by channel name, number, or category. Press OK on a past IPTV programme marked with a clock to play its archive; the red player action returns to live TV.</string>
+    <string name="search_channels">Search channels</string>
+    <string name="channel_search_hint">Channel name, number, or category</string>
+    <string name="clear_search">Clear search</string>
+    <string name="catchup_unavailable">This programme is not available in the provider archive.</string>
+    <string name="catchup_return_live">Return to live</string>
 </resources>

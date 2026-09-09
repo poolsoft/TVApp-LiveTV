@@ -42,6 +42,7 @@ seçenekleri kullanılabilir.
 * Dört haneli PIN ile kanal kilidi
 * M3U/M3U8 URL ve dosya içe aktarma, yenileme ve kaynak yönetimi
 * Büyük IPTV listelerinde sayfalı yükleme, arama, kategori ve Canlı/VOD filtreleri
+* Uyumlu M3U ve Xtream kaynaklarında program rehberinden arşiv yayını oynatma
 * Canlı yayın ve VOD oynatma kontrolleri
 * TIF/XMLTV program rehberi ile şimdi ve sonraki program bilgisi
 * Ses parçası ve altyazı seçimi
@@ -124,6 +125,7 @@ Highlights:
 * Four-digit PIN channel lock
 * M3U/M3U8 import from URL or file, playlist refresh, and source management
 * Paged loading, search, categories, and Live/VOD filters for large IPTV lists
+* Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
 * TIF/XMLTV guide with now and next program information
 * Audio track and subtitle selection

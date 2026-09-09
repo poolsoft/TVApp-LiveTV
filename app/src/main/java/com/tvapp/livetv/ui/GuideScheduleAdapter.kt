@@ -193,10 +193,20 @@ class GuideScheduleAdapter(
                 text = program.title.ifBlank { context.getString(R.string.untitled_program) }
                 setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 textSize = 13f
-                if (program.startTimeMillis in reminders[channel.sourceKey].orEmpty()) {
-                    setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_clock_small, 0)
-                    compoundDrawablePadding = dp(5)
-                }
+                val now = System.currentTimeMillis()
+                val archived = channel.source == LiveChannel.Source.IPTV &&
+                    channel.catchUpDays > 0 &&
+                    (!channel.catchUpSource.isNullOrBlank() || channel.catchUpMode == "xtream") &&
+                    program.endTimeMillis <= now &&
+                    program.endTimeMillis >= now - channel.catchUpDays * DAY_MILLIS
+                val reminded = program.startTimeMillis in reminders[channel.sourceKey].orEmpty()
+                setCompoundDrawablesWithIntrinsicBounds(
+                    if (archived) R.drawable.ic_archive else 0,
+                    0,
+                    if (reminded) R.drawable.ic_clock_small else 0,
+                    0,
+                )
+                compoundDrawablePadding = if (archived || reminded) dp(5) else 0
                 isSelected = channel.sourceKey == selectedChannelKey &&
                     program.startTimeMillis == selectedProgramStart
                 setOnFocusChangeListener { view, focused ->
@@ -235,5 +245,6 @@ class GuideScheduleAdapter(
 
     private companion object {
         const val ROW_HEIGHT_FRACTION = 0.072f
+        const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
     }
 }

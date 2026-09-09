@@ -74,4 +74,19 @@ class M3uParserTest {
         assertEquals("Kanal 2", channel.name)
         assertNull(channel.tvgId)
     }
+
+    @Test
+    fun parsesCatchUpMetadata() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="trt1.tr" catchup="append" catchup-days="7" catchup-source="https://example.com/archive/{utc}/{duration}",TRT 1
+            https://example.com/live/trt1.m3u8
+        """.trimIndent()
+
+        val channel = M3uParser.parse(StringReader(playlist)).single()
+
+        assertEquals("append", channel.catchUpMode)
+        assertEquals("https://example.com/archive/{utc}/{duration}", channel.catchUpSource)
+        assertEquals(7, channel.catchUpDays)
+    }
 }

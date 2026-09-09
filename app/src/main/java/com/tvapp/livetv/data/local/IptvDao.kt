@@ -32,6 +32,9 @@ interface IptvDao {
     @Query("SELECT * FROM iptv_sources WHERE location = :location LIMIT 1")
     suspend fun getSourceByLocation(location: String): IptvSourceEntity?
 
+    @Query("SELECT * FROM iptv_sources WHERE id = :sourceId LIMIT 1")
+    suspend fun getSource(sourceId: Long): IptvSourceEntity?
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSource(source: IptvSourceEntity): Long
 
@@ -89,12 +92,15 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
     )
     suspend fun getLibraryPage(
         sourceId: Long,
         category: String?,
         contentType: String,
+        query: String,
         limit: Int,
         offset: Int,
     ): List<IptvChannelListProjection>
@@ -105,6 +111,8 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (originalIndex > :anchorIndex " +
             "OR (originalIndex = :anchorIndex AND sourceKey > :anchorKey)) " +
             "ORDER BY originalIndex, sourceKey LIMIT :limit",
@@ -113,6 +121,7 @@ interface IptvDao {
         sourceId: Long,
         category: String?,
         contentType: String,
+        query: String,
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
@@ -124,6 +133,8 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND (originalIndex < :anchorIndex " +
             "OR (originalIndex = :anchorIndex AND sourceKey < :anchorKey)) " +
             "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
@@ -132,6 +143,7 @@ interface IptvDao {
         sourceId: Long,
         category: String?,
         contentType: String,
+        query: String,
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
@@ -143,12 +155,15 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
     )
     suspend fun getLibraryLastPage(
         sourceId: Long,
         category: String?,
         contentType: String,
+        query: String,
         limit: Int,
     ): List<IptvChannelListProjection>
 
@@ -158,6 +173,8 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
             "AND originalIndex >= :targetIndex " +
             "ORDER BY originalIndex, sourceKey LIMIT :limit",
     )
@@ -165,6 +182,7 @@ interface IptvDao {
         sourceId: Long,
         category: String?,
         contentType: String,
+        query: String,
         targetIndex: Int,
         limit: Int,
     ): List<IptvChannelListProjection>
@@ -173,9 +191,11 @@ interface IptvDao {
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
-            "AND (:contentType = 'ALL' OR contentType = :contentType)",
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query))",
     )
-    suspend fun libraryCount(sourceId: Long, category: String?, contentType: String): Int
+    suspend fun libraryCount(sourceId: Long, category: String?, contentType: String, query: String): Int
 
     @Query(
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
@@ -442,6 +462,12 @@ interface IptvDao {
             "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
             "contentType = (SELECT staged.contentType FROM iptv_channel_staging staged " +
             "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "catchUpMode = (SELECT staged.catchUpMode FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "catchUpSource = (SELECT staged.catchUpSource FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
+            "catchUpDays = (SELECT staged.catchUpDays FROM iptv_channel_staging staged " +
+            "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey), " +
             "matchKey = (SELECT staged.matchKey FROM iptv_channel_staging staged " +
             "WHERE staged.sessionId = :sessionId AND staged.resolvedSourceKey = sourceKey) " +
             "WHERE sourceId = :sourceId AND EXISTS (SELECT 1 FROM iptv_channel_staging staged " +
@@ -457,6 +483,9 @@ interface IptvDao {
             "OR iptv_channels.subtitleUrl IS NOT staged.subtitleUrl " +
             "OR iptv_channels.originalIndex IS NOT staged.originalIndex " +
             "OR iptv_channels.contentType IS NOT staged.contentType " +
+            "OR iptv_channels.catchUpMode IS NOT staged.catchUpMode " +
+            "OR iptv_channels.catchUpSource IS NOT staged.catchUpSource " +
+            "OR iptv_channels.catchUpDays IS NOT staged.catchUpDays " +
             "OR iptv_channels.matchKey IS NOT staged.matchKey))",
     )
     suspend fun updateChangedStagedChannels(sessionId: String, sourceId: Long): Int
@@ -472,11 +501,12 @@ interface IptvDao {
         "INSERT INTO iptv_channels " +
             "(sourceKey, sourceId, tvgId, tvgName, displayName, streamUrl, logoUrl, " +
             "groupTitle, userAgent, referrer, subtitleUrl, originalIndex, contentType, " +
-            "selected, lastSeenAt, matchKey) " +
+            "selected, lastSeenAt, matchKey, catchUpMode, catchUpSource, catchUpDays) " +
             "SELECT staged.resolvedSourceKey, :sourceId, staged.tvgId, staged.tvgName, " +
             "staged.displayName, staged.streamUrl, staged.logoUrl, staged.groupTitle, " +
             "staged.userAgent, staged.referrer, staged.subtitleUrl, staged.originalIndex, " +
-            "staged.contentType, 0, :lastSeenAt, staged.matchKey " +
+            "staged.contentType, 0, :lastSeenAt, staged.matchKey, staged.catchUpMode, " +
+            "staged.catchUpSource, staged.catchUpDays " +
             "FROM iptv_channel_staging staged WHERE staged.sessionId = :sessionId " +
             "AND staged.resolvedSourceKey IS NOT NULL AND NOT EXISTS " +
             "(SELECT 1 FROM iptv_channels old WHERE old.sourceKey = staged.resolvedSourceKey)",

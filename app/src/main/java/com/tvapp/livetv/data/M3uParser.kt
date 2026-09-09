@@ -15,6 +15,9 @@ data class ParsedIptvChannel(
     val referrer: String? = null,
     val subtitleUrl: String? = null,
     val contentType: String = "LIVE",
+    val catchUpMode: String? = null,
+    val catchUpSource: String? = null,
+    val catchUpDays: Int = 0,
 )
 
 object M3uParser {
@@ -61,6 +64,9 @@ object M3uParser {
                             referrer = stream.referrer ?: metadata.referrer.nullIfBlank(),
                             subtitleUrl = metadata.subtitleUrl.nullIfBlank(),
                             contentType = contentType(metadata.durationSeconds, stream.url, metadata.groupTitle),
+                            catchUpMode = metadata.catchUpMode.nullIfBlank(),
+                            catchUpSource = metadata.catchUpSource.nullIfBlank(),
+                            catchUpDays = metadata.catchUpDays,
                         )
                         if (channel.streamUrl.startsWith("http", ignoreCase = true)) {
                             yield(channel)
@@ -90,6 +96,11 @@ object M3uParser {
             logoUrl = attributes["tvg-logo"],
             groupTitle = attributes["group-title"],
             durationSeconds = duration,
+            catchUpMode = attributes["catchup"],
+            catchUpSource = attributes["catchup-source"],
+            catchUpDays = attributes["catchup-days"]?.toIntOrNull()
+                ?: attributes["timeshift"]?.toIntOrNull()
+                ?: 0,
         )
     }
 
@@ -142,6 +153,9 @@ object M3uParser {
         val referrer: String? = null,
         val subtitleUrl: String? = null,
         val durationSeconds: Long? = null,
+        val catchUpMode: String? = null,
+        val catchUpSource: String? = null,
+        val catchUpDays: Int = 0,
     )
 
     private data class StreamLocation(

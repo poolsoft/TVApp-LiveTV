@@ -480,6 +480,9 @@ class AppBackupRepository(context: Context) {
             name("selected").value(channel.selected)
             name("lastSeenAt").value(channel.lastSeenAt)
             name("matchKey").value(channel.matchKey)
+            name("catchUpMode").nullableValue(channel.catchUpMode)
+            name("catchUpSource").nullableValue(channel.catchUpSource)
+            name("catchUpDays").value(channel.catchUpDays.toLong())
             endObject()
         }
 
@@ -539,6 +542,9 @@ class AppBackupRepository(context: Context) {
             contentType = optString("contentType", "LIVE"),
             selected = optBoolean("selected", false), lastSeenAt = optLong("lastSeenAt", 0L),
             matchKey = optString("matchKey", ""),
+            catchUpMode = nullableString("catchUpMode"),
+            catchUpSource = nullableString("catchUpSource"),
+            catchUpDays = optInt("catchUpDays", 0),
         )
 
         fun JSONObject.toDisplayPreferences() = DisplayPreferences(

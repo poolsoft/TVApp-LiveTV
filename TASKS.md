@@ -134,11 +134,11 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic FEATURE - Sonraki kullanıcı özellikleri
 
-- [ ] **FEATURE-001 (P1): Ana kanal listesinde hızlı arama**
+- [x] **FEATURE-001 (P1): Ana kanal listesinde hızlı arama**
   TV `SEARCH` tuşu ve liste başlığı üzerinden tüm geçerli kaynaklarda arama aç.
   **Kabul:** Sayı ile kanal seçimi korunur; IPTV-only modda arama tüm seçili kataloğu kapsar.
 
-- [ ] **FEATURE-002 (P2): Catch-up/arşiv**
+- [x] **FEATURE-002 (P2): Catch-up/arşiv**
   M3U catch-up öznitelikleri ve Xtream arşiv API'sini modelle, EPG programından oynat.
   **Kabul:** Arşivlenebilir program işaretlidir; canlıya dönüş tek eylemdir.
 

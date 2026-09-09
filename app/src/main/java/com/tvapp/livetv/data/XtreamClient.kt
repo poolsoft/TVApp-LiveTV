@@ -50,6 +50,8 @@ internal class XtreamClient(
                     logoUrl = item.icon,
                     groupTitle = liveCategories[item.categoryId] ?: item.categoryId,
                     contentType = "LIVE",
+                    catchUpMode = if (item.hasArchive) "xtream" else null,
+                    catchUpDays = item.archiveDays,
                 ),
             )
         }
@@ -107,6 +109,8 @@ internal class XtreamClient(
                     var categoryId: String? = null
                     var epgId: String? = null
                     var extension: String? = null
+                    var hasArchive = false
+                    var archiveDays = 0
                     reader.beginObject()
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
@@ -116,11 +120,13 @@ internal class XtreamClient(
                             "category_id" -> categoryId = reader.scalarString()
                             "epg_channel_id" -> epgId = reader.scalarString()
                             "container_extension" -> extension = reader.scalarString()
+                            "tv_archive" -> hasArchive = reader.scalarString() == "1"
+                            "tv_archive_duration" -> archiveDays = reader.scalarString()?.toIntOrNull() ?: 0
                             else -> reader.skipValue()
                         }
                     }
                     reader.endObject()
-                    yield(StreamItem(id, name, icon, categoryId, epgId, extension))
+                    yield(StreamItem(id, name, icon, categoryId, epgId, extension, hasArchive, archiveDays))
                 }
                 reader.endArray()
             }
@@ -227,6 +233,8 @@ internal class XtreamClient(
         val categoryId: String?,
         val epgId: String?,
         val extension: String?,
+        val hasArchive: Boolean,
+        val archiveDays: Int,
     )
 
     companion object {

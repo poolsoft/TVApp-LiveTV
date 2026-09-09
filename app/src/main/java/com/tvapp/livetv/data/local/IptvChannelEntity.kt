@@ -42,4 +42,7 @@ data class IptvChannelEntity(
     val selected: Boolean = false,
     val lastSeenAt: Long,
     val matchKey: String = "",
+    val catchUpMode: String? = null,
+    val catchUpSource: String? = null,
+    val catchUpDays: Int = 0,
 )

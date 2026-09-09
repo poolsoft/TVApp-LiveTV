@@ -376,10 +376,26 @@ class ProgramGuideActivity : TvRemoteActivity() {
         val now = System.currentTimeMillis()
         if (now in program.startTimeMillis until program.endTimeMillis) {
             focusedChannel?.let(::openChannel)
+        } else if (program.endTimeMillis <= now && focusedChannel?.canPlayCatchUp(program, now) == true) {
+            val channel = focusedChannel ?: return
+            setResult(
+                RESULT_OK,
+                Intent()
+                    .putExtra(EXTRA_SELECTED_SOURCE_KEY, channel.sourceKey)
+                    .putExtra(EXTRA_CATCHUP_START, program.startTimeMillis)
+                    .putExtra(EXTRA_CATCHUP_END, program.endTimeMillis),
+            )
+            finish()
         } else {
             showProgramDetail(program)
         }
     }
+
+    private fun LiveChannel.canPlayCatchUp(program: ProgramSummary, now: Long): Boolean =
+        source == LiveChannel.Source.IPTV &&
+            catchUpDays > 0 &&
+            (!catchUpSource.isNullOrBlank() || catchUpMode == "xtream") &&
+            program.endTimeMillis >= now - catchUpDays * DAY_MILLIS
 
     private fun focusChannel(sourceKey: String?) {
         val position = channelAdapter.positionOf(sourceKey).takeIf { it >= 0 } ?: 0
@@ -715,6 +731,9 @@ class ProgramGuideActivity : TvRemoteActivity() {
     companion object {
         const val EXTRA_CURRENT_SOURCE_KEY = "current-source-key"
         const val EXTRA_SELECTED_SOURCE_KEY = "selected-source-key"
+        const val EXTRA_CATCHUP_START = "catchup-start"
+        const val EXTRA_CATCHUP_END = "catchup-end"
+        private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
         private const val HEADER_HEIGHT_FRACTION = 0.11f
         private const val DETAIL_HEIGHT_FRACTION = 0.31f
         private const val OVERLAY_WIDTH_FRACTION = 0.82f
@@ -723,7 +742,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         private const val CHANNEL_FOCUS_DELAY_MS = 250L
         private const val FOCUS_RETRY_DELAY_MS = 60L
         private const val GUIDE_REFRESH_INTERVAL_MS = 15_000L
-        private const val PAST_WINDOW_MS = 2 * 60 * 60 * 1_000L
+        private const val PAST_WINDOW_MS = 7 * 24 * 60 * 60 * 1_000L
         private const val GUIDE_WINDOW_MS = 24 * 60 * 60 * 1_000L
         private const val GUIDE_CHANNEL_RADIUS = 6
         private const val TIMELINE_STEP_MS = 60 * 60 * 1_000L

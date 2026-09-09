@@ -27,5 +27,8 @@ data class IptvChannelStagingEntity(
     val subtitleUrl: String?,
     val contentType: String,
     val matchKey: String,
+    val catchUpMode: String?,
+    val catchUpSource: String?,
+    val catchUpDays: Int,
     val createdAt: Long,
 )

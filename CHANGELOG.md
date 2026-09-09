@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Kanal arama ve IPTV arşivi
+* Kanal paneline ad, numara ve kategori arayan başlık eylemi ile `SEARCH` kumanda tuşu desteği eklendi. Büyük IPTV kütüphanesi araması, bütün kataloğu belleğe almadan Room FTS ve keyset sayfalama üzerinden çalışıyor.
+* M3U `catchup`, `catchup-source`, `catchup-days`/`timeshift` alanları ve Xtream `tv_archive` bilgileri içe aktarılıp kalıcı olarak saklanıyor.
+* Arşiv süresi içindeki geçmiş EPG programları rehberde işaretleniyor ve doğrudan Media3 ile oynatılabiliyor. Kırmızı oynatıcı eylemi arşivden tek adımda canlı kanala dönüyor.
+* Room 15→16 migration ve yedek içe/dışa aktarma arşiv alanlarını kullanıcı seçimlerini silmeden koruyor.
+
 ### Merkezi OSD durumu
 * Kanal paneli, infobar, IPTV oynatma kontrolleri, son kanallar, ebeveyn kilidi ve hata/durum panelinin görünürlüğü `PlaybackUiState` ve `OsdCoordinator` üzerinden tek noktadan yönetiliyor.
 * IPTV Grid, Multi View, IPTV küçük pencere ve dahili mini oynatıcı etkinliği aynı playback durum modeline alındı. Yeni birincil OSD açıldığında çakışan panel kontrollü kapanıyor; kanal paneliyle birlikte kullanılan infobar korunuyor.

@@ -14,7 +14,10 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.zip.GZIPInputStream
@@ -196,7 +199,10 @@ class IptvRepository(context: Context) {
         contentType: String,
         limit: Int,
         offset: Int,
-    ): List<LiveChannel> = dao.getLibraryPage(sourceId, category, contentType, limit, offset)
+        query: String = "",
+    ): List<LiveChannel> = dao.getLibraryPage(
+        sourceId, category, contentType, IptvFtsQuery.from(query), limit, offset,
+    )
         .map { it.toLiveChannel() }
 
     suspend fun libraryLiveChannelsWindow(
@@ -207,28 +213,32 @@ class IptvRepository(context: Context) {
         direction: IptvPageDirection,
         anchor: IptvPageAnchor? = null,
         targetIndex: Int = 0,
+        query: String = "",
     ): IptvLibraryPage {
+        val ftsQuery = IptvFtsQuery.from(query)
         val entities = when (direction) {
             IptvPageDirection.FIRST -> dao.getLibraryPage(
-                sourceId, category, contentType, limit, 0,
+                sourceId, category, contentType, ftsQuery, limit, 0,
             )
             IptvPageDirection.NEXT -> requireNotNull(anchor).let {
                 dao.getLibraryPageAfter(
-                    sourceId, category, contentType,
+                    sourceId, category, contentType, ftsQuery,
                     it.originalIndex, it.sourceKey, limit,
                 )
             }
             IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
                 dao.getLibraryPageBefore(
-                    sourceId, category, contentType,
+                    sourceId, category, contentType, ftsQuery,
                     it.originalIndex, it.sourceKey, limit,
                 ).asReversed()
             }
             IptvPageDirection.LAST -> dao.getLibraryLastPage(
-                sourceId, category, contentType, limit,
+                sourceId, category, contentType, ftsQuery, limit,
             ).asReversed()
-            IptvPageDirection.AT_INDEX -> dao.getLibraryPageAtOrAfter(
-                sourceId, category, contentType, targetIndex, limit,
+            // Direct numeric jumps use a filtered ordinal. originalIndex is sparse after
+            // category/FTS filtering, so this one explicit jump must use OFFSET.
+            IptvPageDirection.AT_INDEX -> dao.getLibraryPage(
+                sourceId, category, contentType, ftsQuery, limit, targetIndex,
             )
         }
         return IptvLibraryPage(
@@ -242,7 +252,8 @@ class IptvRepository(context: Context) {
         sourceId: Long,
         category: String?,
         contentType: String,
-    ): Int = dao.libraryCount(sourceId, category, contentType)
+        query: String = "",
+    ): Int = dao.libraryCount(sourceId, category, contentType, IptvFtsQuery.from(query))
 
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
 
@@ -283,8 +294,44 @@ class IptvRepository(context: Context) {
             referrer = referrer,
             subtitleUrl = subtitleUrl,
             iptvContentType = contentType,
+            catchUpMode = catchUpMode,
+            catchUpSource = catchUpSource,
+            catchUpDays = catchUpDays,
             inMainList = selected,
         )
+
+    suspend fun catchUpChannel(
+        sourceKey: String,
+        startTimeMillis: Long,
+        endTimeMillis: Long,
+    ): LiveChannel? {
+        val entity = dao.getChannel(sourceKey) ?: return null
+        if (entity.catchUpDays <= 0 || startTimeMillis >= System.currentTimeMillis()) return null
+        val oldestAllowed = System.currentTimeMillis() - entity.catchUpDays * DAY_MILLIS
+        if (endTimeMillis < oldestAllowed) return null
+        val source = dao.getSource(entity.sourceId) ?: return null
+        val archiveUrl = when {
+            source.kind == KIND_XTREAM && entity.catchUpMode == "xtream" -> {
+                val streamId = XtreamClient.streamIdFromHttpUrl(entity.streamUrl) ?: return null
+                val baseUrl = source.serverUrl?.let(XtreamClient::normalizeBaseUrl) ?: return null
+                val username = source.username?.takeIf(String::isNotBlank) ?: return null
+                val password = source.password?.takeIf(String::isNotBlank) ?: return null
+                val durationMinutes = ((endTimeMillis - startTimeMillis + 59_999L) / 60_000L)
+                    .coerceAtLeast(1L)
+                val start = SimpleDateFormat("yyyy-MM-dd:HH-mm", Locale.US).format(Date(startTimeMillis))
+                "$baseUrl/timeshift/${encodePath(username)}/${encodePath(password)}/" +
+                    "$durationMinutes/$start/$streamId.ts"
+            }
+            !entity.catchUpSource.isNullOrBlank() -> CatchUpUrlResolver.resolve(
+                entity.catchUpSource,
+                entity,
+                startTimeMillis,
+                endTimeMillis,
+            )
+            else -> null
+        } ?: return null
+        return entity.toLiveChannel().copy(uri = archiveUrl, iptvContentType = "CATCHUP")
+    }
 
     private fun IptvChannelListProjection.toLiveChannel() =
         LiveChannel(
@@ -486,6 +533,9 @@ class IptvRepository(context: Context) {
                         subtitleUrl = item.subtitleUrl,
                         contentType = item.contentType,
                         matchKey = matchKey,
+                        catchUpMode = item.catchUpMode,
+                        catchUpSource = item.catchUpSource,
+                        catchUpDays = item.catchUpDays,
                         createdAt = now,
                     )
                     channelCount++
@@ -588,6 +638,10 @@ class IptvRepository(context: Context) {
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
         private const val IMPORT_BATCH_SIZE = 500
         private const val STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
+        private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
         private val IMPORT_MUTEX = Mutex()
+
+        private fun encodePath(value: String): String =
+            URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
     }
 }
