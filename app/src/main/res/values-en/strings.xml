@@ -229,8 +229,9 @@
     <string name="xmltv_option_hint">OK: Link XMLTV channel  •  Red: Use automatic  •  Blue: Source  •  Back: Channel list</string>
     <string name="xmltv_match_manual">Manual: %1$s</string>
     <string name="xmltv_match_missing_manual">Manual selection not found: %1$s</string>
-    <string name="xmltv_match_by_id">Automatic ID: %1$s</string>
-    <string name="xmltv_match_by_name">Automatic name: %1$s</string>
+    <string name="xmltv_match_by_id">Exact tvg-id: %1$s</string>
+    <string name="xmltv_match_by_name">Exact name: %1$s</string>
+    <string name="xmltv_match_by_normalized_name">Normalized name: %1$s</string>
     <string name="xmltv_match_none">No match</string>
     <string name="xmltv_choose_match">Source: %1$s  •  %2$d XMLTV channels</string>
     <string name="xmltv_option_detail">%1$s  •  ID: %2$s  •  %3$d programs</string>
@@ -532,10 +533,10 @@
     <string name="access_active">Active</string>
     <string name="access_inactive">Inactive</string>
     <string name="about_content">TVApp\n\nVersion: %1$s (%2$d)\nDistribution: %3$s\n\nIPTV purchase state: %4$s\nIPTV access: %5$s\nTrial remaining: %6$d days\n\nIPTV sources: %7$d\nTotal IPTV items: %8$d\nAdded to the main channel list: %9$d\n\nTVApp provides a live TV and IPTV experience compatible with Android TV Input Framework sources.</string>
-    <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions. On unobstructed playback, Back shows the last 5 channels; LAST CHANNEL returns directly to the previous channel.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nA media key opens playback controls. While controls are open, Up/Down moves between the timeline and action row; CH+/CH- changes channels. On the timeline, Left/Right seeks backward or forward. On the action row, Left/Right moves between actions and OK activates the selection. Back closes playback controls.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
+    <string name="user_guide_content">LIVE TV\nOK opens the channel list. Up and Down browse channels. Press OK on a channel to tune; hold OK for channel actions. On unobstructed playback, Back shows the last 5 channels; LAST CHANNEL returns directly to the previous channel.\n\nCHANNEL LISTS\nShort-press Yellow to cycle through All, Satellite, Radio, IPTV and the full IPTV library. Hold Yellow to choose a list directly. In the IPTV library, Blue opens list and category filters. Red opens editing.\n\nIPTV PLAYBACK\nA media key opens playback controls. While controls are open, Up/Down moves between the timeline and action row; CH+/CH- changes channels. On the timeline, Left/Right seeks backward or forward. On the action row, Left/Right moves between actions and OK activates the selection. Back closes playback controls.\n\nPROGRAM GUIDE\nUse Up/Down in the channel column and Right to enter the program timeline. In the timeline, Left/Right changes programs and Up/Down changes channels. Hold OK on a future program to toggle its reminder.\n\nCHANNEL MANAGEMENT\nRed opens the channel editor. Number keys jump to a target channel. Current color-key actions are shown at the bottom of the screen.\n\nSETTINGS\nWhile TVApp is open, the Settings key opens display, channel list, playback, EPG, cache and startup options.</string>
     <string name="system_settings_unavailable">System settings could not be opened.</string>
     <string name="verbose_remote_key_logging">Write remote keys to the debug log</string>
-    <string name="guide_control_hints">RED: TIF · GREEN: XMLTV · BLUE: Merged · OK: Watch · BACK: Close</string>
+    <string name="guide_control_hints">LEFT/RIGHT: Program · UP/DOWN: Channel · OK: Watch · RED: TIF · GREEN: XMLTV · BLUE: Merged · BACK: Close</string>
     <string name="epg_source_tif">TIF guide</string>
     <string name="epg_source_xmltv">XMLTV guide</string>
     <string name="epg_source_merged">Merged guide</string>

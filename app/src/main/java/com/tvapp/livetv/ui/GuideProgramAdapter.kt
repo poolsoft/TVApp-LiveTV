@@ -39,11 +39,16 @@ class GuideProgramAdapter(
     inner class ViewHolder(private val binding: ItemGuideProgramBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(program: ProgramSummary) = with(binding) {
+            val density = root.resources.displayMetrics.density
+            val durationMinutes = ((program.endTimeMillis - program.startTimeMillis) / 60_000f)
+                .coerceAtLeast(1f)
             root.layoutParams = root.layoutParams.apply {
-                height = (root.resources.displayMetrics.heightPixels * ROW_HEIGHT_FRACTION).toInt()
-            }
-            programTime.layoutParams = programTime.layoutParams.apply {
-                width = (root.resources.displayMetrics.widthPixels * TIME_WIDTH_FRACTION).toInt()
+                width = (durationMinutes * WIDTH_DP_PER_MINUTE * density).toInt()
+                    .coerceIn(
+                        (MIN_WIDTH_DP * density).toInt(),
+                        (MAX_WIDTH_DP * density).toInt(),
+                    )
+                height = ViewGroup.LayoutParams.MATCH_PARENT
             }
             val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
             programTime.text = root.context.getString(
@@ -76,7 +81,8 @@ class GuideProgramAdapter(
     }
 
     private companion object {
-        const val ROW_HEIGHT_FRACTION = 0.082f
-        const val TIME_WIDTH_FRACTION = 0.055f
+        const val WIDTH_DP_PER_MINUTE = 3f
+        const val MIN_WIDTH_DP = 132f
+        const val MAX_WIDTH_DP = 480f
     }
 }

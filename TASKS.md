@@ -88,7 +88,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic EPG - Program verisi ve rehber
 
-- [ ] **EPG-001 (P0): Ortak EPG snapshot cache**
+- [x] **EPG-001 (P0): Ortak EPG snapshot cache**
   Infobar, kanal listesi ve rehber için tek now/next veri kaynağı kur.
   **Kabul:** Aynı anda aynı kanal için farklı EPG gösterilmez.
 
@@ -96,15 +96,15 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Odaktaki kanalı hemen, komşuları debounce ile getir; stale async yanıtları reddet.
   **Kabul:** Hızlı tuş basılı gezinmede ağ/DB kuyruğu büyümez ve eski EPG yeni satıra yazılmaz.
 
-- [ ] **EPG-003 (P1): EPG ölçüm ve cache politikası**
+- [x] **EPG-003 (P1): EPG ölçüm ve cache politikası**
   Geçerli programı bitişine kadar, boş sonucu kısa süre cache'le; TIF/XMLTV sorgu süresini ölç.
   **Kabul:** Kanal listesinde tekrarlanan gereksiz sorgular belirgin biçimde azalır.
 
-- [ ] **EPG-004 (P2): Zaman çizelgeli rehber**
+- [x] **EPG-004 (P2): Zaman çizelgeli rehber**
   Sabit kanal kolonu, yatay program zaman çizelgesi, açıklama alanı ve kaynak göstergesi ekle.
   **Kabul:** D-pad ile kanal/program kolonları arasında kayıpsız gezinilir; Back yayına döner.
 
-- [ ] **EPG-005 (P2): Eşleştirme güveni**
+- [x] **EPG-005 (P2): Eşleştirme güveni**
   Kesin `tvg-id`, kesin ad, normalize ad ve elle eşleşmeyi kullanıcıya göster.
   **Kabul:** Yanlış eşleşme tek ekrandan düzeltilebilir ve tüm EPG tüketicilerine yansır.
 

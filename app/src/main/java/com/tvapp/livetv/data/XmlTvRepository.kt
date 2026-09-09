@@ -131,6 +131,7 @@ class XmlTvRepository(context: Context) {
             dao.deleteSource(sourceId)
         }
         updateSourceSummary()
+        EpgSnapshotCache.clear()
         if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
     }
 
@@ -145,6 +146,7 @@ class XmlTvRepository(context: Context) {
 
     fun setSourceEnabled(sourceId: Long, enabled: Boolean) {
         dao.setSourceEnabled(sourceId, enabled)
+        EpgSnapshotCache.clear()
         updateSourceSummary()
     }
 
@@ -163,6 +165,7 @@ class XmlTvRepository(context: Context) {
             sourceIds.forEach(dao::deleteSource)
         }
         legacyCacheFile.delete()
+        EpgSnapshotCache.clear()
         cancelPeriodicRefresh()
     }
 
@@ -378,6 +381,7 @@ class XmlTvRepository(context: Context) {
             xtreamEpgDao.clearPrograms()
             distinctPrograms.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
         }
+        EpgSnapshotCache.clear()
         if (queriedChannels > 0 && successfulQueries == queriedChannels) {
             preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
         }
@@ -453,6 +457,7 @@ class XmlTvRepository(context: Context) {
             programs.asSequence().map { it.copy(sourceId = sourceId) }.chunked(INSERT_BATCH_SIZE)
                 .forEach { dao.insertPrograms(it) }
         }
+        EpgSnapshotCache.clear()
         updateSourceSummary()
         preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
         legacyCacheFile.delete()

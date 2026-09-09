@@ -126,8 +126,12 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
                 manual != null && match != null -> getString(R.string.xmltv_match_manual, match.channelName)
                 manual != null -> getString(R.string.xmltv_match_missing_manual, manual)
                 match != null -> {
-                    val type = automatic?.type
-                    val label = if (type == XmlTvMatcher.MatchType.ID) R.string.xmltv_match_by_id else R.string.xmltv_match_by_name
+                    val label = when (automatic?.type) {
+                        XmlTvMatcher.MatchType.EXACT_ID -> R.string.xmltv_match_by_id
+                        XmlTvMatcher.MatchType.EXACT_NAME -> R.string.xmltv_match_by_name
+                        XmlTvMatcher.MatchType.NORMALIZED_NAME -> R.string.xmltv_match_by_normalized_name
+                        null -> R.string.xmltv_match_by_normalized_name
+                    }
                     getString(label, match.channelName)
                 }
                 else -> getString(R.string.xmltv_match_none)

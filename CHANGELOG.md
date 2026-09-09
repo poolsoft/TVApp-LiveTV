@@ -50,6 +50,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * OSD kapalıyken Sol ok artık kanal değiştirmiyor; Back son kanallar kartını açıyor. Last Channel kısa basışta önceki kanala geçiyor, uzun basışta son kanallar kartını açıyor.
 
 ### TIF ve EPG tanılama
+* Infobar, kanal listesi ve rehber aynı süreç geneli EPG snapshot önbelleğini kullanıyor. Bulunan program bitiş sınırına kadar, boş sonuç iki saniye saklanıyor; TIF/XMLTV sorgu süreleri ve cache isabetleri debug performans loguna yazılıyor.
+* XMLTV eşleştirme editörü kesin `tvg-id`, kesin kanal adı, normalize edilmiş ad ve elle eşleşmeyi ayrı güven düzeyleriyle gösteriyor; belirsiz yinelenen adaylar otomatik eşleştirilmiyor.
+* Program Rehberi sabit kanal kolonu, süreyle orantılı yatay program zaman çizelgesi, yarım saatlik zaman cetveli ve kalıcı açıklama paneliyle yenilendi. Çizelgede Sol/Sağ program, Yukarı/Aşağı kanal değiştiriyor ve aynı zaman noktası korunuyor.
 * Kanal Sistem Bilgileri, `internal_provider_data` alanını ham hex, UTF-8, UTF-16LE ve okunabilir metin olarak gösteriyor; MediaTek blobunda bulunabilen frekans, sembol oranı, polarizasyon, uydu/transponder, frontend, LNB ve servis anahtarları ayrıca ayrıştırılıp debug loguna yazılıyor.
 * XMLTV eşleştirmesi kalite eklerini kesin karşılaştırmada koruyor; `HD`, `SD`, `FHD` ve `4K` farklarını yok sayan gevşek eşleşme yalnız tek bir aday bulunduğunda kullanılıyor. Büyük EPG tablolarını açılışta kilitleyen toplu yeniden indeksleme kaldırıldı.
 * Infobar EPG ilerleme çubuğuna dar alanlarda kaybolmaması için asgari genişlik verildi ve yatay boşluğu azaltıldı.

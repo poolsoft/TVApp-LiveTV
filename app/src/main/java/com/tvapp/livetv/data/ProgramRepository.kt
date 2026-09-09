@@ -2,6 +2,8 @@ package com.tvapp.livetv.data
 
 import android.content.Context
 import android.media.tv.TvContract
+import android.os.SystemClock
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 
 data class ProgramSummary(
@@ -35,17 +37,28 @@ internal fun replaceCurrentPrograms(
 class ProgramRepository(context: Context) {
     private val contentResolver = context.applicationContext.contentResolver
     private val xmlTvRepository = XmlTvRepository(context)
-    private val listWindowCache = mutableMapOf<String, CachedCurrentProgram>()
+    private val debugLog = CrashReportStore(context)
 
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
+        EpgSnapshotCache.nowNext(channel.sourceKey, now)?.let { return it }
+        val startedAt = SystemClock.elapsedRealtime()
+        val tifStartedAt = SystemClock.elapsedRealtime()
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
         else NowNextPrograms(null, null)
+        val tifDuration = SystemClock.elapsedRealtime() - tifStartedAt
+        val xmlTvStartedAt = SystemClock.elapsedRealtime()
         val fallback = xmlTvRepository.nowAndNext(channel, now)
+        val xmlTvDuration = SystemClock.elapsedRealtime() - xmlTvStartedAt
         val resolved = NowNextPrograms(
             current = tif.current ?: fallback.current,
             next = tif.next ?: fallback.next,
         )
-        cacheCurrent(channel.sourceKey, resolved.current, now)
+        EpgSnapshotCache.putNowNext(channel.sourceKey, resolved, now)
+        debugLog.recordDebug(
+            "PERF | operation=epg_now_next, durationMs=${SystemClock.elapsedRealtime() - startedAt}, " +
+                "tifMs=$tifDuration, xmlTvMs=$xmlTvDuration, source=${channel.source}, " +
+                "current=${resolved.current != null}, next=${resolved.next != null}",
+        )
         return resolved
     }
 
@@ -214,21 +227,20 @@ class ProgramRepository(context: Context) {
         now: Long = System.currentTimeMillis(),
     ): Map<String, ProgramSummary> {
         if (channels.isEmpty()) return emptyMap()
+        val startedAt = SystemClock.elapsedRealtime()
         val result = mutableMapOf<String, ProgramSummary>()
         val unresolved = mutableListOf<LiveChannel>()
-        synchronized(listWindowCache) {
-            listWindowCache.entries.removeAll { it.value.expiresAtMillis <= now }
-            channels.forEach { channel ->
-                val cached = listWindowCache[channel.sourceKey]
-                if (cached != null && cached.expiresAtMillis > now) {
-                    cached.program?.let { result[channel.sourceKey] = it }
-                } else {
-                    unresolved += channel
-                }
+        channels.forEach { channel ->
+            val cached = EpgSnapshotCache.current(channel.sourceKey, now)
+            if (cached.found) {
+                cached.program?.let { result[channel.sourceKey] = it }
+            } else {
+                unresolved += channel
             }
         }
 
         val missingXmlTv = mutableListOf<LiveChannel>()
+        val tifStartedAt = SystemClock.elapsedRealtime()
         unresolved.forEach { channel ->
             val tifProgram = if (channel.source == LiveChannel.Source.TIF) {
                 runCatching { nowAndNext(channel.id, now).current }.getOrNull()
@@ -240,30 +252,30 @@ class ProgramRepository(context: Context) {
                 missingXmlTv += channel
             }
         }
+        val tifDuration = SystemClock.elapsedRealtime() - tifStartedAt
 
+        val xmlTvStartedAt = SystemClock.elapsedRealtime()
         val xmlTvPrograms = runCatching {
             xmlTvRepository.currentPrograms(missingXmlTv, now)
         }.getOrDefault(emptyMap())
+        val xmlTvDuration = SystemClock.elapsedRealtime() - xmlTvStartedAt
         missingXmlTv.forEach { channel ->
             val program = xmlTvPrograms[channel.sourceKey]?.takeIf { it.title.isNotBlank() }
             if (program != null) result[channel.sourceKey] = program
             cacheCurrent(channel.sourceKey, program, now)
         }
+        debugLog.recordDebug(
+            "PERF | operation=epg_list_window, durationMs=${SystemClock.elapsedRealtime() - startedAt}, " +
+                "requested=${channels.size}, cacheHits=${channels.size - unresolved.size}, " +
+                "tifQueries=${unresolved.count { it.source == LiveChannel.Source.TIF }}, " +
+                "tifMs=$tifDuration, xmlTvQueries=${missingXmlTv.size}, xmlTvMs=$xmlTvDuration, " +
+                "found=${result.size}",
+        )
         return result
     }
 
     private fun cacheCurrent(sourceKey: String, program: ProgramSummary?, now: Long) {
-        val expiry = program?.endTimeMillis
-            ?.coerceAtMost(now + POSITIVE_CACHE_MAX_MS)
-            ?.coerceAtLeast(now + MINIMUM_CACHE_MS)
-            ?: now + NEGATIVE_CACHE_MS
-        synchronized(listWindowCache) {
-            listWindowCache[sourceKey] = CachedCurrentProgram(program, expiry)
-            if (listWindowCache.size > MAX_LIST_WINDOW_CACHE_ENTRIES) {
-                listWindowCache.minByOrNull { it.value.expiresAtMillis }?.key
-                    ?.let(listWindowCache::remove)
-            }
-        }
+        EpgSnapshotCache.putCurrent(sourceKey, program, now)
     }
 
     fun diagnose(channel: LiveChannel, now: Long = System.currentTimeMillis()): List<EpgDiagnosticStep> {
@@ -372,16 +384,7 @@ class ProgramRepository(context: Context) {
         const val MAX_PROGRAMS = 32
         const val CURRENT_WINDOW_BEFORE_MS = 6 * 60 * 60 * 1_000L
         const val CURRENT_WINDOW_AFTER_MS = 72 * 60 * 60 * 1_000L
-        const val NEGATIVE_CACHE_MS = 2_000L
-        const val MINIMUM_CACHE_MS = 5_000L
-        const val POSITIVE_CACHE_MAX_MS = 5 * 60_000L
-        const val MAX_LIST_WINDOW_CACHE_ENTRIES = 160
     }
-
-    private data class CachedCurrentProgram(
-        val program: ProgramSummary?,
-        val expiresAtMillis: Long,
-    )
 
     private fun android.database.Cursor.programDescription(
         longDescriptionIndex: Int,

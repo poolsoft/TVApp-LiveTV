@@ -242,8 +242,9 @@
     <string name="xmltv_option_hint">OK: Bu XMLTV kanalını bağla  •  Kırmızı: Otomatiğe dön  •  Mavi: Kaynak  •  Back: Kanal listesi</string>
     <string name="xmltv_match_manual">Elle: %1$s</string>
     <string name="xmltv_match_missing_manual">Elle seçilmiş fakat bulunamadı: %1$s</string>
-    <string name="xmltv_match_by_id">Otomatik ID: %1$s</string>
-    <string name="xmltv_match_by_name">Otomatik ad: %1$s</string>
+    <string name="xmltv_match_by_id">Kesin tvg-id: %1$s</string>
+    <string name="xmltv_match_by_name">Kesin ad: %1$s</string>
+    <string name="xmltv_match_by_normalized_name">Normalize ad: %1$s</string>
     <string name="xmltv_match_none">Eşleşme yok</string>
     <string name="xmltv_choose_match">Kaynak: %1$s  •  %2$d XMLTV kanalı</string>
     <string name="xmltv_option_detail">%1$s  •  ID: %2$s  •  %3$d program</string>
@@ -532,10 +533,10 @@
     <string name="access_active">Aktif</string>
     <string name="access_inactive">Aktif değil</string>
     <string name="about_content">TVApp\n\nSürüm: %1$s (%2$d)\nDağıtım: %3$s\n\nIPTV satın alma durumu: %4$s\nIPTV erişimi: %5$s\nKalan deneme: %6$d gün\n\nIPTV listesi: %7$d\nToplam IPTV içeriği: %8$d\nAna kanal listesine ekli: %9$d\n\nTVApp, Android TV Input Framework kaynaklarıyla uyumlu canlı TV ve IPTV deneyimi sunar.</string>
-    <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir. Boş ekranda Back son 5 kanalı gösterir; LAST CHANNEL önceki kanala döner.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nMedya tuşu oynatma çubuğunu açar. Çubuk açıkken Yukarı/Aşağı zaman çizgisi ile işlem satırı arasında geçer; CH+/CH- kanalı değiştirir. Zaman çizgisinde Sol/Sağ ileri veya geri sarar. İşlem satırında Sol/Sağ seçenekler arasında gezer, OK seçimi çalıştırır. Back oynatma çubuğunu kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
+    <string name="user_guide_content">CANLI TV\nOK tuşu kanal listesini açar. Yukarı ve aşağı kanallar arasında gezer. Kanal üzerinde OK seçilen kanalı açar; uzun OK kanal işlemlerini gösterir. Boş ekranda Back son 5 kanalı gösterir; LAST CHANNEL önceki kanala döner.\n\nKANAL LİSTELERİ\nSarı tuşa kısa basarak Tümü, Uydu, Radyo, IPTV ve tam IPTV listeleri arasında sırayla geçilir. Sarı tuşa uzun basarak istenen liste doğrudan seçilir. IPTV kütüphanesinde mavi tuş liste ve kategori filtresini açar. Kırmızı tuş düzenleme ekranını açar.\n\nIPTV OYNATMA\nMedya tuşu oynatma çubuğunu açar. Çubuk açıkken Yukarı/Aşağı zaman çizgisi ile işlem satırı arasında geçer; CH+/CH- kanalı değiştirir. Zaman çizgisinde Sol/Sağ ileri veya geri sarar. İşlem satırında Sol/Sağ seçenekler arasında gezer, OK seçimi çalıştırır. Back oynatma çubuğunu kapatır.\n\nPROGRAM REHBERİ\nKanal kolonunda Yukarı/Aşağı ile gezinilir; Sağ program zaman çizelgesine geçer. Çizelgede Sol/Sağ program, Yukarı/Aşağı kanal değiştirir. Uzun OK gelecek program için hatırlatıcıyı açar veya kapatır.\n\nKANAL YÖNETİMİ\nKırmızı tuş kanal düzenleyicisini açar. Sayı tuşlarıyla hedef kanala hızla gidilebilir. Renk tuşlarının güncel görevleri ekranın altında gösterilir.\n\nAYARLAR\nAyarlar tuşu TVApp açıkken görüntü, kanal listesi, oynatma, EPG, önbellek ve başlangıç seçeneklerini açar.</string>
     <string name="system_settings_unavailable">Sistem ayarları açılamadı.</string>
     <string name="verbose_remote_key_logging">Kumanda tuşlarını debug loguna yaz</string>
-    <string name="guide_control_hints">KIRMIZI: TIF · YEŞİL: XMLTV · MAVİ: Birleşik · OK: İzle · BACK: Kapat</string>
+    <string name="guide_control_hints">SOL/SAĞ: Program · YUKARI/AŞAĞI: Kanal · OK: İzle · KIRMIZI: TIF · YEŞİL: XMLTV · MAVİ: Birleşik · BACK: Kapat</string>
     <string name="epg_source_tif">TIF rehberi</string>
     <string name="epg_source_xmltv">XMLTV rehberi</string>
     <string name="epg_source_merged">Birleşik rehber</string>

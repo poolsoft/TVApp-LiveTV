@@ -50,6 +50,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private var currentProgramsRequestId = 0L
     private var focusedChannelIndex = 0
     private var focusedProgramIndex = 0
+    private var timelineAnchorMillis = System.currentTimeMillis()
     private lateinit var reminderStore: ProgramReminderStore
     private lateinit var reminderScheduler: ProgramReminderScheduler
     private var pendingReminder: Pair<LiveChannel, ProgramSummary>? = null
@@ -99,7 +100,11 @@ class ProgramGuideActivity : TvRemoteActivity() {
         )
         binding.guideChannelList.layoutManager = LinearLayoutManager(this)
         binding.guideChannelList.adapter = channelAdapter
-        binding.programList.layoutManager = LinearLayoutManager(this)
+        binding.programList.layoutManager = LinearLayoutManager(
+            this,
+            RecyclerView.HORIZONTAL,
+            false,
+        )
         binding.programList.adapter = programAdapter
         applyPercentageGeometry()
         binding.guideDate.text = SimpleDateFormat(
@@ -109,6 +114,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
             it.uppercase(resources.configuration.locales[0])
         }
         updateEpgSourceLabel()
+        updateTimelineRuler(timelineAnchorMillis)
         loadChannels()
     }
 
@@ -184,7 +190,11 @@ class ProgramGuideActivity : TvRemoteActivity() {
         }
     }
 
-    private fun loadPrograms(channel: LiveChannel) {
+    private fun loadPrograms(
+        channel: LiveChannel,
+        focusTimeline: Boolean = false,
+        preferredTimeMillis: Long? = null,
+    ) {
         focusedChannel = channel
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
@@ -222,12 +232,20 @@ class ProgramGuideActivity : TvRemoteActivity() {
                 binding.detailTime.text = ""
                 binding.detailDescription.text = ""
                 binding.detailDescription.visibility = View.GONE
+                if (focusTimeline) focusChannel(channel.sourceKey)
             } else {
+                val targetTime = preferredTimeMillis ?: now
                 val selectedProgram = loaded.firstOrNull {
-                    now in it.startTimeMillis until it.endTimeMillis
-                } ?: loaded.first()
+                    targetTime in it.startTimeMillis until it.endTimeMillis
+                } ?: loaded.minByOrNull { kotlin.math.abs(it.startTimeMillis - targetTime) }
+                    ?: loaded.first()
                 focusedProgramIndex = loaded.indexOf(selectedProgram).coerceAtLeast(0)
                 showProgramDetail(selectedProgram)
+                if (focusTimeline) {
+                    focusRecyclerPosition(binding.programList, focusedProgramIndex)
+                } else {
+                    binding.programList.scrollToPosition(focusedProgramIndex)
+                }
             }
         }
     }
@@ -235,6 +253,8 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private fun showProgramDetail(program: ProgramSummary) {
         focusedProgramIndex = programs.indexOf(program).takeIf { it >= 0 }
             ?: focusedProgramIndex
+        timelineAnchorMillis = program.startTimeMillis
+        updateTimelineRuler(program.startTimeMillis)
         binding.detailTitle.text = program.title.ifBlank { getString(R.string.untitled_program) }
         val format = SimpleDateFormat("HH:mm", Locale.getDefault())
         val startStr = format.format(Date(program.startTimeMillis))
@@ -259,6 +279,20 @@ class ProgramGuideActivity : TvRemoteActivity() {
             View.GONE
         } else {
             View.VISIBLE
+        }
+    }
+
+    private fun updateTimelineRuler(anchorMillis: Long) {
+        val halfHour = 30 * 60_000L
+        val start = anchorMillis - anchorMillis.mod(halfHour)
+        val format = SimpleDateFormat("HH:mm", Locale.getDefault())
+        listOf(
+            binding.timelineTime0,
+            binding.timelineTime1,
+            binding.timelineTime2,
+            binding.timelineTime3,
+        ).forEachIndexed { index, label ->
+            label.text = format.format(Date(start + index * halfHour))
         }
     }
 
@@ -303,6 +337,19 @@ class ProgramGuideActivity : TvRemoteActivity() {
             focusedProgramIndex = target
         }
         focusRecyclerPosition(recyclerView, target)
+        return true
+    }
+
+    private fun moveTimelineChannel(offset: Int): Boolean {
+        if (channels.isEmpty()) return false
+        val target = (focusedChannelIndex + offset).mod(channels.size)
+        val channel = channels[target]
+        focusedChannelIndex = target
+        focusedChannel = channel
+        channelAdapter.select(channel.sourceKey)
+        focusJob?.cancel()
+        refreshCurrentPrograms()
+        loadPrograms(channel, focusTimeline = true, preferredTimeMillis = timelineAnchorMillis)
         return true
     }
 
@@ -457,23 +504,29 @@ class ProgramGuideActivity : TvRemoteActivity() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> when {
-                    binding.programList.hasFocus() -> moveRecyclerFocus(binding.programList, -1)
+                    binding.programList.hasFocus() -> moveTimelineChannel(-1)
                     binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, -1)
                     else -> false
                 }.also { handled -> if (handled) return true }
                 KeyEvent.KEYCODE_DPAD_DOWN -> when {
-                    binding.programList.hasFocus() -> moveRecyclerFocus(binding.programList, 1)
+                    binding.programList.hasFocus() -> moveTimelineChannel(1)
                     binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, 1)
                     else -> false
                 }.also { handled -> if (handled) return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> if (binding.guideChannelList.hasFocus() &&
-                    programs.isNotEmpty()
-                ) {
-                    focusRecyclerPosition(binding.programList, focusedProgramIndex)
-                    return true
-                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> when {
+                    binding.guideChannelList.hasFocus() && programs.isNotEmpty() -> {
+                        focusRecyclerPosition(binding.programList, focusedProgramIndex)
+                        true
+                    }
+                    binding.programList.hasFocus() -> moveRecyclerFocus(binding.programList, 1)
+                    else -> false
+                }.also { handled -> if (handled) return true }
                 KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.programList.hasFocus()) {
-                    focusChannel(focusedChannel?.sourceKey)
+                    if (focusedProgramIndex > 0) {
+                        moveRecyclerFocus(binding.programList, -1)
+                    } else {
+                        focusChannel(focusedChannel?.sourceKey)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_INFO,

@@ -14,7 +14,7 @@ class XmlTvMatcherTest {
         val result = XmlTvMatcher.automaticResolution(channel, listOf(byName, byId))
 
         assertEquals(byId, result?.option)
-        assertEquals(XmlTvMatcher.MatchType.ID, result?.type)
+        assertEquals(XmlTvMatcher.MatchType.EXACT_ID, result?.type)
     }
 
     @Test
@@ -24,7 +24,7 @@ class XmlTvMatcherTest {
             listOf(option("trt.one", "TRT 1")),
         )
 
-        assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
+        assertEquals(XmlTvMatcher.MatchType.NORMALIZED_NAME, result?.type)
     }
 
     @Test
@@ -60,9 +60,32 @@ class XmlTvMatcherTest {
             listOf(option("TRT1 HD.tr", "TRT1 HD.tr")),
         )
 
-        assertEquals(XmlTvMatcher.MatchType.NAME, result?.type)
+        assertEquals(XmlTvMatcher.MatchType.NORMALIZED_NAME, result?.type)
         assertEquals("trt1", "TRT1 HD.tr".normalizeEpgKey())
         assertEquals("trt1hd", "TRT1 HD.tr".normalizeExactEpgKey())
+    }
+
+    @Test
+    fun matching_reportsExactNameSeparatelyFromNormalizedName() {
+        val result = XmlTvMatcher.automaticResolution(
+            channel("TRT 1 HD", null),
+            listOf(option("unrelated", "trt 1 hd")),
+        )
+
+        assertEquals(XmlTvMatcher.MatchType.EXACT_NAME, result?.type)
+    }
+
+    @Test
+    fun exactMatchingRejectsDuplicateCandidates() {
+        val result = XmlTvMatcher.automaticResolution(
+            channel("TRT 1 HD", null),
+            listOf(
+                XmlTvChannelOption(1, "EPG 1", "one", "TRT 1 HD", 10),
+                XmlTvChannelOption(2, "EPG 2", "two", "TRT 1 HD", 10),
+            ),
+        )
+
+        assertEquals(null, result)
     }
 
     private fun channel(name: String, epgId: String?) = LiveChannel(
