@@ -110,7 +110,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic UIINPUT - OSD, kumanda ve görsel sistem
 
-- [ ] **UIINPUT-001 (P0): PlaybackUiState/OsdCoordinator**
+- [x] **UIINPUT-001 (P0): PlaybackUiState/OsdCoordinator**
   Kanal listesi, infobar, IPTV kontrolü, son kanallar, PIN, hata, grid ve Multi View durumlarını
   tek koordinatöre taşı.
   **Kabul:** Aynı anda çakışan birincil OSD yok; görünürlük değişimi tek noktadan yapılır.

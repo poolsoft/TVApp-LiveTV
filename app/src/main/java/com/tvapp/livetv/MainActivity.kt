@@ -93,6 +93,10 @@ import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
 import com.tvapp.livetv.ui.ParentalPinDialog
+import com.tvapp.livetv.ui.OsdCoordinator
+import com.tvapp.livetv.ui.PlaybackSurfaceMode
+import com.tvapp.livetv.ui.PlaybackUiState
+import com.tvapp.livetv.ui.PrimaryOsd
 import com.tvapp.livetv.ui.VideoQuality
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +180,7 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var deviceResourcePolicy: DeviceResourcePolicy
     private var experienceMode = ExperienceMode.IPTV_ONLY_TV
     private lateinit var adapter: ChannelAdapter
+    private lateinit var osdCoordinator: OsdCoordinator
     private var lastTifTrackLogSignature: String? = null
     private var lastTifCallbackLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
@@ -334,6 +339,8 @@ class MainActivity : TvRemoteActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        osdCoordinator = OsdCoordinator(::renderPlaybackUiState)
+        renderPlaybackUiState(osdCoordinator.state)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding.tvView.keepScreenOn = true
 
@@ -434,10 +441,10 @@ class MainActivity : TvRemoteActivity() {
             if (recoveredFromFailure) {
                 hideIptvPlaybackControls()
             }
-            if (binding.statusPanel.visibility == View.VISIBLE &&
+            if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS &&
                 currentChannel?.source == LiveChannel.Source.IPTV
             ) {
-                binding.statusPanel.visibility = View.GONE
+                osdCoordinator.hideStatus()
             }
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
                 currentChannel?.let { channel ->
@@ -492,7 +499,7 @@ class MainActivity : TvRemoteActivity() {
         binding.retryButton.setOnClickListener {
             statusRetryAction?.invoke() ?: ensurePermissionAndLoad()
         }
-        binding.closeButton.setOnClickListener { binding.statusPanel.visibility = View.GONE }
+        binding.closeButton.setOnClickListener { osdCoordinator.hideStatus() }
         binding.scanButton.setOnClickListener { openTunerSetup() }
         binding.allFilter.setOnClickListener {
             applyChannelFilter(source = ChannelSourceFilter.ALL)
@@ -564,7 +571,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showSetupError(title: String, detail: String?) {
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.text = title
         binding.statusMessage.text = detail.orEmpty().ifBlank { getString(R.string.no_detail) }
         binding.closeButton.requestFocus()
@@ -591,7 +598,7 @@ class MainActivity : TvRemoteActivity() {
             inputs.size,
             inputs.size,
         )
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.permission_required_title)
         binding.statusMessage.setText(R.string.permission_required_message)
         tvListingsPermission.launch(READ_TV_LISTINGS)
@@ -673,14 +680,14 @@ class MainActivity : TvRemoteActivity() {
         statusRetryAction = null
         binding.retryButton.setText(R.string.retry)
         binding.closeButton.visibility = View.VISIBLE
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.hideStatus()
         updateChannelCount(panelChannels().size)
     }
 
     private fun showEmptyState(inputs: List<TvInputInfo>) {
         if (experienceMode != ExperienceMode.HYBRID_TV) {
             statusRetryAction = ::openIptvEditor
-            binding.statusPanel.visibility = View.VISIBLE
+            osdCoordinator.showStatus()
             binding.statusTitle.setText(R.string.no_channels_title)
             binding.statusMessage.setText(R.string.iptv_only_empty_message)
             binding.retryButton.setText(R.string.manage_iptv_sources)
@@ -691,7 +698,7 @@ class MainActivity : TvRemoteActivity() {
         statusRetryAction = null
         binding.retryButton.setText(R.string.retry)
         binding.closeButton.visibility = View.VISIBLE
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.no_channels_title)
         binding.statusMessage.text = if (inputs.isEmpty()) {
             getString(R.string.no_inputs_message)
@@ -701,7 +708,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showReadError(inputs: List<TvInputInfo>, error: Throwable) {
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.permission_title)
         binding.statusMessage.text = getString(
             R.string.permission_message,
@@ -712,7 +719,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showPermissionDenied(inputs: List<TvInputInfo>) {
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.permission_denied_title)
         binding.inputSummary.text = resources.getQuantityString(
             R.plurals.input_count,
@@ -771,9 +778,9 @@ class MainActivity : TvRemoteActivity() {
         binding.tvView.visibility = View.GONE
         binding.iptvPlayerView.visibility = View.GONE
         binding.audioOnlyPanel.visibility = View.GONE
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.hideStatus()
         binding.parentalLockChannel.text = channel.displayName
-        binding.parentalLockPanel.visibility = View.VISIBLE
+        osdCoordinator.showParentalLock()
         binding.nowChannel.text = channel.displayName
         binding.nowNumber.text = channel.displayNumber
         updateTechnicalBadges(channel, emptyList())
@@ -811,7 +818,7 @@ class MainActivity : TvRemoteActivity() {
         iptvNoticeJob?.cancel()
         iptvLiveHealthJob?.cancel()
         binding.iptvNotice.visibility = View.GONE
-        binding.parentalLockPanel.visibility = View.GONE
+        osdCoordinator.hideParentalLock()
         if (recordHistory) {
             playbackHistory.record(channel.sourceKey)
             lifecycleScope.launch(Dispatchers.IO) {
@@ -829,7 +836,7 @@ class MainActivity : TvRemoteActivity() {
         binding.nowNumber.text = channel.displayNumber
         updateTechnicalBadges(channel, emptyList())
         updateAudioOnlyPanel(channel, channel.isRadioChannel())
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.hideStatus()
         statusRetryAction = null
         showInfoBar()
         loadPrograms(channel)
@@ -947,12 +954,12 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showIptvPlaybackFailure() {
         iptvPlaybackFailed = true
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.hideStatus()
         showIptvPlaybackControls(R.string.iptv_stream_failed, autoHide = false)
     }
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
-        binding.statusPanel.visibility = View.VISIBLE
+        osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.playback_error_title)
         binding.inputSummary.text = channel?.displayName.orEmpty()
         binding.statusMessage.text = detail
@@ -1484,9 +1491,9 @@ class MainActivity : TvRemoteActivity() {
     private fun showIptvPlaybackChrome(interactive: Boolean) {
         val wasHidden = binding.iptvPlaybackContainer.visibility != View.VISIBLE
         iptvControlsInteractive = interactive
+        osdCoordinator.showInfoBar(iptvChrome = true, interactive = interactive)
         binding.programMeta.visibility = View.GONE
         binding.nextProgram.visibility = View.GONE
-        binding.iptvPlaybackContainer.visibility = View.VISIBLE
         if (wasHidden) pendingBufferSeconds = iptvPlayback.targetBufferSeconds()
         updateInfoBarHeight()
         updateInfoColorActions()
@@ -1537,7 +1544,7 @@ class MainActivity : TvRemoteActivity() {
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
         channelPanelExpanded = false
-        binding.channelPanel.visibility = View.GONE
+        osdCoordinator.showIptvControls(activateControls)
         binding.advancedFilterRow.visibility = View.GONE
 
         showIptvPlaybackChrome(interactive = activateControls)
@@ -1574,7 +1581,7 @@ class MainActivity : TvRemoteActivity() {
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
         iptvControlsInteractive = false
-        binding.iptvPlaybackContainer.visibility = View.GONE
+        osdCoordinator.hideIptvControls(hideInfoBar)
         updateInfoBarHeight()
         updateInfoColorActions()
         iptvControlRow = IptvControlRow.TIMELINE
@@ -2393,8 +2400,8 @@ class MainActivity : TvRemoteActivity() {
         playback.stop()
         binding.iptvPlayerView.visibility = View.GONE
         binding.audioOnlyPanel.visibility = View.GONE
-        binding.parentalLockPanel.visibility = View.GONE
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.hideParentalLock()
+        osdCoordinator.hideStatus()
         binding.tvView.visibility = View.VISIBLE
         activePassthroughInputId = input.id
         runCatching { playback.playPassthrough(input.id) }
@@ -2437,6 +2444,10 @@ class MainActivity : TvRemoteActivity() {
 
     private fun toggleInternalMiniPlayer() {
         internalMiniPlayerActive = !internalMiniPlayerActive
+        osdCoordinator.setPlaybackMode(
+            if (internalMiniPlayerActive) PlaybackSurfaceMode.INTERNAL_MINI_PLAYER
+            else PlaybackSurfaceMode.SINGLE,
+        )
         val width = if (internalMiniPlayerActive) {
             (resources.displayMetrics.widthPixels * INTERNAL_MINI_WIDTH_FRACTION).toInt()
         } else {
@@ -2473,9 +2484,7 @@ class MainActivity : TvRemoteActivity() {
         infoBarJob?.cancel()
         numberInputJob?.cancel()
         numberInput = ""
-        binding.channelPanel.visibility = View.GONE
-        setInfoBarVisible(false)
-        binding.statusPanel.visibility = View.GONE
+        osdCoordinator.clearOsd()
         binding.audioOnlyPanel.visibility = View.GONE
     }
 
@@ -3047,6 +3056,7 @@ class MainActivity : TvRemoteActivity() {
         if (multiViewActive) stopMultiView()
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
         iptvOverlayActive = true
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_OVERLAY)
         secondaryPlayback.stop()
         binding.secondaryTvView.visibility = View.GONE
         val width = (resources.displayMetrics.widthPixels * 0.32f).toInt()
@@ -3069,6 +3079,7 @@ class MainActivity : TvRemoteActivity() {
     private fun stopIptvOverlay() {
         if (!iptvOverlayActive) return
         iptvOverlayActive = false
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
         secondaryIptvPlayback.stop()
         binding.secondaryIptvPlayerView.visibility = View.GONE
         debugLog.recordDebug("IPTV_OVERLAY_STOP")
@@ -3182,16 +3193,14 @@ class MainActivity : TvRemoteActivity() {
         gridActiveIndex = 0
         gridFullscreenIndex = null
         iptvGridActive = true
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_GRID)
         playback.stop()
         iptvPlayback.stop()
         binding.tvView.visibility = View.GONE
         binding.iptvPlayerView.visibility = View.GONE
         binding.audioOnlyPanel.visibility = View.GONE
-        binding.parentalLockPanel.visibility = View.GONE
-        binding.statusPanel.visibility = View.GONE
         hideChannelPanel()
         setInfoBarVisible(false)
-        binding.iptvGrid.visibility = View.VISIBLE
         renderIptvGrid()
         debugLog.recordDebug(
             "IPTV_GRID_START | channels=${gridChannels.joinToString { it.sourceKey }}",
@@ -3277,7 +3286,7 @@ class MainActivity : TvRemoteActivity() {
         gridLongPressJob?.cancel()
         gridFullscreenIndex = null
         gridControllers.forEach(IptvPlaybackController::stop)
-        binding.iptvGrid.visibility = View.GONE
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
         gridChannels = emptyList()
         gridReturnChannel = null
         if (resumePrevious && previous != null) playSelectedChannel(previous, recordHistory = false)
@@ -3856,6 +3865,7 @@ class MainActivity : TvRemoteActivity() {
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
 
         multiViewActive = true
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.MULTI_VIEW)
         internalMiniPlayerActive = false
         multiViewActiveSide = 0
 
@@ -4064,6 +4074,7 @@ class MainActivity : TvRemoteActivity() {
         if (!multiViewActive) return
         val activeChannel = (if (multiViewActiveSide == 0) multiViewLeftChannel else multiViewRightChannel) ?: currentChannel
         multiViewActive = false
+        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
         multiViewLongPressJob?.cancel()
         playback.setMuted(false)
         iptvPlayback.setMuted(false)
@@ -4377,6 +4388,40 @@ class MainActivity : TvRemoteActivity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private fun renderPlaybackUiState(state: PlaybackUiState) {
+        channelPanelExpanded = state.channelPanelExpanded
+        iptvControlsInteractive = state.iptvControlsInteractive
+        binding.channelPanel.visibility = if (state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        binding.infoBar.visibility = if (state.infoBarVisible) View.VISIBLE else View.GONE
+        binding.iptvPlaybackContainer.visibility = if (
+            state.infoBarVisible && state.iptvChromeVisible
+        ) View.VISIBLE else View.GONE
+        binding.recentChannelsPanel.visibility = if (
+            state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
+        ) View.VISIBLE else View.GONE
+        binding.parentalLockPanel.visibility = if (
+            state.primaryOsd == PrimaryOsd.PARENTAL_LOCK
+        ) View.VISIBLE else View.GONE
+        binding.statusPanel.visibility = if (state.primaryOsd == PrimaryOsd.STATUS) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        binding.iptvGrid.visibility = if (state.playbackMode == PlaybackSurfaceMode.IPTV_GRID) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
+        binding.infoColorActions.visibility = if (
+            state.infoBarVisible && state.primaryOsd != PrimaryOsd.CHANNEL_PANEL
+        ) View.VISIBLE else View.GONE
+        updateIptvActionBarState()
+    }
+
     private fun setInfoBarVisible(visible: Boolean) {
         if (!visible && iptvControlsInteractive) {
             iptvControlsInteractive = false
@@ -4384,12 +4429,14 @@ class MainActivity : TvRemoteActivity() {
             renderIptvControlSelection()
             updateIptvControlHints()
         }
-        val visibility = if (visible) View.VISIBLE else View.GONE
-        binding.infoBar.visibility = visibility
-        binding.infoColorActions.visibility = if (
-            visible && binding.channelPanel.visibility != View.VISIBLE
-        ) View.VISIBLE else View.GONE
-        updateIptvActionBarState()
+        if (visible) {
+            osdCoordinator.showInfoBar(
+                iptvChrome = currentChannel?.source == LiveChannel.Source.IPTV,
+                interactive = iptvControlsInteractive,
+            )
+        } else {
+            osdCoordinator.hideInfoBar()
+        }
     }
 
     private fun updateChannelListModeIcon() {
@@ -4422,7 +4469,10 @@ class MainActivity : TvRemoteActivity() {
                 focusedAutoTuneTargetKey = null
             }
             channelPanelExpanded = expanded
-            binding.channelPanel.visibility = View.VISIBLE
+            osdCoordinator.showChannelPanel(
+                expanded = expanded,
+                iptvChrome = currentChannel?.source == LiveChannel.Source.IPTV,
+            )
             binding.sourceFilterRow.visibility = View.GONE
             binding.advancedFilterRow.visibility = if (
                 expanded && channelPanelContent == ChannelPanelContent.NORMAL
@@ -4461,7 +4511,7 @@ class MainActivity : TvRemoteActivity() {
         focusedAutoTunePreviousChannel = null
         focusedAutoTuneTargetKey = null
         channelPanelExpanded = false
-        binding.channelPanel.visibility = View.GONE
+        osdCoordinator.hideChannelPanel(keepInfoBar = currentChannel != null)
         binding.advancedFilterRow.visibility = View.GONE
         applyPanelGeometry()
         currentChannel?.let { showInfoBar() }
@@ -4777,8 +4827,8 @@ class MainActivity : TvRemoteActivity() {
             iptvOverlayActive -> stopIptvOverlay()
             multiViewActive -> stopMultiView()
             internalMiniPlayerActive -> toggleInternalMiniPlayer()
-            binding.statusPanel.visibility == View.VISIBLE -> {
-                binding.statusPanel.visibility = View.GONE
+            osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS -> {
+                osdCoordinator.hideStatus()
             }
             binding.channelPanel.visibility == View.VISIBLE && channelPanelExpanded -> {
                 showChannelPanel(expanded = false)
@@ -4827,12 +4877,12 @@ class MainActivity : TvRemoteActivity() {
             }
             binding.recentChannelsContainer.addView(card)
         }
-        binding.recentChannelsPanel.visibility = View.VISIBLE
+        osdCoordinator.showRecentChannels()
         binding.recentChannelsContainer.getChildAt(0)?.requestFocus()
     }
 
     private fun hideRecentChannels() {
-        binding.recentChannelsPanel.visibility = View.GONE
+        osdCoordinator.hideRecentChannels()
         binding.recentChannelsContainer.removeAllViews()
     }
 
@@ -4964,10 +5014,10 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
-        if (binding.statusPanel.visibility == View.VISIBLE) {
+        if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    binding.statusPanel.visibility = View.GONE
+                    osdCoordinator.hideStatus()
                 }
                 return true
             }

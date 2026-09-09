@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Merkezi OSD durumu
+* Kanal paneli, infobar, IPTV oynatma kontrolleri, son kanallar, ebeveyn kilidi ve hata/durum panelinin görünürlüğü `PlaybackUiState` ve `OsdCoordinator` üzerinden tek noktadan yönetiliyor.
+* IPTV Grid, Multi View, IPTV küçük pencere ve dahili mini oynatıcı etkinliği aynı playback durum modeline alındı. Yeni birincil OSD açıldığında çakışan panel kontrollü kapanıyor; kanal paneliyle birlikte kullanılan infobar korunuyor.
+* OSD geçiş kuralları kanal paneli, IPTV kontrolü, son kanallar, Grid ve ebeveyn kilidi senaryolarını kapsayan birim testlerle güvenceye alındı.
+
 ### Performans tabanı ve düşük kaynaklı cihazlar
 * Startup, kanal yükleme/panel, IPTV sayfası, EPG ve tune-ready işlemleri süre, kayıt sayısı ve çalışma moduyla yapılandırılmış debug performans kaydına alındı.
 * Soğuk başlangıç ile sıcak başlangıç + hızlı kanal paneli gezinimini ölçen Macrobenchmark modülü ve yeniden üretilebilir Perfetto çıktıları eklendi.
