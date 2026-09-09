@@ -140,7 +140,7 @@ uygulaması yapmaktır. Medya merkezi görünümü, zengin katalog süsleri ve �
 bu aşamanın kapsamında değildir. Her iş IPTV-only modu güçlendirirken Hibrit TV/TIF davranışını
 korumalıdır.
 
-- [ ] **IPTVCORE-001 (P0): Ortak oynatma sağlık modeli**
+- [x] **IPTVCORE-001 (P0): Ortak oynatma sağlık modeli**
   Media3 oynatma durumunu ilk kare süresi, son kare zamanı, buffer, bitrate, çözünürlük, codec,
   dropped frame ve son hata sınıfıyla tek bir salt-okunur modelde topla. TIF tarafı desteklediği
   alanları aynı teşhis sözleşmesine verir fakat IPTV kurtarma kararlarına dahil edilmez.
@@ -222,7 +222,7 @@ korumalıdır.
   **Kabul:** 15.000+ içerikte liste sayfalıdır; bölümler canlı kanal geçmişine karışmaz; kullanıcı
   en fazla birkaç kumanda hareketiyle kaldığı bölüme dönebilir.
 
-- [ ] **FEATURE-004 (P2): Yayın sağlık bilgisi arayüzü**
+- [x] **FEATURE-004 (P2): Yayın sağlık bilgisi arayüzü**
   `IPTVCORE-001` modelindeki codec, çözünürlük, bitrate, buffer, dropped frame ve hata nedenini
   mevcut Sistem Bilgileri/teşhis görünümünde göster.
   **Kabul:** Normal izleme arayüzünü kalabalıklaştırmaz; kullanıcı açmadıkça ek sorgu maliyeti yaratmaz.

@@ -60,6 +60,7 @@ import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvBufferingState
 import com.tvapp.livetv.playback.IptvPlaybackProfile
+import com.tvapp.livetv.playback.IptvPlaybackHealthSnapshot
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
@@ -190,6 +191,7 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var osdCoordinator: OsdCoordinator
     private var lastTifTrackLogSignature: String? = null
     private var lastTifCallbackLogSignature: String? = null
+    private var lastIptvHealthLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
     private var channels: List<LiveChannel> = emptyList()
     private val currentPrograms = mutableMapOf<String, ProgramSummary>()
@@ -543,6 +545,35 @@ class MainActivity : TvRemoteActivity() {
         }
         binding.favoriteFilter.setOnClickListener {
             applyChannelFilter(showFavorites = !favoriteFilter)
+        }
+        iptvPlayback.onHealthChanged = { health ->
+            val channel = currentChannel?.takeIf { it.source == LiveChannel.Source.IPTV }
+            val signature = listOf(
+                channel?.id,
+                health.phase,
+                health.firstFrameRendered,
+                health.retryAttempt,
+                health.lastErrorCode,
+            ).joinToString("|")
+            if (signature != lastIptvHealthLogSignature) {
+                lastIptvHealthLogSignature = signature
+                lifecycleScope.launch(Dispatchers.IO) {
+                    debugLog.recordDebug(
+                        "IPTV_HEALTH | channelId=${channel?.id ?: -1}, " +
+                            "phase=${health.phase}, kind=${health.contentKind}, " +
+                            "playing=${health.isPlaying}, firstFrame=${health.firstFrameRendered}, " +
+                            "startupMs=${health.startupDurationMillis ?: -1}, " +
+                            "resolution=${health.width ?: 0}x${health.height ?: 0}, " +
+                            "videoCodec=${health.videoCodec ?: "unknown"}, " +
+                            "audioCodec=${health.audioCodec ?: "unknown"}, " +
+                            "bitrate=${health.bitrateBps ?: -1}, " +
+                            "bandwidth=${health.estimatedBandwidthBps ?: -1}, " +
+                            "bufferMs=${health.bufferedDurationMillis}, dropped=${health.droppedFrames}, " +
+                            "retry=${health.retryAttempt}, failure=${health.lastFailureClass}, " +
+                            "error=${health.lastErrorCode ?: "none"}",
+                    )
+                }
+            }
         }
         binding.channelSearchButton.setOnClickListener { showChannelSearchDialog() }
         setupMobileTouchControls()
@@ -3553,6 +3584,9 @@ class MainActivity : TvRemoteActivity() {
     ) {
         val isCurrentTif = channel.source == LiveChannel.Source.TIF &&
             channel.sourceKey == currentChannel?.sourceKey
+        val isCurrentIptv = channel.source == LiveChannel.Source.IPTV &&
+            channel.sourceKey == currentChannel?.sourceKey
+        val iptvHealth = if (isCurrentIptv) iptvPlayback.healthSnapshot() else null
         val tracks = if (isCurrentTif) playback.allTracks() else emptyList()
         val videoState = if (isCurrentTif) playback.currentVideoState() else null
         val videoTrack = tracks.filter { it.type == TvTrackInfo.TYPE_VIDEO }
@@ -3568,9 +3602,21 @@ class MainActivity : TvRemoteActivity() {
             add(getString(R.string.system_info_section_app) to "")
             add(getString(R.string.system_info_source) to channel.source.name)
             add(getString(R.string.system_info_channel_id) to channel.id.toString())
-            add(getString(R.string.system_info_source_key) to channel.sourceKey)
+            add(
+                getString(R.string.system_info_source_key) to if (channel.source == LiveChannel.Source.IPTV) {
+                    getString(R.string.system_info_private_value_hidden)
+                } else {
+                    channel.sourceKey
+                },
+            )
             add(getString(R.string.system_info_input_id) to channel.inputId)
-            add(getString(R.string.system_info_channel_uri) to channel.uri)
+            add(
+                getString(R.string.system_info_channel_uri) to if (channel.source == LiveChannel.Source.IPTV) {
+                    sanitizedIptvLocation(channel.uri)
+                } else {
+                    channel.uri
+                },
+            )
             add(getString(R.string.system_info_channel_number) to channel.displayNumber)
             add(getString(R.string.system_info_channel_name) to channel.displayName)
             add(getString(R.string.system_info_service_type) to channel.serviceType.orUnknown())
@@ -3583,6 +3629,7 @@ class MainActivity : TvRemoteActivity() {
                     addAll(rawValues)
                 }
             }
+            if (channel.source == LiveChannel.Source.TIF) {
             add(getString(R.string.system_info_section_callback) to "")
             add(
                 getString(R.string.system_info_live_video_state) to when (videoState?.available) {
@@ -3616,10 +3663,32 @@ class MainActivity : TvRemoteActivity() {
                     event.values.forEach { (key, value) -> add("$prefix $key" to value) }
                 }
             }
-            add(getString(R.string.system_info_quality) to quality)
+            }
+            if (channel.source == LiveChannel.Source.IPTV) {
+                add(getString(R.string.system_info_section_iptv_health) to "")
+                if (iptvHealth == null) {
+                    add(
+                        getString(R.string.system_info_iptv_health) to
+                            getString(R.string.system_info_tracks_current_only),
+                    )
+                } else {
+                    addIptvHealthRows(iptvHealth)
+                }
+            }
+            add(
+                getString(R.string.system_info_quality) to if (iptvHealth != null) {
+                    VideoQuality.label(
+                        iptvHealth.width ?: 0,
+                        iptvHealth.height ?: 0,
+                        channel.videoFormat.orEmpty().uppercase(Locale.ROOT),
+                    ) ?: getString(R.string.unknown_value)
+                } else {
+                    quality
+                },
+            )
             add(getString(R.string.system_info_encrypted) to yesNo(channel.encrypted))
             add(getString(R.string.system_info_locked) to yesNo(channel.locked))
-            if (tracks.isEmpty()) {
+            if (channel.source == LiveChannel.Source.TIF && tracks.isEmpty()) {
                 add(
                     getString(R.string.system_info_tracks) to getString(
                         if (channel.sourceKey == currentChannel?.sourceKey) {
@@ -3629,7 +3698,7 @@ class MainActivity : TvRemoteActivity() {
                         },
                     ),
                 )
-            } else {
+            } else if (channel.source == LiveChannel.Source.TIF) {
                 tracks.forEachIndexed { index, track ->
                     val prefix = getString(R.string.system_info_track_index, index + 1)
                     add("$prefix ${getString(R.string.system_info_track_type)}" to trackTypeLabel(track))
@@ -3675,6 +3744,50 @@ class MainActivity : TvRemoteActivity() {
         dialog.setOnShowListener { scroll.requestFocus() }
         dialog.show()
     }
+
+    private fun MutableList<Pair<String, String>>.addIptvHealthRows(
+        health: IptvPlaybackHealthSnapshot,
+    ) {
+        fun duration(value: Long?): String = value?.let { "$it ms" }
+            ?: getString(R.string.unknown_value)
+        fun bitrate(value: Long?): String = value?.let { "${it / 1_000} kbps" }
+            ?: getString(R.string.unknown_value)
+        add(getString(R.string.system_info_iptv_phase) to health.phase.name)
+        add(getString(R.string.system_info_iptv_content_kind) to health.contentKind.name)
+        add(getString(R.string.system_info_iptv_playing) to yesNo(health.isPlaying))
+        add(getString(R.string.system_info_iptv_first_frame) to yesNo(health.firstFrameRendered))
+        add(getString(R.string.system_info_iptv_startup_time) to duration(health.startupDurationMillis))
+        add(getString(R.string.system_info_iptv_last_frame_age) to duration(health.timeSinceLastFrameMillis))
+        add(getString(R.string.system_info_iptv_progress_age) to duration(health.timeSinceLastProgressMillis))
+        add(getString(R.string.system_info_resolution) to if (health.width != null && health.height != null) {
+            "${health.width} × ${health.height}"
+        } else {
+            getString(R.string.unknown_value)
+        })
+        add(getString(R.string.system_info_iptv_video_codec) to health.videoCodec.orUnknown())
+        add(getString(R.string.system_info_iptv_audio_codec) to health.audioCodec.orUnknown())
+        add(getString(R.string.system_info_iptv_bitrate) to bitrate(health.bitrateBps?.toLong()))
+        add(getString(R.string.system_info_iptv_bandwidth) to bitrate(health.estimatedBandwidthBps))
+        add(getString(R.string.system_info_iptv_buffer) to duration(health.bufferedDurationMillis))
+        add(getString(R.string.system_info_iptv_dropped_frames) to health.droppedFrames.toString())
+        add(getString(R.string.system_info_iptv_retry) to health.retryAttempt.toString())
+        add(
+            getString(R.string.system_info_iptv_failure_class) to
+                (health.lastFailureClass?.name ?: getString(R.string.none)),
+        )
+        add(
+            getString(R.string.system_info_iptv_last_error) to
+                (health.lastErrorCode ?: getString(R.string.none)),
+        )
+    }
+
+    private fun sanitizedIptvLocation(value: String): String = runCatching {
+        val uri = android.net.Uri.parse(value)
+        val scheme = uri.scheme?.takeIf(String::isNotBlank)
+            ?: return@runCatching getString(R.string.system_info_private_value_hidden)
+        val host = uri.host?.takeIf(String::isNotBlank)
+        if (host == null) "$scheme://…" else "$scheme://$host/…"
+    }.getOrDefault(getString(R.string.system_info_private_value_hidden))
 
     private fun LinearLayout.addSystemInformationRow(key: String, value: String, index: Int) {
         if (value.isEmpty()) {

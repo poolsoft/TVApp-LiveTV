@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV yayın sağlığı
+* Media3 oynatma durumu; ilk kare süresi, oynatma ilerlemesi, buffer, bitrate, tahmini bant genişliği, çözünürlük, codec, atlanan kare, yeniden deneme ve son hata sınıfıyla ortak bir sağlık modelinde toplandı.
+* IPTV kanallarının Sistem Bilgileri ekranı bu sağlık anlık görüntüsünü talep üzerine gösteriyor; normal izleme arayüzüne ek yük bindirmiyor.
+* Anlamlı IPTV durum geçişleri kimlik bilgisi ve tam özel URL içermeden debug loguna yazılıyor. IPTV adresleri Sistem Bilgileri ekranında yalnız protokol ve sunucu düzeyinde maskeleniyor.
+
 ### Kanal arama ve IPTV arşivi
 * Kanal paneline ad, numara ve kategori arayan başlık eylemi ile `SEARCH` kumanda tuşu desteği eklendi. Büyük IPTV kütüphanesi araması, bütün kataloğu belleğe almadan Room FTS ve keyset sayfalama üzerinden çalışıyor.
 * M3U `catchup`, `catchup-source`, `catchup-days`/`timeshift` alanları ve Xtream `tv_archive` bilgileri içe aktarılıp kalıcı olarak saklanıyor.

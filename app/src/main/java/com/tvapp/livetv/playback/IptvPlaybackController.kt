@@ -47,6 +47,12 @@ class IptvPlaybackController(
     private var currentChannel: LiveChannel? = null
     private var hasReachedReady = false
     private var explicitLoading = true
+    private var healthPhase = IptvPlaybackPhase.IDLE
+    private var tuneStartedAt = 0L
+    private var firstFrameAt: Long? = null
+    @Volatile private var lastFrameAt: Long? = null
+    private var lastErrorCode: String? = null
+    private var lastFailureClass: IptvPlaybackFailureClass? = null
     private val playbackPreferencesStore = IptvPlaybackPreferencesStore(appContext)
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
@@ -54,6 +60,7 @@ class IptvPlaybackController(
     private val retryRunnable = Runnable {
         player?.let { current ->
             explicitLoading = true
+            updateHealthPhase(IptvPlaybackPhase.PREPARING)
             current.prepare()
             current.playWhenReady = true
         }
@@ -63,6 +70,7 @@ class IptvPlaybackController(
     var onBuffering: ((IptvBufferingState) -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
+    var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
@@ -83,7 +91,13 @@ class IptvPlaybackController(
         }
         hasReachedReady = false
         explicitLoading = true
+        tuneStartedAt = SystemClock.elapsedRealtime()
+        firstFrameAt = null
+        lastFrameAt = null
+        lastErrorCode = null
+        lastFailureClass = null
         resetProgressObservation()
+        healthPhase = IptvPlaybackPhase.PREPARING
         val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
             targetBufferSeconds * 1_000
         } else {
@@ -121,6 +135,7 @@ class IptvPlaybackController(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
+                            updateHealthPhase(IptvPlaybackPhase.BUFFERING)
                             onBuffering?.invoke(
                                 if (!hasReachedReady || explicitLoading) IptvBufferingState.LOADING
                                 else IptvBufferingState.BUFFERING,
@@ -131,17 +146,28 @@ class IptvPlaybackController(
                             retryCount = 0
                             hasReachedReady = true
                             explicitLoading = false
+                            updateHealthPhase(IptvPlaybackPhase.READY)
                             onBuffering?.invoke(IptvBufferingState.NONE)
                             onPlaybackReady?.invoke()
                             onContentKindChanged?.invoke(contentKind())
                         }
                         Player.STATE_ENDED, Player.STATE_IDLE -> {
+                            updateHealthPhase(
+                                if (playbackState == Player.STATE_ENDED) {
+                                    IptvPlaybackPhase.ENDED
+                                } else {
+                                    IptvPlaybackPhase.IDLE
+                                },
+                            )
                             onBuffering?.invoke(IptvBufferingState.NONE)
                         }
                     }
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    lastErrorCode = error.errorCodeName
+                    lastFailureClass = classifyIptvPlaybackFailure(error.errorCodeName)
+                    updateHealthPhase(IptvPlaybackPhase.FAILED)
                     if (!released && retryCount < MAX_RETRY_COUNT) {
                         val delay = RETRY_BASE_DELAY_MS * (1L shl retryCount)
                         retryCount++
@@ -155,7 +181,20 @@ class IptvPlaybackController(
                 override fun onTracksChanged(tracks: Tracks) {
                     onTracksChanged?.invoke()
                 }
+
+                override fun onRenderedFirstFrame() {
+                    val now = SystemClock.elapsedRealtime()
+                    if (firstFrameAt == null) firstFrameAt = now
+                    lastFrameAt = now
+                    onHealthChanged?.invoke(healthSnapshot())
+                }
             })
+            created.setVideoFrameMetadataListener { _, _, _, _ ->
+                val now = SystemClock.elapsedRealtime()
+                if (now - (lastFrameAt ?: 0L) >= FRAME_HEALTH_SAMPLE_INTERVAL_MS) {
+                    lastFrameAt = now
+                }
+            }
             player = created
             playerView.player = created
         }
@@ -187,6 +226,7 @@ class IptvPlaybackController(
         exoPlayer.prepare()
         exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
+        onHealthChanged?.invoke(healthSnapshot())
     }
 
     fun stop() {
@@ -195,6 +235,8 @@ class IptvPlaybackController(
         onBuffering?.invoke(IptvBufferingState.NONE)
         player?.stop()
         player?.clearMediaItems()
+        currentChannel = null
+        updateHealthPhase(IptvPlaybackPhase.IDLE)
     }
 
     fun contentKind(): IptvContentKind {
@@ -357,6 +399,42 @@ class IptvPlaybackController(
         )
     }
 
+    fun healthSnapshot(): IptvPlaybackHealthSnapshot {
+        val now = SystemClock.elapsedRealtime()
+        val current = player
+        val technical = currentTechnicalInfo()
+        val position = current?.currentPosition ?: 0L
+        if (current?.isPlaying == true &&
+            (lastObservedPosition == C.TIME_UNSET || position - lastObservedPosition >= 500L)
+        ) {
+            lastObservedPosition = position
+            lastProgressAt = now
+        }
+        return IptvPlaybackHealthSnapshot(
+            phase = healthPhase,
+            contentKind = contentKind(),
+            isPlaying = current?.isPlaying == true,
+            firstFrameRendered = firstFrameAt != null,
+            startupDurationMillis = firstFrameAt?.let { (it - tuneStartedAt).coerceAtLeast(0L) },
+            timeSinceLastFrameMillis = lastFrameAt?.let { (now - it).coerceAtLeast(0L) },
+            timeSinceLastProgressMillis = if (current == null) null else {
+                (now - lastProgressAt).coerceAtLeast(0L)
+            },
+            positionMillis = position,
+            bufferedDurationMillis = technical.bufferedDurationMillis,
+            bitrateBps = technical.bitrate,
+            estimatedBandwidthBps = technical.estimatedBandwidthBps,
+            width = technical.width,
+            height = technical.height,
+            videoCodec = technical.videoCodec,
+            audioCodec = technical.audioCodec,
+            droppedFrames = current?.videoDecoderCounters?.droppedBufferCount ?: 0,
+            retryAttempt = retryCount,
+            lastErrorCode = lastErrorCode,
+            lastFailureClass = lastFailureClass,
+        )
+    }
+
     fun setMuted(muted: Boolean) {
         player?.volume = if (muted) 0f else 1f
     }
@@ -475,6 +553,8 @@ class IptvPlaybackController(
         player = null
         trackSelector = null
         mediaSourceFactory = null
+        currentChannel = null
+        updateHealthPhase(IptvPlaybackPhase.RELEASED)
     }
 
     fun currentTechnicalInfo(): IptvTechnicalSnapshot {
@@ -503,8 +583,9 @@ class IptvPlaybackController(
         return IptvTechnicalSnapshot(
             width = videoWidth,
             height = videoHeight,
-            videoCodec = videoFormat?.sampleMimeType,
-            audioCodec = if (hasDolby) "dolby" else null,
+            videoCodec = videoFormat?.codecs ?: videoFormat?.sampleMimeType,
+            audioCodec = p.audioFormat?.codecs ?: p.audioFormat?.sampleMimeType
+                ?: if (hasDolby) "dolby" else null,
             bitrate = videoFormat?.bitrate?.takeIf { it > 0 },
             bufferedDurationMillis = p.totalBufferedDuration,
             hasAudio = audioList.isNotEmpty(),
@@ -522,6 +603,12 @@ class IptvPlaybackController(
         lastProgressAt = SystemClock.elapsedRealtime()
     }
 
+    private fun updateHealthPhase(phase: IptvPlaybackPhase) {
+        if (healthPhase == phase) return
+        healthPhase = phase
+        onHealthChanged?.invoke(healthSnapshot())
+    }
+
     private companion object {
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
@@ -529,6 +616,7 @@ class IptvPlaybackController(
         const val MAX_BUFFER_MS = 30_000
         const val BUFFER_FOR_PLAYBACK_MS = 500
         const val BUFFER_AFTER_REBUFFER_MS = 2_500
+        const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
         const val ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 2_500
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
