@@ -1,0 +1,7 @@
+HSPLcom/tvapp/livetv/MainActivity;->**(**)**
+HSPLcom/tvapp/livetv/data/ChannelRepository;->**(**)**
+HSPLcom/tvapp/livetv/data/IptvRepository;->**(**)**
+HSPLcom/tvapp/livetv/data/ProgramRepository;->**(**)**
+HSPLcom/tvapp/livetv/playback/IptvPlaybackController;->**(**)**
+HSPLcom/tvapp/livetv/ui/ChannelAdapter;->**(**)**
+HSPLcom/tvapp/livetv/databinding/ActivityMainBinding;->**(**)**

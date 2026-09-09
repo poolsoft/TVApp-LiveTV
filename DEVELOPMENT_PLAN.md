@@ -45,6 +45,18 @@ Gerçek düşük donanımlı cihaz edinildiğinde hedefler aynı test verileriyl
 o zamana kadar sorgu sayısı, UI thread bloklaması, frame gecikmesi ve göreli süre değişimi esas
 alınır.
 
+Yerel macrobenchmark komutu:
+
+```powershell
+.\gradlew.bat :benchmark:connectedBenchmarkAndroidTest
+```
+
+İlk API 31 Google TV emülatör tabanı 9 Eylül 2026 tarihinde kaydedildi. Soğuk başlangıç medyanı
+3.890 ms; sıcak başlangıç + kanal paneli hızlı gezinme medyanı 1.839 ms oldu. İlk sıcak örnekteki
+emülatör/kurulum sapması dahil aralık 1.728-9.295 ms'dir. Bu değerler cihaz hedefi değil, sonraki
+değişikliklerin aynı AVD üzerindeki regresyon tabanıdır. Ayrıntılı kare izleri benchmark çıktısında
+Perfetto dosyaları olarak üretilir.
+
 ## 3. Mimari yön
 
 ### Yetenek tabanlı çalışma

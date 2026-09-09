@@ -212,7 +212,10 @@ class ChannelAdapter(
                 true
             }
             root.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) onFocused(channel)
+                if (hasFocus) {
+                    onFocused(channel)
+                    if (rowOptions.showLogo) prefetchAround(root, bindingAdapterPosition)
+                }
             }
         }
 
@@ -232,6 +235,17 @@ class ChannelAdapter(
 
         fun bindSelection(channel: LiveChannel) {
             binding.root.isSelected = channel.id == selectedId
+        }
+
+        private fun prefetchAround(view: View, position: Int) {
+            if (position !in channels.indices) return
+            val candidates = channels.asSequence()
+                .drop(position + 1)
+                .map { candidate ->
+                    if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                    else TvContract.buildChannelLogoUri(candidate.id)
+                }
+            ChannelLogoLoader.prefetch(view.context, candidates)
         }
     }
 

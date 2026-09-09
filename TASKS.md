@@ -5,7 +5,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
 
 ## Epic PERF - Ölçüm ve performans tabanı
 
-- [~] **PERF-001 (P0): Performans ölçüm altyapısı**
+- [x] **PERF-001 (P0): Performans ölçüm altyapısı**
   Startup, kanal yükleme, liste açma, sayfa sorgusu, arama, EPG ve tune sürelerini debug loguna
   yapılandırılmış biçimde yaz. Release'te hassas URL veya kimlik kaydetme.
   **Kabul:** Her işlemde süre, kayıt sayısı ve cihaz çalışma modu görülebilir.
@@ -15,22 +15,22 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   Üretim veritabanını kullanma; test verisi açıkça ayrı tutulmalı ve güvenle temizlenebilmelidir.
   **Kabul:** Aynı veri seti emülatör ve cihaz testlerinde tekrar üretilebilir.
 
-- [ ] **PERF-003 (P0): Macrobenchmark ve frame ölçümü**
+- [x] **PERF-003 (P0): Macrobenchmark ve frame ölçümü**
   Soğuk/sıcak başlangıç, kanal listesi açma ve hızlı gezinme benchmarklarını ekle.
   **Kabul:** CI veya yerel komut hedefleri DEVELOPMENT_PLAN.md eşikleriyle raporlar.
 
-- [ ] **PERF-004 (P1): Baseline Profile**
+- [x] **PERF-004 (P1): Baseline Profile**
   Ana açılış, IPTV liste açma ve oynatma rotaları için profil üret.
   **Kabul:** Release başlangıç süresi ölçümle iyileşir; profil iki dağıtım varyantında paketlenir.
 
-- [ ] **PERF-005 (P1): Düşük RAM politikası**
+- [x] **PERF-005 (P1): Düşük RAM politikası**
   `ActivityManager.isLowRamDevice`, decoder sayısı ve bellek baskısına göre logo prefetch,
   Grid ve Multi View limitlerini belirle.
   **Kabul:** Düşük RAM cihazda bellek sürekli büyümez; uygulama kaynak baskısında kontrollü düşer.
 
 ## Epic PLATFORM - TIF ve IPTV-only cihaz desteği
 
-- [~] **PLATFORM-001 (P0): DeviceCapabilities modeli**
+- [x] **PLATFORM-001 (P0): DeviceCapabilities modeli**
   Leanback, TIF özelliği, TvInputManager, kullanılabilir vendor tuner, kanal erişimi, PiP,
   decoder ve düşük RAM sonuçlarını tek modelde topla.
   **Kabul:** TVApp'in kendi TIF input'u vendor tuner sayılmaz; başarısız sorgu crash üretmez.
@@ -39,17 +39,17 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   `HYBRID_TV`, `IPTV_ONLY_TV`, `MOBILE_TEST` modlarını üret ve sonucu oturum boyunca sabitle.
   **Kabul:** Marka/model kontrolü yoktur; aynı karar UI ve repository tarafından kullanılır.
 
-- [~] **PLATFORM-003 (P0): IPTV-only açılış akışı**
+- [x] **PLATFORM-003 (P0): IPTV-only açılış akışı**
   Tuner bulunmayan TV stick/box cihazında TIF izin ve hata dialoglarını atla. Kayıtlı IPTV varsa
   son geçerli IPTV görünümünü aç; kaynak yoksa IPTV kaynak yönetimini öner.
   **Kabul:** TIF'siz cihazda uygulama siyah/hata ekranında kalmadan tamamen kullanılabilir.
 
-- [ ] **PLATFORM-004 (P1): Yeteneklere göre UI**
+- [x] **PLATFORM-004 (P1): Yeteneklere göre UI**
   TIF yoksa Uydu/Radio, tuner setup ve fiziksel tuner editörü seçeneklerini gizle; IPTV, VOD,
   EPG ve ayarları koru. Kullanıcıya Ayarlar > Sistem altında algılanan modu göster.
   **Kabul:** Kaynak döngüsünde boş kaynak oluşmaz; dokümantasyon algılanan modu açıklar.
 
-- [ ] **PLATFORM-005 (P1): Manuel çalışma modu override**
+- [x] **PLATFORM-005 (P1): Manuel çalışma modu override**
   Otomatik, Hibrit ve IPTV-only seçenekleri ekle. Geçersiz Hibrit seçimde güvenli fallback yap.
   **Kabul:** Tercih kalıcıdır ve uygulama yeniden açıldığında korunur.
 
@@ -82,7 +82,7 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   kullanımından çıkar; yedeklemede akış/chunk kullan.
   **Kabul:** Heap içinde 15.000 satırlık katalog listesi tutulmaz.
 
-- [ ] **DATA-007 (P1): Logo cache bütçesi**
+- [x] **DATA-007 (P1): Logo cache bütçesi**
   Görünür pencere + sınırlı prefetch kullan; disk ve bellek limitlerini cihaz sınıfına göre uygula.
   **Kabul:** Kaydırma logo yüklemesi yüzünden odak/frame atlamaz; cache sınırı aşılmaz.
 

@@ -1,5 +1,6 @@
 package com.tvapp.livetv.platform
 
+import com.tvapp.livetv.settings.ExperienceModeOverride
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -58,6 +59,32 @@ class ExperienceModeResolverTest {
         )
     }
 
+    @Test
+    fun iptvOnlyOverrideDisablesAvailableTuner() {
+        val capabilities = capabilities(hasTvInputManager = true, vendorTunerInputCount = 1)
+
+        assertEquals(
+            ExperienceMode.IPTV_ONLY_TV,
+            resolveExperienceMode(
+                capabilities,
+                mobileUiEnabled = false,
+                override = ExperienceModeOverride.IPTV_ONLY,
+            ),
+        )
+    }
+
+    @Test
+    fun unavailableHybridOverrideFallsBackSafely() {
+        assertEquals(
+            ExperienceMode.IPTV_ONLY_TV,
+            resolveExperienceMode(
+                capabilities(),
+                mobileUiEnabled = false,
+                override = ExperienceModeOverride.HYBRID,
+            ),
+        )
+    }
+
     private fun capabilities(
         reportsLiveTvFeature: Boolean = false,
         hasTvInputManager: Boolean = false,
@@ -70,5 +97,8 @@ class ExperienceModeResolverTest {
         hasTvListingsPermission = false,
         supportsPictureInPicture = false,
         isLowRamDevice = false,
+        memoryClassMegabytes = 256,
+        hardwareVideoDecoderCount = 2,
+        maximumConcurrentVideoDecoders = 4,
     )
 }

@@ -6,6 +6,15 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Performans tabanı ve düşük kaynaklı cihazlar
+* Startup, kanal yükleme/panel, IPTV sayfası, EPG ve tune-ready işlemleri süre, kayıt sayısı ve çalışma moduyla yapılandırılmış debug performans kaydına alındı.
+* Soğuk başlangıç ile sıcak başlangıç + hızlı kanal paneli gezinimini ölçen Macrobenchmark modülü ve yeniden üretilebilir Perfetto çıktıları eklendi.
+* Ana açılış, kanal repository'si, IPTV liste ve oynatma rotaları için Baseline Profile eklendi; profil local APK ve paid AAB içinde doğrulandı.
+* Bellek sınıfı, düşük RAM işareti ve donanım video decoder kapasitesi cihaz yetenek modeline eklendi. Logo cache/prefetch, IPTV Grid ve Multi View limitleri bu kaynak bütçesine göre ayarlanıyor; kritik bellek baskısında ikincil oynatıcılar kontrollü kapatılıyor.
+* `Ayarlar > Sistem` bölümüne kalıcı Otomatik, Hibrit ve IPTV-only çalışma modu seçimi ile algılanan mod/kaynak özeti eklendi. Desteklenmeyen Hibrit tercihi güvenli biçimde IPTV-only moda düşüyor.
+* IPTV-only cihazlarda Uydu/Radio döngüsü ile TIF eşitleme ve fiziksel tuner kaynak seçenekleri gizlenirken IPTV, VOD, XMLTV, kanal sıralama ve yedek işlemleri korunuyor.
+* Kanal ve rehber satırı logoları yalnız odak çevresindeki sınırlı pencere için önceden yükleniyor; bellek ve disk cache bütçesi cihaz sınıfına göre uygulanıyor.
+
 ### Büyük veri performans testi
 * IPTV yedek dışa/içe aktarma, tüm kataloğu tek bir `JSONObject`, `ByteArray` veya liste halinde belleğe almak yerine akışlı JSON ve 500 satırlık Room parçalarıyla çalışıyor. İçe aktarma önce dosyanın tamamını doğruluyor; veritabanı değişiklikleri tek transaction içinde yapıldığı için bozuk veya yarım dosya mevcut veriyi silmiyor.
 * Xtream Codes ve Stalker Portal kanal katalogları ağ yanıtından akışlı ayrıştırılıyor; 15.000+ kayıtta dev JSON dizisi ve kanal listesi bellekte tutulmuyor.

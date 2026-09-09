@@ -122,6 +122,7 @@ dependencies {
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("io.coil-kt:coil:2.7.0")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     val media3Version = "1.8.0"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")

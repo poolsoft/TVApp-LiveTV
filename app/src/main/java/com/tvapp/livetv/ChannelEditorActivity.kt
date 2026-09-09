@@ -22,7 +22,11 @@ import com.tvapp.livetv.databinding.ActivityChannelEditorBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
+import com.tvapp.livetv.platform.DeviceCapabilitiesSession
+import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.resolveExperienceMode
 import com.tvapp.livetv.settings.ChannelSourceFilterStore
+import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
 import com.tvapp.livetv.ui.ParentalPinDialog
@@ -691,26 +695,32 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun showSourceManagement() {
-        val actions = arrayOf(
-            getString(R.string.sync_tif),
-            getString(R.string.channel_sources),
-            getString(R.string.iptv_sources_title),
-            getString(R.string.xmltv_alternative_epg),
-            getString(R.string.export_backup),
-            getString(R.string.import_backup),
+        val experienceMode = resolveExperienceMode(
+            DeviceCapabilitiesSession.get(this),
+            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+            override = ExperienceModePreferencesStore(this).load(),
         )
+        val actions = buildList<Pair<String, () -> Unit>> {
+            if (experienceMode == ExperienceMode.HYBRID_TV) {
+                add(getString(R.string.sync_tif) to { loadChannels(syncMessage = true) })
+                add(getString(R.string.channel_sources) to ::showChannelSources)
+            }
+            add(getString(R.string.iptv_sources_title) to ::openIptvSources)
+            add(
+                getString(R.string.xmltv_alternative_epg) to {
+                    startActivity(Intent(this@ChannelEditorActivity, XmlTvSourcesActivity::class.java))
+                },
+            )
+            add(getString(R.string.export_backup) to { createBackupFile.launch(defaultBackupFileName()) })
+            add(
+                getString(R.string.import_backup) to {
+                    openBackupFile.launch(arrayOf("application/json", "text/plain"))
+                },
+            )
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.source_management)
-            .setItems(actions) { _, which ->
-                when (which) {
-                    0 -> loadChannels(syncMessage = true)
-                    1 -> showChannelSources()
-                    2 -> openIptvSources()
-                    3 -> startActivity(Intent(this, XmlTvSourcesActivity::class.java))
-                    4 -> createBackupFile.launch(defaultBackupFileName())
-                    5 -> openBackupFile.launch(arrayOf("application/json", "text/plain"))
-                }
-            }
+            .setItems(actions.map { it.first }.toTypedArray()) { _, which -> actions[which].second() }
             .setNegativeButton(R.string.close, null)
             .show()
     }

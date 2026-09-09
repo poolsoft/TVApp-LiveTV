@@ -100,7 +100,19 @@ class ProgramGuideChannelAdapter(
             root.setOnFocusChangeListener { _, focused ->
                 root.scaleX = if (focused) 1.02f else 1.0f
                 root.scaleY = if (focused) 1.02f else 1.0f
-                if (focused) onFocused(channel)
+                if (focused) {
+                    onFocused(channel)
+                    val position = bindingAdapterPosition
+                    if (position in channels.indices) {
+                        ChannelLogoLoader.prefetch(
+                            root.context,
+                            channels.asSequence().drop(position + 1).map { candidate ->
+                                if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                                else TvContract.buildChannelLogoUri(candidate.id)
+                            },
+                        )
+                    }
+                }
             }
             root.setOnClickListener { onSelected(channel) }
         }

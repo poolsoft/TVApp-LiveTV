@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "TVApp"
 include(":app")
+include(":benchmark")

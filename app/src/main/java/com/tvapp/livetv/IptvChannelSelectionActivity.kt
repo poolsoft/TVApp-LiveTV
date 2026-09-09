@@ -1,6 +1,7 @@
 package com.tvapp.livetv
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
@@ -13,6 +14,7 @@ import com.tvapp.livetv.data.IptvPageAnchor
 import com.tvapp.livetv.data.IptvPageDirection
 import com.tvapp.livetv.data.local.IptvChannelListProjection
 import com.tvapp.livetv.databinding.ActivityIptvChannelSelectionBinding
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityIptvChannelSelectionBinding
     private lateinit var repository: IptvRepository
     private lateinit var preview: IptvPlaybackController
+    private lateinit var debugLog: CrashReportStore
     private lateinit var channelListAdapter: ArrayAdapter<String>
     private var sourceId = -1L
     private var channels: List<IptvChannelListProjection> = emptyList()
@@ -53,6 +56,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         binding = ActivityIptvChannelSelectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
         repository = IptvRepository(this)
+        debugLog = CrashReportStore(this)
         preview = IptvPlaybackController(this, binding.previewPlayer)
         configurePreview()
         sourceId = intent.getLongExtra(EXTRA_SOURCE_ID, -1L)
@@ -282,6 +286,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             anchor == null
         ) return
         loading = true
+        val startedAt = SystemClock.elapsedRealtime()
         val generation = filterGeneration
         pageJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -308,6 +313,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             if (generation != filterGeneration) return@launch
             loading = false
             result.onSuccess { (total, loaded) ->
+                debugLog.recordDebug(
+                    "PERF | operation=iptv_selection_page, " +
+                        "durationMs=${SystemClock.elapsedRealtime() - startedAt}, " +
+                        "direction=$direction, rows=${loaded.size}, total=$total, " +
+                        "queryLength=${searchQuery.length}, category=${selectedCategory != null}",
+                )
                 filteredCount = total
                 val effective = loaded.map { channel ->
                     channel.copy(selected = selectionOverrides[channel.sourceKey] ?: channel.selected)
@@ -332,6 +343,11 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                 }
                 renderChannels(requestFocus)
             }.onFailure { error ->
+                debugLog.recordDebug(
+                    "PERF | operation=iptv_selection_page_failed, " +
+                        "durationMs=${SystemClock.elapsedRealtime() - startedAt}, " +
+                        "error=${error.javaClass.simpleName}",
+                )
                 binding.status.text = error.message ?: error.javaClass.simpleName
             }
         }

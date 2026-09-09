@@ -32,6 +32,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TVApp">
 
+        <profileable android:shell="true" />
+
         <receiver
             android:name=".reminder.ProgramReminderReceiver"
             android:enabled="true"

@@ -39,6 +39,12 @@ import com.tvapp.livetv.settings.ExternalPlayerPreference
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.image.ChannelLogoLoader
+import com.tvapp.livetv.platform.DeviceCapabilitiesSession
+import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.resourcePolicyFor
+import com.tvapp.livetv.platform.resolveExperienceMode
+import com.tvapp.livetv.settings.ExperienceModeOverride
+import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
@@ -57,6 +63,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var logoCacheStore: LogoCachePreferencesStore
     private lateinit var externalPlayerStore: ExternalPlayerPreferencesStore
     private lateinit var iptvPlaybackStore: IptvPlaybackPreferencesStore
+    private lateinit var experienceModeStore: ExperienceModePreferencesStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
@@ -92,6 +99,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         logoCacheStore = LogoCachePreferencesStore(this)
         externalPlayerStore = ExternalPlayerPreferencesStore(this)
         iptvPlaybackStore = IptvPlaybackPreferencesStore(this)
+        experienceModeStore = ExperienceModePreferencesStore(this)
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
@@ -348,6 +356,40 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun buildSystemSettings() {
+        section(R.string.device_mode_settings)
+        val capabilities = DeviceCapabilitiesSession.get(this)
+        val modeOptions = ExperienceModeOverride.entries
+        choice(
+            R.string.working_mode,
+            listOf(
+                getString(R.string.working_mode_automatic),
+                getString(R.string.working_mode_hybrid),
+                getString(R.string.working_mode_iptv_only),
+            ),
+            modeOptions.indexOf(experienceModeStore.load()).coerceAtLeast(0),
+        ) { index ->
+            experienceModeStore.save(modeOptions[index])
+            markChanged()
+            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+            content.post { firstContentFocusable?.requestFocus() }
+        }
+        val resolvedMode = resolveExperienceMode(
+            capabilities,
+            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+            override = experienceModeStore.load(),
+        )
+        info(R.string.detected_working_mode, experienceModeLabel(resolvedMode))
+        val policy = resourcePolicyFor(capabilities)
+        info(
+            R.string.device_resources,
+            getString(
+                R.string.device_resource_summary,
+                capabilities.memoryClassMegabytes,
+                capabilities.hardwareVideoDecoderCount,
+                policy.maximumGridStreams,
+            ),
+        )
+
         section(R.string.playback_settings)
         val timerValues = listOf(0, 15, 30, 60, 90, 120)
         val remaining = sleepTimerStore.remainingMinutes()
@@ -543,6 +585,14 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     } else {
         getString(R.string.milliseconds_value, value)
     }
+
+    private fun experienceModeLabel(mode: ExperienceMode): String = getString(
+        when (mode) {
+            ExperienceMode.HYBRID_TV -> R.string.working_mode_hybrid
+            ExperienceMode.IPTV_ONLY_TV -> R.string.working_mode_iptv_only
+            ExperienceMode.MOBILE_TEST -> R.string.mobile_test_mode
+        },
+    )
 
     private fun settingRow(titleRes: Int): SettingRow {
         val row = LinearLayout(this).apply {

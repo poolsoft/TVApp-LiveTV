@@ -69,7 +69,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - `OK`: Kanal listesini açar; listedeki kanalı seçer.
 - `Yukarı/Aşağı`: Liste kapalıyken kanal değiştirir, liste açıkken satırlar arasında gezer.
 - `CH+/CH-`: Kanal değiştirir.
-- `INFO`: Program rehberini açar.
+- `INFO`: Bilgi çubuğunu açar; bilgi çubuğu açıkken tekrar basılırsa program rehberini açar.
+- `GUIDE/EPG`: Program rehberini doğrudan açar.
 - `AUDIO`: Yayındaki ses dilini/parçasını seçer.
 - `SUBT/CAPTIONS`: Altyazı parçasını seçer veya kapatır.
 - `INPUT/SOURCE`: DTV/ATV ve HDMI/AV gibi fiziksel TV girişlerini açar.
@@ -139,6 +140,27 @@ doğrulayamaz; desteklenmeyen donanımda ana yayın korunur.
 $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat assembleLocalDebug
 ```
+
+### Performans ve cihaz modu
+
+TVApp cihaz adını değil gerçek yetenekleri kullanır. Vendor tuner bulunan cihazlarda Hibrit TV,
+tuner bulunmayan TV stick/box cihazlarında IPTV-only, telefon test varyantında Mobil Test modu
+seçilir. Algılanan mod ve bellek/decoder özeti `Ayarlar > Sistem` altında görülebilir; kullanıcı
+aynı yerden Otomatik, Hibrit veya IPTV-only tercihinde bulunabilir. Donanımın desteklemediği
+Hibrit seçimi IPTV-only moda güvenli biçimde döner.
+
+Macrobenchmark modülü soğuk başlangıcı ve sıcak başlangıçtan sonra kanal panelinde hızlı D-pad
+gezinimini ölçer. Emülatör sonuçları yalnız regresyon karşılaştırmasıdır; fiziksel TV hedefi
+olarak kabul edilmez:
+
+```powershell
+.\gradlew.bat :benchmark:connectedBenchmarkAndroidTest
+```
+
+Baseline profile; ana açılış, kanal repository'si, IPTV liste ve oynatma rotalarını kapsar ve
+hem local APK hem paid AAB içine paketlenir. Düşük RAM cihazlarda logo cache/prefetch bütçesi,
+Grid kanal sayısı ve Multi View kullanılabilirliği bellek ile donanım decoder kapasitesine göre
+otomatik azaltılır.
 
 Telefon üzerinde IPTV/VOD ve yönetim ekranlarını sınamak için TV paketlerinden ayrı mobil test
 varyantı kullanılabilir:

@@ -69,9 +69,12 @@ import com.tvapp.livetv.playback.IptvViewPreferencesStore
 import com.tvapp.livetv.playback.ChannelNavigator
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.platform.DeviceCapabilities
-import com.tvapp.livetv.platform.DeviceCapabilitiesDetector
+import com.tvapp.livetv.platform.DeviceCapabilitiesSession
+import com.tvapp.livetv.platform.DeviceResourcePolicy
 import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.resourcePolicyFor
 import com.tvapp.livetv.platform.resolveExperienceMode
+import com.tvapp.livetv.image.ChannelLogoLoader
 import com.tvapp.livetv.settings.ChannelPanelSide
 import com.tvapp.livetv.settings.ChannelListFilterStore
 import com.tvapp.livetv.settings.ChannelTrackPreferenceStore
@@ -84,6 +87,7 @@ import com.tvapp.livetv.settings.IptvPlaybackPreferences
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
+import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.billing.IptvAccessDialogs
 import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.ui.ChannelAdapter
@@ -169,6 +173,7 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var homeRecentChannelsPublisher: HomeRecentChannelsPublisher
     private lateinit var debugLog: CrashReportStore
     private lateinit var deviceCapabilities: DeviceCapabilities
+    private lateinit var deviceResourcePolicy: DeviceResourcePolicy
     private var experienceMode = ExperienceMode.IPTV_ONLY_TV
     private lateinit var adapter: ChannelAdapter
     private var lastTifTrackLogSignature: String? = null
@@ -177,6 +182,8 @@ class MainActivity : TvRemoteActivity() {
     private var channels: List<LiveChannel> = emptyList()
     private val currentPrograms = mutableMapOf<String, ProgramSummary>()
     private var currentChannel: LiveChannel? = null
+    private var pendingTuneStartedAt = 0L
+    private var pendingTuneSourceKey: String? = null
     private var activePassthroughInputId: String? = null
     private var resumeTifPlayback = false
     private var channelPanelContent = ChannelPanelContent.NORMAL
@@ -310,6 +317,9 @@ class MainActivity : TvRemoteActivity() {
     ) {
         applyDisplayPreferences()
         scheduleSleepTimer()
+        val previousMode = experienceMode
+        applyExperienceMode()
+        if (experienceMode != previousMode) loadChannels(preserveCurrentPlayback = true)
     }
     private val programGuide = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -331,11 +341,10 @@ class MainActivity : TvRemoteActivity() {
         iptvRepository = IptvRepository(this)
         programRepository = ProgramRepository(this)
         debugLog = CrashReportStore(this)
-        deviceCapabilities = DeviceCapabilitiesDetector(this).detect()
-        experienceMode = resolveExperienceMode(
-            deviceCapabilities,
-            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
-        )
+        deviceCapabilities = DeviceCapabilitiesSession.get(this)
+        deviceResourcePolicy = resourcePolicyFor(deviceCapabilities)
+        ChannelLogoLoader.configure(this, deviceCapabilities)
+        applyExperienceMode()
         playback = TifPlaybackController(binding.tvView)
         iptvPlayback = IptvPlaybackController(this, binding.iptvPlayerView)
         secondaryPlayback = TifPlaybackController(binding.secondaryTvView)
@@ -376,7 +385,12 @@ class MainActivity : TvRemoteActivity() {
                 "vendorTuners=${deviceCapabilities.vendorTunerInputCount}, " +
                 "tvPermission=${deviceCapabilities.hasTvListingsPermission}, " +
                 "pip=${deviceCapabilities.supportsPictureInPicture}, " +
-                "lowRam=${deviceCapabilities.isLowRamDevice}",
+                "lowRam=${deviceCapabilities.isLowRamDevice}, " +
+                "memoryClassMb=${deviceCapabilities.memoryClassMegabytes}, " +
+                "hardwareDecoders=${deviceCapabilities.hardwareVideoDecoderCount}, " +
+                "decoderInstances=${deviceCapabilities.maximumConcurrentVideoDecoders}, " +
+                "gridLimit=${deviceResourcePolicy.maximumGridStreams}, " +
+                "multiView=${deviceResourcePolicy.supportsMultiView}",
         )
         if (intent.getBooleanExtra(BootLaunchReceiver.EXTRA_STARTED_AFTER_BOOT, false)) {
             debugLog.recordDebug("MAIN_STARTED_AFTER_BOOT")
@@ -401,6 +415,7 @@ class MainActivity : TvRemoteActivity() {
         playback.onVideoStateChanged = { available, _ ->
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF) {
+                if (available) recordTuneReady(channel)
                 when {
                     channel.isRadioChannel() -> updateAudioOnlyPanel(channel, true)
                     available -> updateAudioOnlyPanel(channel, false)
@@ -425,7 +440,10 @@ class MainActivity : TvRemoteActivity() {
                 binding.statusPanel.visibility = View.GONE
             }
             if (currentChannel?.source == LiveChannel.Source.IPTV) {
-                currentChannel?.let(::updateTechnicalBadgesForIptv)
+                currentChannel?.let { channel ->
+                    recordTuneReady(channel)
+                    updateTechnicalBadgesForIptv(channel)
+                }
             }
         }
         iptvPlayback.onBuffering = { state ->
@@ -747,6 +765,8 @@ class MainActivity : TvRemoteActivity() {
         lockedChannelRecordsHistory = recordHistory
         currentPlaybackUsesIptvLibrary = !recordHistory
         currentChannel = channel
+        pendingTuneStartedAt = SystemClock.elapsedRealtime()
+        pendingTuneSourceKey = channel.sourceKey
         adapter.select(channel.sourceKey)
         binding.tvView.visibility = View.GONE
         binding.iptvPlayerView.visibility = View.GONE
@@ -1040,6 +1060,17 @@ class MainActivity : TvRemoteActivity() {
 
     private fun loadFocusedProgram(channel: LiveChannel) {
         loadProgramWindow(channel.sourceKey, EPG_FOCUS_DEBOUNCE_MS)
+    }
+
+    private fun recordTuneReady(channel: LiveChannel) {
+        if (pendingTuneSourceKey != channel.sourceKey || pendingTuneStartedAt <= 0L) return
+        recordPerformance(
+            "channel_tune_ready",
+            pendingTuneStartedAt,
+            "source=${channel.source}, mode=$experienceMode",
+        )
+        pendingTuneStartedAt = 0L
+        pendingTuneSourceKey = null
     }
 
     @Suppress("ClickableViewAccessibility")
@@ -1828,6 +1859,14 @@ class MainActivity : TvRemoteActivity() {
         if (!displayPreferences.showCurrentProgram) binding.currentProgram.visibility = View.GONE
         if (!displayPreferences.showNextProgram) binding.nextProgram.visibility = View.GONE
         if (!displayPreferences.subtitlesEnabled) playback.selectSubtitle(null)
+    }
+
+    private fun applyExperienceMode() {
+        experienceMode = resolveExperienceMode(
+            deviceCapabilities,
+            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+            override = ExperienceModePreferencesStore(this).load(),
+        )
     }
 
     private fun applyPreferredTracks() {
@@ -2937,7 +2976,7 @@ class MainActivity : TvRemoteActivity() {
         get() = (this * resources.displayMetrics.density).toInt()
 
     private fun prepareIptvGrid() {
-        repeat(4) { index ->
+        repeat(deviceResourcePolicy.maximumGridStreams) { index ->
             val cell = layoutInflater.inflate(
                 R.layout.view_iptv_grid_cell,
                 binding.iptvGrid,
@@ -3054,17 +3093,25 @@ class MainActivity : TvRemoteActivity() {
                 checked,
             ) { target, which, isChecked ->
                 checked[which] = isChecked
-                if (isChecked && checked.count { it } > 4) {
+                if (isChecked && checked.count { it } > deviceResourcePolicy.maximumGridStreams) {
                     checked[which] = false
                     (target as AlertDialog).listView.setItemChecked(which, false)
-                    Toast.makeText(this, R.string.iptv_grid_maximum, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(
+                            R.string.iptv_grid_maximum,
+                            deviceResourcePolicy.maximumGridStreams,
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             }
             .setPositiveButton(R.string.iptv_grid_start, null)
             .setNegativeButton(R.string.close, null)
             .create()
         fun startSelectedGrid() {
-            val selected = choices.filterIndexed { index, _ -> checked[index] }.take(4)
+            val selected = choices.filterIndexed { index, _ -> checked[index] }
+                .take(deviceResourcePolicy.maximumGridStreams)
             if (selected.isEmpty()) {
                 Toast.makeText(this, R.string.iptv_grid_empty, Toast.LENGTH_SHORT).show()
             } else {
@@ -3131,7 +3178,7 @@ class MainActivity : TvRemoteActivity() {
         if (multiViewActive) stopMultiView()
         stopIptvOverlay()
         gridReturnChannel = currentChannel
-        gridChannels = selected.take(4)
+        gridChannels = selected.take(deviceResourcePolicy.maximumGridStreams)
         gridActiveIndex = 0
         gridFullscreenIndex = null
         iptvGridActive = true
@@ -3793,6 +3840,10 @@ class MainActivity : TvRemoteActivity() {
 
     private fun startMultiView(channel: LiveChannel) {
         val playing = currentChannel ?: return
+        if (!deviceResourcePolicy.supportsMultiView) {
+            Toast.makeText(this, R.string.multiview_device_limit, Toast.LENGTH_LONG).show()
+            return
+        }
         if (playing.sourceKey == channel.sourceKey) {
             Toast.makeText(this, R.string.multiview_select_iptv, Toast.LENGTH_SHORT).show()
             return
@@ -4363,40 +4414,45 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showChannelPanel(expanded: Boolean) {
+        android.os.Trace.beginSection("channel_panel_open")
         val openedAt = SystemClock.elapsedRealtime()
-        if (binding.channelPanel.visibility != View.VISIBLE) {
-            focusedAutoTunePreviousChannel = null
-            focusedAutoTuneTargetKey = null
-        }
-        channelPanelExpanded = expanded
-        binding.channelPanel.visibility = View.VISIBLE
-        binding.sourceFilterRow.visibility = View.GONE
-        binding.advancedFilterRow.visibility = if (
-            expanded && channelPanelContent == ChannelPanelContent.NORMAL
-        ) View.VISIBLE else View.GONE
-        binding.channelList.setPadding(
-            (resources.displayMetrics.widthPixels * LIST_HORIZONTAL_PADDING_FRACTION).toInt(),
-            0,
-            (resources.displayMetrics.widthPixels * LIST_HORIZONTAL_PADDING_FRACTION).toInt(),
-            if (expanded) {
-                (resources.displayMetrics.heightPixels * EXPANDED_LIST_BOTTOM_PADDING_FRACTION)
-                    .toInt()
-            } else {
-                (resources.displayMetrics.heightPixels * VERTICAL_MARGIN_FRACTION).toInt()
-            },
-        )
-        applyPanelGeometry()
-        showInfoBar()
-        focusCurrentListChannel()
-        binding.channelList.post {
-            loadVisiblePrograms()
-            recordPerformance(
-                "channel_panel_open",
-                openedAt,
-                "count=${adapter.itemCount}, content=$channelPanelContent",
+        try {
+            if (binding.channelPanel.visibility != View.VISIBLE) {
+                focusedAutoTunePreviousChannel = null
+                focusedAutoTuneTargetKey = null
+            }
+            channelPanelExpanded = expanded
+            binding.channelPanel.visibility = View.VISIBLE
+            binding.sourceFilterRow.visibility = View.GONE
+            binding.advancedFilterRow.visibility = if (
+                expanded && channelPanelContent == ChannelPanelContent.NORMAL
+            ) View.VISIBLE else View.GONE
+            binding.channelList.setPadding(
+                (resources.displayMetrics.widthPixels * LIST_HORIZONTAL_PADDING_FRACTION).toInt(),
+                0,
+                (resources.displayMetrics.widthPixels * LIST_HORIZONTAL_PADDING_FRACTION).toInt(),
+                if (expanded) {
+                    (resources.displayMetrics.heightPixels * EXPANDED_LIST_BOTTOM_PADDING_FRACTION)
+                        .toInt()
+                } else {
+                    (resources.displayMetrics.heightPixels * VERTICAL_MARGIN_FRACTION).toInt()
+                },
             )
+            applyPanelGeometry()
+            showInfoBar()
+            focusCurrentListChannel()
+            binding.channelList.post {
+                loadVisiblePrograms()
+                recordPerformance(
+                    "channel_panel_open",
+                    openedAt,
+                    "count=${adapter.itemCount}, content=$channelPanelContent",
+                )
+            }
+            scheduleChannelPanelClose()
+        } finally {
+            android.os.Trace.endSection()
         }
-        scheduleChannelPanelClose()
     }
 
     private fun hideChannelPanel() {
@@ -5286,6 +5342,19 @@ class MainActivity : TvRemoteActivity() {
         secondaryIptvPlayback.release()
         gridControllers.forEach(IptvPlaybackController::release)
         super.onDestroy()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        ChannelLogoLoader.trimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            when {
+                iptvGridActive -> stopIptvGrid(resumePrevious = true)
+                multiViewActive -> stopMultiView()
+                iptvOverlayActive -> stopIptvOverlay()
+            }
+            debugLog.recordDebug("MEMORY_PRESSURE | level=$level, secondaryPlaybackStopped=true")
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
