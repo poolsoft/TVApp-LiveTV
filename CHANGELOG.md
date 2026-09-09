@@ -55,6 +55,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * OSD kapalıyken Sol ok artık kanal değiştirmiyor; Back son kanallar kartını açıyor. Last Channel kısa basışta önceki kanala geçiyor, uzun basışta son kanallar kartını açıyor.
 
 ### TIF ve EPG tanılama
+* Program Rehberi bütün kanalları solda, süreyle orantılı programları ortak saat cetvelinde sağda gösteren çok kanallı grid düzenine geçirildi. Seçili programın tam açıklaması alttaki kaydırılabilir panelde gösteriliyor.
+* Rehber yalnız odak çevresindeki kanal penceresinin programlarını yükler; hızlı gezinmede eski EPG isteği iptal edilir ve boş bir kanalın sonucu diğer kanal satırlarını kapatmaz.
 * Infobar, kanal listesi ve rehber aynı süreç geneli EPG snapshot önbelleğini kullanıyor. Bulunan program bitiş sınırına kadar, boş sonuç iki saniye saklanıyor; TIF/XMLTV sorgu süreleri ve cache isabetleri debug performans loguna yazılıyor.
 * XMLTV eşleştirme editörü kesin `tvg-id`, kesin kanal adı, normalize edilmiş ad ve elle eşleşmeyi ayrı güven düzeyleriyle gösteriyor; belirsiz yinelenen adaylar otomatik eşleştirilmiyor.
 * Program Rehberi sabit kanal kolonu, süreyle orantılı yatay program zaman çizelgesi, yarım saatlik zaman cetveli ve kalıcı açıklama paneliyle yenilendi. Çizelgede Sol/Sağ program, Yukarı/Aşağı kanal değiştiriyor ve aynı zaman noktası korunuyor.

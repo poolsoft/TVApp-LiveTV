@@ -28,7 +28,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Kanal listesi, infobar, EPG, ses ve altyazı seçimi kumandayla kullanılabilir.
 - Ana yayında Back tuşu son 5 kanal şeridini açar; LAST CHANNEL/RECALL önceki kanala doğrudan döner.
 - IPTV oynatma çubuğunda Yukarı/Aşağı zaman çizgisi ile işlem satırı arasında geçer; CH+/CH- kanalı değiştirir. Normal buffer doldurma ilk yükleme ve gerçek yeniden denemeden ayrı gösterilir.
-- EPG'de gelecek bir programa uzun OK ile hatırlatıcı kurulabilir; program başlayınca bildirim gösterilir ve bildirime basınca kanala geçilir. Hatırlatıcılar yeniden başlatmada korunur.
+- Program rehberi bütün kanalları ortak saat cetvelinde satır satır gösterir. Yukarı/Aşağı kanal, Sol/Sağ program değiştirir; INFO seçili programın kaydırılabilir tam açıklamasına geçer. Gelecek bir programa uzun OK ile hatırlatıcı kurulabilir.
 - Son kanal, önceki kanal ve izleme geçmişi yerel olarak saklanır.
 
 ### IPTV

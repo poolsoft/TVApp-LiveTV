@@ -18,14 +18,12 @@
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="14dp">
+            android:paddingHorizontal="24dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:letterSpacing="0.04"
                 android:text="@string/program_guide"
                 android:textColor="@color/text_primary"
                 android:textSize="22sp"
@@ -36,7 +34,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="18dp"
-                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/accent"
                 android:textSize="13sp" />
 
@@ -44,15 +41,81 @@
                 android:id="@+id/guide_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/accent"
                 android:textSize="15sp" />
         </LinearLayout>
 
-        <View
+        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#263E52" />
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#1E2A36" />
+            android:layout_height="78dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="38"
+                android:gravity="bottom"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="12dp"
+                android:text="@string/channels"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#263E52" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="62"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp">
+
+                    <TextView
+                        android:id="@+id/selected_channel_number"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/accent"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/selected_channel_name"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/timeline_ruler"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:background="#26000000"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="6dp">
+
+                    <TextView android:id="@+id/timeline_time_0" style="@style/GuideTimelineTime" />
+                    <TextView android:id="@+id/timeline_time_1" style="@style/GuideTimelineTime" />
+                    <TextView android:id="@+id/timeline_time_2" style="@style/GuideTimelineTime" />
+                    <TextView android:id="@+id/timeline_time_3" style="@style/GuideTimelineTime" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -64,185 +127,109 @@
                 android:id="@+id/guide_channel_column"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="46"
-                android:background="@android:color/transparent"
+                android:layout_weight="38"
                 android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:letterSpacing="0.06"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:text="@string/channels"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/guide_channel_list"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
+                    android:layout_height="match_parent"
                     android:clipToPadding="false"
                     android:descendantFocusability="afterDescendants"
                     android:focusable="true"
                     android:overScrollMode="never"
-                    android:paddingBottom="16dp" />
+                    android:paddingBottom="10dp" />
             </LinearLayout>
 
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="#263E52" />
+            <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#263E52" />
 
-            <LinearLayout
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="54"
-                android:background="#14000000"
-                android:orientation="vertical">
+                android:layout_weight="62"
+                android:background="#14000000">
 
-                <LinearLayout
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/program_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="true"
+                    android:overScrollMode="never"
+                    android:paddingBottom="10dp" />
+
+                <TextView
+                    android:id="@+id/empty_programs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:padding="24dp"
+                    android:text="@string/no_epg_data"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/program_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#E915181C"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="11dp">
+
+            <TextView
+                android:id="@+id/detail_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/detail_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/accent"
+                android:textSize="13sp" />
+
+            <ScrollView
+                android:id="@+id/detail_description_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_guide_detail_scroll"
+                android:fadeScrollbars="false"
+                android:focusable="true"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:scrollbars="vertical">
+
+                <TextView
+                    android:id="@+id/detail_description"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="18dp"
-                    android:paddingVertical="12dp">
+                    android:lineSpacingMultiplier="1.15"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </ScrollView>
 
-                    <TextView
-                        android:id="@+id/selected_channel_number"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textColor="@color/accent"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/selected_channel_name"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#263E52" />
-
-                <LinearLayout
-                    android:id="@+id/timeline_ruler"
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:background="#26000000"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="12dp">
-
-                    <TextView
-                        android:id="@+id/timeline_time_0"
-                        style="@style/GuideTimelineTime" />
-
-                    <TextView
-                        android:id="@+id/timeline_time_1"
-                        style="@style/GuideTimelineTime" />
-
-                    <TextView
-                        android:id="@+id/timeline_time_2"
-                        style="@style/GuideTimelineTime" />
-
-                    <TextView
-                        android:id="@+id/timeline_time_3"
-                        style="@style/GuideTimelineTime" />
-                </LinearLayout>
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1">
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/program_list"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:clipToPadding="false"
-                        android:descendantFocusability="afterDescendants"
-                        android:focusable="true"
-                        android:overScrollMode="never"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="10dp" />
-
-                    <TextView
-                        android:id="@+id/empty_programs"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:gravity="center"
-                        android:padding="24dp"
-                        android:text="@string/no_epg_data"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="15sp"
-                        android:visibility="gone" />
-                </FrameLayout>
-
-                <LinearLayout
-                    android:id="@+id/program_detail"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="#2A000000"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="20dp"
-                    android:paddingVertical="14dp">
-
-                    <TextView
-                        android:id="@+id/detail_title"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_primary"
-                        android:textSize="17sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/detail_time"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textColor="@color/accent"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/detail_description"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:ellipsize="end"
-                        android:lineSpacingMultiplier="1.2"
-                        android:maxLines="3"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/guide_control_hints"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:fontFamily="sans-serif"
-                        android:gravity="end"
-                        android:text="@string/guide_control_hints"
-                        android:textColor="#7A8B9C"
-                        android:textSize="11sp" />
-                </LinearLayout>
-            </LinearLayout>
+            <TextView
+                android:id="@+id/guide_control_hints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:gravity="end"
+                android:text="@string/guide_control_hints"
+                android:textColor="#7A8B9C"
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>
