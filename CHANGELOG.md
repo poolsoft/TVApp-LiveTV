@@ -334,3 +334,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * Google TV Home "Son İzlenen Kanallar" satırı entegrasyonu.
 * Sürümlü JSON dosyası olarak tüm ayarları ve kanal düzenini yedekleme/geri yükleme (Backup & Restore).
 * GitHub Actions üzerinden otomatik derleme (`dev-r<run>`) ve uygulama içi SHA-256 kontrollü self-update.
+## Unreleased
+
+- UIINPUT grubunu tamamladık: remote olay sahipliği için `RemoteActionRouter`, güvenli Back/dialog yönlendirmesi ve Android TV UiAutomator smoke testleri eklendi.
+- Ayarlar Görünüm ve Kanal sekmelerine video üstü canlı görünüm önizlemesi eklendi; ortak odak çerçevesi, renk eylemi ve ikon yuvası bileşenleri kullanıma alındı.

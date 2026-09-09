@@ -115,20 +115,20 @@ P1 yüksek, P2 normal, P3 sonraki sürüm.
   tek koordinatöre taşı.
   **Kabul:** Aynı anda çakışan birincil OSD yok; görünürlük değişimi tek noktadan yapılır.
 
-- [ ] **UIINPUT-002 (P0): RemoteActionRouter**
+- [x] **UIINPUT-002 (P0): RemoteActionRouter**
   Kısa/uzun tuş, Back, medya, yön, kanal ve renk eylemlerini UI durumuna göre yönlendir.
   **Kabul:** Eylem tablosu birim testli; dialog odaktayken tuş arkadaki ekrana gitmez.
 
-- [ ] **UIINPUT-003 (P0): UiAutomator kumanda testleri**
+- [x] **UIINPUT-003 (P0): UiAutomator kumanda testleri**
   Kanal listesi, editor, EPG, IPTV seek, PIN, son kanallar, grid ve Multi View senaryolarını ekle.
   **Kabul:** Kritik akışlar emülatörde tek komutla tekrar edilebilir.
 
-- [ ] **UIINPUT-004 (P1): Ortak TV görsel bileşenleri**
+- [x] **UIINPUT-004 (P1): Ortak TV görsel bileşenleri**
   Focus çerçevesi, teknik ikon slotu, renk eylemi, dialog satırı, panel ve safe-area ölçülerini
   ortaklaştır.
   **Kabul:** İsteğe bağlı ikonlar satırı kaydırmaz; 720p/1080p/4K ekran görüntüleri tutarlıdır.
 
-- [ ] **UIINPUT-005 (P2): Ayarlar canlı önizlemesi**
+- [x] **UIINPUT-005 (P2): Ayarlar canlı önizlemesi**
   Infobar/panel konumu ve saydamlığı değişirken video üstünde örnek göster.
   **Kabul:** Ayar uygulanmadan sonucu görülebilir; video kapanmaz.
 
