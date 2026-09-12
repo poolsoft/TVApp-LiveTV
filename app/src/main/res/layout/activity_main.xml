@@ -767,7 +767,7 @@
                     android:background="@drawable/bg_iptv_control"
                     android:clickable="true"
                     android:contentDescription="@string/iptv_playback_engine"
-                    android:drawableStart="@drawable/ic_source_iptv"
+                    android:drawableStart="@drawable/ic_engine_small"
                     android:drawablePadding="2dp"
                     android:focusable="true"
                     android:gravity="center"
