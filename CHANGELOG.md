@@ -6,6 +6,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV kaynak yenileme performansı
+* Kaynak yenilemede mevcut kanal kimliğini çözme sırası indeksli `tvg-id` ve normalize ad/grup anahtarlarını önce kullanacak şekilde düzenlendi; değişmeyen listelerde pahalı ad taraması büyük ölçüde kaldırıldı.
+* IPTV kanallarına `(sourceId, tvgId)` bileşik indeksi ekleyen Room 17→18 migration oluşturuldu. Migration mevcut kaynakları, seçili kanalları ve kullanıcı sıralamasını korur.
+
 ### Kanal listesi metin yerleşimi
 * Kanal adı üst satırın tamamını kullanacak şekilde genişletildi; kanal türü, üyelik ve kilit simgeleri EPG satırının sağına taşındı. Seri kanal adlarının ayırt edici son bölümleri için daha fazla alan açıldı.
 * Kanal listesi başlığındaki sabit genişlik kaldırıldı; başlık sağdaki sayaç, arama ve kaynak simgelerine kadar kullanılabilir alanı dinamik olarak dolduruyor.

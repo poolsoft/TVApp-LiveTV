@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -54,6 +54,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_14_15,
                 MIGRATION_15_16,
                 MIGRATION_16_17,
+                MIGRATION_17_18,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
@@ -326,6 +327,15 @@ abstract class TVAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS " +
                         "`index_iptv_channel_staging_sessionId_resolvedSourceKey` " +
                         "ON `iptv_channel_staging` (`sessionId`, `resolvedSourceKey`)",
+                )
+            }
+        }
+
+        internal val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_tvgId` " +
+                        "ON `iptv_channels` (`sourceId`, `tvgId`)",
                 )
             }
         }

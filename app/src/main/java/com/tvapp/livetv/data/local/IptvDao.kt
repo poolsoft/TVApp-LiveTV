@@ -408,6 +408,13 @@ interface IptvDao {
             "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
             "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
             "WHERE old.sourceId = :sourceId " +
+            "AND old.matchKey = iptv_channel_staging.matchKey) " +
+            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
+            "AND old.matchKey = iptv_channel_staging.matchKey " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
+            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId " +
             "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
             "AND TRIM(COALESCE(old.groupTitle, '')) = " +
             "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE) " +
@@ -416,13 +423,6 @@ interface IptvDao {
             "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
             "AND TRIM(COALESCE(old.groupTitle, '')) = " +
             "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE " +
-            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
-            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND old.matchKey = iptv_channel_staging.matchKey) " +
-            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND old.matchKey = iptv_channel_staging.matchKey " +
             "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
             "ELSE 'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash END " +
             "WHERE sessionId = :sessionId",

@@ -22,6 +22,7 @@ import androidx.room.PrimaryKey
         Index(value = ["sourceId", "originalIndex"]),
         Index(value = ["sourceId", "contentType", "originalIndex"]),
         Index(value = ["sourceId", "contentType", "groupTitle", "originalIndex"]),
+        Index(value = ["sourceId", "tvgId"]),
         Index(value = ["sourceId", "matchKey"]),
     ],
 )
