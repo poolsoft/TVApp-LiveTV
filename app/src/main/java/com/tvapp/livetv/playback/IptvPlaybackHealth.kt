@@ -4,6 +4,53 @@ enum class IptvPlaybackPhase { IDLE, PREPARING, BUFFERING, READY, ENDED, FAILED,
 
 enum class IptvPlaybackFailureClass { NETWORK, HTTP, DECODER, SOURCE, TIMEOUT, UNKNOWN }
 
+enum class IptvRecoveryReason {
+    FIRST_FRAME_TIMEOUT,
+    BUFFERING_TIMEOUT,
+    PLAYBACK_STALLED,
+    LIVE_STREAM_ENDED,
+}
+
+enum class IptvRecoveryAction { REPREPARE, EXHAUSTED }
+
+data class IptvRecoveryEvent(
+    val reason: IptvRecoveryReason,
+    val action: IptvRecoveryAction,
+    val attempt: Int,
+)
+
+internal data class IptvWatchdogObservation(
+    val expectsVideo: Boolean,
+    val firstFrameRendered: Boolean,
+    val startupMillis: Long,
+    val isIdle: Boolean,
+    val isBuffering: Boolean,
+    val bufferingMillis: Long,
+    val isReadyAndPlaying: Boolean,
+    val stalledProgressMillis: Long,
+    val staleFrameMillis: Long?,
+)
+
+internal fun decideIptvWatchdogReason(
+    observation: IptvWatchdogObservation,
+    firstFrameTimeoutMillis: Long,
+    bufferingTimeoutMillis: Long,
+    stallTimeoutMillis: Long,
+): IptvRecoveryReason? = when {
+    observation.expectsVideo &&
+        !observation.firstFrameRendered &&
+        !observation.isIdle &&
+        observation.startupMillis >= firstFrameTimeoutMillis ->
+        IptvRecoveryReason.FIRST_FRAME_TIMEOUT
+    observation.isBuffering && observation.bufferingMillis >= bufferingTimeoutMillis ->
+        IptvRecoveryReason.BUFFERING_TIMEOUT
+    observation.isReadyAndPlaying &&
+        observation.stalledProgressMillis >= stallTimeoutMillis &&
+        (observation.staleFrameMillis == null || observation.staleFrameMillis >= stallTimeoutMillis) ->
+        IptvRecoveryReason.PLAYBACK_STALLED
+    else -> null
+}
+
 data class IptvPlaybackHealthSnapshot(
     val phase: IptvPlaybackPhase = IptvPlaybackPhase.IDLE,
     val contentKind: IptvContentKind = IptvContentKind.UNKNOWN,

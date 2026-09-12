@@ -55,6 +55,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - M3U `catchup-source`/`catchup-days` ve Xtream arşiv bilgisi olan kanallarda geçmiş EPG programları saat simgesiyle gösterilir; `OK` arşivi oynatır, kırmızı eylem canlı yayına döner.
 - Mavi oynatıcı eylemi üzerinden kalite, ekrana sığdırma/doldurma/yakınlaştırma ve harici oynatıcı seçilebilir.
 - Geçici IPTV oynatma hataları 1, 2 ve 4 saniyelik aralıklarla otomatik yeniden denenir; aynı kanala ait alternatif akış bulunursa sıradaki URL denenir.
+- IPTV watchdog'u ilk kare gelmemesi, uzun buffer, görüntünün donması ve canlı akışın beklenmedik bitmesini ayırır. Kurtarma denemeleri sınırlıdır; kanal değiştirildiğinde eski denemeler iptal edilir ve radyo yayınları video hatası sayılmaz.
 
 ### Ekran ve sistem entegrasyonu
 

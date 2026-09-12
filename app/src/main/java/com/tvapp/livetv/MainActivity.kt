@@ -61,6 +61,7 @@ import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvBufferingState
 import com.tvapp.livetv.playback.IptvPlaybackProfile
 import com.tvapp.livetv.playback.IptvPlaybackHealthSnapshot
+import com.tvapp.livetv.playback.IptvRecoveryAction
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
@@ -140,7 +141,6 @@ class MainActivity : TvRemoteActivity() {
         private const val IPTV_CONTROLS_BOTTOM_MARGIN_FRACTION = 0.045f
         private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
         private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
-        private const val IPTV_STALL_TIMEOUT_MS = 15_000L
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
         private const val EPG_FOCUS_DEBOUNCE_MS = 300L
         private const val EPG_LIST_WINDOW_RADIUS = 5
@@ -578,6 +578,18 @@ class MainActivity : TvRemoteActivity() {
                             "error=${health.lastErrorCode ?: "none"}",
                     )
                 }
+            }
+        }
+        iptvPlayback.onRecovery = { recovery ->
+            val channelId = currentChannel?.takeIf { it.source == LiveChannel.Source.IPTV }?.id ?: -1L
+            lifecycleScope.launch(Dispatchers.IO) {
+                debugLog.recordDebug(
+                    "IPTV_RECOVERY | channelId=$channelId, reason=${recovery.reason}, " +
+                        "action=${recovery.action}, attempt=${recovery.attempt}",
+                )
+            }
+            if (recovery.action == IptvRecoveryAction.REPREPARE) {
+                showIptvNotice(R.string.iptv_reconnecting)
             }
         }
         binding.channelSearchButton.setOnClickListener { showChannelSearchDialog() }
@@ -1481,10 +1493,7 @@ class MainActivity : TvRemoteActivity() {
                 delay(IPTV_PLAYBACK_CHECK_INTERVAL_MS)
                 when (kind) {
                     IptvContentKind.LIVE -> {
-                        if (iptvPlayback.recoverIfStalled(IPTV_STALL_TIMEOUT_MS)) {
-                            debugLog.recordDebug("IPTV_STALL_RECOVERED | channel=$sourceKey")
-                            showIptvNotice(R.string.iptv_reconnecting)
-                        } else if (
+                        if (
                             !iptvManualTimeshift &&
                             iptvPlayback.catchUpToLive(IPTV_MAX_LIVE_OFFSET_MS)
                         ) {

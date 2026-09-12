@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV donma algılama ve kontrollü kurtarma
+* İlk video karesi gelmemesi, uzun süren buffer, ilerlemesi duran oynatma ve beklenmedik canlı yayın sonu ayrı nedenler olarak izleniyor; radyo yayınları video karesi beklemediği için yanlış hata sayılmıyor.
+* Kurtarma aynı oynatma oturumunda iki kontrollü yeniden hazırlamayla sınırlandırıldı; sonuç alınamazsa mevcut alternatif akış zincirine geçiliyor ve sonsuz yeniden bağlanma döngüsü önleniyor.
+* Kanal değişimi, durdurma ve oynatıcı kapatma eski watchdog ve retry işlerini iptal ediyor. Kurtarma nedeni, eylemi ve deneme sayısı özel yayın adresi içermeden debug loguna yazılıyor.
+
 ### IPTV liste içe aktarma
 * PHP tabanlı liste adreslerinin göreli adresler dahil HTTP 301/302/303/307/308 yönlendirmeleri sınırlı ve güvenli biçimde izleniyor.
 * Büyük dosya aktarımlarının son eşleştirme aşamasına bileşik hazırlama indeksi eklendi; 15.000 civarı kayıtta yinelenen tam tablo taramaları kaldırıldı.

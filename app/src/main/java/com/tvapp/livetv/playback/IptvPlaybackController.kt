@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
+import com.tvapp.livetv.ui.isRadioChannel
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -53,6 +54,9 @@ class IptvPlaybackController(
     @Volatile private var lastFrameAt: Long? = null
     private var lastErrorCode: String? = null
     private var lastFailureClass: IptvPlaybackFailureClass? = null
+    private var recoveryAttempt = 0
+    private var recoveryExhausted = false
+    private var bufferingStartedAt: Long? = null
     private val playbackPreferencesStore = IptvPlaybackPreferencesStore(appContext)
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
@@ -60,9 +64,18 @@ class IptvPlaybackController(
     private val retryRunnable = Runnable {
         player?.let { current ->
             explicitLoading = true
+            tuneStartedAt = SystemClock.elapsedRealtime()
+            bufferingStartedAt = null
             updateHealthPhase(IptvPlaybackPhase.PREPARING)
             current.prepare()
             current.playWhenReady = true
+        }
+    }
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (released || currentChannel == null) return
+            evaluateWatchdog(SystemClock.elapsedRealtime())?.let(::recoverFromWatchdog)
+            retryHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
         }
     }
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
@@ -71,11 +84,13 @@ class IptvPlaybackController(
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
     var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
+    var onRecovery: ((IptvRecoveryEvent) -> Unit)? = null
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
         released = false
         retryHandler.removeCallbacks(retryRunnable)
+        retryHandler.removeCallbacks(watchdogRunnable)
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
@@ -96,6 +111,9 @@ class IptvPlaybackController(
         lastFrameAt = null
         lastErrorCode = null
         lastFailureClass = null
+        recoveryAttempt = 0
+        recoveryExhausted = false
+        bufferingStartedAt = null
         resetProgressObservation()
         healthPhase = IptvPlaybackPhase.PREPARING
         val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
@@ -135,6 +153,7 @@ class IptvPlaybackController(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
+                            if (bufferingStartedAt == null) bufferingStartedAt = SystemClock.elapsedRealtime()
                             updateHealthPhase(IptvPlaybackPhase.BUFFERING)
                             onBuffering?.invoke(
                                 if (!hasReachedReady || explicitLoading) IptvBufferingState.LOADING
@@ -142,6 +161,7 @@ class IptvPlaybackController(
                             )
                         }
                         Player.STATE_READY -> {
+                            bufferingStartedAt = null
                             retryHandler.removeCallbacks(retryRunnable)
                             retryCount = 0
                             hasReachedReady = true
@@ -152,6 +172,7 @@ class IptvPlaybackController(
                             onContentKindChanged?.invoke(contentKind())
                         }
                         Player.STATE_ENDED, Player.STATE_IDLE -> {
+                            bufferingStartedAt = null
                             updateHealthPhase(
                                 if (playbackState == Player.STATE_ENDED) {
                                     IptvPlaybackPhase.ENDED
@@ -160,6 +181,16 @@ class IptvPlaybackController(
                                 },
                             )
                             onBuffering?.invoke(IptvBufferingState.NONE)
+                            if (
+                                playbackState == Player.STATE_ENDED &&
+                                !currentChannel?.iptvContentType.equals("VOD", ignoreCase = true)
+                            ) {
+                                retryHandler.post {
+                                    if (!released && currentChannel != null) {
+                                        recoverFromWatchdog(IptvRecoveryReason.LIVE_STREAM_ENDED)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -186,6 +217,8 @@ class IptvPlaybackController(
                     val now = SystemClock.elapsedRealtime()
                     if (firstFrameAt == null) firstFrameAt = now
                     lastFrameAt = now
+                    recoveryAttempt = 0
+                    recoveryExhausted = false
                     onHealthChanged?.invoke(healthSnapshot())
                 }
             })
@@ -226,16 +259,19 @@ class IptvPlaybackController(
         exoPlayer.prepare()
         exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
+        retryHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
         onHealthChanged?.invoke(healthSnapshot())
     }
 
     fun stop() {
         retryHandler.removeCallbacks(retryRunnable)
+        retryHandler.removeCallbacks(watchdogRunnable)
         retryCount = 0
         onBuffering?.invoke(IptvBufferingState.NONE)
         player?.stop()
         player?.clearMediaItems()
         currentChannel = null
+        bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.IDLE)
     }
 
@@ -294,6 +330,8 @@ class IptvPlaybackController(
         val current = player ?: return false
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
+        recoveryAttempt = 0
+        recoveryExhausted = false
         explicitLoading = true
         current.prepare()
         current.playWhenReady = true
@@ -307,34 +345,6 @@ class IptvPlaybackController(
         if (offset == C.TIME_UNSET || offset <= maximumOffsetMillis) return false
         current.seekToDefaultPosition()
         current.play()
-        return true
-    }
-
-    fun recoverIfStalled(maximumStallMillis: Long): Boolean {
-        val current = player ?: return false
-        val now = SystemClock.elapsedRealtime()
-        if (
-            !current.playWhenReady ||
-            current.playbackState == Player.STATE_IDLE ||
-            current.playbackState == Player.STATE_ENDED ||
-            current.playbackState == Player.STATE_BUFFERING
-        ) {
-            lastObservedPosition = current.currentPosition
-            lastProgressAt = now
-            return false
-        }
-        val position = current.currentPosition
-        if (lastObservedPosition == C.TIME_UNSET || position - lastObservedPosition >= 500L) {
-            lastObservedPosition = position
-            lastProgressAt = now
-            return false
-        }
-        if (now - lastProgressAt < maximumStallMillis) return false
-        if (current.isCurrentMediaItemLive) current.seekToDefaultPosition()
-        else current.seekTo(position)
-        current.prepare()
-        current.play()
-        resetProgressObservation()
         return true
     }
 
@@ -547,6 +557,7 @@ class IptvPlaybackController(
     fun release() {
         released = true
         retryHandler.removeCallbacks(retryRunnable)
+        retryHandler.removeCallbacks(watchdogRunnable)
         onBuffering?.invoke(IptvBufferingState.NONE)
         playerView.player = null
         player?.release()
@@ -554,6 +565,7 @@ class IptvPlaybackController(
         trackSelector = null
         mediaSourceFactory = null
         currentChannel = null
+        bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.RELEASED)
     }
 
@@ -603,6 +615,70 @@ class IptvPlaybackController(
         lastProgressAt = SystemClock.elapsedRealtime()
     }
 
+    private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
+        val current = player ?: return null
+        val channel = currentChannel ?: return null
+        if (recoveryExhausted || !current.playWhenReady || current.playbackState == Player.STATE_ENDED) {
+            return null
+        }
+        val bufferingFor = bufferingStartedAt?.let { now - it } ?: 0L
+        val position = current.currentPosition
+        val progressAdvanced = lastObservedPosition == C.TIME_UNSET ||
+            position - lastObservedPosition >= MIN_PROGRESS_MS
+        if (progressAdvanced) {
+            lastObservedPosition = position
+            lastProgressAt = now
+            if (firstFrameAt != null || channel.isRadioChannel()) {
+                recoveryAttempt = 0
+                recoveryExhausted = false
+            }
+        }
+        return decideIptvWatchdogReason(
+            observation = IptvWatchdogObservation(
+                expectsVideo = !channel.isRadioChannel(),
+                firstFrameRendered = firstFrameAt != null,
+                startupMillis = now - tuneStartedAt,
+                isIdle = current.playbackState == Player.STATE_IDLE,
+                isBuffering = current.playbackState == Player.STATE_BUFFERING,
+                bufferingMillis = bufferingFor,
+                isReadyAndPlaying = current.playbackState == Player.STATE_READY && current.isPlaying,
+                stalledProgressMillis = if (progressAdvanced) 0L else now - lastProgressAt,
+                staleFrameMillis = lastFrameAt?.let { now - it },
+            ),
+            firstFrameTimeoutMillis = FIRST_FRAME_TIMEOUT_MS,
+            bufferingTimeoutMillis = BUFFERING_TIMEOUT_MS,
+            stallTimeoutMillis = STALL_TIMEOUT_MS,
+        )
+    }
+
+    private fun recoverFromWatchdog(reason: IptvRecoveryReason) {
+        val current = player ?: return
+        recoveryAttempt++
+        if (recoveryAttempt > MAX_WATCHDOG_RECOVERY_COUNT) {
+            recoveryExhausted = true
+            onRecovery?.invoke(
+                IptvRecoveryEvent(reason, IptvRecoveryAction.EXHAUSTED, recoveryAttempt - 1),
+            )
+            onPlaybackError?.invoke(
+                PlaybackException(
+                    "IPTV watchdog exhausted: $reason",
+                    IllegalStateException("IPTV watchdog exhausted: $reason"),
+                    PlaybackException.ERROR_CODE_TIMEOUT,
+                ),
+            )
+            return
+        }
+        onRecovery?.invoke(IptvRecoveryEvent(reason, IptvRecoveryAction.REPREPARE, recoveryAttempt))
+        explicitLoading = false
+        bufferingStartedAt = SystemClock.elapsedRealtime()
+        updateHealthPhase(IptvPlaybackPhase.BUFFERING)
+        if (current.isCurrentMediaItemLive) current.seekToDefaultPosition()
+        current.prepare()
+        current.playWhenReady = true
+        resetProgressObservation()
+        tuneStartedAt = SystemClock.elapsedRealtime()
+    }
+
     private fun updateHealthPhase(phase: IptvPlaybackPhase) {
         if (healthPhase == phase) return
         healthPhase = phase
@@ -617,6 +693,12 @@ class IptvPlaybackController(
         const val BUFFER_FOR_PLAYBACK_MS = 500
         const val BUFFER_AFTER_REBUFFER_MS = 2_500
         const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
+        const val WATCHDOG_INTERVAL_MS = 2_000L
+        const val FIRST_FRAME_TIMEOUT_MS = 15_000L
+        const val BUFFERING_TIMEOUT_MS = 25_000L
+        const val STALL_TIMEOUT_MS = 12_000L
+        const val MIN_PROGRESS_MS = 500L
+        const val MAX_WATCHDOG_RECOVERY_COUNT = 2
         const val ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 2_500
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000

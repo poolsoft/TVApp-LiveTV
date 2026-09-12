@@ -147,14 +147,14 @@ korumalıdır.
   **Kabul:** Sistem bilgileri ve debug logu aynı anlık görüntüyü kullanır; kimlik bilgisi veya tam
   özel URL yazılmaz; ölçüm UI thread'i bloke etmez.
 
-- [ ] **IPTVCORE-002 (P0): Donma ve görüntü gelmeme watchdog'u**
+- [x] **IPTVCORE-002 (P0): Donma ve görüntü gelmeme watchdog'u**
   İlk video karesi gelmeyen, `READY` olduğu halde görüntü üretmeyen ve oynarken ilerlemesi duran
   yayınları ayrı durumlar olarak algıla. Kanal değişimi, Back ve Activity kapanışı bekleyen bütün
   retry/watchdog işlerini iptal etmelidir.
   **Kabul:** Çalışan yayına eski timer müdahale etmez; sesli radyo yanlışlıkla görüntü hatası sayılmaz;
   donan akış kontrollü kurtarılır veya kullanıcıya kısa, işlem yapılabilir durum gösterilir.
 
-- [ ] **IPTVCORE-003 (P0): Deterministik kurtarma durum makinesi**
+- [x] **IPTVCORE-003 (P0): Deterministik kurtarma durum makinesi**
   Geçici ağ hatası, HTTP hata sınıfı, decoder hatası, canlı akış sonu ve kullanıcı yenilemesini
   farklılaştır. Sınırlı geri çekilme, aynı akışı yeniden hazırlama ve varsa alternatif akışa geçme
   sırasını tek noktadan yönet.
