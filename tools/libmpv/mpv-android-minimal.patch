@@ -1,0 +1,64 @@
+diff --git a/buildscripts/include/depinfo.sh b/buildscripts/include/depinfo.sh
+index 85b05d6..d6eb6d6 100644
+--- a/buildscripts/include/depinfo.sh
++++ b/buildscripts/include/depinfo.sh
+@@ -31,6 +31,6 @@ dep_unibreak=()
+ dep_libass=(freetype2 fontconfig fribidi harfbuzz unibreak)
+ dep_lua=()
+ dep_libplacebo=()
+ dep_curl=(mbedtls)
+-dep_mpv=(ffmpeg libass lua libplacebo curl)
++dep_mpv=(ffmpeg libass libplacebo curl)
+ dep_mpv_android=(mpv)
+diff --git a/buildscripts/scripts/ffmpeg.sh b/buildscripts/scripts/ffmpeg.sh
+index 3ba2555..f763c1a 100755
+--- a/buildscripts/scripts/ffmpeg.sh
++++ b/buildscripts/scripts/ffmpeg.sh
+@@ -31,17 +31,19 @@ args=(
+ 	--extra-cflags="-I$prefix_dir/include $cpuflags" --extra-ldflags="-L$prefix_dir/lib"
+ 
+ 	--enable-{jni,mediacodec,mbedtls,libdav1d,libxml2} --disable-vulkan
+-	--disable-static --enable-shared --enable-{gpl,version3}
++	--disable-static --enable-shared --disable-gpl --disable-version3
+ 
+-	# disable unneeded parts
+-	--disable-{stripping,doc,programs}
+-	# to keep the build lean we disable some feature quite aggressively:
+-	# - muxers, encoders: mpv-android does not have any way to use these
+-	# - devices: no practical use on Android
+-	--disable-{muxers,encoders,devices}
+-	# useful to taking screenshots
+-	--enable-encoder=mjpeg,png
+-	# useful for the `dump-cache` command
+-	--enable-muxer=mov,matroska,mpegts
++	--disable-everything
++	--disable-{stripping,doc,programs,devices,encoders,muxers}
++	--enable-{avcodec,avformat,avutil,swresample,swscale,avfilter,avdevice}
++	--enable-network
++	--enable-protocol=file,http,https,tcp,tls,crypto,udp,rtp
++	--enable-demuxer=hls,mpegts,mov,matroska,flv,aac,mp3,ac3,eac3,ogg,flac,rtsp,sdp,mpegvideo
++	--enable-parser=h264,hevc,mpegvideo,aac,aac_latm,ac3,mpegaudio,opus,vorbis
++	--enable-decoder=h264,h264_mediacodec,hevc,hevc_mediacodec,mpeg2video,mpeg2_mediacodec
++	--enable-decoder=aac,mp2,mp3,ac3,eac3,opus,vorbis,flac
++	--enable-decoder=ass,ssa,subrip,webvtt,mov_text,dvbsub,dvb_teletext
++	--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc
++	--enable-filter=scale,format,aformat,aresample
+ )
+ ../configure "${args[@]}"
+diff --git a/buildscripts/scripts/mpv.sh b/buildscripts/scripts/mpv.sh
+index 9fbcce2..376a7bb 100755
+--- a/buildscripts/scripts/mpv.sh
++++ b/buildscripts/scripts/mpv.sh
+@@ -17,8 +17,9 @@ unset CC CXX # meson wants these unset
+ 
+ meson setup $build --cross-file "$prefix_dir"/crossfile.txt \
+ 	--default-library shared \
+-	-Diconv=disabled -D{lua,libcurl}=enabled \
++	-Diconv=disabled -Dlua=disabled -Dlibcurl=enabled \
+-	-Dlibmpv=true -Dcplayer=false \
++	-Dlibmpv=true -Dcplayer=false -Dgpl=false \
+-	-Dmanpage-build=disabled
++	-Dmanpage-build=disabled \
++	-Dtests=false
+ 
+ ninja -C $build -j$cores

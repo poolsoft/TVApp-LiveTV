@@ -1,0 +1,143 @@
+name: Build experimental libmpv TVApp
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/libmpv-fallback]
+    paths:
+      - ".github/workflows/libmpv-experimental.yml"
+      - "tools/libmpv/**"
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - "gradle/**"
+      - "gradlew"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tvapp-libmpv-experimental
+  cancel-in-progress: true
+
+env:
+  MPV_ANDROID_COMMIT: 751d53205cc3d878c7161d79a97e1b65ed6ed37b
+  MPV_CORE_COMMIT: 14f2d48cbc7dda61adb4bd181e107a1f3f76e533
+  DAV1D_COMMIT: a34e0685b9111b9eb1d7835ea7bea5b425dced73
+  LIBPLACEBO_COMMIT: 3330a515d62139259c26239014f286e233bd3a5c
+  IN_CI: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout TVApp experiment
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install native build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake build-essential curl git gperf \
+            libtool meson ninja-build pkg-config python3-pip unzip
+
+      - name: Checkout and configure minimal mpv-android
+        shell: bash
+        run: |
+          git clone https://github.com/mpv-android/mpv-android.git "$RUNNER_TEMP/mpv-android"
+          git -C "$RUNNER_TEMP/mpv-android" checkout "$MPV_ANDROID_COMMIT"
+          git -C "$RUNNER_TEMP/mpv-android" apply "$GITHUB_WORKSPACE/tools/libmpv/mpv-android-minimal.patch"
+
+      - name: Cache native prefix
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/mpv-android/buildscripts/prefix
+            ${{ runner.temp }}/mpv-android/buildscripts/sdk
+          key: libmpv-minimal-v2-${{ env.MPV_ANDROID_COMMIT }}-${{ env.MPV_CORE_COMMIT }}-${{ runner.os }}
+
+      - name: Download native dependencies
+        working-directory: ${{ runner.temp }}/mpv-android/buildscripts
+        shell: bash
+        run: |
+          ./download.sh
+          git -C deps/mpv checkout "$MPV_CORE_COMMIT"
+          git -C deps/dav1d checkout "$DAV1D_COMMIT"
+          git -C deps/libplacebo checkout "$LIBPLACEBO_COMMIT"
+          git -C deps/libplacebo submodule update --init --recursive
+
+      - name: Build ARMv7 and ARM64 libmpv
+        working-directory: ${{ runner.temp }}/mpv-android/buildscripts
+        shell: bash
+        run: |
+          ./buildall.sh --arch armv7l mpv
+          ./buildall.sh --arch arm64 mpv
+          DONT_BUILD_RELEASE=1 ./buildall.sh -n mpv-android
+
+      - name: Import experimental native libraries
+        shell: bash
+        run: |
+          mkdir -p app/src/main/jniLibs/armeabi-v7a app/src/main/jniLibs/arm64-v8a
+          cp "$RUNNER_TEMP/mpv-android/app/src/main/libs/armeabi-v7a/"*.so \
+            app/src/main/jniLibs/armeabi-v7a/
+          cp "$RUNNER_TEMP/mpv-android/app/src/main/libs/arm64-v8a/"*.so \
+            app/src/main/jniLibs/arm64-v8a/
+          find app/src/main/jniLibs -name '*.so' -print -exec ls -lh {} \;
+
+      - name: Restore release keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TVAPP_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "TVAPP_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tvapp-release.jks"
+
+      - name: Test and build experimental APK
+        env:
+          TVAPP_KEYSTORE_PATH: ${{ runner.temp }}/tvapp-release.jks
+          TVAPP_KEY_ALIAS: ${{ secrets.TVAPP_KEY_ALIAS }}
+          TVAPP_KEY_PASSWORD: ${{ secrets.TVAPP_KEY_PASSWORD }}
+          TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew testLocalDebugUnitTest assembleLocalRelease
+          cp app/build/outputs/apk/local/release/app-local-release.apk TVApp-LibMpv-Experiment.apk
+
+      - name: Measure package
+        id: package
+        shell: bash
+        run: |
+          BYTES=$(stat -c '%s' TVApp-LibMpv-Experiment.apk)
+          MIB=$(awk "BEGIN { printf \"%.2f\", $BYTES / 1048576 }")
+          SHA256=$(sha256sum TVApp-LibMpv-Experiment.apk | cut -d' ' -f1)
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "mib=$MIB" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Publish experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="libmpv-r${{ github.run_number }}"
+          NOTES="Experimental ARMv7 + ARM64 minimal libmpv package. Size: ${{ steps.package.outputs.mib }} MiB. SHA-256: ${{ steps.package.outputs.sha256 }}. This prerelease is isolated from the normal TVApp updater and is not marked latest."
+          gh release create "$TAG" TVApp-LibMpv-Experiment.apk \
+            --target "$(git rev-parse HEAD)" \
+            --title "TVApp libmpv experiment r${{ github.run_number }}" \
+            --notes "$NOTES" \
+            --prerelease

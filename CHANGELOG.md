@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Deneysel libmpv dalı
+* Media3 ana oynatıcıyı değiştirmeden ARMv7 ve ARM64 minimal libmpv native paketini üreten,
+  boyutunu raporlayan ve ayrı bir GitHub prerelease yayımlayan deney workflow'u eklendi.
+* Deney öncesi Media3 + OkHttp durumu `media3-okhttp-baseline` etiketiyle korumaya alındı.
+
 ### IPTV oynatma toleransı
 * IPTV HTTP isteklerine protokoller arası yönlendirme, tarayıcı uyumlu User-Agent ve canlı
   yayınlara uygun bağlantı/okuma zaman aşımı değerleri eklendi.
