@@ -7,8 +7,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ## [Geliştirme / En Son Değişiklikler]
 
 ### IPTV oynatma toleransı
-* IPTV HTTP isteklerine protokoller arası yönlendirme, POST 302 koruması, tarayıcı uyumlu
-  User-Agent ve canlı yayınlara uygun bağlantı/okuma zaman aşımı değerleri eklendi.
+* IPTV HTTP isteklerine protokoller arası yönlendirme, tarayıcı uyumlu User-Agent ve canlı
+  yayınlara uygun bağlantı/okuma zaman aşımı değerleri eklendi.
+* IPTV oynatma ağı bağlantı havuzu, HTTP/2 ve daha tutarlı yönlendirme davranışı için Media3
+  OkHttp data source üzerine taşındı; kanal bazlı User-Agent ve Referer başlıkları korunur.
 * Progressive MPEG-TS akışlarında IDR olmayan karelere, erişim birimi algılamasına ve daha geniş
   zaman damgası aramasına izin veren ortak extractor yapılandırması ana oynatıcı ve TIF servisine uygulandı.
 * Decoder ve kaynak biçimi hataları ağ hatalarından ayrılarak harici oynatıcı fallback tetikleyicisine bağlandı.

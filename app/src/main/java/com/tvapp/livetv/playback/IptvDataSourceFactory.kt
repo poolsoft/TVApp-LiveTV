@@ -4,21 +4,19 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import com.tvapp.livetv.data.StalkerStreamUri
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 object IptvDataSourceFactory {
     fun create(userAgent: String?, referrer: String?): DataSource.Factory {
-        val http = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setKeepPostFor302Redirects(true)
-            .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
-            .setReadTimeoutMs(READ_TIMEOUT_MS)
+        val http = OkHttpDataSource.Factory(HTTP_CLIENT)
             .setUserAgent(userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
         referrer?.takeIf(String::isNotBlank)?.let {
             http.setDefaultRequestProperties(mapOf("Referer" to it))
@@ -43,4 +41,11 @@ object IptvDataSourceFactory {
     private const val DEFAULT_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    private val HTTP_CLIENT = OkHttpClient.Builder()
+        .connectTimeout(CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .readTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
+        .build()
 }
