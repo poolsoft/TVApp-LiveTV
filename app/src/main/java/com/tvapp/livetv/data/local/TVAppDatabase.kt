@@ -343,10 +343,6 @@ abstract class TVAppDatabase : RoomDatabase() {
 
         internal val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "UPDATE `iptv_channels` SET `groupTitle` = TRIM(`groupTitle`) " +
-                        "WHERE `groupTitle` IS NOT NULL",
-                )
                 db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId`")
                 db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_originalIndex`")
                 db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId_originalIndex`")

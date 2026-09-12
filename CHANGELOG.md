@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Açılışta boş ekran düzeltmesi
+* Büyük IPTV kataloglarında Room yükseltmesini kilitleyebilen toplu kategori güncellemesi
+  kaldırıldı; mevcut kanal, seçim, sıralama ve EPG verileri korunur.
+* Kanal yükleme başlangıcı debug loguna eklenerek veritabanı açılışı ile sorgu aşaması ayrıştırıldı.
+
 ### IPTV kaynak yenileme performansı
 * Kaynak yenilemede mevcut kanal kimliğini çözme sırası indeksli `tvg-id` ve normalize ad/grup anahtarlarını önce kullanacak şekilde düzenlendi; değişmeyen listelerde pahalı ad taraması büyük ölçüde kaldırıldı.
 * IPTV kanallarına `(sourceId, tvgId)` bileşik indeksi ekleyen Room 17→18 migration oluşturuldu. Migration mevcut kaynakları, seçili kanalları ve kullanıcı sıralamasını korur.

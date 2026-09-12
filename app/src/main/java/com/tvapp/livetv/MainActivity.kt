@@ -684,6 +684,9 @@ class MainActivity : TvRemoteActivity() {
     private fun loadChannels(preserveCurrentPlayback: Boolean = false) {
         val loadStartedAt = SystemClock.elapsedRealtime()
         val includeTif = experienceMode == ExperienceMode.HYBRID_TV
+        debugLog.recordDebug(
+            "CHANNEL_LOAD_START | includeTif=$includeTif, preserve=$preserveCurrentPlayback",
+        )
         val inputs = if (includeTif) repository.tunerInputs() else emptyList()
         binding.inputSummary.text = resources.getQuantityString(
             R.plurals.input_count,
