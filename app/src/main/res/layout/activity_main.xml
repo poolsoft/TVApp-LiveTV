@@ -753,6 +753,27 @@
                     android:text="@string/iptv_more_controls"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/iptv_btn_engine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_iptv_control"
+                    android:clickable="true"
+                    android:contentDescription="@string/iptv_playback_engine"
+                    android:drawableStart="@drawable/ic_source_iptv"
+                    android:drawablePadding="2dp"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
 

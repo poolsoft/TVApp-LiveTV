@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
+import com.tvapp.livetv.settings.IptvPlaybackEngineMode
 import com.tvapp.livetv.ui.isRadioChannel
 import java.util.Locale
 import tv.danmaku.ijk.media.player.misc.ITrackInfo
@@ -63,6 +64,7 @@ class IptvPlaybackController(
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
     private var vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
+    private var playbackEngineMode = playbackPreferences.engineMode
     private var muted = false
     private var usingIjk = false
     private var ijkFallbackAttempted = false
@@ -147,7 +149,6 @@ class IptvPlaybackController(
         ijkFallbackAttempted = false
         fallbackReason = null
         lastFallbackPositionMillis = 0L
-        onEngineChanged?.invoke(IptvPlaybackEngine.MEDIA3, null)
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
@@ -155,6 +156,7 @@ class IptvPlaybackController(
         playbackPreferences = playbackPreferencesStore.load()
         targetBufferSeconds = playbackPreferences.targetBufferSeconds
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
+        playbackEngineMode = playbackPreferences.engineMode
         if (player != null && previousBufferSeconds != targetBufferSeconds) {
             playerView.player = null
             player?.release()
@@ -173,6 +175,20 @@ class IptvPlaybackController(
         bufferingStartedAt = null
         resetProgressObservation()
         healthPhase = IptvPlaybackPhase.PREPARING
+        if (enableIjkFallback && playbackEngineMode == IptvPlaybackEngineMode.IJK) {
+            playerView.player = null
+            player?.release()
+            player = null
+            trackSelector = null
+            mediaSourceFactory = null
+            usingIjk = true
+            ijkFallbackAttempted = true
+            fallbackReason = DIRECT_IJK_REASON
+            onEngineChanged?.invoke(IptvPlaybackEngine.IJK, fallbackReason)
+            restartIjk(channel, startPositionMillis)
+            return
+        }
+        onEngineChanged?.invoke(IptvPlaybackEngine.MEDIA3, null)
         val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
             targetBufferSeconds * 1_000
         } else {
@@ -486,6 +502,27 @@ class IptvPlaybackController(
     }
 
     fun vodPlaybackSpeed(): Float = vodPlaybackSpeed
+
+    fun playbackEngineMode(): IptvPlaybackEngineMode = playbackEngineMode
+
+    fun activePlaybackEngine(): IptvPlaybackEngine = if (usingIjk) {
+        IptvPlaybackEngine.IJK
+    } else {
+        IptvPlaybackEngine.MEDIA3
+    }
+
+    fun setPlaybackEngineMode(mode: IptvPlaybackEngineMode): IptvPlaybackEngineMode {
+        if (profile != IptvPlaybackProfile.PRIMARY || !enableIjkFallback) return playbackEngineMode
+        if (mode == playbackEngineMode) return mode
+        val channel = currentChannel
+        val resumePosition = playbackSnapshot().positionMillis.takeIf {
+            channel?.iptvContentType.equals("VOD", ignoreCase = true)
+        } ?: 0L
+        playbackEngineMode = mode
+        playbackPreferencesStore.saveEngineMode(mode)
+        if (channel != null) play(channel, resumePosition)
+        return mode
+    }
 
     fun setVodPlaybackSpeed(speed: Float): Float {
         if (profile != IptvPlaybackProfile.PRIMARY) return vodPlaybackSpeed
@@ -860,7 +897,12 @@ class IptvPlaybackController(
     }
 
     private fun startIjkFallback(error: PlaybackException): Boolean {
-        if (!shouldUseIjkFallback(enableIjkFallback, ijkFallbackAttempted, lastFailureClass)) {
+        if (!shouldUseIjkFallback(
+                enableIjkFallback && playbackEngineMode == IptvPlaybackEngineMode.AUTO_FALLBACK,
+                ijkFallbackAttempted,
+                lastFailureClass,
+            )
+        ) {
             return false
         }
         val channel = currentChannel ?: return false
@@ -970,6 +1012,7 @@ class IptvPlaybackController(
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
         const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
+        const val DIRECT_IJK_REASON = "DIRECT_MODE"
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
         ) {

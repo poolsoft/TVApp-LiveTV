@@ -500,6 +500,11 @@
     <string name="iptv_control_speed_row">Oynatma hızı    &lt;  %1$s  &gt;</string>
     <string name="iptv_default_buffer">IPTV buffer hedefi</string>
     <string name="iptv_default_vod_speed">Varsayılan VOD hızı</string>
+    <string name="iptv_playback_engine">IPTV oynatma motoru</string>
+    <string name="iptv_engine_label">Motor</string>
+    <string name="iptv_engine_media3">Yalnız Media3</string>
+    <string name="iptv_engine_auto_fallback">Media3 + otomatik IJK</string>
+    <string name="iptv_engine_ijk">Doğrudan IJK</string>
     <string name="automatic_abr">Otomatik (ABR)</string>
     <string name="iptv_more_controls">Ses · Altyazı · Kalite</string>
     <string name="iptv_play_label">Oynat</string>

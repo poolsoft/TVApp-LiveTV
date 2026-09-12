@@ -487,6 +487,11 @@
     <string name="iptv_control_speed_row">Playback speed    &lt;  %1$s  &gt;</string>
     <string name="iptv_default_buffer">IPTV buffer target</string>
     <string name="iptv_default_vod_speed">Default VOD speed</string>
+    <string name="iptv_playback_engine">IPTV playback engine</string>
+    <string name="iptv_engine_label">Engine</string>
+    <string name="iptv_engine_media3">Media3 only</string>
+    <string name="iptv_engine_auto_fallback">Media3 + automatic IJK</string>
+    <string name="iptv_engine_ijk">Direct IJK</string>
     <string name="automatic_abr">Auto (ABR)</string>
     <string name="iptv_more_controls">Audio · Subtitles · Quality</string>
     <string name="iptv_play_label">Play</string>

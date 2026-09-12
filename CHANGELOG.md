@@ -9,6 +9,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ### Deneysel IJK fallback dalı
 * Media3 ana IPTV motoru olarak korunurken yalnız ana tam ekran oynatıcıdaki decoder ve kaynak
   biçimi hataları için bir defalık IJK fallback eklendi. Ağ ve HTTP hataları fallback tetiklemez.
+* IPTV oynatma ayarına Media3, otomatik IJK fallback ve doğrudan IJK seçenekleri eklendi. IPTV
+  medya kontrol satırı etkin motoru gösterir ve aynı seçimi kanal üzerinde doğrudan değiştirebilir.
 * Önizleme, Grid, PiP, Multi View, TIF ve TV Input Service deneyin dışında bırakıldı; oynatıcı
   değişimi mevcut TVApp infobar ve medya kontrollerini kullanmaya devam eder.
 * ARM64 ve ARMv7 içeren deney APK'sını 30 MiB sınırıyla ayrı prerelease olarak yayımlayan iş akışı eklendi.
