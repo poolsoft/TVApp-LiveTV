@@ -19,7 +19,7 @@ index 3ba2555..f763c1a 100755
  
  	--enable-{jni,mediacodec,mbedtls,libdav1d,libxml2} --disable-vulkan
 -	--disable-static --enable-shared --enable-{gpl,version3}
-+	--disable-static --enable-shared --disable-gpl --disable-version3
++	--disable-static --enable-shared --disable-gpl --enable-version3
  
 -	# disable unneeded parts
 -	--disable-{stripping,doc,programs}
