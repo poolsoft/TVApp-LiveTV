@@ -6,6 +6,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Kanal listesi metin yerleşimi
+* Kanal adı üst satırın tamamını kullanacak şekilde genişletildi; kanal türü, üyelik ve kilit simgeleri EPG satırının sağına taşındı. Seri kanal adlarının ayırt edici son bölümleri için daha fazla alan açıldı.
+* Kanal listesi başlığındaki sabit genişlik kaldırıldı; başlık sağdaki sayaç, arama ve kaynak simgelerine kadar kullanılabilir alanı dinamik olarak dolduruyor.
+
 ### IPTV donma algılama ve kontrollü kurtarma
 * İlk video karesi gelmemesi, uzun süren buffer, ilerlemesi duran oynatma ve beklenmedik canlı yayın sonu ayrı nedenler olarak izleniyor; radyo yayınları video karesi beklemediği için yanlış hata sayılmıyor.
 * Kurtarma aynı oynatma oturumunda iki kontrollü yeniden hazırlamayla sınırlandırıldı; sonuç alınamazsa mevcut alternatif akış zincirine geçiliyor ve sonsuz yeniden bağlanma döngüsü önleniyor.
