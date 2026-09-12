@@ -567,7 +567,7 @@ class IptvRepository(context: Context) {
                         displayName = item.name,
                         streamUrl = item.streamUrl,
                         logoUrl = item.logoUrl,
-                        groupTitle = item.groupTitle,
+                        groupTitle = item.groupTitle?.trim()?.takeIf(String::isNotBlank),
                         userAgent = item.userAgent,
                         referrer = item.referrer,
                         subtitleUrl = item.subtitleUrl,

@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -55,6 +55,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_15_16,
                 MIGRATION_16_17,
                 MIGRATION_17_18,
+                MIGRATION_18_19,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
@@ -336,6 +337,42 @@ abstract class TVAppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_iptv_channels_sourceId_tvgId` " +
                         "ON `iptv_channels` (`sourceId`, `tvgId`)",
+                )
+            }
+        }
+
+        internal val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "UPDATE `iptv_channels` SET `groupTitle` = TRIM(`groupTitle`) " +
+                        "WHERE `groupTitle` IS NOT NULL",
+                )
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId`")
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_originalIndex`")
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId_originalIndex`")
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channel_staging_sessionId`")
+                db.execSQL("DROP INDEX IF EXISTS `index_xmltv_programs_sourceId`")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_originalIndex_sourceKey` " +
+                        "ON `iptv_channels` (`sourceId`, `originalIndex`, `sourceKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_selected_originalIndex_sourceKey` " +
+                        "ON `iptv_channels` " +
+                        "(`sourceId`, `selected`, `originalIndex`, `sourceKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_groupTitle_originalIndex_sourceKey` " +
+                        "ON `iptv_channels` " +
+                        "(`sourceId`, `groupTitle`, `originalIndex`, `sourceKey`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_xmltv_programs_sourceId_channelId_channelName` " +
+                        "ON `xmltv_programs` (`sourceId`, `channelId`, `channelName`)",
                 )
             }
         }

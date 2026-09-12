@@ -16,10 +16,10 @@ import androidx.room.PrimaryKey
         ),
     ],
     indices = [
-        Index("sourceId"),
-        Index("originalIndex"),
         Index("selected"),
-        Index(value = ["sourceId", "originalIndex"]),
+        Index(value = ["sourceId", "originalIndex", "sourceKey"]),
+        Index(value = ["sourceId", "selected", "originalIndex", "sourceKey"]),
+        Index(value = ["sourceId", "groupTitle", "originalIndex", "sourceKey"]),
         Index(value = ["sourceId", "contentType", "originalIndex"]),
         Index(value = ["sourceId", "contentType", "groupTitle", "originalIndex"]),
         Index(value = ["sourceId", "tvgId"]),

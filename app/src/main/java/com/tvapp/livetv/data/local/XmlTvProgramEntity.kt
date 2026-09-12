@@ -7,7 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "xmltv_programs",
     indices = [
-        Index(value = ["sourceId"]),
+        Index(value = ["sourceId", "channelId", "channelName"]),
         Index(value = ["normalizedChannelId", "startTimeMillis", "endTimeMillis"]),
         Index(value = ["normalizedChannelName", "startTimeMillis", "endTimeMillis"]),
     ],

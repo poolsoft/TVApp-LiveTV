@@ -7,7 +7,6 @@ import androidx.room.Index
     tableName = "iptv_channel_staging",
     primaryKeys = ["sessionId", "originalIndex"],
     indices = [
-        Index("sessionId"),
         Index("createdAt"),
         Index(value = ["sessionId", "resolvedSourceKey"]),
     ],

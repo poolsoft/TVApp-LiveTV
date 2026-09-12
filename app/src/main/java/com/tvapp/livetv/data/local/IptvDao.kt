@@ -76,7 +76,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
     )
     suspend fun getChannelsPage(
@@ -90,7 +90,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
@@ -109,7 +109,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
@@ -131,7 +131,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
@@ -153,7 +153,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
@@ -171,7 +171,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
@@ -190,7 +190,7 @@ interface IptvDao {
     @Query(
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query))",
@@ -201,7 +201,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
@@ -220,7 +220,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
@@ -242,7 +242,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
@@ -264,7 +264,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
@@ -282,7 +282,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1) " +
@@ -301,7 +301,7 @@ interface IptvDao {
     @Query(
         "SELECT COUNT(*) FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (:selectedOnly = 0 OR selected = 1)",
@@ -316,7 +316,7 @@ interface IptvDao {
     @Query(
         "UPDATE iptv_channels SET selected = :selected " +
             "WHERE sourceId = :sourceId " +
-            "AND (:category IS NULL OR TRIM(groupTitle) = :category) " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query))",
     )
@@ -328,9 +328,9 @@ interface IptvDao {
     ): Int
 
     @Query(
-        "SELECT DISTINCT TRIM(groupTitle) FROM iptv_channels " +
+        "SELECT DISTINCT groupTitle FROM iptv_channels " +
             "WHERE sourceId = :sourceId AND groupTitle IS NOT NULL " +
-            "AND TRIM(groupTitle) != '' ORDER BY TRIM(groupTitle) COLLATE NOCASE",
+            "AND groupTitle != '' ORDER BY groupTitle COLLATE NOCASE",
     )
     suspend fun getCategoriesForSource(sourceId: Long): List<String>
 
