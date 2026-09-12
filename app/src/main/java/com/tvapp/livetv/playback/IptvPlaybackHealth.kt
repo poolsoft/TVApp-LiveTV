@@ -87,3 +87,8 @@ internal fun classifyIptvPlaybackFailure(errorCodeName: String): IptvPlaybackFai
         else -> IptvPlaybackFailureClass.UNKNOWN
     }
 }
+
+internal fun shouldRecommendExternalFallback(
+    failureClass: IptvPlaybackFailureClass?,
+): Boolean = failureClass == IptvPlaybackFailureClass.DECODER ||
+    failureClass == IptvPlaybackFailureClass.SOURCE

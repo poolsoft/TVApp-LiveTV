@@ -1,6 +1,8 @@
 package com.tvapp.livetv.playback
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IptvPlaybackHealthTest {
@@ -26,6 +28,14 @@ class IptvPlaybackHealthTest {
             IptvPlaybackFailureClass.UNKNOWN,
             classifyIptvPlaybackFailure("ERROR_CODE_UNSPECIFIED"),
         )
+    }
+
+    @Test
+    fun recommendsFallbackOnlyForDecoderAndSourceFailures() {
+        assertTrue(shouldRecommendExternalFallback(IptvPlaybackFailureClass.DECODER))
+        assertTrue(shouldRecommendExternalFallback(IptvPlaybackFailureClass.SOURCE))
+        assertFalse(shouldRecommendExternalFallback(IptvPlaybackFailureClass.NETWORK))
+        assertFalse(shouldRecommendExternalFallback(IptvPlaybackFailureClass.HTTP))
     }
 
     @Test

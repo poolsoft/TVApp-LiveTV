@@ -6,6 +6,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV oynatma toleransı
+* IPTV HTTP isteklerine protokoller arası yönlendirme, POST 302 koruması, tarayıcı uyumlu
+  User-Agent ve canlı yayınlara uygun bağlantı/okuma zaman aşımı değerleri eklendi.
+* Progressive MPEG-TS akışlarında IDR olmayan karelere, erişim birimi algılamasına ve daha geniş
+  zaman damgası aramasına izin veren ortak extractor yapılandırması ana oynatıcı ve TIF servisine uygulandı.
+* Decoder ve kaynak biçimi hataları ağ hatalarından ayrılarak harici oynatıcı fallback tetikleyicisine bağlandı.
+
 ### Açılışta boş ekran düzeltmesi
 * Büyük IPTV kataloglarında Room yükseltmesini kilitleyebilen toplu kategori güncellemesi
   kaldırıldı; mevcut kanal, seçim, sıralama ve EPG verileri korunur.

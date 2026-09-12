@@ -469,6 +469,12 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvBufferingContainer.visibility = View.GONE
             handleIptvPlaybackError(error)
         }
+        iptvPlayback.onExternalFallbackRecommended = { error ->
+            debugLog.recordDebug(
+                "IPTV_EXTERNAL_FALLBACK_RECOMMENDED | code=${error.errorCodeName}, " +
+                    "channel=${currentChannel?.sourceKey}",
+            )
+        }
         iptvPlayback.onPlaybackReady = {
             val recoveredFromFailure = iptvPlaybackFailed
             iptvPlaybackFailed = false

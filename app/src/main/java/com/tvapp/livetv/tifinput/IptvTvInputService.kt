@@ -38,8 +38,12 @@ class IptvTvInputService : TvInputService() {
             }
             releasePlayer()
             val httpFactory = IptvDataSourceFactory.create(metadata.userAgent, metadata.referrer)
+            val mediaSourceFactory = DefaultMediaSourceFactory(
+                httpFactory,
+                IptvDataSourceFactory.createExtractors(),
+            )
             player = ExoPlayer.Builder(appContext)
-                .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+                .setMediaSourceFactory(mediaSourceFactory)
                 .build()
                 .also { exoPlayer ->
                     exoPlayer.setVideoSurface(surface)

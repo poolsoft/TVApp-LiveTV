@@ -85,6 +85,7 @@ class IptvPlaybackController(
     var onTracksChanged: (() -> Unit)? = null
     var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
     var onRecovery: ((IptvRecoveryEvent) -> Unit)? = null
+    var onExternalFallbackRecommended: ((PlaybackException) -> Unit)? = null
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
@@ -130,6 +131,7 @@ class IptvPlaybackController(
                     BUFFER_AFTER_REBUFFER_MS,
                 )
             }
+            setPrioritizeTimeOverSizeThresholds(true)
         }.build()
         val trackSelectionFactory = AdaptiveTrackSelection.Factory(
             ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
@@ -205,6 +207,9 @@ class IptvPlaybackController(
                         retryHandler.removeCallbacks(retryRunnable)
                         retryHandler.postDelayed(retryRunnable, delay)
                     } else {
+                        if (shouldRecommendExternalFallback(lastFailureClass)) {
+                            onExternalFallbackRecommended?.invoke(error)
+                        }
                         onPlaybackError?.invoke(error)
                     }
                 }
@@ -248,6 +253,7 @@ class IptvPlaybackController(
         val mediaItem = mediaItemBuilder.build()
         val sourceFactory = DefaultMediaSourceFactory(
             DefaultDataSource.Factory(appContext, dataSource).setTransferListener(bandwidthMeter),
+            IptvDataSourceFactory.createExtractors(),
         )
         mediaSourceFactory = sourceFactory
         val mediaSource = sourceFactory.createMediaSource(mediaItem)
