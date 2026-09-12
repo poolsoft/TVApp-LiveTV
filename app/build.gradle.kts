@@ -24,6 +24,15 @@ val releaseStorePassword = System.getenv("TVAPP_STORE_PASSWORD")
     ?: localSigningProperties.getProperty("storePassword")
 val updateManifestUrl = System.getenv("TVAPP_UPDATE_MANIFEST_URL")
     ?: "https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json"
+val targetAbis = providers.gradleProperty("tvappTargetAbis").orNull
+    ?.split(',')
+    ?.map(String::trim)
+    ?.filter(String::isNotEmpty)
+    ?.toSet()
+    ?: setOf("arm64-v8a", "armeabi-v7a", "x86_64")
+val experimentalMinify = providers.gradleProperty("tvappExperimentalMinify")
+    .orNull
+    .toBoolean()
 
 android {
     namespace = "com.tvapp.livetv"
@@ -36,6 +45,9 @@ android {
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters += targetAbis
+        }
     }
 
     flavorDimensions += "distribution"
@@ -99,7 +111,11 @@ android {
         }
         getByName("release") {
             signingConfig = signingConfigs.findByName("release")
-            isMinifyEnabled = false
+            isMinifyEnabled = experimentalMinify
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
@@ -130,6 +146,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
     implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
+    implementation("io.github.carguo:gsyijkjava:1.0.0")
+    implementation("io.github.carguo:gsyvideoplayer-ex_so:13.2.1")
     ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")

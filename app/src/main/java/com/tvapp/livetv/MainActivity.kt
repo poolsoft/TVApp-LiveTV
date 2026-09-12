@@ -388,7 +388,11 @@ class MainActivity : TvRemoteActivity() {
         ChannelLogoLoader.configure(this, deviceCapabilities)
         applyExperienceMode()
         playback = TifPlaybackController(binding.tvView)
-        iptvPlayback = IptvPlaybackController(this, binding.iptvPlayerView)
+        iptvPlayback = IptvPlaybackController(
+            this,
+            binding.iptvPlayerView,
+            enableIjkFallback = true,
+        )
         secondaryPlayback = TifPlaybackController(binding.secondaryTvView)
         secondaryIptvPlayback = IptvPlaybackController(
             this,
@@ -472,6 +476,12 @@ class MainActivity : TvRemoteActivity() {
         iptvPlayback.onExternalFallbackRecommended = { error ->
             debugLog.recordDebug(
                 "IPTV_EXTERNAL_FALLBACK_RECOMMENDED | code=${error.errorCodeName}, " +
+                    "channel=${currentChannel?.sourceKey}",
+            )
+        }
+        iptvPlayback.onEngineChanged = { engine, reason ->
+            debugLog.recordDebug(
+                "IPTV_ENGINE | engine=$engine, reason=${reason ?: "primary"}, " +
                     "channel=${currentChannel?.sourceKey}",
             )
         }
@@ -565,6 +575,8 @@ class MainActivity : TvRemoteActivity() {
                 health.firstFrameRendered,
                 health.retryAttempt,
                 health.lastErrorCode,
+                health.engine,
+                health.fallbackReason,
             ).joinToString("|")
             if (signature != lastIptvHealthLogSignature) {
                 lastIptvHealthLogSignature = signature
@@ -581,7 +593,8 @@ class MainActivity : TvRemoteActivity() {
                             "bandwidth=${health.estimatedBandwidthBps ?: -1}, " +
                             "bufferMs=${health.bufferedDurationMillis}, dropped=${health.droppedFrames}, " +
                             "retry=${health.retryAttempt}, failure=${health.lastFailureClass}, " +
-                            "error=${health.lastErrorCode ?: "none"}",
+                            "error=${health.lastErrorCode ?: "none"}, engine=${health.engine}, " +
+                            "fallbackReason=${health.fallbackReason ?: "none"}",
                     )
                 }
             }

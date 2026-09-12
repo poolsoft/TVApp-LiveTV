@@ -39,6 +39,16 @@ class IptvPlaybackHealthTest {
     }
 
     @Test
+    fun startsIjkOnlyOnceForEligiblePrimaryFailures() {
+        assertTrue(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.DECODER))
+        assertTrue(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.SOURCE))
+        assertFalse(shouldUseIjkFallback(false, false, IptvPlaybackFailureClass.DECODER))
+        assertFalse(shouldUseIjkFallback(true, true, IptvPlaybackFailureClass.DECODER))
+        assertFalse(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.NETWORK))
+        assertFalse(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.HTTP))
+    }
+
+    @Test
     fun watchdogSeparatesStartupBufferAndStall() {
         assertEquals(
             IptvRecoveryReason.FIRST_FRAME_TIMEOUT,

@@ -27,12 +27,14 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
 import com.tvapp.livetv.ui.isRadioChannel
 import java.util.Locale
+import tv.danmaku.ijk.media.player.misc.ITrackInfo
 
 @OptIn(UnstableApi::class)
 class IptvPlaybackController(
     context: Context,
     private val playerView: PlayerView,
     private val profile: IptvPlaybackProfile = IptvPlaybackProfile.PRIMARY,
+    private val enableIjkFallback: Boolean = false,
 ) {
     private val appContext = context.applicationContext
     private val retryHandler = Handler(Looper.getMainLooper())
@@ -61,7 +63,54 @@ class IptvPlaybackController(
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
     private var vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
+    private var muted = false
+    private var usingIjk = false
+    private var ijkFallbackAttempted = false
+    private var fallbackReason: String? = null
+    private var lastFallbackPositionMillis = 0L
+    private val ijkFallbackPlayer = if (enableIjkFallback) {
+        IptvIjkFallbackPlayer(playerView).also { fallback ->
+            fallback.onPrepared = {
+                hasReachedReady = true
+                explicitLoading = false
+                bufferingStartedAt = null
+                updateHealthPhase(IptvPlaybackPhase.READY)
+                onBuffering?.invoke(IptvBufferingState.NONE)
+                onPlaybackReady?.invoke()
+                onContentKindChanged?.invoke(contentKind())
+            }
+            fallback.onFirstFrame = {
+                val now = SystemClock.elapsedRealtime()
+                if (firstFrameAt == null) firstFrameAt = now
+                lastFrameAt = now
+                onHealthChanged?.invoke(healthSnapshot())
+            }
+            fallback.onBufferingChanged = { buffering ->
+                bufferingStartedAt = if (buffering) SystemClock.elapsedRealtime() else null
+                updateHealthPhase(
+                    if (buffering) IptvPlaybackPhase.BUFFERING else IptvPlaybackPhase.READY,
+                )
+                onBuffering?.invoke(
+                    if (buffering) IptvBufferingState.BUFFERING else IptvBufferingState.NONE,
+                )
+            }
+            fallback.onTracksChanged = { onTracksChanged?.invoke() }
+            fallback.onVideoSizeChanged = { onHealthChanged?.invoke(healthSnapshot()) }
+            fallback.onCompletion = {
+                updateHealthPhase(IptvPlaybackPhase.ENDED)
+                if (!currentChannel?.iptvContentType.equals("VOD", ignoreCase = true)) {
+                    finishIjkWithError("IJK live stream ended", 0, 0)
+                }
+            }
+            fallback.onError = { what, extra ->
+                finishIjkWithError("IJK playback error", what, extra)
+            }
+        }
+    } else {
+        null
+    }
     private val retryRunnable = Runnable {
+        if (usingIjk) return@Runnable
         player?.let { current ->
             explicitLoading = true
             tuneStartedAt = SystemClock.elapsedRealtime()
@@ -86,12 +135,19 @@ class IptvPlaybackController(
     var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
     var onRecovery: ((IptvRecoveryEvent) -> Unit)? = null
     var onExternalFallbackRecommended: ((PlaybackException) -> Unit)? = null
+    var onEngineChanged: ((IptvPlaybackEngine, String?) -> Unit)? = null
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
         released = false
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
+        ijkFallbackPlayer?.release()
+        usingIjk = false
+        ijkFallbackAttempted = false
+        fallbackReason = null
+        lastFallbackPositionMillis = 0L
+        onEngineChanged?.invoke(IptvPlaybackEngine.MEDIA3, null)
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
@@ -201,6 +257,7 @@ class IptvPlaybackController(
                     lastErrorCode = error.errorCodeName
                     lastFailureClass = classifyIptvPlaybackFailure(error.errorCodeName)
                     updateHealthPhase(IptvPlaybackPhase.FAILED)
+                    if (startIjkFallback(error)) return
                     if (!released && retryCount < MAX_RETRY_COUNT) {
                         val delay = RETRY_BASE_DELAY_MS * (1L shl retryCount)
                         retryCount++
@@ -274,14 +331,28 @@ class IptvPlaybackController(
         retryHandler.removeCallbacks(watchdogRunnable)
         retryCount = 0
         onBuffering?.invoke(IptvBufferingState.NONE)
-        player?.stop()
-        player?.clearMediaItems()
+        if (usingIjk) {
+            ijkFallbackPlayer?.stop()
+            ijkFallbackPlayer?.release()
+            usingIjk = false
+        } else {
+            player?.stop()
+            player?.clearMediaItems()
+        }
         currentChannel = null
+        lastFallbackPositionMillis = 0L
         bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.IDLE)
     }
 
     fun contentKind(): IptvContentKind {
+        if (usingIjk) {
+            return if (currentChannel?.iptvContentType.equals("VOD", ignoreCase = true)) {
+                IptvContentKind.VOD
+            } else {
+                IptvContentKind.LIVE
+            }
+        }
         val current = player ?: return IptvContentKind.UNKNOWN
         return when {
             current.isCurrentMediaItemLive -> IptvContentKind.LIVE
@@ -291,18 +362,27 @@ class IptvPlaybackController(
     }
 
     fun togglePlayPause() {
+        if (usingIjk) {
+            ijkFallbackPlayer?.togglePlayPause()
+            return
+        }
         player?.let { current -> if (current.isPlaying) current.pause() else current.play() }
     }
 
     fun play() {
-        player?.play()
+        if (usingIjk) ijkFallbackPlayer?.play() else player?.play()
     }
 
     fun pause() {
-        player?.pause()
+        if (usingIjk) ijkFallbackPlayer?.pause() else player?.pause()
     }
 
     fun stopVod() {
+        if (usingIjk) {
+            ijkFallbackPlayer?.pause()
+            ijkFallbackPlayer?.seekTo(0L)
+            return
+        }
         player?.let { current ->
             current.pause()
             current.seekTo(0L)
@@ -310,6 +390,11 @@ class IptvPlaybackController(
     }
 
     fun restartVod() {
+        if (usingIjk) {
+            ijkFallbackPlayer?.seekTo(0L)
+            ijkFallbackPlayer?.play()
+            return
+        }
         player?.let { current ->
             current.seekTo(0L)
             current.play()
@@ -317,6 +402,13 @@ class IptvPlaybackController(
     }
 
     fun seekBy(offsetMillis: Long): Boolean {
+        if (usingIjk) {
+            if (contentKind() != IptvContentKind.VOD) return false
+            val duration = ijkFallbackPlayer?.durationMillis()?.takeIf { it > 0L } ?: Long.MAX_VALUE
+            val position = ijkFallbackPlayer?.positionMillis() ?: return false
+            ijkFallbackPlayer.seekTo((position + offsetMillis).coerceIn(0L, duration))
+            return true
+        }
         val current = player ?: return false
         if (contentKind() != IptvContentKind.VOD && !current.isCurrentMediaItemSeekable) return false
         val duration = current.duration.takeUnless { it == C.TIME_UNSET } ?: Long.MAX_VALUE
@@ -325,6 +417,7 @@ class IptvPlaybackController(
     }
 
     fun goLive(): Boolean {
+        if (usingIjk) return false
         val current = player ?: return false
         if (!current.isCurrentMediaItemLive) return false
         current.seekToDefaultPosition()
@@ -333,6 +426,13 @@ class IptvPlaybackController(
     }
 
     fun retry(): Boolean {
+        if (usingIjk) {
+            val channel = currentChannel ?: return false
+            val position = ijkFallbackPlayer?.positionMillis()?.takeIf {
+                channel.iptvContentType.equals("VOD", ignoreCase = true)
+            } ?: 0L
+            return restartIjk(channel, position)
+        }
         val current = player ?: return false
         retryHandler.removeCallbacks(retryRunnable)
         retryCount = 0
@@ -345,6 +445,7 @@ class IptvPlaybackController(
     }
 
     fun catchUpToLive(maximumOffsetMillis: Long): Boolean {
+        if (usingIjk) return false
         val current = player ?: return false
         if (!current.isCurrentMediaItemLive) return false
         val offset = current.currentLiveOffset
@@ -364,9 +465,17 @@ class IptvPlaybackController(
         targetBufferSeconds = updated
         playbackPreferencesStore.saveTargetBufferSeconds(updated)
         val channel = currentChannel ?: return updated
-        val resumePosition = player?.currentPosition?.takeIf {
+        val resumePosition = (if (usingIjk) {
+            ijkFallbackPlayer?.positionMillis()
+        } else {
+            player?.currentPosition
+        })?.takeIf {
             contentKind() == IptvContentKind.VOD
         } ?: 0L
+        if (usingIjk) {
+            restartIjk(channel, resumePosition)
+            return updated
+        }
         retryHandler.removeCallbacks(retryRunnable)
         playerView.player = null
         player?.release()
@@ -383,11 +492,14 @@ class IptvPlaybackController(
         if (speed !in com.tvapp.livetv.settings.IptvPlaybackPreferences.SPEED_OPTIONS) return vodPlaybackSpeed
         vodPlaybackSpeed = speed
         playbackPreferencesStore.saveVodPlaybackSpeed(speed)
-        if (contentKind() == IptvContentKind.VOD) player?.setPlaybackSpeed(speed)
+        if (contentKind() == IptvContentKind.VOD) {
+            if (usingIjk) ijkFallbackPlayer?.setSpeed(speed) else player?.setPlaybackSpeed(speed)
+        }
         return speed
     }
 
     fun technicalSnapshot(): IptvTechnicalSnapshot {
+        if (usingIjk) return ijkFallbackPlayer?.technicalSnapshot() ?: IptvTechnicalSnapshot()
         val current = player
         val video = current?.videoFormat
         val audio = current?.audioFormat
@@ -404,7 +516,29 @@ class IptvPlaybackController(
     }
 
     fun playbackSnapshot(): IptvPlaybackSnapshot {
+        if (usingIjk) {
+            val position = ijkFallbackPlayer?.positionMillis() ?: 0L
+            val duration = ijkFallbackPlayer?.durationMillis() ?: 0L
+            return IptvPlaybackSnapshot(
+                positionMillis = position,
+                durationMillis = duration,
+                bufferedPositionMillis = position,
+                isPlaying = ijkFallbackPlayer?.isPlaying() == true,
+                isSeekable = contentKind() == IptvContentKind.VOD && duration > 0L,
+                kind = contentKind(),
+            )
+        }
         val current = player
+        if (current == null && lastFallbackPositionMillis > 0L) {
+            return IptvPlaybackSnapshot(
+                positionMillis = lastFallbackPositionMillis,
+                durationMillis = 0L,
+                bufferedPositionMillis = lastFallbackPositionMillis,
+                isPlaying = false,
+                isSeekable = contentKind() == IptvContentKind.VOD,
+                kind = contentKind(),
+            )
+        }
         return IptvPlaybackSnapshot(
             positionMillis = current?.currentPosition ?: 0L,
             durationMillis = current?.duration?.takeUnless { it == C.TIME_UNSET } ?: 0L,
@@ -419,8 +553,10 @@ class IptvPlaybackController(
         val now = SystemClock.elapsedRealtime()
         val current = player
         val technical = currentTechnicalInfo()
-        val position = current?.currentPosition ?: 0L
-        if (current?.isPlaying == true &&
+        val position = if (usingIjk) ijkFallbackPlayer?.positionMillis() ?: 0L
+        else current?.currentPosition ?: 0L
+        val isPlaying = if (usingIjk) ijkFallbackPlayer?.isPlaying() == true else current?.isPlaying == true
+        if (isPlaying &&
             (lastObservedPosition == C.TIME_UNSET || position - lastObservedPosition >= 500L)
         ) {
             lastObservedPosition = position
@@ -429,11 +565,11 @@ class IptvPlaybackController(
         return IptvPlaybackHealthSnapshot(
             phase = healthPhase,
             contentKind = contentKind(),
-            isPlaying = current?.isPlaying == true,
+            isPlaying = isPlaying,
             firstFrameRendered = firstFrameAt != null,
             startupDurationMillis = firstFrameAt?.let { (it - tuneStartedAt).coerceAtLeast(0L) },
             timeSinceLastFrameMillis = lastFrameAt?.let { (now - it).coerceAtLeast(0L) },
-            timeSinceLastProgressMillis = if (current == null) null else {
+            timeSinceLastProgressMillis = if (current == null && !usingIjk) null else {
                 (now - lastProgressAt).coerceAtLeast(0L)
             },
             positionMillis = position,
@@ -444,28 +580,45 @@ class IptvPlaybackController(
             height = technical.height,
             videoCodec = technical.videoCodec,
             audioCodec = technical.audioCodec,
-            droppedFrames = current?.videoDecoderCounters?.droppedBufferCount ?: 0,
+            droppedFrames = if (usingIjk) 0 else current?.videoDecoderCounters?.droppedBufferCount ?: 0,
             retryAttempt = retryCount,
             lastErrorCode = lastErrorCode,
             lastFailureClass = lastFailureClass,
+            engine = if (usingIjk) IptvPlaybackEngine.IJK else IptvPlaybackEngine.MEDIA3,
+            fallbackReason = fallbackReason,
         )
     }
 
     fun setMuted(muted: Boolean) {
-        player?.volume = if (muted) 0f else 1f
+        this.muted = muted
+        if (usingIjk) ijkFallbackPlayer?.setMuted(muted)
+        else player?.volume = if (muted) 0f else 1f
     }
 
-    fun audioTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_AUDIO)
+    fun audioTracks(): List<IptvTrackOption> = if (usingIjk) {
+        ijkFallbackPlayer?.tracks(ITrackInfo.MEDIA_TRACK_TYPE_AUDIO).orEmpty()
+    } else tracksOfType(C.TRACK_TYPE_AUDIO)
 
-    fun subtitleTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_TEXT)
+    fun subtitleTracks(): List<IptvTrackOption> = if (usingIjk) {
+        ijkFallbackPlayer?.tracks(ITrackInfo.MEDIA_TRACK_TYPE_SUBTITLE).orEmpty() +
+            ijkFallbackPlayer?.tracks(ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT).orEmpty()
+    } else tracksOfType(C.TRACK_TYPE_TEXT)
 
-    fun videoTracks(): List<IptvTrackOption> = tracksOfType(C.TRACK_TYPE_VIDEO)
+    fun videoTracks(): List<IptvTrackOption> = if (usingIjk) {
+        ijkFallbackPlayer?.tracks(ITrackInfo.MEDIA_TRACK_TYPE_VIDEO).orEmpty()
+    } else tracksOfType(C.TRACK_TYPE_VIDEO)
 
     fun videoTrackOverrideId(): String? = selectedVideoTrackId
 
-    fun selectAudioTrack(id: String): Boolean = selectTrack(C.TRACK_TYPE_AUDIO, id)
+    fun selectAudioTrack(id: String): Boolean = if (usingIjk) {
+        ijkFallbackPlayer?.selectTrack(ITrackInfo.MEDIA_TRACK_TYPE_AUDIO, id) == true
+    } else selectTrack(C.TRACK_TYPE_AUDIO, id)
 
     fun selectVideoTrack(id: String?): Boolean {
+        if (usingIjk) {
+            if (id == null) return false
+            return ijkFallbackPlayer?.selectTrack(ITrackInfo.MEDIA_TRACK_TYPE_VIDEO, id) == true
+        }
         val current = player ?: return false
         val builder = current.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
@@ -482,6 +635,15 @@ class IptvPlaybackController(
     }
 
     fun selectSubtitleTrack(id: String?): Boolean {
+        if (usingIjk) {
+            return if (id == null) {
+                ijkFallbackPlayer?.clearTrack(ITrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) == true ||
+                    ijkFallbackPlayer?.clearTrack(ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT) == true
+            } else {
+                ijkFallbackPlayer?.selectTrack(ITrackInfo.MEDIA_TRACK_TYPE_SUBTITLE, id) == true ||
+                    ijkFallbackPlayer?.selectTrack(ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT, id) == true
+            }
+        }
         val current = player ?: return false
         val builder = current.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
@@ -500,6 +662,7 @@ class IptvPlaybackController(
     }
 
     fun addExternalSubtitle(uri: Uri, mimeType: String? = null): Boolean {
+        if (usingIjk) return false
         val current = player ?: return false
         val currentItem = current.currentMediaItem ?: return false
         val sourceFactory = mediaSourceFactory ?: return false
@@ -565,17 +728,21 @@ class IptvPlaybackController(
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
         onBuffering?.invoke(IptvBufferingState.NONE)
+        ijkFallbackPlayer?.release()
+        usingIjk = false
         playerView.player = null
         player?.release()
         player = null
         trackSelector = null
         mediaSourceFactory = null
         currentChannel = null
+        lastFallbackPositionMillis = 0L
         bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.RELEASED)
     }
 
     fun currentTechnicalInfo(): IptvTechnicalSnapshot {
+        if (usingIjk) return ijkFallbackPlayer?.technicalSnapshot() ?: IptvTechnicalSnapshot()
         val p = player ?: return IptvTechnicalSnapshot()
         val videoFormat = p.videoFormat
         val videoWidth = videoFormat?.width?.takeIf { it > 0 } ?: p.videoSize.width.takeIf { it > 0 }
@@ -622,6 +789,7 @@ class IptvPlaybackController(
     }
 
     private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
+        if (usingIjk) return null
         val current = player ?: return null
         val channel = currentChannel ?: return null
         if (recoveryExhausted || !current.playWhenReady || current.playbackState == Player.STATE_ENDED) {
@@ -691,6 +859,99 @@ class IptvPlaybackController(
         onHealthChanged?.invoke(healthSnapshot())
     }
 
+    private fun startIjkFallback(error: PlaybackException): Boolean {
+        if (!shouldUseIjkFallback(enableIjkFallback, ijkFallbackAttempted, lastFailureClass)) {
+            return false
+        }
+        val channel = currentChannel ?: return false
+        ijkFallbackAttempted = true
+        fallbackReason = error.errorCodeName
+        val resumePosition = player?.currentPosition?.takeIf {
+            channel.iptvContentType.equals("VOD", ignoreCase = true)
+        } ?: 0L
+        retryHandler.removeCallbacks(retryRunnable)
+        retryHandler.removeCallbacks(watchdogRunnable)
+        playerView.player = null
+        player?.release()
+        player = null
+        trackSelector = null
+        mediaSourceFactory = null
+        usingIjk = true
+        explicitLoading = true
+        tuneStartedAt = SystemClock.elapsedRealtime()
+        firstFrameAt = null
+        lastFrameAt = null
+        bufferingStartedAt = null
+        resetProgressObservation()
+        updateHealthPhase(IptvPlaybackPhase.PREPARING)
+        onBuffering?.invoke(IptvBufferingState.LOADING)
+        onEngineChanged?.invoke(IptvPlaybackEngine.IJK, fallbackReason)
+        return try {
+            val started = ijkFallbackPlayer?.start(
+                channel = channel,
+                positionMillis = resumePosition,
+                speed = if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f,
+                initiallyMuted = muted,
+            ) == true
+            if (!started) finishIjkWithError("IJK surface unavailable", 0, 0)
+            true
+        } catch (error: Exception) {
+            finishIjkWithError("IJK initialization failed", 0, 0, error)
+            true
+        } catch (error: LinkageError) {
+            finishIjkWithError("IJK native library unavailable", 0, 0, error)
+            true
+        }
+    }
+
+    private fun restartIjk(channel: LiveChannel, positionMillis: Long): Boolean {
+        explicitLoading = true
+        tuneStartedAt = SystemClock.elapsedRealtime()
+        firstFrameAt = null
+        lastFrameAt = null
+        bufferingStartedAt = null
+        updateHealthPhase(IptvPlaybackPhase.PREPARING)
+        onBuffering?.invoke(IptvBufferingState.LOADING)
+        return try {
+            val started = ijkFallbackPlayer?.start(
+                channel = channel,
+                positionMillis = positionMillis,
+                speed = if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f,
+                initiallyMuted = muted,
+            ) == true
+            if (!started) finishIjkWithError("IJK surface unavailable", 0, 0)
+            started
+        } catch (error: Exception) {
+            finishIjkWithError("IJK restart failed", 0, 0, error)
+            false
+        } catch (error: LinkageError) {
+            finishIjkWithError("IJK native library unavailable", 0, 0, error)
+            false
+        }
+    }
+
+    private fun finishIjkWithError(
+        message: String,
+        what: Int,
+        extra: Int,
+        cause: Throwable? = null,
+    ) {
+        lastFallbackPositionMillis = ijkFallbackPlayer?.positionMillis() ?: 0L
+        lastErrorCode = "IJK_${what}_$extra"
+        lastFailureClass = IptvPlaybackFailureClass.DECODER
+        updateHealthPhase(IptvPlaybackPhase.FAILED)
+        onBuffering?.invoke(IptvBufferingState.NONE)
+        ijkFallbackPlayer?.release()
+        usingIjk = false
+        onPlaybackError?.invoke(
+            PlaybackException(
+                "$message (what=$what, extra=$extra)",
+                cause ?: IllegalStateException("$message (what=$what, extra=$extra)"),
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+            ),
+        )
+    }
+
     private companion object {
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
@@ -721,6 +982,8 @@ class IptvPlaybackController(
 }
 
 enum class IptvContentKind { LIVE, VOD, UNKNOWN }
+
+enum class IptvPlaybackEngine { MEDIA3, IJK }
 
 enum class IptvBufferingState { NONE, LOADING, BUFFERING }
 

@@ -71,6 +71,8 @@ data class IptvPlaybackHealthSnapshot(
     val retryAttempt: Int = 0,
     val lastErrorCode: String? = null,
     val lastFailureClass: IptvPlaybackFailureClass? = null,
+    val engine: IptvPlaybackEngine = IptvPlaybackEngine.MEDIA3,
+    val fallbackReason: String? = null,
 )
 
 internal fun classifyIptvPlaybackFailure(errorCodeName: String): IptvPlaybackFailureClass {
@@ -92,3 +94,9 @@ internal fun shouldRecommendExternalFallback(
     failureClass: IptvPlaybackFailureClass?,
 ): Boolean = failureClass == IptvPlaybackFailureClass.DECODER ||
     failureClass == IptvPlaybackFailureClass.SOURCE
+
+internal fun shouldUseIjkFallback(
+    enabled: Boolean,
+    alreadyAttempted: Boolean,
+    failureClass: IptvPlaybackFailureClass?,
+): Boolean = enabled && !alreadyAttempted && shouldRecommendExternalFallback(failureClass)
