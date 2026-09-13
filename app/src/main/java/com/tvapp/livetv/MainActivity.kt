@@ -526,12 +526,12 @@ class MainActivity : TvRemoteActivity() {
                 when (state) {
                     IptvBufferingState.NONE -> binding.iptvBufferingContainer.visibility = View.GONE
                     IptvBufferingState.LOADING -> {
-                        binding.iptvBufferingText.setText(R.string.iptv_loading)
+                        updateIptvBufferingStatus(R.string.iptv_opening)
                         binding.iptvBufferingContainer.visibility = View.VISIBLE
                     }
                     IptvBufferingState.BUFFERING -> {
-                        binding.iptvBufferingContainer.visibility = View.GONE
-                        showIptvNotice(R.string.iptv_buffering)
+                        updateIptvBufferingStatus(R.string.iptv_buffering)
+                        binding.iptvBufferingContainer.visibility = View.VISIBLE
                     }
                 }
             }
@@ -985,7 +985,7 @@ class MainActivity : TvRemoteActivity() {
                     playback.stop()
                     binding.tvView.visibility = View.GONE
                     binding.iptvPlayerView.visibility = View.VISIBLE
-                    binding.iptvBufferingText.setText(R.string.iptv_connecting)
+                    updateIptvBufferingStatus(R.string.iptv_connecting)
                     binding.iptvBufferingContainer.visibility = View.VISIBLE
                     val resumePosition = if (channel.iptvContentType == "VOD") {
                         iptvResumeStore.position(channel.sourceKey)
@@ -1010,6 +1010,18 @@ class MainActivity : TvRemoteActivity() {
                     showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
                 }
             }
+    }
+
+    private fun updateIptvBufferingStatus(statusResId: Int) {
+        val status = getString(statusResId)
+        val channelName = currentChannel
+            ?.takeIf { it.source == LiveChannel.Source.IPTV }
+            ?.displayName
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+        binding.iptvBufferingText.text = channelName?.let {
+            getString(R.string.iptv_playback_status, it, status)
+        } ?: status
     }
 
     private fun prepareIptvAlternatives(channel: LiveChannel) {

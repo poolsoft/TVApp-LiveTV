@@ -495,8 +495,10 @@
     <string name="iptv_grid_empty">Grid için en az bir kanal seçin.</string>
     <string name="iptv_grid_no_channels">Grid için kullanılabilir canlı IPTV kanalı yok.</string>
     <string name="iptv_connecting">Bağlanıyor…</string>
-    <string name="iptv_buffering">Buffer alınıyor…</string>
+    <string name="iptv_buffering">Arabelleğe alınıyor…</string>
     <string name="iptv_loading">Yükleniyor…</string>
+    <string name="iptv_opening">Açılıyor…</string>
+    <string name="iptv_playback_status">%1$s\n%2$s</string>
     <string name="iptv_buffer_target">Buffer hedefi: %1$d saniye</string>
     <string name="iptv_buffer_target_short">Hedef %1$d sn</string>
     <string name="iptv_buffer_target_auto">Buffer hedefi: Otomatik (ABR)</string>

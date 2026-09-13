@@ -507,7 +507,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                             0,
                             0,
                         )
-                        view.compoundDrawablePadding = (14 * resources.displayMetrics.density).toInt()
+                        view.compoundDrawablePadding = (8 * resources.displayMetrics.density).toInt()
                         return view
                     }
                 }

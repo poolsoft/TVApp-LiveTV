@@ -484,6 +484,8 @@
     <string name="iptv_connecting">Connecting…</string>
     <string name="iptv_buffering">Buffering…</string>
     <string name="iptv_loading">Loading…</string>
+    <string name="iptv_opening">Opening…</string>
+    <string name="iptv_playback_status">%1$s\n%2$s</string>
     <string name="iptv_buffer_target">Buffer target: %1$d seconds</string>
     <string name="iptv_buffer_target_short">Target %1$d sec</string>
     <string name="iptv_buffer_target_auto">Buffer target: Auto (ABR)</string>
