@@ -518,6 +518,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun setBusy(busy: Boolean) {
+        binding.root.keepScreenOn = busy
         binding.importUrlButton.isEnabled = !busy
         binding.importFileButton.isEnabled = !busy
         binding.importXtreamButton.isEnabled = !busy

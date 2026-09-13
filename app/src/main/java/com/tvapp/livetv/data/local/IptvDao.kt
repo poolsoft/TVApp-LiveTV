@@ -392,39 +392,16 @@ interface IptvDao {
     suspend fun stagingCount(sessionId: String): Int
 
     @Query(
-        "UPDATE iptv_channel_staging SET resolvedSourceKey = CASE " +
-            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
+        "UPDATE iptv_channel_staging SET resolvedSourceKey = COALESCE(" +
+            "(SELECT old.sourceKey FROM iptv_channels old " +
             "WHERE old.sourceId = :sourceId " +
-            "AND old.sourceKey = 'iptv:' || :sourceId || ':' || " +
-            "iptv_channel_staging.identityHash) " +
-            "THEN 'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash " +
-            "WHEN TRIM(COALESCE(iptv_channel_staging.tvgId, '')) != '' " +
-            "AND EXISTS (SELECT 1 FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND old.tvgId = iptv_channel_staging.tvgId) " +
-            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
+            "AND TRIM(COALESCE(iptv_channel_staging.tvgId, '')) != '' " +
             "AND old.tvgId = iptv_channel_staging.tvgId " +
-            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
-            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND old.matchKey = iptv_channel_staging.matchKey) " +
-            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND old.matchKey = iptv_channel_staging.matchKey " +
-            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
-            "WHEN EXISTS (SELECT 1 FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
-            "AND TRIM(COALESCE(old.groupTitle, '')) = " +
-            "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE) " +
-            "THEN (SELECT old.sourceKey FROM iptv_channels old " +
-            "WHERE old.sourceId = :sourceId " +
-            "AND TRIM(old.displayName) = TRIM(iptv_channel_staging.displayName) COLLATE NOCASE " +
-            "AND TRIM(COALESCE(old.groupTitle, '')) = " +
-            "TRIM(COALESCE(iptv_channel_staging.groupTitle, '')) COLLATE NOCASE " +
-            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1) " +
-            "ELSE 'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash END " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1), " +
+            "(SELECT old.sourceKey FROM iptv_channels old " +
+            "WHERE old.sourceId = :sourceId AND old.matchKey = iptv_channel_staging.matchKey " +
+            "ORDER BY old.selected DESC, old.originalIndex LIMIT 1), " +
+            "'iptv:' || :sourceId || ':' || iptv_channel_staging.identityHash) " +
             "WHERE sessionId = :sessionId",
     )
     suspend fun resolveStagedSourceKeys(sessionId: String, sourceId: Long)
@@ -462,5 +439,22 @@ interface IptvDao {
 
     @Query("DELETE FROM iptv_channels WHERE sourceId = :sourceId")
     suspend fun deleteSourceChannels(sourceId: Long)
+
+    @Query("DELETE FROM iptv_channel_search")
+    suspend fun clearSearchIndex()
+
+    @Query(
+        "INSERT INTO iptv_channel_search (sourceKey, displayName, tvgName, groupTitle) " +
+            "SELECT sourceKey, displayName, COALESCE(tvgName, ''), COALESCE(groupTitle, '') " +
+            "FROM iptv_channels WHERE sourceId != :excludedSourceId",
+    )
+    suspend fun indexOtherSources(excludedSourceId: Long)
+
+    @Query(
+        "INSERT INTO iptv_channel_search (sourceKey, displayName, tvgName, groupTitle) " +
+            "SELECT sourceKey, displayName, COALESCE(tvgName, ''), COALESCE(groupTitle, '') " +
+            "FROM iptv_channels",
+    )
+    suspend fun rebuildSearchIndex()
 
 }

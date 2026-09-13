@@ -2,12 +2,14 @@ package com.tvapp.livetv.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import androidx.room.withTransaction
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.IptvChannelListProjection
 import com.tvapp.livetv.data.local.IptvChannelStagingEntity
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.tifinput.IptvInputSyncScheduler
 import java.io.InputStream
@@ -67,6 +69,7 @@ class IptvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.iptvDao()
+    private val debugLog = CrashReportStore(appContext)
     private val xmlTvRepository by lazy { XmlTvRepository(appContext) }
 
     suspend fun sources(): List<IptvSourceSummary> = dao.getSources().map { source ->
@@ -545,7 +548,11 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun delete(source: IptvSourceEntity) {
-        dao.deleteSource(source)
+        database.withTransaction {
+            dao.clearSearchIndex()
+            dao.deleteSource(source)
+            dao.rebuildSearchIndex()
+        }
         notifySharedChannelsChanged()
     }
 
@@ -581,6 +588,7 @@ class IptvRepository(context: Context) {
         val result = IMPORT_MUTEX.withLock {
             val sessionId = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
+            val startedAt = SystemClock.elapsedRealtime()
             try {
                 dao.deleteStaleStaging(now - STAGING_MAX_AGE_MS)
                 onProgress(IptvImportProgress(IptvImportStage.READING))
@@ -597,7 +605,7 @@ class IptvRepository(context: Context) {
                     batch += IptvChannelStagingEntity(
                         sessionId = sessionId,
                         originalIndex = channelCount,
-                        identityHash = sha256(identity).take(24),
+                        identityHash = sha256Prefix(identity),
                         tvgId = tvgId,
                         tvgName = item.tvgName,
                         displayName = item.name,
@@ -622,13 +630,16 @@ class IptvRepository(context: Context) {
                     }
                 }
                 if (batch.isNotEmpty()) dao.insertStagedChannels(batch)
+                val readingFinishedAt = SystemClock.elapsedRealtime()
                 onProgress(IptvImportProgress(IptvImportStage.READING, channelCount))
                 require(channelCount > 0 && dao.stagingCount(sessionId) > 0) {
                     "Listede oynatılabilir IPTV kanalı bulunamadı."
                 }
 
                 onProgress(IptvImportProgress(IptvImportStage.SAVING, channelCount))
-                database.withTransaction {
+                var matchingFinishedAt = readingFinishedAt
+                var replacementFinishedAt = readingFinishedAt
+                val imported = database.withTransaction {
                     val existing = replacementSource ?: dao.getSourceByLocation(location)
                     val sourceId = existing?.id ?: dao.insertSource(
                         IptvSourceEntity(
@@ -662,11 +673,26 @@ class IptvRepository(context: Context) {
                     dao.resolveStagedSourceKeys(sessionId, sourceId)
                     dao.discardSupersededStagedDuplicates(sessionId)
                     dao.preserveStagedSelection(sessionId)
+                    matchingFinishedAt = SystemClock.elapsedRealtime()
+                    // FTS sourceKey is intentionally not indexed. Clearing it once prevents
+                    // the per-channel delete trigger from scanning the whole index repeatedly.
+                    dao.clearSearchIndex()
                     dao.deleteSourceChannels(sourceId)
                     dao.insertStagedAsSource(sessionId, sourceId, now)
+                    dao.indexOtherSources(sourceId)
+                    replacementFinishedAt = SystemClock.elapsedRealtime()
                     onProgress(IptvImportProgress(IptvImportStage.FINISHING, channelCount))
                     IptvImportResult(sourceId, source.name, dao.channelCount(sourceId))
                 }
+                val finishedAt = SystemClock.elapsedRealtime()
+                debugLog.recordDebug(
+                    "IPTV_IMPORT_TIMING | source=${imported.sourceId}, channels=$channelCount, " +
+                        "read=${readingFinishedAt - startedAt}ms, " +
+                        "match=${matchingFinishedAt - readingFinishedAt}ms, " +
+                        "replaceIndex=${replacementFinishedAt - matchingFinishedAt}ms, " +
+                        "total=${finishedAt - startedAt}ms",
+                )
+                imported
             } finally {
                 withContext(NonCancellable) {
                     runCatching { dao.deleteStagingSession(sessionId) }
@@ -689,9 +715,16 @@ class IptvRepository(context: Context) {
         IptvInputSyncScheduler.scheduleImmediate(appContext)
     }
 
-    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(Charsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
+    private fun sha256Prefix(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        return buildString(24) {
+            repeat(12) { index ->
+                val byte = digest[index].toInt() and 0xff
+                append(HEX_DIGITS[byte ushr 4])
+                append(HEX_DIGITS[byte and 0x0f])
+            }
+        }
+    }
 
     private fun stableLongId(value: String): Long {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
@@ -719,6 +752,7 @@ class IptvRepository(context: Context) {
         private const val STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
         private const val MAX_REDIRECTS = 5
         private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
+        private const val HEX_DIGITS = "0123456789abcdef"
         private val IMPORT_MUTEX = Mutex()
         private val REDIRECT_STATUS_CODES = setOf(
             HttpURLConnection.HTTP_MOVED_PERM,
