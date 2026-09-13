@@ -440,21 +440,4 @@ interface IptvDao {
     @Query("DELETE FROM iptv_channels WHERE sourceId = :sourceId")
     suspend fun deleteSourceChannels(sourceId: Long)
 
-    @Query("DELETE FROM iptv_channel_search")
-    suspend fun clearSearchIndex()
-
-    @Query(
-        "INSERT INTO iptv_channel_search (sourceKey, displayName, tvgName, groupTitle) " +
-            "SELECT sourceKey, displayName, COALESCE(tvgName, ''), COALESCE(groupTitle, '') " +
-            "FROM iptv_channels WHERE sourceId != :excludedSourceId",
-    )
-    suspend fun indexOtherSources(excludedSourceId: Long)
-
-    @Query(
-        "INSERT INTO iptv_channel_search (sourceKey, displayName, tvgName, groupTitle) " +
-            "SELECT sourceKey, displayName, COALESCE(tvgName, ''), COALESCE(groupTitle, '') " +
-            "FROM iptv_channels",
-    )
-    suspend fun rebuildSearchIndex()
-
 }

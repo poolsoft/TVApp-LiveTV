@@ -394,7 +394,9 @@ class IptvRepository(context: Context) {
             "Bu adres zaten baska bir IPTV listesinde kayitli."
         }
         onProgress(IptvImportProgress(IptvImportStage.CONNECTING))
+        val requestStartedAt = SystemClock.elapsedRealtime()
         val opened = openPlaylistConnection(normalized)
+        val responseReadyAt = SystemClock.elapsedRealtime()
         val connection = opened.connection
         try {
             check(connection.responseCode in 200..299) {
@@ -409,9 +411,14 @@ class IptvRepository(context: Context) {
                 ?: Uri.parse(normalized).host
                 ?: "IPTV"
             val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: derivedName
-            return input.use {
+            val imported = input.use {
                 importStream(normalized, KIND_URL, name, it, replacementSource, onProgress)
             }
+            debugLog.recordDebug(
+                "IPTV_HTTP_TIMING | source=${imported.sourceId}, " +
+                    "response=${responseReadyAt - requestStartedAt}ms",
+            )
+            return imported
         } finally {
             connection.disconnect()
         }
@@ -548,11 +555,7 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun delete(source: IptvSourceEntity) {
-        database.withTransaction {
-            dao.clearSearchIndex()
-            dao.deleteSource(source)
-            dao.rebuildSearchIndex()
-        }
+        dao.deleteSource(source)
         notifySharedChannelsChanged()
     }
 
@@ -674,12 +677,8 @@ class IptvRepository(context: Context) {
                     dao.discardSupersededStagedDuplicates(sessionId)
                     dao.preserveStagedSelection(sessionId)
                     matchingFinishedAt = SystemClock.elapsedRealtime()
-                    // FTS sourceKey is intentionally not indexed. Clearing it once prevents
-                    // the per-channel delete trigger from scanning the whole index repeatedly.
-                    dao.clearSearchIndex()
                     dao.deleteSourceChannels(sourceId)
                     dao.insertStagedAsSource(sessionId, sourceId, now)
-                    dao.indexOtherSources(sourceId)
                     replacementFinishedAt = SystemClock.elapsedRealtime()
                     onProgress(IptvImportProgress(IptvImportStage.FINISHING, channelCount))
                     IptvImportResult(sourceId, source.name, dao.channelCount(sourceId))
@@ -689,7 +688,7 @@ class IptvRepository(context: Context) {
                     "IPTV_IMPORT_TIMING | source=${imported.sourceId}, channels=$channelCount, " +
                         "read=${readingFinishedAt - startedAt}ms, " +
                         "match=${matchingFinishedAt - readingFinishedAt}ms, " +
-                        "replaceIndex=${replacementFinishedAt - matchingFinishedAt}ms, " +
+                        "replace=${replacementFinishedAt - matchingFinishedAt}ms, " +
                         "total=${finishedAt - startedAt}ms",
                 )
                 imported
