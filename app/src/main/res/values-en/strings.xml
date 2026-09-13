@@ -418,6 +418,13 @@
     <string name="clear_iptv_selection">Red - Clear</string>
     <string name="save_iptv_selection">Green - Save</string>
     <string name="iptv_selection_ok_hint">OK - Select / Deselect</string>
+    <string name="helper_iptv_selection_channel_list">OK · Select / Deselect  ·  Left · Toolbar  ·  Right · Preview</string>
+    <string name="helper_iptv_selection_select_all">Select All: Selects all filtered channels</string>
+    <string name="helper_iptv_selection_clear">Red · Clear: Deselects all selected channels</string>
+    <string name="helper_iptv_selection_category">Yellow · Categories: Filter by category</string>
+    <string name="helper_iptv_selection_selected_filter">Blue · Filter: Shows only selected channels</string>
+    <string name="helper_iptv_selection_save">Green · Save: Saves selection to main list and exits</string>
+    <string name="helper_iptv_selection_search">Search: Filter channels by name or group</string>
     <string name="select_channel_for_preview">Focus a channel to preview it</string>
     <string name="iptv_preview_loading">Opening stream...</string>
     <string name="iptv_preview_failed">Unable to open preview</string>

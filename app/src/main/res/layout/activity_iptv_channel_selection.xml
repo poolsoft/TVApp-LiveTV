@@ -73,6 +73,132 @@
         android:layout_weight="1"
         android:orientation="horizontal">
 
+        <!-- Sol Dikey Araç Çubuğu -->
+        <LinearLayout
+            android:id="@+id/action_sidebar"
+            android:layout_width="54dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_glass_panel"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp">
+
+            <!-- 1. Tümünü Seç (Accent) -->
+            <FrameLayout
+                android:id="@+id/select_all_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusDown="@+id/clear_button"
+                android:nextFocusRight="@+id/channel_list"
+                android:nextFocusUp="@id/category_filter">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/select_all_iptv_selection"
+                    android:src="@drawable/ic_playlist_added"
+                    app:tint="@color/accent" />
+            </FrameLayout>
+
+            <!-- 2. Seçimi Temizle (Kırmızı) -->
+            <FrameLayout
+                android:id="@+id/clear_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusDown="@+id/category_button"
+                android:nextFocusRight="@+id/channel_list"
+                android:nextFocusUp="@+id/select_all_button">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/clear_visible_iptv_selection"
+                    android:src="@drawable/ic_close"
+                    app:tint="@color/remote_red" />
+            </FrameLayout>
+
+            <!-- 3. Kategori Filtresi (Sarı) -->
+            <FrameLayout
+                android:id="@+id/category_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusDown="@+id/selected_filter_button"
+                android:nextFocusRight="@+id/channel_list"
+                android:nextFocusUp="@+id/clear_button">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/iptv_category_filter"
+                    android:src="@drawable/ic_filter_list"
+                    app:tint="@color/remote_yellow" />
+            </FrameLayout>
+
+            <!-- 4. Yalnızca Seçilenler (Mavi) -->
+            <FrameLayout
+                android:id="@+id/selected_filter_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusDown="@+id/save_button"
+                android:nextFocusRight="@+id/channel_list"
+                android:nextFocusUp="@+id/category_button">
+
+                <ImageView
+                    android:id="@+id/selected_filter_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/selected_iptv_only"
+                    android:src="@drawable/ic_check_circle"
+                    app:tint="@color/remote_blue" />
+            </FrameLayout>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- 5. Kaydet (Yeşil) -->
+            <FrameLayout
+                android:id="@+id/save_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:focusable="true"
+                android:nextFocusRight="@+id/channel_list"
+                android:nextFocusUp="@+id/selected_filter_button">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/save_iptv_selection"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/remote_green" />
+            </FrameLayout>
+        </LinearLayout>
+
         <ListView
             android:id="@+id/channel_list"
             android:layout_width="0dp"
@@ -82,7 +208,7 @@
             android:divider="#3E4650"
             android:dividerHeight="1dp"
             android:listSelector="@drawable/bg_focusable"
-            android:nextFocusLeft="@id/clear_button"
+            android:nextFocusLeft="@id/select_all_button"
             android:nextFocusRight="@id/save_button"
             android:nextFocusUp="@id/category_filter" />
 
@@ -150,157 +276,106 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!-- Alt Helper / Renkli Kumanda Efsanesi (Legend) Barı -->
     <LinearLayout
+        android:id="@+id/helper_bar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_glass_panel"
         android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
 
-        <LinearLayout
-            android:id="@+id/clear_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:nextFocusUp="@id/channel_list"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp">
-
-            <View
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:background="@drawable/key_red" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/clear_visible_iptv_selection"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/select_all_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:nextFocusUp="@id/channel_list"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp">
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_playlist_added"
-                app:tint="@color/accent" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="7dp"
-                android:text="@string/select_all_iptv_selection"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/category_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:nextFocusUp="@id/category_filter"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp">
-
-            <View
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:background="@drawable/key_yellow" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/iptv_category_filter"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/selected_filter_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:nextFocusUp="@id/channel_list"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp">
-
-            <View
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:background="@drawable/key_blue" />
-
-            <TextView
-                android:id="@+id/selected_filter_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/selected_iptv_only"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-        </LinearLayout>
+        <!-- 1. Kırmızı: Seçimi Temizle -->
+        <View
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:background="@drawable/key_red" />
 
         <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/clear_visible_iptv_selection"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- 2. Tümünü Seç (Accent) -->
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_playlist_added"
+            app:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:text="@string/select_all_iptv_selection"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- 3. Sarı: Kategori Filtresi -->
+        <View
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/key_yellow" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/iptv_category_filter"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- 4. Mavi: Yalnızca Seçilenler -->
+        <View
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/key_blue" />
+
+        <TextView
+            android:id="@+id/selected_filter_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/selected_iptv_only"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- 5. Yeşil: Kaydet -->
+        <View
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/key_green" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:text="@string/save_iptv_selection"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <Space
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginHorizontal="12dp"
-            android:layout_weight="1"
-            android:gravity="center"
+            android:layout_weight="1" />
+
+        <!-- Sağ Taraf: Kumanda Gezinme İpucu -->
+        <TextView
+            android:id="@+id/helper_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="@string/iptv_selection_ok_hint"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
-
-        <LinearLayout
-            android:id="@+id/save_button"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_focusable"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:nextFocusUp="@id/channel_list"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp">
-
-            <View
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:background="@drawable/key_green" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/save_iptv_selection"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

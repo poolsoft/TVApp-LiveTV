@@ -431,6 +431,13 @@
     <string name="clear_iptv_selection">Kırmızı · Temizle</string>
     <string name="save_iptv_selection">Yeşil · Kaydet</string>
     <string name="iptv_selection_ok_hint">OK · Seç / Kaldır</string>
+    <string name="helper_iptv_selection_channel_list">OK · Seç / Kaldır  ·  Sol ok · Araç Çubuğu  ·  Sağ ok · Önizleme</string>
+    <string name="helper_iptv_selection_select_all">Tümünü Seç: Filtrelenen tüm kanalları seçer</string>
+    <string name="helper_iptv_selection_clear">Kırmızı Tuş · Seçimi Temizle: Seçili kanalların işaretini kaldırır</string>
+    <string name="helper_iptv_selection_category">Sarı Tuş · Kategori Filtresi: Farklı kategorileri görüntüler</string>
+    <string name="helper_iptv_selection_selected_filter">Mavi Tuş · Filtre: Sadece seçili olan kanalları gösterir</string>
+    <string name="helper_iptv_selection_save">Yeşil Tuş · Kaydet: Değişiklikleri ana listeye kaydeder ve çıkar</string>
+    <string name="helper_iptv_selection_search">Arama: Kanal adı veya grubuna göre filtreler</string>
     <string name="select_channel_for_preview">Önizlemek için bir kanala gelin</string>
     <string name="iptv_preview_loading">Yayın açılıyor…</string>
     <string name="iptv_preview_failed">Önizleme açılamadı</string>

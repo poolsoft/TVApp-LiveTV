@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### IPTV kanal seçimi dikey araç çubuğu ve kalıcı kumanda rehberi
+* IPTV kanal seçim ekranında (`IptvChannelSelectionActivity`) işlem butonları ekranın soluna simge tabanlı dikey araç çubuğu olarak taşındı.
+* Kanal listesinde gezinirken Sol Ok (D-Pad Left) ile dikey bara geçiş, dikey bardan Sağ Ok (D-Pad Right) ile kalınan kanala geri dönüş sağlandı.
+* Butonlar kumanda renk tuşlarıyla uyumlu şekilde renklendirildi (Kırmızı: Temizle, Sarı: Kategori, Mavi: Yalnızca Seçilenler, Yeşil: Kaydet, Turkuaz: Tümünü Seç).
+* Sayfanın altına kumanda renk tuşlarının ve sol bar simgelerinin karşılıklarını sürekli gösteren kalıcı kumanda rehberi yerleştirildi.
+
 ### IJK ve birleşik MultiView
 * IJK donanım çözme seçenekleri AVC, HEVC, MPEG-2 ve MPEG-4 için açıkça yapılandırıldı; akış
   metadata'sından codec, çözünürlük, bitrate, FPS, buffer, ses ve drop-rate bilgileri alınarak

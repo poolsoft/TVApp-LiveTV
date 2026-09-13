@@ -50,6 +50,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     private var numberInput = ""
     private var focusedPosition = 0
     private var initializingCategories = false
+    private var lastSidebarFocusedId = R.id.select_all_button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -183,6 +184,77 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.saveButton.setOnClickListener { saveSelection() }
+
+        // Dikey bar buton odaklanma ve helper metinleri
+        binding.selectAllButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.select_all_button
+                binding.helperText.setText(R.string.select_all_iptv_selection)
+            }
+        }
+        binding.clearButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.clear_button
+                binding.helperText.setText(R.string.clear_visible_iptv_selection)
+            }
+        }
+        binding.categoryButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.category_button
+                binding.helperText.setText(R.string.iptv_category_filter)
+            }
+        }
+        binding.selectedFilterButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.selected_filter_button
+                binding.helperText.setText(
+                    if (selectedOnly) R.string.show_all_iptv_channels else R.string.selected_iptv_only,
+                )
+            }
+        }
+        binding.saveButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.save_button
+                binding.helperText.setText(R.string.save_iptv_selection)
+            }
+        }
+
+        // Dikey bardan sag ok ile kanal listesine geri donus
+        listOf(
+            binding.selectAllButton,
+            binding.clearButton,
+            binding.categoryButton,
+            binding.selectedFilterButton,
+            binding.saveButton,
+        ).forEach { button ->
+            button.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                    binding.channelList.requestFocus()
+                    if (channels.isNotEmpty()) {
+                        binding.channelList.setSelection(focusedPosition)
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+
+        binding.channelList.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.helperText.setText(R.string.iptv_selection_ok_hint)
+            }
+        }
+        binding.categoryFilter.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.helperText.setText(R.string.iptv_category_filter)
+            }
+        }
+        binding.searchInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.helperText.setText(R.string.iptv_search_hint)
+            }
+        }
     }
 
     private fun applyBulkSelection(selected: Boolean) {
@@ -222,6 +294,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
 
     private fun updateSelectedFilterUi() {
         binding.selectedFilterButton.isSelected = selectedOnly
+        binding.selectedFilterIcon.isSelected = selectedOnly
         binding.selectedFilterLabel.setText(
             if (selectedOnly) R.string.show_all_iptv_channels else R.string.selected_iptv_only,
         )
@@ -501,12 +574,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    binding.clearButton.requestFocus()
+                    val target = findViewById<View>(lastSidebarFocusedId) ?: binding.selectAllButton
+                    target.requestFocus()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    binding.saveButton.requestFocus()
-                    return true
+                    return false
                 }
             }
         }
