@@ -74,6 +74,17 @@
             android:textColor="@color/accent"
             android:textSize="14sp" />
 
+        <ProgressBar
+            android:id="@+id/import_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="8dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/accent"
+            android:progressTint="@color/accent"
+            android:visibility="gone" />
+
         <Space
             android:layout_width="1dp"
             android:layout_height="0dp"

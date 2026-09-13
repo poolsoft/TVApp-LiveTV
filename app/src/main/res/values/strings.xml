@@ -385,6 +385,10 @@
     <string name="saved_iptv_sources">Kayıtlı listeler</string>
     <string name="iptv_url_required">Önce geçerli bir liste adresi girin.</string>
     <string name="iptv_importing">IPTV kaynağı okunuyor…</string>
+    <string name="iptv_import_connecting">IPTV kaynağına bağlanılıyor…</string>
+    <string name="iptv_import_reading">IPTV kaynağı okunuyor: %1$d içerik</string>
+    <string name="iptv_import_saving">Değişiklikler veritabanına uygulanıyor…</string>
+    <string name="iptv_import_finishing">IPTV listesi tamamlanıyor…</string>
     <string name="iptv_import_complete">%1$d IPTV kanalı içe aktarıldı.</string>
     <string name="iptv_source_row">%1$s\n%2$d kanal · %3$d seçili</string>
     <string name="iptv_source_channel_count">Bu listede %1$d kanal bulunuyor.</string>

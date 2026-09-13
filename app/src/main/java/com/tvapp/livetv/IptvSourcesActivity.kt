@@ -20,6 +20,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.data.IptvRepository
+import com.tvapp.livetv.data.IptvImportProgress
+import com.tvapp.livetv.data.IptvImportStage
 import com.tvapp.livetv.data.IptvSourceSummary
 import com.tvapp.livetv.databinding.ActivityIptvSourcesBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
@@ -149,12 +151,16 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         submit.isEnabled = false
                         status.visibility = View.VISIBLE
                         status.setText(R.string.iptv_importing)
+                        setBusy(true)
                         debugLog.recordDebug("IPTV_URL_IMPORT START")
                         lifecycleScope.launch {
                             val result = withContext(Dispatchers.IO) {
-                                runCatching { repository.importUrl(enteredUrl, enteredName) }
+                                runCatching {
+                                    repository.importUrl(enteredUrl, enteredName, ::showImportProgress)
+                                }
                             }
                             result.onSuccess { imported ->
+                                setBusy(false)
                                 debugLog.recordDebug(
                                     "IPTV_URL_IMPORT SUCCESS | source=${imported.sourceId}, channels=${imported.channelCount}",
                                 )
@@ -169,6 +175,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                                 dialog.dismiss()
                                 openChannelSelection(imported.sourceId, imported.sourceName)
                             }.onFailure { error ->
+                                setBusy(false)
                                 debugLog.recordDebug(
                                     "IPTV_URL_IMPORT FAILURE | ${error.javaClass.name}: ${error.message}",
                                 )
@@ -426,13 +433,15 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private fun runImport(
         event: String,
         openSelectionAfter: Boolean = false,
-        action: suspend () -> com.tvapp.livetv.data.IptvImportResult,
+        action: suspend ((IptvImportProgress) -> Unit) -> com.tvapp.livetv.data.IptvImportResult,
     ) {
         setBusy(true)
         binding.importStatus.setText(R.string.iptv_importing)
         debugLog.recordDebug("$event START")
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { action() } }
+            val result = withContext(Dispatchers.IO) {
+                runCatching { action(::showImportProgress) }
+            }
             setBusy(false)
             result.onSuccess { imported ->
                 debugLog.recordDebug(
@@ -494,12 +503,28 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.importStatus.text = error.message ?: error.javaClass.simpleName
     }
 
+    private fun showImportProgress(progress: IptvImportProgress) {
+        binding.root.post {
+            binding.importStatus.text = when (progress.stage) {
+                IptvImportStage.CONNECTING -> getString(R.string.iptv_import_connecting)
+                IptvImportStage.READING -> getString(
+                    R.string.iptv_import_reading,
+                    progress.processedChannels,
+                )
+                IptvImportStage.SAVING -> getString(R.string.iptv_import_saving)
+                IptvImportStage.FINISHING -> getString(R.string.iptv_import_finishing)
+            }
+        }
+    }
+
     private fun setBusy(busy: Boolean) {
         binding.importUrlButton.isEnabled = !busy
         binding.importFileButton.isEnabled = !busy
         binding.importXtreamButton.isEnabled = !busy
         binding.importStalkerButton.isEnabled = !busy
         binding.sourceList.isEnabled = !busy
+        binding.importProgress.visibility = if (busy) View.VISIBLE else View.GONE
+        binding.importProgress.isIndeterminate = true
     }
 
     private fun sourceTypeLabel(kind: String): String = getString(

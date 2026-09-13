@@ -30,5 +30,6 @@ data class IptvChannelStagingEntity(
     val catchUpMode: String?,
     val catchUpSource: String?,
     val catchUpDays: Int,
+    val selected: Boolean = false,
     val createdAt: Long,
 )

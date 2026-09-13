@@ -40,6 +40,13 @@ data class IptvImportResult(
     val channelCount: Int,
 )
 
+enum class IptvImportStage { CONNECTING, READING, SAVING, FINISHING }
+
+data class IptvImportProgress(
+    val stage: IptvImportStage,
+    val processedChannels: Int = 0,
+)
+
 data class IptvStatistics(
     val sourceCount: Int,
     val channelCount: Int,
@@ -354,19 +361,28 @@ class IptvRepository(context: Context) {
 
     private fun IptvChannelListProjection.pageAnchor() = IptvPageAnchor(originalIndex, sourceKey)
 
-    suspend fun importUrl(location: String, nameOverride: String? = null): IptvImportResult {
-        return importUrlInternal(location, nameOverride, null)
+    suspend fun importUrl(
+        location: String,
+        nameOverride: String? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
+    ): IptvImportResult {
+        return importUrlInternal(location, nameOverride, null, onProgress)
     }
 
-    suspend fun updateUrl(source: IptvSourceEntity, location: String): IptvImportResult {
+    suspend fun updateUrl(
+        source: IptvSourceEntity,
+        location: String,
+        onProgress: (IptvImportProgress) -> Unit = {},
+    ): IptvImportResult {
         require(source.kind == KIND_URL) { "Yalniz URL kaynaklari duzenlenebilir." }
-        return importUrlInternal(location, source.name, source)
+        return importUrlInternal(location, source.name, source, onProgress)
     }
 
     private suspend fun importUrlInternal(
         location: String,
         nameOverride: String?,
         replacementSource: IptvSourceEntity?,
+        onProgress: (IptvImportProgress) -> Unit,
     ): IptvImportResult {
         val normalized = location.trim()
         require(normalized.startsWith("http://") || normalized.startsWith("https://"))
@@ -374,6 +390,7 @@ class IptvRepository(context: Context) {
         require(conflicting == null || conflicting.id == replacementSource?.id) {
             "Bu adres zaten baska bir IPTV listesinde kayitli."
         }
+        onProgress(IptvImportProgress(IptvImportStage.CONNECTING))
         val opened = openPlaylistConnection(normalized)
         val connection = opened.connection
         try {
@@ -390,7 +407,7 @@ class IptvRepository(context: Context) {
                 ?: "IPTV"
             val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: derivedName
             return input.use {
-                importStream(normalized, KIND_URL, name, it, replacementSource)
+                importStream(normalized, KIND_URL, name, it, replacementSource, onProgress)
             }
         } finally {
             connection.disconnect()
@@ -445,12 +462,13 @@ class IptvRepository(context: Context) {
         uri: Uri,
         name: String,
         replacementSource: IptvSourceEntity? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
     ): IptvImportResult {
         val input = checkNotNull(appContext.contentResolver.openInputStream(uri))
         val compressed = uri.lastPathSegment?.endsWith(".gz", ignoreCase = true) == true
         val decoded = if (compressed) GZIPInputStream(input) else input
         return decoded.use {
-            importStream(uri.toString(), KIND_DOCUMENT, name, it, replacementSource)
+            importStream(uri.toString(), KIND_DOCUMENT, name, it, replacementSource, onProgress)
         }
     }
 
@@ -460,6 +478,7 @@ class IptvRepository(context: Context) {
         password: String,
         name: String,
         replacementSource: IptvSourceEntity? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
     ): IptvImportResult {
         require(username.isNotBlank() && password.isNotBlank()) {
             "Xtream kullanıcı adı ve parola gereklidir."
@@ -474,6 +493,7 @@ class IptvRepository(context: Context) {
             username = username.trim(),
             password = password,
             replacementSource = replacementSource,
+            onProgress = onProgress,
         ) { client.channels().asIterable() }
         xmlTvRepository.ensurePeriodicRefresh()
         xmlTvRepository.requestXtreamRefresh(force = true)
@@ -485,6 +505,7 @@ class IptvRepository(context: Context) {
         macAddress: String,
         name: String,
         replacementSource: IptvSourceEntity? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
     ): IptvImportResult {
         val normalizedMac = normalizeMac(macAddress)
         val client = StalkerClient(portalUrl, normalizedMac)
@@ -495,24 +516,30 @@ class IptvRepository(context: Context) {
             serverUrl = client.endpoint,
             macAddress = normalizedMac,
             replacementSource = replacementSource,
+            onProgress = onProgress,
         ) { client.channels().asIterable() }
     }
 
-    suspend fun refresh(source: IptvSourceEntity): IptvImportResult = when (source.kind) {
-        KIND_URL -> importUrlInternal(source.location, source.name, source)
-        KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name, source)
+    suspend fun refresh(
+        source: IptvSourceEntity,
+        onProgress: (IptvImportProgress) -> Unit = {},
+    ): IptvImportResult = when (source.kind) {
+        KIND_URL -> importUrlInternal(source.location, source.name, source, onProgress)
+        KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name, source, onProgress)
         KIND_XTREAM -> importXtream(
             checkNotNull(source.serverUrl),
             checkNotNull(source.username),
             checkNotNull(source.password),
             source.name,
             source,
+            onProgress,
         )
         KIND_STALKER -> importStalker(
             checkNotNull(source.serverUrl),
             checkNotNull(source.macAddress),
             source.name,
             source,
+            onProgress,
         )
         else -> error("Bilinmeyen IPTV kaynak türü: ${source.kind}")
     }
@@ -528,7 +555,14 @@ class IptvRepository(context: Context) {
         name: String,
         input: InputStream,
         replacementSource: IptvSourceEntity? = null,
-    ): IptvImportResult = importGenerated(location, kind, name, replacementSource = replacementSource) {
+        onProgress: (IptvImportProgress) -> Unit = {},
+    ): IptvImportResult = importGenerated(
+        location,
+        kind,
+        name,
+        replacementSource = replacementSource,
+        onProgress = onProgress,
+    ) {
         M3uParser.sequence(InputStreamReader(input, Charsets.UTF_8)).asIterable()
     }
 
@@ -541,6 +575,7 @@ class IptvRepository(context: Context) {
         password: String? = null,
         macAddress: String? = null,
         replacementSource: IptvSourceEntity? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
         produce: () -> Iterable<ParsedIptvChannel>,
     ): IptvImportResult {
         val result = IMPORT_MUTEX.withLock {
@@ -548,6 +583,7 @@ class IptvRepository(context: Context) {
             val now = System.currentTimeMillis()
             try {
                 dao.deleteStaleStaging(now - STAGING_MAX_AGE_MS)
+                onProgress(IptvImportProgress(IptvImportStage.READING))
                 val batch = ArrayList<IptvChannelStagingEntity>(IMPORT_BATCH_SIZE)
                 var channelCount = 0
                 for (item in produce()) {
@@ -582,13 +618,16 @@ class IptvRepository(context: Context) {
                     if (batch.size >= IMPORT_BATCH_SIZE) {
                         dao.insertStagedChannels(batch.toList())
                         batch.clear()
+                        onProgress(IptvImportProgress(IptvImportStage.READING, channelCount))
                     }
                 }
                 if (batch.isNotEmpty()) dao.insertStagedChannels(batch)
+                onProgress(IptvImportProgress(IptvImportStage.READING, channelCount))
                 require(channelCount > 0 && dao.stagingCount(sessionId) > 0) {
                     "Listede oynatılabilir IPTV kanalı bulunamadı."
                 }
 
+                onProgress(IptvImportProgress(IptvImportStage.SAVING, channelCount))
                 database.withTransaction {
                     val existing = replacementSource ?: dao.getSourceByLocation(location)
                     val sourceId = existing?.id ?: dao.insertSource(
@@ -622,10 +661,10 @@ class IptvRepository(context: Context) {
                     dao.updateSource(source)
                     dao.resolveStagedSourceKeys(sessionId, sourceId)
                     dao.discardSupersededStagedDuplicates(sessionId)
-                    dao.updateChangedStagedChannels(sessionId, sourceId)
-                    dao.touchStagedChannels(sessionId, sourceId, now)
-                    dao.insertNewStagedChannels(sessionId, sourceId, now)
-                    dao.deleteChannelsMissingFromStaging(sourceId, sessionId)
+                    dao.preserveStagedSelection(sessionId)
+                    dao.deleteSourceChannels(sourceId)
+                    dao.insertStagedAsSource(sessionId, sourceId, now)
+                    onProgress(IptvImportProgress(IptvImportStage.FINISHING, channelCount))
                     IptvImportResult(sourceId, source.name, dao.channelCount(sourceId))
                 }
             } finally {

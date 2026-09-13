@@ -372,6 +372,10 @@
     <string name="saved_iptv_sources">Saved lists</string>
     <string name="iptv_url_required">Enter a valid list URL first.</string>
     <string name="iptv_importing">Reading IPTV source...</string>
+    <string name="iptv_import_connecting">Connecting to IPTV source...</string>
+    <string name="iptv_import_reading">Reading IPTV source: %1$d items</string>
+    <string name="iptv_import_saving">Applying database changes...</string>
+    <string name="iptv_import_finishing">Finishing IPTV list...</string>
     <string name="iptv_import_complete">%1$d IPTV channels imported.</string>
     <string name="iptv_source_row">%1$s\n%2$d channels - %3$d selected</string>
     <string name="iptv_source_channel_count">This list contains %1$d channels.</string>
