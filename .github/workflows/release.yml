@@ -61,7 +61,8 @@ jobs:
           TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease
+          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease \
+            -PtvappTargetAbis=arm64-v8a,armeabi-v7a
 
       - name: Prepare release assets
         id: assets

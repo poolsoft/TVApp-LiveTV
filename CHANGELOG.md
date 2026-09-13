@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Release APK boyutu
+* TV release derlemelerinde R8 ve kaynak küçültme etkinleştirildi. GitHub TV APK'sı yalnız
+  fiziksel TV cihazları için ARM64 ve ARMv7 yerel kütüphanelerini içeriyor; emülatör için gereken
+  x86_64 yalnız yerel debug derlemelerinde tutuluyor.
+
 ### Deneysel IJK fallback dalı
 * Media3 ana IPTV motoru olarak korunurken yalnız ana tam ekran oynatıcıdaki decoder ve kaynak
   biçimi hataları için bir defalık IJK fallback eklendi. Ağ ve HTTP hataları fallback tetiklemez.

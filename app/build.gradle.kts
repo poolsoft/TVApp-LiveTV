@@ -30,10 +30,6 @@ val targetAbis = providers.gradleProperty("tvappTargetAbis").orNull
     ?.filter(String::isNotEmpty)
     ?.toSet()
     ?: setOf("arm64-v8a", "armeabi-v7a", "x86_64")
-val experimentalMinify = providers.gradleProperty("tvappExperimentalMinify")
-    .orNull
-    .toBoolean()
-
 android {
     namespace = "com.tvapp.livetv"
     compileSdk = 35
@@ -111,7 +107,8 @@ android {
         }
         getByName("release") {
             signingConfig = signingConfigs.findByName("release")
-            isMinifyEnabled = experimentalMinify
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
