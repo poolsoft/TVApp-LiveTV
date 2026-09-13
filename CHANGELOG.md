@@ -18,6 +18,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
   medya kontrol satırı etkin motoru gösterir ve aynı seçimi kanal üzerinde doğrudan değiştirebilir.
 * Ayarlardaki motor seçimi genel varsayılan olarak bırakıldı; medya kontrolündeki seçim kanal
   bazında Room'a kaydedilir. Kanal kilidi kaldırıldığında yeniden genel varsayılan kullanılır.
+* Kanal bazındaki motor seçiminin genel ayardan önce uygulanması tek çözümleyicide sabitlendi;
+  motor seçici simgesi diğer kompakt medya kontrolleriyle aynı çizgi stiline getirildi.
 * Önizleme, Grid, PiP, Multi View, TIF ve TV Input Service deneyin dışında bırakıldı; oynatıcı
   değişimi mevcut TVApp infobar ve medya kontrollerini kullanmaya devam eder.
 * ARM64 ve ARMv7 içeren deney APK'sını 30 MiB sınırıyla ayrı prerelease olarak yayımlayan iş akışı eklendi.

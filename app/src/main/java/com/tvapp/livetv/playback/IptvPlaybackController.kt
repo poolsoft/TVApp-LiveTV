@@ -27,6 +27,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
 import com.tvapp.livetv.settings.IptvPlaybackEngineMode
 import com.tvapp.livetv.ui.isRadioChannel
+import com.tvapp.livetv.settings.resolveIptvPlaybackEngineMode
 import java.util.Locale
 import tv.danmaku.ijk.media.player.misc.ITrackInfo
 
@@ -161,9 +162,10 @@ class IptvPlaybackController(
         playbackPreferences = playbackPreferencesStore.load()
         targetBufferSeconds = playbackPreferences.targetBufferSeconds
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
-        playbackEngineMode = channel.playbackEngineOverride
-            ?.let { stored -> IptvPlaybackEngineMode.entries.firstOrNull { it.name == stored } }
-            ?: playbackPreferences.engineMode
+        playbackEngineMode = resolveIptvPlaybackEngineMode(
+            channel.playbackEngineOverride,
+            playbackPreferences.engineMode,
+        )
         if (player != null && previousBufferSeconds != targetBufferSeconds) {
             playerView.player = null
             player?.release()

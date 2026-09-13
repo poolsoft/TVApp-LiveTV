@@ -22,6 +22,13 @@ enum class IptvPlaybackEngineMode {
     IJK,
 }
 
+internal fun resolveIptvPlaybackEngineMode(
+    channelOverride: String?,
+    defaultMode: IptvPlaybackEngineMode,
+): IptvPlaybackEngineMode = channelOverride
+    ?.let { stored -> IptvPlaybackEngineMode.entries.firstOrNull { it.name == stored } }
+    ?: defaultMode
+
 class IptvPlaybackPreferencesStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
