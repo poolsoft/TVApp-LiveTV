@@ -12,7 +12,6 @@ enum class PrimaryOsd {
 enum class PlaybackSurfaceMode {
     SINGLE,
     IPTV_GRID,
-    MULTI_VIEW,
     IPTV_OVERLAY,
     INTERNAL_MINI_PLAYER,
 }

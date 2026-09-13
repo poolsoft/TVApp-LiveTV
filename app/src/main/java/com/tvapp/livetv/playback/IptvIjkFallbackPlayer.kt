@@ -1,16 +1,22 @@
 package com.tvapp.livetv.playback
 
-import android.media.AudioManager
 import android.graphics.Color
+import android.graphics.SurfaceTexture
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.TextureView
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.ui.isRadioChannel
+import java.util.Locale
+import tv.danmaku.ijk.media.player.IjkMediaMeta
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
+import tv.danmaku.ijk.media.player.misc.IMediaFormat
 import tv.danmaku.ijk.media.player.misc.ITrackInfo
 
 /** Minimal IJK bridge. TVApp keeps ownership of every visible playback control. */
@@ -19,6 +25,8 @@ internal class IptvIjkFallbackPlayer(
 ) {
     private var player: IjkMediaPlayer? = null
     private var surfaceView: SurfaceView? = null
+    private var textureView: TextureView? = null
+    private var textureSurface: Surface? = null
     private var startPositionMillis = 0L
     private var playbackSpeed = 1f
     private var muted = false
@@ -31,6 +39,7 @@ internal class IptvIjkFallbackPlayer(
 
     var onPrepared: (() -> Unit)? = null
     var onFirstFrame: (() -> Unit)? = null
+    var onFrameRendered: (() -> Unit)? = null
     var onBufferingChanged: ((Boolean) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
     var onVideoSizeChanged: (() -> Unit)? = null
@@ -52,6 +61,27 @@ internal class IptvIjkFallbackPlayer(
         }
     }
 
+    private val textureListener = object : TextureView.SurfaceTextureListener {
+        override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+            attachTextureSurface(surface)
+        }
+
+        override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+            attachTextureSurface(surface)
+        }
+
+        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+            player?.setSurface(null)
+            textureSurface?.release()
+            textureSurface = null
+            return true
+        }
+
+        override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
+            onFrameRendered?.invoke()
+        }
+    }
+
     fun start(
         channel: LiveChannel,
         positionMillis: Long,
@@ -63,9 +93,8 @@ internal class IptvIjkFallbackPlayer(
         // Stalker commands require a network handshake. Media3 resolves them on its loader thread;
         // the first fallback experiment deliberately avoids moving that operation onto the UI thread.
         if (channel.uri.startsWith("tvapp-stalker:", ignoreCase = true)) return false
-        val videoSurface = playerView.videoSurfaceView as? SurfaceView ?: return false
+        val videoSurface = playerView.videoSurfaceView ?: return false
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
-        surfaceView = videoSurface
         startPositionMillis = positionMillis.coerceAtLeast(0L)
         playbackSpeed = speed
         muted = initiallyMuted
@@ -76,11 +105,19 @@ internal class IptvIjkFallbackPlayer(
         player = created
         IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_WARN)
         created.setAudioStreamType(AudioManager.STREAM_MUSIC)
-        created.setOption(
-            IjkMediaPlayer.OPT_CATEGORY_PLAYER,
-            "mediacodec",
-            if (forceSoftwareVideoDecoder) 0L else 1L,
-        )
+        val hardwareDecoderEnabled = if (forceSoftwareVideoDecoder) 0L else 1L
+        listOf(
+            "mediacodec-avc",
+            "mediacodec-hevc",
+            "mediacodec-mpeg2",
+            "mediacodec-mpeg4",
+        ).forEach { codecOption ->
+            created.setOption(
+                IjkMediaPlayer.OPT_CATEGORY_PLAYER,
+                codecOption,
+                hardwareDecoderEnabled,
+            )
+        }
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1L)
         created.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER,
@@ -158,8 +195,23 @@ internal class IptvIjkFallbackPlayer(
             true
         }
 
-        videoSurface.holder.addCallback(surfaceCallback)
-        if (videoSurface.holder.surface.isValid) created.setSurface(videoSurface.holder.surface)
+        when (videoSurface) {
+            is SurfaceView -> {
+                surfaceView = videoSurface
+                videoSurface.holder.addCallback(surfaceCallback)
+                if (videoSurface.holder.surface.isValid) created.setSurface(videoSurface.holder.surface)
+            }
+            is TextureView -> {
+                textureView = videoSurface
+                videoSurface.surfaceTextureListener = textureListener
+                videoSurface.surfaceTexture?.takeIf { videoSurface.isAvailable }
+                    ?.let(::attachTextureSurface)
+            }
+            else -> {
+                release()
+                return false
+            }
+        }
         val headers = buildMap {
             put("User-Agent", channel.userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
             channel.referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
@@ -205,17 +257,37 @@ internal class IptvIjkFallbackPlayer(
 
     fun isPlaying(): Boolean = player?.isPlaying == true
 
-    fun tracks(type: Int): List<IptvTrackOption> = player?.trackInfo.orEmpty()
-        .mapIndexedNotNull { index, track ->
+    fun bufferedDurationMillis(): Long = player?.let { current ->
+        maxOf(
+            runCatching { current.videoCachedDuration }.getOrDefault(0L),
+            runCatching { current.audioCachedDuration }.getOrDefault(0L),
+        ).coerceAtLeast(0L)
+    } ?: 0L
+
+    fun droppedFrameRate(): Float? = player?.let { current ->
+        runCatching { current.dropFrameRate }.getOrNull()?.takeIf { it >= 0f }
+    }
+
+    fun tracks(type: Int): List<IptvTrackOption> {
+        val current = player ?: return emptyList()
+        val meta = mediaMeta(current)
+        return current.trackInfo.orEmpty().mapIndexedNotNull { index, track ->
             if (track.trackType != type) return@mapIndexedNotNull null
+            val stream = meta?.mStreams?.getOrNull(index)
             IptvTrackOption(
                 id = "ijk:$index",
                 language = track.language,
                 label = track.infoInline,
-                mimeType = null,
-                selected = player?.getSelectedTrack(type) == index,
+                mimeType = runCatching {
+                    track.format?.getString(IMediaFormat.KEY_MIME)
+                }.getOrNull(),
+                selected = current.getSelectedTrack(type) == index,
+                width = stream?.mWidth?.takeIf { it > 0 } ?: track.formatValue(IMediaFormat.KEY_WIDTH),
+                height = stream?.mHeight?.takeIf { it > 0 } ?: track.formatValue(IMediaFormat.KEY_HEIGHT),
+                bitrate = stream?.mBitrate?.positiveInt(),
             )
         }
+    }
 
     fun selectTrack(type: Int, id: String): Boolean {
         val index = id.removePrefix("ijk:").toIntOrNull() ?: return false
@@ -239,16 +311,40 @@ internal class IptvIjkFallbackPlayer(
             it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_SUBTITLE ||
                 it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT
         }
+        val meta = mediaMeta(current)
+        val video = meta?.mVideoStream
+        val audio = meta?.mAudioStream
+        val audioCodec = audio?.mCodecName ?: current.mediaInfo?.mAudioDecoder
+        val normalizedAudioCodec = audioCodec?.lowercase(Locale.ROOT).orEmpty()
+        val outputFps = runCatching { current.videoOutputFramesPerSecond }
+            .getOrNull()
+            ?.takeIf { it > 0f }
+        val networkSpeed = runCatching { current.tcpSpeed }.getOrDefault(0L)
         return IptvTechnicalSnapshot(
-            width = current.videoWidth.takeIf { it > 0 },
-            height = current.videoHeight.takeIf { it > 0 },
-            videoCodec = current.mediaInfo?.mVideoDecoder,
-            audioCodec = current.mediaInfo?.mAudioDecoder,
-            bufferedDurationMillis = 0L,
-            hasAudio = audioTracks.isNotEmpty(),
+            width = video?.mWidth?.takeIf { it > 0 } ?: current.videoWidth.takeIf { it > 0 },
+            height = video?.mHeight?.takeIf { it > 0 } ?: current.videoHeight.takeIf { it > 0 },
+            videoCodec = video?.mCodecName ?: current.mediaInfo?.mVideoDecoder,
+            audioCodec = audioCodec,
+            bitrate = (video?.mBitrate?.takeIf { it > 0 }
+                ?: runCatching { current.bitRate }.getOrDefault(0L).takeIf { it > 0 })?.positiveInt(),
+            bufferedDurationMillis = bufferedDurationMillis(),
+            hasAudio = audioTracks.isNotEmpty() || audio != null,
             hasSubtitles = subtitleTracks.isNotEmpty(),
-            audioLanguage = audioTracks.firstOrNull()?.language,
+            audioLanguage = audioTracks.firstOrNull()?.language ?: audio?.mLanguage,
             subtitleLanguage = subtitleTracks.firstOrNull()?.language,
+            hasDolby = normalizedAudioCodec.contains("ac3") ||
+                normalizedAudioCodec.contains("eac3") ||
+                normalizedAudioCodec.contains("dolby"),
+            isAdaptive = tracks.count { it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_VIDEO } > 1,
+            estimatedBandwidthBps = networkSpeed.takeIf { it > 0 }?.let { it * 8L },
+            containerFormat = meta?.mFormat,
+            videoProfile = video?.mCodecProfile,
+            framesPerSecond = outputFps ?: video?.frameRate(),
+            droppedFrameRate = droppedFrameRate(),
+            audioSampleRateHz = audio?.mSampleRate?.takeIf { it > 0 },
+            audioChannelCount = audio?.mChannelLayout?.takeIf { it > 0 }
+                ?.let(java.lang.Long::bitCount)
+                ?.takeIf { it > 0 },
         )
     }
 
@@ -256,6 +352,11 @@ internal class IptvIjkFallbackPlayer(
         videoStartHandler.removeCallbacksAndMessages(null)
         surfaceView?.holder?.removeCallback(surfaceCallback)
         surfaceView = null
+        textureView?.takeIf { it.surfaceTextureListener === textureListener }
+            ?.surfaceTextureListener = null
+        textureView = null
+        textureSurface?.release()
+        textureSurface = null
         val current = player
         player = null
         current?.let {
@@ -269,6 +370,29 @@ internal class IptvIjkFallbackPlayer(
     private fun applyVolume() {
         val volume = if (muted) 0f else 1f
         player?.setVolume(volume, volume)
+    }
+
+    private fun attachTextureSurface(surfaceTexture: SurfaceTexture) {
+        textureSurface?.release()
+        textureSurface = Surface(surfaceTexture).also { player?.setSurface(it) }
+    }
+
+    private fun mediaMeta(current: IjkMediaPlayer): IjkMediaMeta? = runCatching {
+        current.mediaMeta?.let(IjkMediaMeta::parse)
+    }.getOrNull()
+
+    private fun ITrackInfo.formatValue(key: String): Int? = runCatching {
+        format?.getInteger(key)
+    }.getOrNull()?.takeIf { it > 0 }
+
+    private fun Long.positiveInt(): Int? = takeIf { it > 0 }
+        ?.coerceAtMost(Int.MAX_VALUE.toLong())
+        ?.toInt()
+
+    private fun IjkMediaMeta.IjkStreamMeta.frameRate(): Float? = if (mFpsNum > 0 && mFpsDen > 0) {
+        mFpsNum.toFloat() / mFpsDen
+    } else {
+        null
     }
 
     private companion object {

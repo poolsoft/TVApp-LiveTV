@@ -27,7 +27,6 @@ enum class RemoteAction {
     FORWARD_TO_DIALOG,
     HANDLE_SETTINGS_PRESS,
     HANDLE_GRID,
-    HANDLE_MULTI_VIEW,
     DISMISS_STATUS,
     DISMISS_RECENT_CHANNELS,
     HANDLE_PARENTAL_LOCK,
@@ -58,7 +57,6 @@ class RemoteActionRouter {
 
         when (context.playbackUiState.playbackMode) {
             PlaybackSurfaceMode.IPTV_GRID -> return RemoteAction.HANDLE_GRID
-            PlaybackSurfaceMode.MULTI_VIEW -> return RemoteAction.HANDLE_MULTI_VIEW
             else -> Unit
         }
 

@@ -20,12 +20,6 @@
         app:show_buffering="when_playing"
         app:use_controller="false" />
 
-    <android.media.tv.TvView
-        android:id="@+id/secondary_tv_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
-
     <androidx.media3.ui.PlayerView
         android:id="@+id/secondary_iptv_player_view"
         android:layout_width="match_parent"
@@ -35,29 +29,11 @@
         app:surface_type="texture_view"
         app:use_controller="false" />
 
-    <View
-        android:id="@+id/multi_view_left_focus"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:background="@drawable/bg_multiview_active"
-        android:elevation="18dp"
-        android:visibility="gone" />
-
-    <View
-        android:id="@+id/multi_view_right_focus"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="end"
-        android:background="@drawable/bg_multiview_active"
-        android:elevation="18dp"
-        android:visibility="gone" />
-
     <GridLayout
         android:id="@+id/iptv_grid"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/black"
+        android:background="@android:color/transparent"
         android:columnCount="2"
         android:padding="6dp"
         android:rowCount="2"

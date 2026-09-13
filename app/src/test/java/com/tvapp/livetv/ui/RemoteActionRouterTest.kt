@@ -22,10 +22,6 @@ class RemoteActionRouterTest {
             RemoteAction.HANDLE_GRID,
             route(mode = PlaybackSurfaceMode.IPTV_GRID, primary = PrimaryOsd.CHANNEL_PANEL),
         )
-        assertEquals(
-            RemoteAction.HANDLE_MULTI_VIEW,
-            route(mode = PlaybackSurfaceMode.MULTI_VIEW, primary = PrimaryOsd.IPTV_CONTROLS),
-        )
     }
 
     @Test

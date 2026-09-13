@@ -89,6 +89,9 @@ class IptvPlaybackController(
                 lastFrameAt = now
                 onHealthChanged?.invoke(healthSnapshot())
             }
+            fallback.onFrameRendered = {
+                lastFrameAt = SystemClock.elapsedRealtime()
+            }
             fallback.onBufferingChanged = { buffering ->
                 bufferingStartedAt = if (buffering) SystemClock.elapsedRealtime() else null
                 updateHealthPhase(
@@ -656,6 +659,12 @@ class IptvPlaybackController(
             videoCodec = technical.videoCodec,
             audioCodec = technical.audioCodec,
             droppedFrames = if (usingIjk) 0 else current?.videoDecoderCounters?.droppedBufferCount ?: 0,
+            droppedFrameRate = technical.droppedFrameRate,
+            framesPerSecond = technical.framesPerSecond,
+            containerFormat = technical.containerFormat,
+            videoProfile = technical.videoProfile,
+            audioSampleRateHz = technical.audioSampleRateHz,
+            audioChannelCount = technical.audioChannelCount,
             retryAttempt = retryCount,
             lastErrorCode = lastErrorCode,
             lastFailureClass = lastFailureClass,
@@ -855,6 +864,11 @@ class IptvPlaybackController(
             hasDolby = hasDolby,
             isAdaptive = isAdaptive,
             estimatedBandwidthBps = estimatedBw,
+            containerFormat = videoFormat?.containerMimeType,
+            videoProfile = videoFormat?.codecs,
+            framesPerSecond = videoFormat?.frameRate?.takeIf { it > 0f },
+            audioSampleRateHz = p.audioFormat?.sampleRate?.takeIf { it > 0 },
+            audioChannelCount = p.audioFormat?.channelCount?.takeIf { it > 0 },
         )
     }
 
@@ -864,10 +878,40 @@ class IptvPlaybackController(
     }
 
     private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
-        if (usingIjk) return null
-        val current = player ?: return null
         val channel = currentChannel ?: return null
-        if (recoveryExhausted || !current.playWhenReady || current.playbackState == Player.STATE_ENDED) {
+        if (recoveryExhausted) return null
+        if (usingIjk) {
+            val fallback = ijkFallbackPlayer ?: return null
+            val position = fallback.positionMillis()
+            val progressAdvanced = lastObservedPosition == C.TIME_UNSET ||
+                position - lastObservedPosition >= MIN_PROGRESS_MS
+            if (progressAdvanced) {
+                lastObservedPosition = position
+                lastProgressAt = now
+                if (firstFrameAt != null || channel.isRadioChannel()) {
+                    recoveryAttempt = 0
+                    recoveryExhausted = false
+                }
+            }
+            return decideIptvWatchdogReason(
+                observation = IptvWatchdogObservation(
+                    expectsVideo = !channel.isRadioChannel(),
+                    firstFrameRendered = firstFrameAt != null,
+                    startupMillis = now - tuneStartedAt,
+                    isIdle = healthPhase == IptvPlaybackPhase.IDLE,
+                    isBuffering = healthPhase == IptvPlaybackPhase.BUFFERING,
+                    bufferingMillis = bufferingStartedAt?.let { now - it } ?: 0L,
+                    isReadyAndPlaying = healthPhase == IptvPlaybackPhase.READY && fallback.isPlaying(),
+                    stalledProgressMillis = if (progressAdvanced) 0L else now - lastProgressAt,
+                    staleFrameMillis = lastFrameAt?.let { now - it },
+                ),
+                firstFrameTimeoutMillis = FIRST_FRAME_TIMEOUT_MS,
+                bufferingTimeoutMillis = BUFFERING_TIMEOUT_MS,
+                stallTimeoutMillis = STALL_TIMEOUT_MS,
+            )
+        }
+        val current = player ?: return null
+        if (!current.playWhenReady || current.playbackState == Player.STATE_ENDED) {
             return null
         }
         val bufferingFor = bufferingStartedAt?.let { now - it } ?: 0L
@@ -901,6 +945,10 @@ class IptvPlaybackController(
     }
 
     private fun recoverFromWatchdog(reason: IptvRecoveryReason) {
+        if (usingIjk) {
+            recoverIjkFromWatchdog(reason)
+            return
+        }
         val current = player ?: return
         recoveryAttempt++
         if (recoveryAttempt > MAX_WATCHDOG_RECOVERY_COUNT) {
@@ -926,6 +974,33 @@ class IptvPlaybackController(
         current.playWhenReady = true
         resetProgressObservation()
         tuneStartedAt = SystemClock.elapsedRealtime()
+    }
+
+    private fun recoverIjkFromWatchdog(reason: IptvRecoveryReason) {
+        val channel = currentChannel ?: return
+        recoveryAttempt++
+        if (recoveryAttempt > MAX_WATCHDOG_RECOVERY_COUNT) {
+            recoveryExhausted = true
+            onRecovery?.invoke(
+                IptvRecoveryEvent(reason, IptvRecoveryAction.EXHAUSTED, recoveryAttempt - 1),
+            )
+            finishIjkWithError(
+                message = "IJK watchdog exhausted: $reason",
+                what = IJK_MEDIA_ERROR_TIMED_OUT,
+                extra = 0,
+                failureClass = IptvPlaybackFailureClass.TIMEOUT,
+            )
+            return
+        }
+        onRecovery?.invoke(IptvRecoveryEvent(reason, IptvRecoveryAction.REPREPARE, recoveryAttempt))
+        explicitLoading = false
+        bufferingStartedAt = SystemClock.elapsedRealtime()
+        updateHealthPhase(IptvPlaybackPhase.BUFFERING)
+        val resumePosition = ijkFallbackPlayer?.positionMillis()?.takeIf {
+            channel.iptvContentType.equals("VOD", ignoreCase = true)
+        } ?: 0L
+        restartIjk(channel, resumePosition)
+        resetProgressObservation()
     }
 
     private fun updateHealthPhase(phase: IptvPlaybackPhase) {
@@ -1001,7 +1076,12 @@ class IptvPlaybackController(
                 initiallyMuted = muted,
                 forceSoftwareVideoDecoder = ijkSoftwareVideoDecoder,
             ) == true
-            if (!started) finishIjkWithError("IJK surface unavailable", 0, 0)
+            if (started) {
+                retryHandler.removeCallbacks(watchdogRunnable)
+                retryHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
+            } else {
+                finishIjkWithError("IJK surface unavailable", 0, 0)
+            }
             started
         } catch (error: Exception) {
             finishIjkWithError("IJK restart failed", 0, 0, error)
@@ -1017,10 +1097,12 @@ class IptvPlaybackController(
         what: Int,
         extra: Int,
         cause: Throwable? = null,
+        failureClass: IptvPlaybackFailureClass = classifyIjkPlaybackFailure(what, extra),
     ) {
         lastFallbackPositionMillis = ijkFallbackPlayer?.positionMillis() ?: 0L
         lastErrorCode = "IJK_${what}_$extra"
-        lastFailureClass = IptvPlaybackFailureClass.DECODER
+        lastFailureClass = failureClass
+        retryHandler.removeCallbacks(watchdogRunnable)
         updateHealthPhase(IptvPlaybackPhase.FAILED)
         onBuffering?.invoke(IptvBufferingState.NONE)
         ijkFallbackPlayer?.release()
@@ -1029,7 +1111,7 @@ class IptvPlaybackController(
             PlaybackException(
                 "$message (what=$what, extra=$extra)",
                 cause ?: IllegalStateException("$message (what=$what, extra=$extra)"),
-                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                ijkPlaybackExceptionCode(failureClass),
             ),
         )
     }
@@ -1068,6 +1150,7 @@ class IptvPlaybackController(
         const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
         const val WATCHDOG_INTERVAL_MS = 2_000L
         const val FIRST_FRAME_TIMEOUT_MS = 15_000L
+        const val IJK_MEDIA_ERROR_TIMED_OUT = -110
         const val BUFFERING_TIMEOUT_MS = 25_000L
         const val STALL_TIMEOUT_MS = 12_000L
         const val MIN_PROGRESS_MS = 500L
@@ -1142,4 +1225,10 @@ data class IptvTechnicalSnapshot(
     val hasDolby: Boolean = false,
     val isAdaptive: Boolean = false,
     val estimatedBandwidthBps: Long? = null,
+    val containerFormat: String? = null,
+    val videoProfile: String? = null,
+    val framesPerSecond: Float? = null,
+    val droppedFrameRate: Float? = null,
+    val audioSampleRateHz: Int? = null,
+    val audioChannelCount: Int? = null,
 )

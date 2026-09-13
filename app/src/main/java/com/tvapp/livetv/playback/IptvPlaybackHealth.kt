@@ -68,12 +68,36 @@ data class IptvPlaybackHealthSnapshot(
     val videoCodec: String? = null,
     val audioCodec: String? = null,
     val droppedFrames: Int = 0,
+    val droppedFrameRate: Float? = null,
+    val framesPerSecond: Float? = null,
+    val containerFormat: String? = null,
+    val videoProfile: String? = null,
+    val audioSampleRateHz: Int? = null,
+    val audioChannelCount: Int? = null,
     val retryAttempt: Int = 0,
     val lastErrorCode: String? = null,
     val lastFailureClass: IptvPlaybackFailureClass? = null,
     val engine: IptvPlaybackEngine = IptvPlaybackEngine.MEDIA3,
     val fallbackReason: String? = null,
 )
+
+internal fun classifyIjkPlaybackFailure(what: Int, extra: Int): IptvPlaybackFailureClass = when {
+    what == -110 -> IptvPlaybackFailureClass.TIMEOUT
+    what == -1004 -> IptvPlaybackFailureClass.NETWORK
+    what == -1010 -> IptvPlaybackFailureClass.DECODER
+    what == -1007 || what == 200 -> IptvPlaybackFailureClass.SOURCE
+    extra in 400..599 -> IptvPlaybackFailureClass.HTTP
+    else -> IptvPlaybackFailureClass.UNKNOWN
+}
+
+internal fun ijkPlaybackExceptionCode(failureClass: IptvPlaybackFailureClass): Int = when (failureClass) {
+    IptvPlaybackFailureClass.NETWORK -> androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+    IptvPlaybackFailureClass.HTTP -> androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+    IptvPlaybackFailureClass.DECODER -> androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED
+    IptvPlaybackFailureClass.SOURCE -> androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
+    IptvPlaybackFailureClass.TIMEOUT -> androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT
+    IptvPlaybackFailureClass.UNKNOWN -> androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED
+}
 
 internal fun classifyIptvPlaybackFailure(errorCodeName: String): IptvPlaybackFailureClass {
     val code = errorCodeName.uppercase()
