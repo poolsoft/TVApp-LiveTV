@@ -30,5 +30,6 @@ data class UserChannelEntity(
     val groupId: Long? = null,
     val epgIdOverride: String? = null,
     val epgSourceIdOverride: Long? = null,
+    val playbackEngineOverride: String? = null,
     val lastSeenAt: Long,
 )

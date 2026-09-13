@@ -132,6 +132,20 @@ class ChannelRepository(context: Context) {
         EpgSnapshotCache.invalidate(sourceKey)
     }
 
+    suspend fun setPlaybackEngineOverride(channel: LiveChannel, engine: String?) =
+        database.withTransaction {
+            val existing = channelDao.getChannel(channel.sourceKey)
+            val row = existing ?: UserChannelEntity(
+                sourceKey = channel.sourceKey,
+                sourceType = channel.source.name,
+                originalDisplayNumber = channel.displayNumber,
+                lastKnownName = channel.displayName,
+                sortOrder = (channelDao.maxSortOrder() ?: -1) + 1,
+                lastSeenAt = System.currentTimeMillis(),
+            )
+            channelDao.upsertChannels(listOf(row.copy(playbackEngineOverride = engine)))
+        }
+
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int) =
         channelDao.setSortOrder(sourceKey, sortOrder)
 

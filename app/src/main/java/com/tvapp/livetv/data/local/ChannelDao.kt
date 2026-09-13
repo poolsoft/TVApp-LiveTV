@@ -45,6 +45,9 @@ interface ChannelDao {
     @Query("UPDATE user_channels SET epgIdOverride = :epgId, epgSourceIdOverride = :sourceId WHERE sourceKey = :sourceKey")
     suspend fun setEpgOverride(sourceKey: String, epgId: String?, sourceId: Long?)
 
+    @Query("UPDATE user_channels SET playbackEngineOverride = :engine WHERE sourceKey = :sourceKey")
+    suspend fun setPlaybackEngineOverride(sourceKey: String, engine: String?)
+
     @Query("UPDATE user_channels SET sortOrder = :sortOrder WHERE sourceKey = :sourceKey")
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int)
 

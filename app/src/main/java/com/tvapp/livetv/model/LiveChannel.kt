@@ -22,6 +22,7 @@ data class LiveChannel(
     val catchUpMode: String? = null,
     val catchUpSource: String? = null,
     val catchUpDays: Int = 0,
+    val playbackEngineOverride: String? = null,
     val inMainList: Boolean = false,
     val source: Source = Source.TIF,
     val favorite: Boolean = false,
