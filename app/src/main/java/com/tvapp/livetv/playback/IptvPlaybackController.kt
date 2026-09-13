@@ -156,7 +156,9 @@ class IptvPlaybackController(
         playbackPreferences = playbackPreferencesStore.load()
         targetBufferSeconds = playbackPreferences.targetBufferSeconds
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
-        playbackEngineMode = playbackPreferences.engineMode
+        playbackEngineMode = channel.playbackEngineOverride
+            ?.let { stored -> IptvPlaybackEngineMode.entries.firstOrNull { it.name == stored } }
+            ?: playbackPreferences.engineMode
         if (player != null && previousBufferSeconds != targetBufferSeconds) {
             playerView.player = null
             player?.release()
@@ -511,16 +513,30 @@ class IptvPlaybackController(
         IptvPlaybackEngine.MEDIA3
     }
 
-    fun setPlaybackEngineMode(mode: IptvPlaybackEngineMode): IptvPlaybackEngineMode {
+    fun setPlaybackEngineMode(
+        mode: IptvPlaybackEngineMode,
+        persistAsDefault: Boolean = true,
+        channelOverride: String? = if (persistAsDefault) null else mode.name,
+    ): IptvPlaybackEngineMode {
         if (profile != IptvPlaybackProfile.PRIMARY || !enableIjkFallback) return playbackEngineMode
-        if (mode == playbackEngineMode) return mode
+        if (persistAsDefault) playbackPreferencesStore.saveEngineMode(mode)
+        if (mode == playbackEngineMode) {
+            currentChannel = currentChannel?.copy(playbackEngineOverride = channelOverride)
+            return mode
+        }
         val channel = currentChannel
         val resumePosition = playbackSnapshot().positionMillis.takeIf {
             channel?.iptvContentType.equals("VOD", ignoreCase = true)
         } ?: 0L
         playbackEngineMode = mode
-        playbackPreferencesStore.saveEngineMode(mode)
-        if (channel != null) play(channel, resumePosition)
+        if (channel != null) {
+            play(
+                channel.copy(
+                    playbackEngineOverride = channelOverride,
+                ),
+                resumePosition,
+            )
+        }
         return mode
     }
 

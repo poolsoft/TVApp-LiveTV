@@ -505,6 +505,9 @@
     <string name="iptv_engine_media3">Yalnız Media3</string>
     <string name="iptv_engine_auto_fallback">Media3 + otomatik IJK</string>
     <string name="iptv_engine_ijk">Doğrudan IJK</string>
+    <string name="iptv_engine_use_default">Genel varsayılanı kullan (%1$s)</string>
+    <string name="iptv_engine_channel_saved">Bu kanal için %1$s motoru kaydedildi</string>
+    <string name="iptv_engine_channel_default">Kanal motor kilidi kaldırıldı</string>
     <string name="automatic_abr">Otomatik (ABR)</string>
     <string name="iptv_more_controls">Ses · Altyazı · Kalite</string>
     <string name="iptv_play_label">Oynat</string>

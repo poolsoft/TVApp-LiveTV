@@ -75,6 +75,18 @@ class ChannelMergerTest {
         assertEquals(42L, result.epgSourceId)
     }
 
+    @Test
+    fun merge_appliesChannelPlaybackEngineOverride() {
+        val channel = channel("iptv", "1", "IPTV").copy(source = LiveChannel.Source.IPTV)
+        val preference = preference(channel, sortOrder = 0).copy(
+            playbackEngineOverride = "IJK",
+        )
+
+        val result = ChannelMerger.merge(listOf(channel), listOf(preference)).single()
+
+        assertEquals("IJK", result.playbackEngineOverride)
+    }
+
     private fun channel(key: String, number: String, name: String) = LiveChannel(
         id = key.hashCode().toLong(),
         sourceKey = key,

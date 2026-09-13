@@ -446,6 +446,7 @@ class AppBackupRepository(context: Context) {
             name("epgSourceIdOverride").apply {
                 channel.epgSourceIdOverride?.let(::value) ?: nullValue()
             }
+            name("playbackEngineOverride").nullableValue(channel.playbackEngineOverride)
             name("lastSeenAt").value(channel.lastSeenAt)
             endObject()
         }
@@ -521,6 +522,7 @@ class AppBackupRepository(context: Context) {
             groupId = nullableLong("groupId"),
             epgIdOverride = nullableString("epgIdOverride"),
             epgSourceIdOverride = nullableLong("epgSourceIdOverride"),
+            playbackEngineOverride = nullableString("playbackEngineOverride"),
             lastSeenAt = optLong("lastSeenAt", 0L),
         )
 

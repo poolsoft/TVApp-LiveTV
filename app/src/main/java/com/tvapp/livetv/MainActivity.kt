@@ -341,10 +341,17 @@ class MainActivity : TvRemoteActivity() {
     ) {
         applyDisplayPreferences()
         scheduleSleepTimer()
-        if (currentChannel?.source == LiveChannel.Source.IPTV) {
+        if (
+            currentChannel?.source == LiveChannel.Source.IPTV &&
+            currentChannel?.playbackEngineOverride == null
+        ) {
             val selectedEngine = IptvPlaybackPreferencesStore(this).load().engineMode
             if (selectedEngine != iptvPlayback.playbackEngineMode()) {
-                iptvPlayback.setPlaybackEngineMode(selectedEngine)
+                iptvPlayback.setPlaybackEngineMode(
+                    selectedEngine,
+                    persistAsDefault = false,
+                    channelOverride = null,
+                )
             }
         }
         val previousMode = experienceMode
@@ -842,10 +849,15 @@ class MainActivity : TvRemoteActivity() {
 
     private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
         val generation = ++channelResolutionGeneration
-        if (channel.source == LiveChannel.Source.IPTV && channel.uri.isBlank()) {
+        if (channel.source == LiveChannel.Source.IPTV) {
             lifecycleScope.launch {
-                val resolved = withContext(Dispatchers.IO) {
-                    iptvRepository.channel(channel.sourceKey)
+                val (resolved, preference) = withContext(Dispatchers.IO) {
+                    val resolvedChannel = if (channel.uri.isBlank()) {
+                        iptvRepository.channel(channel.sourceKey)
+                    } else {
+                        channel
+                    }
+                    resolvedChannel to repository.channelPreference(channel.sourceKey)
                 }
                 if (generation != channelResolutionGeneration) return@launch
                 if (resolved == null) {
@@ -857,6 +869,7 @@ class MainActivity : TvRemoteActivity() {
                     resolved.copy(
                         displayNumber = channel.displayNumber,
                         inMainList = channel.inMainList,
+                        playbackEngineOverride = preference?.playbackEngineOverride,
                     ),
                     recordHistory,
                 )
@@ -1782,6 +1795,12 @@ class MainActivity : TvRemoteActivity() {
                 IptvPlaybackEngine.MEDIA3 -> "Media3"
                 IptvPlaybackEngine.IJK -> "IJK"
             },
+        )
+        binding.iptvBtnEngine.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            R.drawable.ic_engine_small,
+            0,
+            if (currentChannel?.playbackEngineOverride != null) R.drawable.ic_lock_tiny else 0,
+            0,
         )
         binding.iptvBtnSpeed.visibility = View.VISIBLE
 
@@ -5048,21 +5067,67 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvEngineChoices() {
+        val channel = currentChannel?.takeIf { it.source == LiveChannel.Source.IPTV } ?: return
         val modes = IptvPlaybackEngineMode.entries
-        val labels = arrayOf(
+        val modeLabels = arrayOf(
             getString(R.string.iptv_engine_media3),
             getString(R.string.iptv_engine_auto_fallback),
             getString(R.string.iptv_engine_ijk),
         )
+        val defaultMode = IptvPlaybackPreferencesStore(this).load().engineMode
+        val labels = arrayOf(
+            getString(
+                R.string.iptv_engine_use_default,
+                modeLabels[modes.indexOf(defaultMode).coerceAtLeast(0)],
+            ),
+            *modeLabels,
+        )
+        val overrideMode = channel.playbackEngineOverride
+            ?.let { stored -> modes.firstOrNull { it.name == stored } }
+        val checked = overrideMode?.let { modes.indexOf(it) + 1 } ?: 0
         AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.iptv_playback_engine)
             .setSingleChoiceItems(
                 labels,
-                modes.indexOf(iptvPlayback.playbackEngineMode()).coerceAtLeast(0),
+                checked,
             ) { dialog, which ->
-                iptvPlayback.setPlaybackEngineMode(modes[which])
-                updateIptvPlaybackControls()
                 dialog.dismiss()
+                val selectedOverride = modes.getOrNull(which - 1)
+                val effectiveMode = selectedOverride ?: defaultMode
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        repository.setPlaybackEngineOverride(channel, selectedOverride?.name)
+                    }
+                    if (currentChannel?.sourceKey != channel.sourceKey) return@launch
+                    val updated = channel.copy(playbackEngineOverride = selectedOverride?.name)
+                    currentChannel = updated
+                    channels = channels.map { item ->
+                        if (item.sourceKey == updated.sourceKey) updated else item
+                    }
+                    iptvPlayback.setPlaybackEngineMode(
+                        effectiveMode,
+                        persistAsDefault = false,
+                        channelOverride = selectedOverride?.name,
+                    )
+                    debugLog.recordDebug(
+                        "IPTV_ENGINE_OVERRIDE | channel=${channel.sourceKey}, " +
+                            "override=${selectedOverride?.name ?: "DEFAULT"}, " +
+                            "effective=${effectiveMode.name}",
+                    )
+                    Toast.makeText(
+                        this@MainActivity,
+                        if (selectedOverride == null) {
+                            getString(R.string.iptv_engine_channel_default)
+                        } else {
+                            getString(
+                                R.string.iptv_engine_channel_saved,
+                                modeLabels[modes.indexOf(selectedOverride)],
+                            )
+                        },
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    updateIptvPlaybackControls()
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
