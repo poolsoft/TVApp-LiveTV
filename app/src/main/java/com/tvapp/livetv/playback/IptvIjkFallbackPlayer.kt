@@ -2,11 +2,14 @@ package com.tvapp.livetv.playback
 
 import android.media.AudioManager
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.ui.isRadioChannel
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import tv.danmaku.ijk.media.player.misc.ITrackInfo
 
@@ -19,6 +22,9 @@ internal class IptvIjkFallbackPlayer(
     private var startPositionMillis = 0L
     private var playbackSpeed = 1f
     private var muted = false
+    private var firstFrameRendered = false
+    private var videoSizeObserved = false
+    private val videoStartHandler = Handler(Looper.getMainLooper())
     private val contentFrame = playerView.findViewById<AspectRatioFrameLayout>(
         androidx.media3.ui.R.id.exo_content_frame,
     )
@@ -30,6 +36,7 @@ internal class IptvIjkFallbackPlayer(
     var onVideoSizeChanged: (() -> Unit)? = null
     var onCompletion: (() -> Unit)? = null
     var onError: ((Int, Int) -> Unit)? = null
+    var onVideoStartTimeout: (() -> Unit)? = null
 
     private val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
@@ -50,6 +57,7 @@ internal class IptvIjkFallbackPlayer(
         positionMillis: Long,
         speed: Float,
         initiallyMuted: Boolean,
+        forceSoftwareVideoDecoder: Boolean = false,
     ): Boolean {
         release()
         // Stalker commands require a network handshake. Media3 resolves them on its loader thread;
@@ -61,19 +69,29 @@ internal class IptvIjkFallbackPlayer(
         startPositionMillis = positionMillis.coerceAtLeast(0L)
         playbackSpeed = speed
         muted = initiallyMuted
+        firstFrameRendered = false
+        videoSizeObserved = false
 
         val created = IjkMediaPlayer()
         player = created
         IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_WARN)
         created.setAudioStreamType(AudioManager.STREAM_MUSIC)
-        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1L)
+        created.setOption(
+            IjkMediaPlayer.OPT_CATEGORY_PLAYER,
+            "mediacodec",
+            if (forceSoftwareVideoDecoder) 0L else 1L,
+        )
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1L)
         created.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER,
             "mediacodec-handle-resolution-change",
             1L,
         )
-        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-fallback", 1L)
+        created.setOption(
+            IjkMediaPlayer.OPT_CATEGORY_PLAYER,
+            "mediacodec-auto-fallback",
+            if (forceSoftwareVideoDecoder) 0L else 1L,
+        )
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1L)
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1L)
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 15_000_000L)
@@ -85,11 +103,38 @@ internal class IptvIjkFallbackPlayer(
             mediaPlayer.start()
             onPrepared?.invoke()
             onTracksChanged?.invoke()
+            videoStartHandler.postDelayed(
+                {
+                    val tracks = runCatching { created.trackInfo.orEmpty().toList() }
+                        .getOrDefault(emptyList())
+                    val hasVideoTrack = tracks.any {
+                        it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_VIDEO
+                    }
+                    val hasAudioTrack = tracks.any {
+                        it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO
+                    }
+                    val expectsVideo = !channel.isRadioChannel()
+                    val missingVideoMetadata = tracks.isEmpty() && expectsVideo
+                    if (
+                        player === created &&
+                        !firstFrameRendered &&
+                        (videoSizeObserved || hasVideoTrack || missingVideoMetadata) &&
+                        !(hasAudioTrack && !hasVideoTrack && !videoSizeObserved)
+                    ) {
+                        onVideoStartTimeout?.invoke()
+                    }
+                },
+                VIDEO_START_TIMEOUT_MS,
+            )
         }
         created.setOnInfoListener { _, what, _ ->
             if (player !== created) return@setOnInfoListener true
             when (what) {
-                IjkMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> onFirstFrame?.invoke()
+                IjkMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START -> {
+                    firstFrameRendered = true
+                    videoStartHandler.removeCallbacksAndMessages(null)
+                    onFirstFrame?.invoke()
+                }
                 IjkMediaPlayer.MEDIA_INFO_BUFFERING_START -> onBufferingChanged?.invoke(true)
                 IjkMediaPlayer.MEDIA_INFO_BUFFERING_END -> onBufferingChanged?.invoke(false)
             }
@@ -97,6 +142,7 @@ internal class IptvIjkFallbackPlayer(
         }
         created.setOnVideoSizeChangedListener { _, width, height, sarNum, sarDen ->
             if (player === created) {
+                videoSizeObserved = width > 0 && height > 0
                 val pixelRatio = if (sarNum > 0 && sarDen > 0) sarNum.toFloat() / sarDen else 1f
                 contentFrame?.setAspectRatio(
                     if (width > 0 && height > 0) width.toFloat() * pixelRatio / height else 0f,
@@ -207,6 +253,7 @@ internal class IptvIjkFallbackPlayer(
     }
 
     fun release() {
+        videoStartHandler.removeCallbacksAndMessages(null)
         surfaceView?.holder?.removeCallback(surfaceCallback)
         surfaceView = null
         val current = player
@@ -225,6 +272,7 @@ internal class IptvIjkFallbackPlayer(
     }
 
     private companion object {
+        const val VIDEO_START_TIMEOUT_MS = 12_000L
         const val DEFAULT_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

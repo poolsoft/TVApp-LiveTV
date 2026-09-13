@@ -68,6 +68,7 @@ class IptvPlaybackController(
     private var muted = false
     private var usingIjk = false
     private var ijkFallbackAttempted = false
+    private var ijkSoftwareVideoDecoder = false
     private var fallbackReason: String? = null
     private var lastFallbackPositionMillis = 0L
     private val ijkFallbackPlayer = if (enableIjkFallback) {
@@ -106,6 +107,9 @@ class IptvPlaybackController(
             }
             fallback.onError = { what, extra ->
                 finishIjkWithError("IJK playback error", what, extra)
+            }
+            fallback.onVideoStartTimeout = {
+                switchIjkToSoftwareVideoDecoder()
             }
         }
     } else {
@@ -147,6 +151,7 @@ class IptvPlaybackController(
         ijkFallbackPlayer?.release()
         usingIjk = false
         ijkFallbackAttempted = false
+        ijkSoftwareVideoDecoder = false
         fallbackReason = null
         lastFallbackPositionMillis = 0L
         retryCount = 0
@@ -315,6 +320,15 @@ class IptvPlaybackController(
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)
+        if (channel.iptvContentType.equals("LIVE", ignoreCase = true)) {
+            mediaItemBuilder.setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(liveTargetOffsetMillis())
+                    .setMinPlaybackSpeed(1f)
+                    .setMaxPlaybackSpeed(1f)
+                    .build(),
+            )
+        }
         channel.subtitleUrl?.takeIf(String::isNotBlank)?.let { subtitleUrl ->
             mediaItemBuilder.setSubtitleConfigurations(
                 listOf(
@@ -465,7 +479,13 @@ class IptvPlaybackController(
     fun catchUpToLive(maximumOffsetMillis: Long): Boolean {
         if (usingIjk) return false
         val current = player ?: return false
-        if (!current.isCurrentMediaItemLive) return false
+        if (
+            !current.isCurrentMediaItemLive ||
+            current.playbackState != Player.STATE_READY ||
+            !current.isPlaying
+        ) {
+            return false
+        }
         val offset = current.currentLiveOffset
         if (offset == C.TIME_UNSET || offset <= maximumOffsetMillis) return false
         current.seekToDefaultPosition()
@@ -950,6 +970,7 @@ class IptvPlaybackController(
                 positionMillis = resumePosition,
                 speed = if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f,
                 initiallyMuted = muted,
+                forceSoftwareVideoDecoder = ijkSoftwareVideoDecoder,
             ) == true
             if (!started) finishIjkWithError("IJK surface unavailable", 0, 0)
             true
@@ -976,6 +997,7 @@ class IptvPlaybackController(
                 positionMillis = positionMillis,
                 speed = if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f,
                 initiallyMuted = muted,
+                forceSoftwareVideoDecoder = ijkSoftwareVideoDecoder,
             ) == true
             if (!started) finishIjkWithError("IJK surface unavailable", 0, 0)
             started
@@ -1010,6 +1032,30 @@ class IptvPlaybackController(
         )
     }
 
+    private fun switchIjkToSoftwareVideoDecoder() {
+        val channel = currentChannel ?: return
+        if (!usingIjk) return
+        if (ijkSoftwareVideoDecoder) {
+            finishIjkWithError("IJK video frame timeout", 0, 0)
+            return
+        }
+        val resumePosition = ijkFallbackPlayer?.positionMillis()?.takeIf {
+            channel.iptvContentType.equals("VOD", ignoreCase = true)
+        } ?: 0L
+        ijkSoftwareVideoDecoder = true
+        fallbackReason = IJK_SOFTWARE_VIDEO_REASON
+        onEngineChanged?.invoke(IptvPlaybackEngine.IJK, fallbackReason)
+        restartIjk(channel, resumePosition)
+    }
+
+    private fun liveTargetOffsetMillis(): Long {
+        if (targetBufferSeconds <= 0) return DEFAULT_LIVE_TARGET_OFFSET_MS
+        return (targetBufferSeconds * 500L).coerceIn(
+            MIN_LIVE_TARGET_OFFSET_MS,
+            MAX_LIVE_TARGET_OFFSET_MS,
+        )
+    }
+
     private companion object {
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
@@ -1029,6 +1075,10 @@ class IptvPlaybackController(
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
         const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
         const val DIRECT_IJK_REASON = "DIRECT_MODE"
+        const val IJK_SOFTWARE_VIDEO_REASON = "NO_FIRST_FRAME_SOFTWARE_DECODER"
+        const val DEFAULT_LIVE_TARGET_OFFSET_MS = 6_000L
+        const val MIN_LIVE_TARGET_OFFSET_MS = 3_000L
+        const val MAX_LIVE_TARGET_OFFSET_MS = 10_000L
         fun subtitleMimeType(url: String): String = when (
             url.substringBefore('?').substringAfterLast('.', "").lowercase()
         ) {

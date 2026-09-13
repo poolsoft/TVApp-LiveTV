@@ -147,7 +147,7 @@ class MainActivity : TvRemoteActivity() {
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
         private const val EPG_FOCUS_DEBOUNCE_MS = 300L
         private const val EPG_LIST_WINDOW_RADIUS = 5
-        private const val IPTV_MAX_LIVE_OFFSET_MS = 18_000L
+        private const val IPTV_MAX_LIVE_OFFSET_MS = 60_000L
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
         private const val IPTV_LIBRARY_SOURCE_ID = "source-id"

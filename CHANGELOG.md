@@ -18,6 +18,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * ARM64 ve ARMv7 içeren deney APK'sını 30 MiB sınırıyla ayrı prerelease olarak yayımlayan iş akışı eklendi.
 
 ### IPTV oynatma toleransı
+* IJK donanım decoder'ında ses ve video bilgisi bulunduğu halde ilk kare 12 saniye içinde
+  gelmezse yayın bir kez FFmpeg yazılımsal video decoder'ıyla yeniden açılıyor. Radyo ve gerçek
+  ses yayınları bu denemeye alınmıyor; ikinci başarısızlık yeniden başlatma döngüsüne girmiyor.
+* Media3 canlı yayınlarında hedef canlı-uç gecikmesi tanımlandı ve otomatik hızlandırma/yavaşlatma
+  kapatıldı. Periyodik canlı-uç düzeltmesi buffer sırasında çalışmıyor ve yalnız oynayan yayın
+  60 saniyeden fazla geride kaldığında uygulanıyor; buffer tükenirken oluşan tekrar hissi giderildi.
 * IPTV HTTP isteklerine protokoller arası yönlendirme, tarayıcı uyumlu User-Agent ve canlı
   yayınlara uygun bağlantı/okuma zaman aşımı değerleri eklendi.
 * IPTV oynatma ağı bağlantı havuzu, HTTP/2 ve daha tutarlı yönlendirme davranışı için Media3
