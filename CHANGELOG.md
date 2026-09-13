@@ -6,6 +6,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### ijkplayer siyah ekran düzeltmesi ve Media3 extractor güçlendirmesi
+* ijkplayer motorunda canlı yayınlarda ses gelirken görüntünün gelmemesi (siyah ekran) sorunu giderildi:
+  - Canlı yayınlarda zaman damgası farkından karelerin atılmasını engelleyen `framedrop = 0` ayarlandı.
+  - TV yongalarında donanım decoder kilitlenmesine neden olan `mediacodec-handle-resolution-change` devre dışı bırakıldı; `mediacodec` ve `mediacodec-all-videos` donanım hızlandırma seçenekleri eklendi.
+  - SurfaceView yüzeyi bağlama mantığı `setDisplay(holder)` olarak güncellendi ve Media3 `PlayerView` perde katmanının (`exo_shutter`) ijkplayer görüntüsünü örtmesi engellendi.
+* Media3 `DefaultExtractorsFactory` yapısına CBR seeking desteği, `AdtsExtractor`, `Mp3Extractor`, `MatroskaExtractor` ve `FragmentedMp4Extractor` esneklik ve tolerans bayrakları eklenerek IPTV canlı ve VOD akışlarının doğrudan açılma başarısı artırıldı.
+
 ### IPTV kanal seçimi dikey araç çubuğu ve kalıcı kumanda rehberi
 * IPTV kanal seçim ekranında (`IptvChannelSelectionActivity`) işlem butonları ekranın soluna simge tabanlı dikey araç çubuğu olarak taşındı.
 * Kanal listesinde gezinirken Sol Ok (D-Pad Left) ile dikey bara geçiş, dikey bardan Sağ Ok (D-Pad Right) ile kalınan kanala geri dönüş sağlandı.

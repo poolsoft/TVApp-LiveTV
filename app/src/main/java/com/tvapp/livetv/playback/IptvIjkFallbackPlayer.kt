@@ -49,15 +49,15 @@ internal class IptvIjkFallbackPlayer(
 
     private val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
-            player?.setSurface(holder.surface)
+            player?.setDisplay(holder)
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            player?.setSurface(holder.surface)
+            player?.setDisplay(holder)
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
-            player?.setSurface(null)
+            player?.setDisplay(null)
         }
     }
 
@@ -95,6 +95,8 @@ internal class IptvIjkFallbackPlayer(
         if (channel.uri.startsWith("tvapp-stalker:", ignoreCase = true)) return false
         val videoSurface = playerView.videoSurfaceView ?: return false
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
+        playerView.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_shutter)?.visibility =
+            android.view.View.GONE
         startPositionMillis = positionMillis.coerceAtLeast(0L)
         playbackSpeed = speed
         muted = initiallyMuted
@@ -106,6 +108,8 @@ internal class IptvIjkFallbackPlayer(
         IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_WARN)
         created.setAudioStreamType(AudioManager.STREAM_MUSIC)
         val hardwareDecoderEnabled = if (forceSoftwareVideoDecoder) 0L else 1L
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", hardwareDecoderEnabled)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-all-videos", hardwareDecoderEnabled)
         listOf(
             "mediacodec-avc",
             "mediacodec-hevc",
@@ -118,20 +122,25 @@ internal class IptvIjkFallbackPlayer(
                 hardwareDecoderEnabled,
             )
         }
-        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 0L)
         created.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER,
             "mediacodec-handle-resolution-change",
-            1L,
+            0L,
         )
         created.setOption(
             IjkMediaPlayer.OPT_CATEGORY_PLAYER,
             "mediacodec-auto-fallback",
             if (forceSoftwareVideoDecoder) 0L else 1L,
         )
-        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 0L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", 0L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 1L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 1L)
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "reconnect", 1L)
         created.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 15_000_000L)
+        created.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "dns_cache_clear", 1L)
         created.setOnPreparedListener { mediaPlayer ->
             if (player !== created) return@setOnPreparedListener
             if (startPositionMillis > 0L) mediaPlayer.seekTo(startPositionMillis)
@@ -199,7 +208,7 @@ internal class IptvIjkFallbackPlayer(
             is SurfaceView -> {
                 surfaceView = videoSurface
                 videoSurface.holder.addCallback(surfaceCallback)
-                if (videoSurface.holder.surface.isValid) created.setSurface(videoSurface.holder.surface)
+                if (videoSurface.holder.surface.isValid) created.setDisplay(videoSurface.holder)
             }
             is TextureView -> {
                 textureView = videoSurface
@@ -360,10 +369,13 @@ internal class IptvIjkFallbackPlayer(
         val current = player
         player = null
         current?.let {
+            it.setDisplay(null)
             it.setSurface(null)
             it.release()
         }
         contentFrame?.setAspectRatio(0f)
+        playerView.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_shutter)?.visibility =
+            android.view.View.VISIBLE
         playerView.setShutterBackgroundColor(Color.BLACK)
     }
 
