@@ -53,6 +53,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * IPTV arama FTS tetikleyicileri kanal `rowid` değerini kullanacak şekilde taşındı. Kaynak yenileme artık bütün IPTV kataloglarının arama indeksini yeniden kurmuyor; yalnız değiştirilen kanal satırlarını güncelliyor.
 * Büyük ve yinelenen IPTV kataloglarında kanal kimliği eşleştirmesini dakikalara çıkaran sıralama sorguları kapsayıcı indekslere taşındı; hazırlama tablosundaki yinelenen kayıt temizliği de aynı şekilde indekslendi.
 * Yenileme logunda HTTP yanıt, okuma, eşleştirme ve veritabanı değiştirme süreleri ayrı kaydediliyor.
+* IPTV yönetiminde URL, dosya, Xtream ve Stalker kaynakları ayrı ikonlarla gösteriliyor; URL kaynak satırında adres yer alıyor ve güncelleme ilerlemesi işlenen listenin adını belirtiyor.
 
 ### Kanal listesi metin yerleşimi
 * Kanal adı üst satırın tamamını kullanacak şekilde genişletildi; kanal türü, üyelik ve kilit simgeleri EPG satırının sağına taşındı. Seri kanal adlarının ayırt edici son bölümleri için daha fazla alan açıldı.

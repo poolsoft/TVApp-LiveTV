@@ -39,6 +39,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private lateinit var debugLog: CrashReportStore
     private var sources: List<IptvSourceSummary> = emptyList()
     private var selectedSourcePosition = -1
+    private var activeOperationSourceName: String? = null
     private var sourceListLongPressHandled = false
     private var sourceListLongPressJob: Job? = null
 
@@ -149,6 +150,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     enteredName.isBlank() -> name.error = getString(R.string.iptv_source_name_required)
                     else -> {
                         submit.isEnabled = false
+                        activeOperationSourceName = enteredName
                         status.visibility = View.VISIBLE
                         status.setText(R.string.iptv_importing)
                         setBusy(true)
@@ -169,6 +171,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                                     imported.channelCount,
                                 )
                                 binding.importStatus.text = status.text
+                                activeOperationSourceName = null
                                 loadSources()
                                 setResult(RESULT_OK)
                                 delay(URL_SUCCESS_MESSAGE_MILLIS)
@@ -183,6 +186,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                                     R.string.iptv_url_import_failed,
                                     error.message ?: error.javaClass.simpleName,
                                 )
+                                activeOperationSourceName = null
                                 submit.isEnabled = true
                                 url.requestFocus()
                             }
@@ -197,7 +201,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private fun importDocument(uri: Uri) {
         val defaultName = documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
         promptSourceName(defaultName) { name ->
-            runImport("IPTV_FILE_IMPORT", openSelectionAfter = true) {
+            runImport("IPTV_FILE_IMPORT", name, openSelectionAfter = true) {
                 repository.importDocument(uri, name)
             }
         }
@@ -240,7 +244,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         showSourceDialog(R.string.add_xtream_title, listOf(name, server, username, password)) {
             val values = listOf(name, server, username, password).map { it.text.toString().trim() }
             if (values.any(String::isBlank)) return@showSourceDialog false
-            runImport("IPTV_XTREAM_IMPORT", openSelectionAfter = true) {
+            runImport("IPTV_XTREAM_IMPORT", values[0], openSelectionAfter = true) {
                 repository.importXtream(values[1], values[2], values[3], values[0])
             }
             true
@@ -254,7 +258,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         showSourceDialog(R.string.add_stalker_title, listOf(name, portal, mac)) {
             val values = listOf(name, portal, mac).map { it.text.toString().trim() }
             if (values.any(String::isBlank)) return@showSourceDialog false
-            runImport("IPTV_STALKER_IMPORT", openSelectionAfter = true) {
+            runImport("IPTV_STALKER_IMPORT", values[0], openSelectionAfter = true) {
                 repository.importStalker(values[1], values[2], values[0])
             }
             true
@@ -359,7 +363,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
         when (action) {
             SourceAction.SELECT -> openChannelSelection(summary.source.id, summary.source.name)
-            SourceAction.REFRESH -> runImport("IPTV_REFRESH") {
+            SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.name) {
                 repository.refresh(summary.source)
             }
             SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
@@ -389,7 +393,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     input.requestFocus()
                 } else {
                     dialog.dismiss()
-                    runImport("IPTV_URL_UPDATE") { repository.updateUrl(summary.source, url) }
+                    runImport("IPTV_URL_UPDATE", summary.source.name) {
+                        repository.updateUrl(summary.source, url)
+                    }
                 }
             }
             input.requestFocus()
@@ -432,11 +438,17 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun runImport(
         event: String,
+        sourceName: String,
         openSelectionAfter: Boolean = false,
         action: suspend ((IptvImportProgress) -> Unit) -> com.tvapp.livetv.data.IptvImportResult,
     ) {
+        activeOperationSourceName = sourceName
         setBusy(true)
-        binding.importStatus.setText(R.string.iptv_importing)
+        binding.importStatus.text = getString(
+            R.string.iptv_source_progress,
+            sourceName,
+            getString(R.string.iptv_importing),
+        )
         debugLog.recordDebug("$event START")
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -448,9 +460,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     "$event SUCCESS | source=${imported.sourceId}, channels=${imported.channelCount}",
                 )
                 binding.importStatus.text = getString(
-                    R.string.iptv_import_complete,
+                    R.string.iptv_source_import_complete,
+                    imported.sourceName,
                     imported.channelCount,
                 )
+                activeOperationSourceName = null
                 loadSources()
                 setResult(RESULT_OK)
                 if (openSelectionAfter) {
@@ -458,6 +472,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 }
             }.onFailure { error ->
                 debugLog.recordDebug("$event FAILURE | ${error.javaClass.name}: ${error.message}")
+                activeOperationSourceName = null
                 showError(error)
             }
         }
@@ -473,24 +488,29 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 } else {
                     selectedSourcePosition = selectedSourcePosition.coerceIn(0, loaded.lastIndex)
                 }
-                val labels = loaded.map { summary ->
-                    getString(
-                        R.string.iptv_source_row_detailed,
-                        summary.source.name,
-                        sourceTypeLabel(summary.source.kind),
-                        summary.channelCount,
-                        summary.selectedChannelCount,
-                        summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
-                            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                                .format(Date(it))
-                        } ?: getString(R.string.never),
-                    )
-                }
-                binding.sourceList.adapter = ArrayAdapter(
+                binding.sourceList.adapter = object : ArrayAdapter<IptvSourceSummary>(
                     this@IptvSourcesActivity,
                     R.layout.item_iptv_source,
-                    labels,
-                )
+                    loaded,
+                ) {
+                    override fun getView(
+                        position: Int,
+                        convertView: View?,
+                        parent: android.view.ViewGroup,
+                    ): View {
+                        val view = super.getView(position, convertView, parent) as TextView
+                        val summary = getItem(position) ?: return view
+                        view.text = sourceRowText(summary)
+                        view.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                            sourceIcon(summary.source.kind),
+                            0,
+                            0,
+                            0,
+                        )
+                        view.compoundDrawablePadding = (14 * resources.displayMetrics.density).toInt()
+                        return view
+                    }
+                }
                 if (selectedSourcePosition >= 0) {
                     binding.sourceList.setSelection(selectedSourcePosition)
                 }
@@ -505,7 +525,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun showImportProgress(progress: IptvImportProgress) {
         binding.root.post {
-            binding.importStatus.text = when (progress.stage) {
+            val stage = when (progress.stage) {
                 IptvImportStage.CONNECTING -> getString(R.string.iptv_import_connecting)
                 IptvImportStage.READING -> getString(
                     R.string.iptv_import_reading,
@@ -514,6 +534,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 IptvImportStage.SAVING -> getString(R.string.iptv_import_saving)
                 IptvImportStage.FINISHING -> getString(R.string.iptv_import_finishing)
             }
+            binding.importStatus.text = activeOperationSourceName?.let { sourceName ->
+                getString(R.string.iptv_source_progress, sourceName, stage)
+            } ?: stage
         }
     }
 
@@ -530,11 +553,47 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun sourceTypeLabel(kind: String): String = getString(
         when (kind) {
+            IptvRepository.KIND_URL -> R.string.source_type_m3u_url
+            IptvRepository.KIND_DOCUMENT -> R.string.source_type_m3u_file
             IptvRepository.KIND_XTREAM -> R.string.source_type_xtream
             IptvRepository.KIND_STALKER -> R.string.source_type_stalker
             else -> R.string.source_type_m3u
         },
     )
+
+    private fun sourceIcon(kind: String): Int = when (kind) {
+        IptvRepository.KIND_URL -> R.drawable.ic_link
+        IptvRepository.KIND_DOCUMENT -> R.drawable.ic_file
+        IptvRepository.KIND_XTREAM -> R.drawable.ic_server
+        IptvRepository.KIND_STALKER -> R.drawable.ic_portal
+        else -> R.drawable.ic_source_iptv
+    }
+
+    private fun sourceRowText(summary: IptvSourceSummary): String {
+        val updatedAt = summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
+            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+        } ?: getString(R.string.never)
+        return if (summary.source.kind == IptvRepository.KIND_URL) {
+            getString(
+                R.string.iptv_source_row_url_detailed,
+                summary.source.name,
+                sourceTypeLabel(summary.source.kind),
+                summary.source.location,
+                summary.channelCount,
+                summary.selectedChannelCount,
+                updatedAt,
+            )
+        } else {
+            getString(
+                R.string.iptv_source_row_detailed,
+                summary.source.name,
+                sourceTypeLabel(summary.source.kind),
+                summary.channelCount,
+                summary.selectedChannelCount,
+                updatedAt,
+            )
+        }
+    }
 
     private fun documentName(uri: Uri): String {
         var cursor: Cursor? = null

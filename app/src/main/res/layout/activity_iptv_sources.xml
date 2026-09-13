@@ -27,6 +27,9 @@
             android:layout_height="52dp"
             android:layout_marginTop="24dp"
             android:background="@drawable/bg_focusable"
+            android:drawableStart="@drawable/ic_link"
+            android:drawablePadding="12dp"
+            android:drawableTint="@color/accent"
             android:text="@string/import_iptv_url"
             android:textColor="@color/text_primary" />
 
@@ -36,6 +39,9 @@
             android:layout_height="52dp"
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_focusable"
+            android:drawableStart="@drawable/ic_file"
+            android:drawablePadding="12dp"
+            android:drawableTint="@color/accent"
             android:text="@string/import_iptv_file"
             android:textColor="@color/text_primary" />
 
@@ -52,6 +58,9 @@
                 android:layout_marginEnd="5dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_focusable"
+                android:drawableStart="@drawable/ic_server"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/accent"
                 android:text="@string/add_xtream_source"
                 android:textColor="@color/text_primary" />
 
@@ -62,6 +71,9 @@
                 android:layout_marginStart="5dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_focusable"
+                android:drawableStart="@drawable/ic_portal"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/accent"
                 android:text="@string/add_stalker_source"
                 android:textColor="@color/text_primary" />
         </LinearLayout>

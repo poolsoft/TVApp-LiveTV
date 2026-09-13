@@ -356,6 +356,8 @@
     <string name="required_fields">Complete all fields.</string>
     <string name="iptv_source_row_typed">%1$s · %2$s\n%3$d channels · %4$d selected</string>
     <string name="source_type_m3u">M3U</string>
+    <string name="source_type_m3u_url">M3U URL</string>
+    <string name="source_type_m3u_file">M3U file</string>
     <string name="source_type_xtream">Xtream</string>
     <string name="source_type_stalker">Stalker</string>
     <string name="billing_test_scenarios">IPTV billing test scenarios</string>
@@ -380,7 +382,7 @@
     <string name="iptv_source_row">%1$s\n%2$d channels - %3$d selected</string>
     <string name="iptv_source_channel_count">This list contains %1$d channels.</string>
     <string name="iptv_source_selection_summary">%1$d / %2$d channels in main list</string>
-    <string name="refresh_iptv_source">Refresh list</string>
+    <string name="refresh_iptv_source">Update list</string>
     <string name="select_iptv_channels">Channels to add to main list</string>
     <string name="select_iptv_channels_short">Select channels</string>
     <string name="update">Update</string>
@@ -557,6 +559,9 @@
     <string name="rename_iptv_source">Rename</string>
     <string name="edit_iptv_source_url">Edit playlist address</string>
     <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d channels · %4$d selected · %5$s</string>
+    <string name="iptv_source_row_url_detailed">%1$s · %2$s\n%3$s\n%4$d channels · %5$d selected · %6$s</string>
+    <string name="iptv_source_progress">%1$s · %2$s</string>
+    <string name="iptv_source_import_complete">%1$s updated · %2$d IPTV items</string>
     <string name="never">Not yet</string>
     <string name="iptv_source_renamed">The playlist was renamed.</string>
     <string name="about">About</string>

@@ -369,6 +369,8 @@
     <string name="required_fields">Tüm alanları doldurun.</string>
     <string name="iptv_source_row_typed">%1$s · %2$s\n%3$d kanal · %4$d seçili</string>
     <string name="source_type_m3u">M3U</string>
+    <string name="source_type_m3u_url">M3U URL</string>
+    <string name="source_type_m3u_file">M3U dosyası</string>
     <string name="source_type_xtream">Xtream</string>
     <string name="source_type_stalker">Stalker</string>
     <string name="billing_test_scenarios">IPTV ödeme test senaryoları</string>
@@ -393,7 +395,7 @@
     <string name="iptv_source_row">%1$s\n%2$d kanal · %3$d seçili</string>
     <string name="iptv_source_channel_count">Bu listede %1$d kanal bulunuyor.</string>
     <string name="iptv_source_selection_summary">%1$d / %2$d kanal ana listede</string>
-    <string name="refresh_iptv_source">Listeyi yenile</string>
+    <string name="refresh_iptv_source">Listeyi güncelle</string>
     <string name="select_iptv_channels">Ana listeye eklenecek kanallar</string>
     <string name="select_iptv_channels_short">Kanalları seç</string>
     <string name="update">Güncelle</string>
@@ -557,6 +559,9 @@
     <string name="rename_iptv_source">Yeniden adlandır</string>
     <string name="edit_iptv_source_url">Liste adresini düzenle</string>
     <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d kanal · %4$d seçili · %5$s</string>
+    <string name="iptv_source_row_url_detailed">%1$s · %2$s\n%3$s\n%4$d kanal · %5$d seçili · %6$s</string>
+    <string name="iptv_source_progress">%1$s · %2$s</string>
+    <string name="iptv_source_import_complete">%1$s güncellendi · %2$d IPTV içeriği</string>
     <string name="never">Henüz değil</string>
     <string name="iptv_source_renamed">Liste adı değiştirildi.</string>
     <string name="about">Hakkında</string>
