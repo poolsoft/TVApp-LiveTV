@@ -495,6 +495,8 @@
     <string name="iptv_engine_use_default">Use global default (%1$s)</string>
     <string name="iptv_engine_channel_saved">%1$s engine saved for this channel</string>
     <string name="iptv_engine_channel_default">Channel engine override removed</string>
+    <string name="iptv_engine_short_auto">Auto</string>
+    <string name="iptv_engine_auto_active_ijk">Auto &gt; IJK</string>
     <string name="automatic_abr">Auto (ABR)</string>
     <string name="iptv_more_controls">Audio · Subtitles · Quality</string>
     <string name="iptv_play_label">Play</string>

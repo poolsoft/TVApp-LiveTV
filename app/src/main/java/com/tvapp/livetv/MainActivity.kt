@@ -1791,9 +1791,16 @@ class MainActivity : TvRemoteActivity() {
         setIptvControlLabel(
             binding.iptvBtnEngine,
             getString(R.string.iptv_engine_label),
-            when (iptvPlayback.activePlaybackEngine()) {
-                IptvPlaybackEngine.MEDIA3 -> "Media3"
-                IptvPlaybackEngine.IJK -> "IJK"
+            when (iptvPlayback.playbackEngineMode()) {
+                IptvPlaybackEngineMode.MEDIA3 -> "Media3"
+                IptvPlaybackEngineMode.IJK -> "IJK"
+                IptvPlaybackEngineMode.AUTO_FALLBACK -> {
+                    if (iptvPlayback.activePlaybackEngine() == IptvPlaybackEngine.IJK) {
+                        getString(R.string.iptv_engine_auto_active_ijk)
+                    } else {
+                        getString(R.string.iptv_engine_short_auto)
+                    }
+                }
             },
         )
         binding.iptvBtnEngine.setCompoundDrawablesRelativeWithIntrinsicBounds(

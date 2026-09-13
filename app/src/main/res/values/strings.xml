@@ -508,6 +508,8 @@
     <string name="iptv_engine_use_default">Genel varsayılanı kullan (%1$s)</string>
     <string name="iptv_engine_channel_saved">Bu kanal için %1$s motoru kaydedildi</string>
     <string name="iptv_engine_channel_default">Kanal motor kilidi kaldırıldı</string>
+    <string name="iptv_engine_short_auto">Oto</string>
+    <string name="iptv_engine_auto_active_ijk">Oto &gt; IJK</string>
     <string name="automatic_abr">Otomatik (ABR)</string>
     <string name="iptv_more_controls">Ses · Altyazı · Kalite</string>
     <string name="iptv_play_label">Oynat</string>
