@@ -2,17 +2,6 @@ name: Build TVApp Mobile Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/mobile-test.yml"
-      - "app/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/**"
-      - "gradlew"
-      - ".build"
 
 permissions:
   contents: write
