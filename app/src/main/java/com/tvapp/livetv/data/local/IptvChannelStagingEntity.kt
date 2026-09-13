@@ -8,7 +8,7 @@ import androidx.room.Index
     primaryKeys = ["sessionId", "originalIndex"],
     indices = [
         Index("createdAt"),
-        Index(value = ["sessionId", "resolvedSourceKey"]),
+        Index(value = ["sessionId", "resolvedSourceKey", "originalIndex"]),
     ],
 )
 data class IptvChannelStagingEntity(

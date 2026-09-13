@@ -51,6 +51,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * IPTV kanallarına `(sourceId, tvgId)` bileşik indeksi ekleyen Room 17→18 migration oluşturuldu. Migration mevcut kaynakları, seçili kanalları ve kullanıcı sıralamasını korur.
 * Room sorgu planı denetiminde IPTV sıralama, seçili kanal ve kategori yolları ile XMLTV kanal kataloğu için eksik birleşik indeksler tamamlandı. Daha geniş indekslerin kapsadığı gereksiz tek sütunlu indeksler kaldırılarak kaynak ve EPG içe aktarma yazma maliyeti azaltıldı.
 * IPTV arama FTS tetikleyicileri kanal `rowid` değerini kullanacak şekilde taşındı. Kaynak yenileme artık bütün IPTV kataloglarının arama indeksini yeniden kurmuyor; yalnız değiştirilen kanal satırlarını güncelliyor.
+* Büyük ve yinelenen IPTV kataloglarında kanal kimliği eşleştirmesini dakikalara çıkaran sıralama sorguları kapsayıcı indekslere taşındı; hazırlama tablosundaki yinelenen kayıt temizliği de aynı şekilde indekslendi.
 * Yenileme logunda HTTP yanıt, okuma, eşleştirme ve veritabanı değiştirme süreleri ayrı kaydediliyor.
 
 ### Kanal listesi metin yerleşimi

@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -59,6 +59,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_19_20,
                 MIGRATION_20_21,
                 MIGRATION_21_22,
+                MIGRATION_22_23,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .build()
@@ -405,6 +406,35 @@ abstract class TVAppDatabase : RoomDatabase() {
                         "COALESCE(`groupTitle`, '') FROM `iptv_channels`",
                 )
                 createIptvSearchTriggers(db)
+            }
+        }
+
+        internal val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId_tvgId`")
+                db.execSQL("DROP INDEX IF EXISTS `index_iptv_channels_sourceId_matchKey`")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_tvgId_selected_originalIndex` " +
+                        "ON `iptv_channels` " +
+                        "(`sourceId`, `tvgId`, `selected` DESC, `originalIndex` ASC)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_sourceId_matchKey_selected_originalIndex` " +
+                        "ON `iptv_channels` " +
+                        "(`sourceId`, `matchKey`, `selected` DESC, `originalIndex` ASC)",
+                )
+                db.execSQL(
+                    "DROP INDEX IF EXISTS " +
+                        "`index_iptv_channel_staging_sessionId_resolvedSourceKey`",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channel_staging_sessionId_resolvedSourceKey_originalIndex` " +
+                        "ON `iptv_channel_staging` " +
+                        "(`sessionId`, `resolvedSourceKey`, `originalIndex`)",
+                )
             }
         }
 

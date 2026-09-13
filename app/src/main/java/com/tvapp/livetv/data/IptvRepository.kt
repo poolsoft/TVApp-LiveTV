@@ -640,7 +640,9 @@ class IptvRepository(context: Context) {
                 }
 
                 onProgress(IptvImportProgress(IptvImportStage.SAVING, channelCount))
-                var matchingFinishedAt = readingFinishedAt
+                var resolvingFinishedAt = readingFinishedAt
+                var dedupingFinishedAt = readingFinishedAt
+                var selectionFinishedAt = readingFinishedAt
                 var replacementFinishedAt = readingFinishedAt
                 val imported = database.withTransaction {
                     val existing = replacementSource ?: dao.getSourceByLocation(location)
@@ -674,9 +676,11 @@ class IptvRepository(context: Context) {
                     )
                     dao.updateSource(source)
                     dao.resolveStagedSourceKeys(sessionId, sourceId)
+                    resolvingFinishedAt = SystemClock.elapsedRealtime()
                     dao.discardSupersededStagedDuplicates(sessionId)
+                    dedupingFinishedAt = SystemClock.elapsedRealtime()
                     dao.preserveStagedSelection(sessionId)
-                    matchingFinishedAt = SystemClock.elapsedRealtime()
+                    selectionFinishedAt = SystemClock.elapsedRealtime()
                     dao.deleteSourceChannels(sourceId)
                     dao.insertStagedAsSource(sessionId, sourceId, now)
                     replacementFinishedAt = SystemClock.elapsedRealtime()
@@ -687,8 +691,10 @@ class IptvRepository(context: Context) {
                 debugLog.recordDebug(
                     "IPTV_IMPORT_TIMING | source=${imported.sourceId}, channels=$channelCount, " +
                         "read=${readingFinishedAt - startedAt}ms, " +
-                        "match=${matchingFinishedAt - readingFinishedAt}ms, " +
-                        "replace=${replacementFinishedAt - matchingFinishedAt}ms, " +
+                        "resolve=${resolvingFinishedAt - readingFinishedAt}ms, " +
+                        "dedupe=${dedupingFinishedAt - resolvingFinishedAt}ms, " +
+                        "selection=${selectionFinishedAt - dedupingFinishedAt}ms, " +
+                        "replace=${replacementFinishedAt - selectionFinishedAt}ms, " +
                         "total=${finishedAt - startedAt}ms",
                 )
                 imported
