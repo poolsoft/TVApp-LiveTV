@@ -97,9 +97,9 @@ still needs device verification.
   opens EPG.
 - `INPUT/SOURCE` owns physical input selection, including DTV/ATV and HDMI/AV when exposed by the
   device. Do not assign physical input selection to a color key.
-- On the unobstructed playback screen and in the channel list: short Green opens IPTV PiP selection
-  and long Green opens IPTV Grid selection. Blue opens Settings on unobstructed playback. The
-  infobar hint must describe this context only.
+- On the unobstructed playback screen and in the channel list, Green opens the unified PiP/Multi-View
+  picker: one selected IPTV channel starts PiP, while two to four selected channels start Multi-View.
+  Blue opens Settings on unobstructed playback. The infobar hint must describe this context only.
 - In the channel list: Red opens the relevant editor; Yellow short-press cycles list sources and
   Yellow long-press opens direct source selection. Normal-list Blue opens channel search and
   IPTV-library Blue opens its filter. Keep the list's own color hints separate from the
@@ -149,6 +149,10 @@ still needs device verification.
 
 - Operational failures should be written to the existing debug log facility under `.log`; do not
   leave persistent crash/debug dialogs over playback.
+- Never add dummy, placeholder, fabricated, or guessed production behavior or diagnostic values.
+  Use only data reported by the platform, player, database, or source; when data is unavailable,
+  represent it explicitly as unknown instead of inventing a plausible value. Test fixtures and
+  clearly labeled preview-only sample data are the only exceptions.
 - Never log playlist credentials, access tokens, MAC portal secrets, PIN values, or full private
   URLs containing credentials.
 - Keep `README.md`, `CHANGELOG.md`, the in-app User Guide, and `MARKET_LISTING.md` synchronized when remote mappings,

@@ -2115,7 +2115,7 @@ class MainActivity : TvRemoteActivity() {
         val height = callbackSize?.height?.takeIf { it > 0 } ?: videoTrack?.videoHeight ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format, isTif = true)
+        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
@@ -2268,7 +2268,7 @@ class MainActivity : TvRemoteActivity() {
         val height = info.height ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format, isTif = false)
+        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
@@ -3212,22 +3212,6 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
-    private fun availableLiveIptvChannels(): List<LiveChannel> {
-        val candidates = if (
-            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY &&
-            iptvLibraryChannels.isNotEmpty()
-        ) {
-            iptvLibraryChannels
-        } else {
-            channels
-        }
-        return candidates.asSequence()
-            .filter { it.source == LiveChannel.Source.IPTV }
-            .filter { it.iptvContentType != IptvLibraryContentType.VOD.name }
-            .distinctBy { it.sourceKey }
-            .toList()
-    }
-
     private fun availableMultiViewChannels(): List<LiveChannel> = buildList {
         addAll(channels)
         if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) addAll(iptvLibraryChannels)
@@ -3240,26 +3224,15 @@ class MainActivity : TvRemoteActivity() {
         .distinctBy { it.sourceKey }
         .toList()
 
-    private fun showIptvPipPicker() {
-        val choices = availableLiveIptvChannels()
-        if (choices.isEmpty()) {
-            Toast.makeText(this, R.string.iptv_pip_no_channels, Toast.LENGTH_LONG).show()
-            return
-        }
-        channelPanelJob?.cancel()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.iptv_pip_title)
-            .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
-                startIptvOverlay(choices[which])
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
-    }
-
     private fun startIptvOverlay(channel: LiveChannel) {
         if (!hasIptvAccess { startIptvOverlay(channel) }) return
-        if (channel.source == LiveChannel.Source.TIF && currentChannel?.source == LiveChannel.Source.TIF) {
-            Toast.makeText(this, R.string.multiview_requires_single_tuner, Toast.LENGTH_LONG).show()
+        if (currentChannel == null) return
+        if (channel.source != LiveChannel.Source.IPTV) {
+            Toast.makeText(this, R.string.iptv_pip_requires_iptv, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (channel.sourceKey == currentChannel?.sourceKey) {
+            Toast.makeText(this, R.string.iptv_pip_requires_different_channel, Toast.LENGTH_LONG).show()
             return
         }
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
@@ -4785,7 +4758,7 @@ class MainActivity : TvRemoteActivity() {
                 ),
             )
         }
-        action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvPipPicker)
+        action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvGridPicker)
         action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
     }
 
@@ -5093,12 +5066,16 @@ class MainActivity : TvRemoteActivity() {
             binding.diagCodec.text = health.videoCodec?.substringAfterLast('/')?.take(16) ?: "-"
             binding.diagBitrate.text = formatBitrate(health.bitrateBps)
             binding.diagBandwidth.text = formatBitrate(health.estimatedBandwidthBps)
-            val bufferSec = (health.bufferedDurationMillis ?: 0L) / 1000.0
-            binding.diagBuffer.text = String.format(Locale.US, "%.1f s", bufferSec)
-            binding.diagDropped.text = (health.droppedFrames ?: 0L).toString()
-            val audioInfo = health.audioCodec?.substringAfterLast('/')?.take(10) ?: "-"
-            val ch = health.audioChannelCount ?: 2
-            binding.diagAudio.text = "$audioInfo (${ch}ch)"
+            binding.diagBuffer.text = health.bufferedDurationMillis?.let {
+                String.format(Locale.US, "%.1f s", it / 1000.0)
+            } ?: "-"
+            binding.diagDropped.text = health.droppedFrames?.toString() ?: "-"
+            val audioInfo = health.audioCodec?.substringAfterLast('/')?.take(10)
+            val channelCount = health.audioChannelCount?.takeIf { it > 0 }
+            binding.diagAudio.text = listOfNotNull(
+                audioInfo,
+                channelCount?.let { "${it}ch" },
+            ).joinToString(" / ").ifBlank { "-" }
             binding.diagnosticsOverlay.visibility = View.VISIBLE
         } else if (channel.source == LiveChannel.Source.TIF) {
             val tracks = playback.allTracks()
@@ -5108,24 +5085,33 @@ class MainActivity : TvRemoteActivity() {
             val height = if (videoState.height > 0) videoState.height else videoTrack?.videoHeight ?: 0
             val fps = videoTrack?.videoFrameRate?.takeIf { it > 0f } ?: 0f
             val resText = if (width > 0 && height > 0) {
-                val mode = if (height >= 1080) "1080i" else if (height >= 720) "720p" else "${height}p"
-                if (fps > 0f) "${width}x${height} ($mode) @ ${String.format(Locale.US, "%.1f", fps)}fps"
-                else "${width}x${height} ($mode)"
+                val quality = VideoQuality.resolutionLabel(
+                    width,
+                    height,
+                    channel.videoFormat.orEmpty().uppercase(Locale.ROOT),
+                )
+                val dimensions = "${width}x${height}"
+                val resolution = quality?.let { "$dimensions ($it)" } ?: dimensions
+                if (fps > 0f) "$resolution @ ${String.format(Locale.US, "%.1f", fps)}fps"
+                else resolution
             } else {
                 channel.videoFormat?.takeIf { it.isNotBlank() } ?: "-"
             }
             binding.diagResFps.text = resText
-            val videoCodec = videoTrack?.extra?.toString()?.takeIf { it.isNotBlank() } ?: "DVB Tuner"
-            binding.diagCodec.text = videoCodec.take(16)
-            binding.diagBitrate.text = "Tuner Direct"
-            binding.diagBandwidth.text = "Hardware RF"
-            binding.diagBuffer.text = "Tuner Sync"
-            binding.diagDropped.text = "0"
+            val videoCodec = videoTrack?.extra?.toString()?.takeIf { it.isNotBlank() }
+            binding.diagCodec.text = videoCodec?.take(16) ?: "-"
+            binding.diagBitrate.text = "-"
+            binding.diagBandwidth.text = "-"
+            binding.diagBuffer.text = "-"
+            binding.diagDropped.text = "-"
             val audioTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_AUDIO }
             val audioCodec = audioTrack?.extra?.toString()?.takeIf { it.isNotBlank() }
-                ?: audioTrack?.language ?: "Stereo"
-            val audioCh = audioTrack?.audioChannelCount?.takeIf { it > 0 } ?: 2
-            binding.diagAudio.text = "${audioCodec.take(10)} (${audioCh}ch)"
+                ?: audioTrack?.language
+            val audioChannelCount = audioTrack?.audioChannelCount?.takeIf { it > 0 }
+            binding.diagAudio.text = listOfNotNull(
+                audioCodec?.take(10),
+                audioChannelCount?.let { "${it}ch" },
+            ).joinToString(" / ").ifBlank { "-" }
             binding.diagnosticsOverlay.visibility = View.VISIBLE
         } else {
             binding.diagnosticsOverlay.visibility = View.GONE
