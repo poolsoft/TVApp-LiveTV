@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#16181C" />
-</shape>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="320dp"
+                android:height="180dp" />
+            <solid android:color="#0B2530" />
+            <corners android:radius="8dp" />
+            <stroke
+                android:width="2dp"
+                android:color="#35D0BA" />
+        </shape>
+    </item>
+
+    <item
+        android:width="88dp"
+        android:height="88dp"
+        android:drawable="@drawable/ic_tv"
+        android:gravity="center" />
+</layer-list>

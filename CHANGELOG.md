@@ -6,6 +6,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Android TV ana ekranı banner'ı
+* Uygulamanın TV launcher'larında boş veya siyah kutu gibi görünmesine neden olan düz renk banner,
+  TVApp simgesini taşıyan 16:9 ve yüksek kontrastlı bir launcher banner'ı ile değiştirildi.
+
 ### ijkplayer'ın kaldırılması ve Media3 oynatıcı motorunun güçlendirilmesi
 * ijkplayer ve ilişkili yerel kütüphaneler (`gsyijkjava`, `gsyvideoplayer-ex_so`) projeden tamamen kaldırılarak APK boyutu ~35 MB hafifletildi.
 * Media3 oynatıcı motoruna `DefaultRenderersFactory` üzerinden `enableDecoderFallback = true` ve `EXTENSION_RENDERER_MODE_ON` eklendi; donanım dekoderi kilitlenen veya desteklenmeyen yayınlarda alternatif dekodere otomatik geçiş sağlandı.
