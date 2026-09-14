@@ -143,8 +143,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
     implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
-    implementation("io.github.carguo:gsyijkjava:1.0.0")
-    implementation("io.github.carguo:gsyvideoplayer-ex_so:13.2.1")
     ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")

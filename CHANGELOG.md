@@ -6,12 +6,15 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
-### ijkplayer siyah ekran düzeltmesi ve Media3 extractor güçlendirmesi
-* ijkplayer motorunda canlı yayınlarda ses gelirken görüntünün gelmemesi (siyah ekran) sorunu giderildi:
-  - Canlı yayınlarda zaman damgası farkından karelerin atılmasını engelleyen `framedrop = 0` ayarlandı.
-  - TV yongalarında donanım decoder kilitlenmesine neden olan `mediacodec-handle-resolution-change` devre dışı bırakıldı; `mediacodec` ve `mediacodec-all-videos` donanım hızlandırma seçenekleri eklendi.
-  - SurfaceView yüzeyi bağlama mantığı `setDisplay(holder)` olarak güncellendi ve Media3 `PlayerView` perde katmanının (`exo_shutter`) ijkplayer görüntüsünü örtmesi engellendi.
-* Media3 `DefaultExtractorsFactory` yapısına CBR seeking desteği, `AdtsExtractor`, `Mp3Extractor`, `MatroskaExtractor` ve `FragmentedMp4Extractor` esneklik ve tolerans bayrakları eklenerek IPTV canlı ve VOD akışlarının doğrudan açılma başarısı artırıldı.
+### ijkplayer'ın kaldırılması ve Media3 oynatıcı motorunun güçlendirilmesi
+* ijkplayer ve ilişkili yerel kütüphaneler (`gsyijkjava`, `gsyvideoplayer-ex_so`) projeden tamamen kaldırılarak APK boyutu ~35 MB hafifletildi.
+* Media3 oynatıcı motoruna `DefaultRenderersFactory` üzerinden `enableDecoderFallback = true` ve `EXTENSION_RENDERER_MODE_ON` eklendi; donanım dekoderi kilitlenen veya desteklenmeyen yayınlarda alternatif dekodere otomatik geçiş sağlandı.
+* Canlı yayın tamponlama (buffering) yönetimi baştan yapılandırıldı:
+  - Sürekli tampona düşmeyi önlemek için oynatma başlangıç eşiği `500ms`'den `1500ms`'ye, yeniden başlama tamponu `2500ms`'den `4000ms`'ye çıkarıldı.
+  - Asgari/azami tampon aralığı `15s - 45s` olarak genişletildi.
+  - Canlı yayınlarda bellek şişmesini ve geriye zıplamaları önlemek için `setBackBuffer(0, false)` uygulandı.
+* Watchdog toparlanması sırasında canlı yayının geriden tekrar izletilmesine neden olan `seekToDefaultPosition()` çağrısı canlı yayınlar için kaldırıldı.
+* Canlı yayın oynatma hız toleransı `0.97f - 1.03f` aralığına ayarlanarak mikro ağ gecikmelerinde takılma olmadan canlı yayın noktasına (live edge) yumuşak geçiş sağlandı.
 
 ### IPTV kanal seçimi dikey araç çubuğu ve kalıcı kumanda rehberi
 * IPTV kanal seçim ekranında (`IptvChannelSelectionActivity`) işlem butonları ekranın soluna simge tabanlı dikey araç çubuğu olarak taşındı.
