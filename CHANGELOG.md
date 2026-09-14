@@ -6,6 +6,14 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### PiP seçimi, TIF tanı alanları ve kanal editörü araç çubuğu
+* Birleşik PiP/MultiView seçicisinin düşük kaynaklı cihazlarda da açılması sağlandı; başlangıç
+  seçimi temizlenerek tek IPTV kanalının doğrudan PiP için seçilebilmesi sağlandı.
+* TIF tanı panelinde ağ ve buffer alanları yerine TIF giriş kimliği, video durumu, track sayıları,
+  ses örnekleme hızı ve piksel oranı gibi platformun gerçekten bildirdiği değerler gösteriliyor.
+* Kanal Liste Editörü'ne renk işlemlerini çağıran, kumandayla odaklanabilen dikey ikon çubuğu
+  eklendi; mevcut alt renk tuşu rehberi korundu.
+
 ### TIF Tanı (Diagnostics) Desteği, Net Çözünürlük Rozeti, EPG Yatay Kayma Düzeltmesi ve Birleşik PiP/MultiView
 * **TIF Tanı Paneli:** Canlı tanı OSD paneli DVB/ATV (TIF) kanallarında da aktif hale getirildi; tuner video track çözünürlüğü, formatı ve ses bilgileri yansıtıldı.
 * **Net Çözünürlük Rozeti:** İnfobardaki FPS rozeti yerine televizyon standardında net çözünürlük rozeti getirildi (TIF için `1080i`, `720p`, `576i`; IPTV için `1080p`, `720p`, `4K`).

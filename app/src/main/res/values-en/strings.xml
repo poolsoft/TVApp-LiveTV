@@ -624,4 +624,12 @@
     <string name="diagnostics_buffer">Buffer Health</string>
     <string name="diagnostics_dropped">Dropped Frames</string>
     <string name="diagnostics_audio">Audio Format</string>
+    <string name="diagnostics_tif_input">TIF input</string>
+    <string name="diagnostics_tif_video_state">Video state</string>
+    <string name="diagnostics_tif_video_available">Available</string>
+    <string name="diagnostics_tif_video_unavailable">Unavailable (%1$s)</string>
+    <string name="diagnostics_tif_tracks">Track counts</string>
+    <string name="diagnostics_tif_track_counts">%1$d video / %2$d audio / %3$d subtitle</string>
+    <string name="diagnostics_tif_audio_rate">Audio sample rate</string>
+    <string name="diagnostics_tif_pixel_aspect">Pixel aspect ratio</string>
 </resources>

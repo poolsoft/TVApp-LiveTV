@@ -1017,6 +1017,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_res_fps_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_res_fps"
@@ -1039,6 +1040,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_codec_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_codec"
@@ -1061,6 +1063,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_bitrate_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_bitrate"
@@ -1083,6 +1086,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_bandwidth_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_bandwidth"
@@ -1105,6 +1109,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_buffer_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_buffer"
@@ -1127,6 +1132,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_dropped_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_dropped"
@@ -1149,6 +1155,7 @@
             android:orientation="horizontal">
 
             <TextView
+                android:id="@+id/diag_audio_label"
                 android:layout_width="95dp"
                 android:layout_height="wrap_content"
                 android:text="@string/diagnostics_audio"

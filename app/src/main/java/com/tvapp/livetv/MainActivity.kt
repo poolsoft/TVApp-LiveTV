@@ -3265,10 +3265,6 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvGridPicker() {
-        if (!deviceResourcePolicy.supportsMultiView || deviceResourcePolicy.maximumGridStreams < 2) {
-            Toast.makeText(this, R.string.multiview_device_limit, Toast.LENGTH_LONG).show()
-            return
-        }
         val choices = availableMultiViewChannels()
         if (choices.isEmpty()) {
             Toast.makeText(this, R.string.iptv_grid_no_channels, Toast.LENGTH_LONG).show()
@@ -3276,13 +3272,6 @@ class MainActivity : TvRemoteActivity() {
         }
         channelPanelJob?.cancel()
         val selected = linkedMapOf<String, LiveChannel>()
-        choices.filter { it.sourceKey in gridSelectedKeys }.forEach { selected[it.sourceKey] = it }
-        if (selected.isEmpty()) {
-            currentChannel?.let { current ->
-                choices.firstOrNull { it.sourceKey == current.sourceKey }
-                    ?.let { selected[it.sourceKey] = it }
-            }
-        }
         var sourceFilter = MultiViewPickerFilter.ALL
         var query = ""
         var visibleChoices = choices
@@ -5052,6 +5041,13 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         if (channel.source == LiveChannel.Source.IPTV) {
+            binding.diagResFpsLabel.setText(R.string.diagnostics_res_fps)
+            binding.diagCodecLabel.setText(R.string.diagnostics_codec)
+            binding.diagBitrateLabel.setText(R.string.diagnostics_bitrate)
+            binding.diagBandwidthLabel.setText(R.string.diagnostics_bandwidth)
+            binding.diagBufferLabel.setText(R.string.diagnostics_buffer)
+            binding.diagDroppedLabel.setText(R.string.diagnostics_dropped)
+            binding.diagAudioLabel.setText(R.string.diagnostics_audio)
             val health = iptvPlayback.healthSnapshot()
             val width = health.width ?: 0
             val height = health.height ?: 0
@@ -5080,6 +5076,7 @@ class MainActivity : TvRemoteActivity() {
         } else if (channel.source == LiveChannel.Source.TIF) {
             val tracks = playback.allTracks()
             val videoTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_VIDEO }
+            val audioTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_AUDIO }
             val videoState = playback.currentVideoState()
             val width = if (videoState.width > 0) videoState.width else videoTrack?.videoWidth ?: 0
             val height = if (videoState.height > 0) videoState.height else videoTrack?.videoHeight ?: 0
@@ -5097,19 +5094,48 @@ class MainActivity : TvRemoteActivity() {
             } else {
                 channel.videoFormat?.takeIf { it.isNotBlank() } ?: "-"
             }
+            binding.diagResFpsLabel.setText(R.string.diagnostics_res_fps)
             binding.diagResFps.text = resText
-            val videoCodec = videoTrack?.extra?.toString()?.takeIf { it.isNotBlank() }
-            binding.diagCodec.text = videoCodec?.take(16) ?: "-"
-            binding.diagBitrate.text = "-"
-            binding.diagBandwidth.text = "-"
-            binding.diagBuffer.text = "-"
-            binding.diagDropped.text = "-"
-            val audioTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_AUDIO }
-            val audioCodec = audioTrack?.extra?.toString()?.takeIf { it.isNotBlank() }
+
+            binding.diagCodecLabel.setText(R.string.diagnostics_tif_input)
+            binding.diagCodec.text = channel.inputId.substringAfterLast('/').ifBlank { channel.inputId }
+
+            binding.diagBitrateLabel.setText(R.string.diagnostics_tif_video_state)
+            binding.diagBitrate.text = when (videoState.available) {
+                true -> getString(R.string.diagnostics_tif_video_available)
+                false -> getString(
+                    R.string.diagnostics_tif_video_unavailable,
+                    videoState.unavailableReason?.toString() ?: "-",
+                )
+                null -> "-"
+            }
+
+            binding.diagBandwidthLabel.setText(R.string.diagnostics_tif_tracks)
+            binding.diagBandwidth.text = getString(
+                R.string.diagnostics_tif_track_counts,
+                tracks.count { it.type == TvTrackInfo.TYPE_VIDEO },
+                tracks.count { it.type == TvTrackInfo.TYPE_AUDIO },
+                tracks.count { it.type == TvTrackInfo.TYPE_SUBTITLE },
+            )
+
+            binding.diagBufferLabel.setText(R.string.diagnostics_tif_audio_rate)
+            binding.diagBuffer.text = audioTrack?.audioSampleRate
+                ?.takeIf { it > 0 }
+                ?.let { "$it Hz" }
+                ?: "-"
+
+            binding.diagDroppedLabel.setText(R.string.diagnostics_tif_pixel_aspect)
+            binding.diagDropped.text = videoTrack?.videoPixelAspectRatio
+                ?.takeIf { it > 0f }
+                ?.let { String.format(Locale.US, "%.3f", it) }
+                ?: "-"
+
+            binding.diagAudioLabel.setText(R.string.diagnostics_audio)
+            val audioDescription = audioTrack?.description?.toString()?.takeIf { it.isNotBlank() }
                 ?: audioTrack?.language
             val audioChannelCount = audioTrack?.audioChannelCount?.takeIf { it > 0 }
             binding.diagAudio.text = listOfNotNull(
-                audioCodec?.take(10),
+                audioDescription?.take(16),
                 audioChannelCount?.let { "${it}ch" },
             ).joinToString(" / ").ifBlank { "-" }
             binding.diagnosticsOverlay.visibility = View.VISIBLE

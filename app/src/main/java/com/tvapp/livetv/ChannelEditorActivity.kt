@@ -122,12 +122,24 @@ class ChannelEditorActivity : TvRemoteActivity() {
         iptvPreview = IptvPlaybackController(this, binding.previewIptv)
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.channelList.adapter = adapter
+        setupEditorSidebar()
         setupMobileColorActions()
         loadChannels(
             syncMessage = false,
             preferredKey = restoredFocusedKey
                 ?: intent.getStringExtra(EXTRA_CURRENT_SOURCE_KEY),
         )
+    }
+
+    private fun setupEditorSidebar() {
+        listOf(
+            binding.sidebarRedButton to EditorColor.RED,
+            binding.sidebarGreenButton to EditorColor.GREEN,
+            binding.sidebarYellowButton to EditorColor.YELLOW,
+            binding.sidebarBlueButton to EditorColor.BLUE,
+        ).forEach { (button, color) ->
+            button.setOnClickListener { handleEditorColor(color) }
+        }
     }
 
     private fun setupMobileColorActions() {
@@ -493,6 +505,10 @@ class ChannelEditorActivity : TvRemoteActivity() {
             Mode.MULTI_SELECT -> getString(R.string.move_selected_to_number)
             Mode.MOVE -> getString(R.string.cancel)
         }
+        binding.sidebarRedButton.contentDescription = binding.redAction.text
+        binding.sidebarGreenButton.contentDescription = binding.greenAction.text
+        binding.sidebarYellowButton.contentDescription = binding.yellowAction.text
+        binding.sidebarBlueButton.contentDescription = binding.blueAction.text
     }
 
     private fun showChannelProperties(channel: LiveChannel) {

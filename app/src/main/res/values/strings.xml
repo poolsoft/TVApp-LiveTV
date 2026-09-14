@@ -624,4 +624,12 @@
     <string name="diagnostics_buffer">Tampon Bellek</string>
     <string name="diagnostics_dropped">Düşen Kareler</string>
     <string name="diagnostics_audio">Ses Formatı</string>
+    <string name="diagnostics_tif_input">TIF girişi</string>
+    <string name="diagnostics_tif_video_state">Video durumu</string>
+    <string name="diagnostics_tif_video_available">Kullanılabilir</string>
+    <string name="diagnostics_tif_video_unavailable">Kullanılamıyor (%1$s)</string>
+    <string name="diagnostics_tif_tracks">Track sayıları</string>
+    <string name="diagnostics_tif_track_counts">%1$d video / %2$d ses / %3$d altyazı</string>
+    <string name="diagnostics_tif_audio_rate">Ses örnekleme</string>
+    <string name="diagnostics_tif_pixel_aspect">Piksel oranı</string>
 </resources>
