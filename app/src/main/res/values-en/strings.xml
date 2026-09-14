@@ -613,4 +613,13 @@
     <string name="clear_search">Clear search</string>
     <string name="catchup_unavailable">This programme is not available in the provider archive.</string>
     <string name="catchup_return_live">Return to live</string>
+    <string name="playback_diagnostics">Playback diagnostics (Stats OSD)</string>
+    <string name="diagnostics_title">STATS FOR NERDS</string>
+    <string name="diagnostics_res_fps">Resolution / FPS</string>
+    <string name="diagnostics_codec">Video Codec</string>
+    <string name="diagnostics_bitrate">Video Bitrate</string>
+    <string name="diagnostics_bandwidth">Est. Bandwidth</string>
+    <string name="diagnostics_buffer">Buffer Health</string>
+    <string name="diagnostics_dropped">Dropped Frames</string>
+    <string name="diagnostics_audio">Audio Format</string>
 </resources>

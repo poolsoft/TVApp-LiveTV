@@ -229,6 +229,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         number(R.string.info_bar_duration, 0, 15, current.infoBarDurationSeconds, 1, ::durationLabel) {
             update { copy(infoBarDurationSeconds = it) }
         }
+        toggle(R.string.playback_diagnostics, current.showDiagnosticsOverlay) {
+            update { copy(showDiagnosticsOverlay = it) }
+        }
     }
 
     private fun buildChannelSettings() {
@@ -319,6 +322,8 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
         section(R.string.playback_settings)
         val iptvPlaybackPreferences = iptvPlaybackStore.load()
+        // Note: Engine selection hidden while ijkplayer is suspended. Media3 is the active engine.
+        /*
         val engineModes = IptvPlaybackEngineMode.entries
         choice(
             R.string.iptv_playback_engine,
@@ -332,6 +337,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             iptvPlaybackStore.saveEngineMode(engineModes[index])
             markChanged()
         }
+        */
         val bufferOptions = IptvPlaybackPreferences.BUFFER_OPTIONS
         choice(
             R.string.iptv_default_buffer,

@@ -613,4 +613,13 @@
     <string name="clear_search">Aramayı temizle</string>
     <string name="catchup_unavailable">Bu program sağlayıcının arşivinde bulunmuyor.</string>
     <string name="catchup_return_live">Canlıya dön</string>
+    <string name="playback_diagnostics">Oynatma istatistikleri (Stats OSD)</string>
+    <string name="diagnostics_title">TEKNİK İSTATİSTİKLER</string>
+    <string name="diagnostics_res_fps">Çözünürlük / FPS</string>
+    <string name="diagnostics_codec">Video Codec</string>
+    <string name="diagnostics_bitrate">Video Bitrate</string>
+    <string name="diagnostics_bandwidth">Tahmini Ağ Hızı</string>
+    <string name="diagnostics_buffer">Tampon Bellek</string>
+    <string name="diagnostics_dropped">Düşen Kareler</string>
+    <string name="diagnostics_audio">Ses Formatı</string>
 </resources>

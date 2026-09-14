@@ -24,6 +24,7 @@ data class DisplayPreferences(
     val verboseRemoteKeyLogging: Boolean = false,
     val preferredAudioLanguage: String? = null,
     val preferredSubtitleLanguage: String? = null,
+    val showDiagnosticsOverlay: Boolean = false,
 )
 
 class DisplayPreferencesStore(context: Context) {
@@ -66,6 +67,7 @@ class DisplayPreferencesStore(context: Context) {
         verboseRemoteKeyLogging = preferences.getBoolean(KEY_VERBOSE_REMOTE_KEY_LOGGING, false),
         preferredAudioLanguage = preferences.getString(KEY_AUDIO_LANGUAGE, null),
         preferredSubtitleLanguage = preferences.getString(KEY_SUBTITLE_LANGUAGE, null),
+        showDiagnosticsOverlay = preferences.getBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, false),
     )
 
     fun save(displayPreferences: DisplayPreferences) {
@@ -97,6 +99,7 @@ class DisplayPreferencesStore(context: Context) {
             )
             .putString(KEY_AUDIO_LANGUAGE, displayPreferences.preferredAudioLanguage)
             .putString(KEY_SUBTITLE_LANGUAGE, displayPreferences.preferredSubtitleLanguage)
+            .putBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, displayPreferences.showDiagnosticsOverlay)
             .apply()
     }
 
@@ -135,5 +138,6 @@ class DisplayPreferencesStore(context: Context) {
         const val KEY_VERBOSE_REMOTE_KEY_LOGGING = "verbose-remote-key-logging"
         const val KEY_AUDIO_LANGUAGE = "audio-language"
         const val KEY_SUBTITLE_LANGUAGE = "subtitle-language"
+        const val KEY_SHOW_DIAGNOSTICS_OVERLAY = "show-diagnostics-overlay"
     }
 }

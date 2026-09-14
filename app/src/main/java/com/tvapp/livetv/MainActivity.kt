@@ -42,7 +42,9 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.media3.ui.PlayerView
@@ -116,6 +118,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.text.SimpleDateFormat
 import java.text.Normalizer
 import java.util.Date
@@ -259,6 +262,7 @@ class MainActivity : TvRemoteActivity() {
     private var programJob: Job? = null
     private var channelLoadJob: Job? = null
     private var clockJob: Job? = null
+    private var diagnosticsJob: Job? = null
     private var statusRetryAction: (() -> Unit)? = null
     private var restoredInitialChannel = false
     private var pendingEditorChannelKey: String? = null
@@ -1846,7 +1850,8 @@ class MainActivity : TvRemoteActivity() {
             add(IptvControlButton.BUFFER)
             add(IptvControlButton.SPEED)
             add(IptvControlButton.MORE)
-            add(IptvControlButton.ENGINE)
+            // Note: Engine selection hidden while ijkplayer is suspended
+            // add(IptvControlButton.ENGINE)
         }
         val idx = visibleButtons.indexOf(selectedIptvButton).coerceAtLeast(0)
         selectedIptvButton = visibleButtons[(idx + direction + visibleButtons.size) % visibleButtons.size]
@@ -2032,6 +2037,7 @@ class MainActivity : TvRemoteActivity() {
         if (!displayPreferences.showCurrentProgram) binding.currentProgram.visibility = View.GONE
         if (!displayPreferences.showNextProgram) binding.nextProgram.visibility = View.GONE
         if (!displayPreferences.subtitlesEnabled) playback.selectSubtitle(null)
+        startDiagnosticsObservation()
     }
 
     private fun applyExperienceMode() {
@@ -2156,9 +2162,20 @@ class MainActivity : TvRemoteActivity() {
             .any(trackMetadata::contains)
         binding.txtBadge.visibility = if (hasTeletext) View.VISIBLE else View.GONE
 
+        val fps = videoTrack?.videoFrameRate?.takeIf { it > 0f }
+        val hasFps = !radio && fps != null
+        if (hasFps) {
+            binding.fpsBadge.text = String.format(Locale.US, "%.0f FPS", fps)
+            binding.fpsBadge.visibility = View.VISIBLE
+        } else {
+            binding.fpsBadge.visibility = View.GONE
+        }
+
         val activeSlots = booleanArrayOf(
             true,
+            false,
             radio || quality != null,
+            hasFps,
             audioTracks.isNotEmpty(),
             subtitleTracks.isNotEmpty(),
             hasTeletext,
@@ -2167,7 +2184,9 @@ class MainActivity : TvRemoteActivity() {
         )
         val slots = listOf(
             binding.techSlotSource,
+            binding.techSlotBitrate,
             binding.techSlotQualityBadge,
+            binding.techSlotFps,
             binding.techSlotAudio,
             binding.techSlotSubtitle,
             binding.techSlotTxt,
@@ -2275,6 +2294,14 @@ class MainActivity : TvRemoteActivity() {
             binding.qualityBadge.visibility = View.VISIBLE
         }
         binding.sourceBadgeIcon.setImageResource(R.drawable.ic_source_iptv)
+        val bitrateText = formatBitrate(info.bitrate?.toLong() ?: info.estimatedBandwidthBps)
+        val hasBitrate = !radio && bitrateText != "-"
+        if (hasBitrate) {
+            binding.bitrateBadge.text = bitrateText
+            binding.bitrateBadge.visibility = View.VISIBLE
+        } else {
+            binding.bitrateBadge.visibility = View.GONE
+        }
         binding.lockBadge.visibility = if (
             channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey)
         ) View.VISIBLE else View.GONE
@@ -2289,9 +2316,20 @@ class MainActivity : TvRemoteActivity() {
         binding.subtitleBadge.visibility = if (info.hasSubtitles) View.VISIBLE else View.GONE
         binding.txtBadge.visibility = View.GONE
 
+        val fps = info.framesPerSecond
+        val hasFps = !radio && fps != null && fps > 0f
+        if (hasFps) {
+            binding.fpsBadge.text = String.format(Locale.US, "%.0f FPS", fps)
+            binding.fpsBadge.visibility = View.VISIBLE
+        } else {
+            binding.fpsBadge.visibility = View.GONE
+        }
+
         val activeSlots = booleanArrayOf(
             true,
+            hasBitrate,
             radio || quality != null || info.isAdaptive,
+            hasFps,
             info.hasAudio,
             info.hasSubtitles,
             false,
@@ -2299,7 +2337,9 @@ class MainActivity : TvRemoteActivity() {
         )
         val slots = listOf(
             binding.techSlotSource,
+            binding.techSlotBitrate,
             binding.techSlotQualityBadge,
+            binding.techSlotFps,
             binding.techSlotAudio,
             binding.techSlotSubtitle,
             binding.techSlotTxt,
@@ -4990,6 +5030,20 @@ class MainActivity : TvRemoteActivity() {
             infoHorizontalPadding,
             infoVerticalPadding,
         )
+        val diagGravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
+            Gravity.END
+        } else {
+            Gravity.START
+        }) or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
+            Gravity.BOTTOM
+        } else {
+            Gravity.TOP
+        }
+        (binding.diagnosticsOverlay.layoutParams as? FrameLayout.LayoutParams)?.apply {
+            gravity = diagGravity
+            setMargins(infoOuterMargin, verticalMargin, infoOuterMargin, verticalMargin)
+            binding.diagnosticsOverlay.layoutParams = this
+        }
     }
 
     private fun currentInfoBarHeight(screenHeight: Int): Int =
@@ -5018,6 +5072,67 @@ class MainActivity : TvRemoteActivity() {
                 binding.clockTime.text = timeFormat.format(now)
                 binding.clockDate.text = dateFormat.format(now).uppercase(Locale("tr"))
                 delay(CLOCK_REFRESH_MS)
+            }
+        }
+    }
+
+    private fun formatBitrate(bps: Number?): String {
+        val value = bps?.toLong() ?: return "-"
+        if (value <= 0) return "-"
+        return if (value >= 1_000_000) {
+            String.format(Locale.US, "%.1f Mbps", value / 1_000_000f)
+        } else {
+            String.format(Locale.US, "%d kbps", value / 1000)
+        }
+    }
+
+    private fun updateDiagnosticsOverlay() {
+        if (!displayPreferences.showDiagnosticsOverlay) {
+            binding.diagnosticsOverlay.visibility = View.GONE
+            diagnosticsJob?.cancel()
+            diagnosticsJob = null
+            return
+        }
+        val channel = currentChannel
+        if (channel == null || channel.source != LiveChannel.Source.IPTV) {
+            binding.diagnosticsOverlay.visibility = View.GONE
+            return
+        }
+        val health = iptvPlayback.healthSnapshot()
+        val width = health.width ?: 0
+        val height = health.height ?: 0
+        val fps = health.framesPerSecond ?: 0f
+        val resText = if (width > 0 && height > 0) {
+            if (fps > 0f) "${width}x${height} @ ${String.format(Locale.US, "%.1f", fps)}fps"
+            else "${width}x${height}"
+        } else {
+            "-"
+        }
+        binding.diagResFps.text = resText
+        binding.diagCodec.text = health.videoCodec?.substringAfterLast('/')?.take(16) ?: "-"
+        binding.diagBitrate.text = formatBitrate(health.bitrateBps)
+        binding.diagBandwidth.text = formatBitrate(health.estimatedBandwidthBps)
+        val bufferSec = (health.bufferedDurationMillis ?: 0L) / 1000.0
+        binding.diagBuffer.text = String.format(Locale.US, "%.1f s", bufferSec)
+        binding.diagDropped.text = (health.droppedFrames ?: 0L).toString()
+        val audioInfo = health.audioCodec?.substringAfterLast('/')?.take(10) ?: "-"
+        val ch = health.audioChannelCount ?: 2
+        binding.diagAudio.text = "$audioInfo (${ch}ch)"
+        binding.diagnosticsOverlay.visibility = View.VISIBLE
+    }
+
+    private fun startDiagnosticsObservation() {
+        diagnosticsJob?.cancel()
+        if (!displayPreferences.showDiagnosticsOverlay) {
+            binding.diagnosticsOverlay.visibility = View.GONE
+            return
+        }
+        diagnosticsJob = lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (isActive) {
+                    updateDiagnosticsOverlay()
+                    delay(1000L)
+                }
             }
         }
     }

@@ -6,6 +6,17 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### İnfobarda FPS Rozeti ve Canlı Tanı (Diagnostics) Paneli
+* İnfobara kalite rozetinin hemen sağına canlı kare hızını gösteren FPS rozeti eklendi (IPTV Media3 ve DTV/ATV TIF video track desteği).
+* Ayarlar menüsüne ("Gelişmiş Tanı Bilgilerini Göster") ve ekranda transparan canlı yayın istatistik paneli (çözünürlük, FPS, bitrate, buffer boyutu, düşen kare sayısı) entegre edildi.
+
+### Oynatma Motoru (Engine) Kontrollerinin Gizlenmesi
+* ijkplayer kaldırıldığı ve Media3 tekil aktif motor olarak yapılandırıldığı için infobardaki Motor Değiştir butonu ve Ayarlar menüsündeki oynatma motoru seçeneği gizlendi.
+
+### Program Rehberi (EPG) Senkronizasyonu
+* Program rehberinde sol kanal listesi ile sağ program listesi dikeyde pürüzsüz biçimde senkronize kayacak şekilde eşitlendi.
+* Kumanda ile gezinirken sol kanal kutusu ve sağ program satırının aynı dikey piksel hizasında kalması sağlandı; üstteki kanal başlığı anında odaklanılan kanalla güncellenecek şekilde düzeltildi.
+
 ### Android TV ana ekranı banner'ı
 * Uygulamanın TV launcher'larında boş veya siyah kutu gibi görünmesine neden olan düz renk banner,
   TVApp simgesini taşıyan 16:9 ve yüksek kontrastlı bir launcher banner'ı ile değiştirildi.
