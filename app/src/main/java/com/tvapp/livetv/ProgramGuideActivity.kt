@@ -337,6 +337,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         channel: LiveChannel,
         program: ProgramSummary,
     ) {
+        val rowChanged = focusedChannelIndex != row
         focusedChannelIndex = row
         focusedChannel = channel
         programs = programSchedules[channel.sourceKey].orEmpty()
@@ -344,7 +345,9 @@ class ProgramGuideActivity : TvRemoteActivity() {
         channelAdapter.select(channel.sourceKey)
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
-        syncScrollToRow(row)
+        if (rowChanged) {
+            syncScrollToRow(row)
+        }
         showProgramDetail(program)
     }
 

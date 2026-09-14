@@ -1284,7 +1284,7 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         touchTarget(binding.channelActionGreen) {
-            showIptvPipPicker()
+            showIptvGridPicker()
         }
         binding.channelActionGreen.setOnLongClickListener {
             showIptvGridPicker()
@@ -2115,7 +2115,7 @@ class MainActivity : TvRemoteActivity() {
         val height = callbackSize?.height?.takeIf { it > 0 } ?: videoTrack?.videoHeight ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = if (radio) null else VideoQuality.label(width, height, format)
+        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format, isTif = true)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
@@ -2162,20 +2162,10 @@ class MainActivity : TvRemoteActivity() {
             .any(trackMetadata::contains)
         binding.txtBadge.visibility = if (hasTeletext) View.VISIBLE else View.GONE
 
-        val fps = videoTrack?.videoFrameRate?.takeIf { it > 0f }
-        val hasFps = !radio && fps != null
-        if (hasFps) {
-            binding.fpsBadge.text = String.format(Locale.US, "%.0f FPS", fps)
-            binding.fpsBadge.visibility = View.VISIBLE
-        } else {
-            binding.fpsBadge.visibility = View.GONE
-        }
-
         val activeSlots = booleanArrayOf(
             true,
             false,
             radio || quality != null,
-            hasFps,
             audioTracks.isNotEmpty(),
             subtitleTracks.isNotEmpty(),
             hasTeletext,
@@ -2186,7 +2176,6 @@ class MainActivity : TvRemoteActivity() {
             binding.techSlotSource,
             binding.techSlotBitrate,
             binding.techSlotQualityBadge,
-            binding.techSlotFps,
             binding.techSlotAudio,
             binding.techSlotSubtitle,
             binding.techSlotTxt,
@@ -2279,7 +2268,7 @@ class MainActivity : TvRemoteActivity() {
         val height = info.height ?: 0
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
-        val quality = if (radio) null else VideoQuality.label(width, height, format)
+        val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format, isTif = false)
         binding.qualityBadge.visibility = View.GONE
         binding.radioBadge.visibility = View.GONE
         if (radio) {
@@ -2316,20 +2305,10 @@ class MainActivity : TvRemoteActivity() {
         binding.subtitleBadge.visibility = if (info.hasSubtitles) View.VISIBLE else View.GONE
         binding.txtBadge.visibility = View.GONE
 
-        val fps = info.framesPerSecond
-        val hasFps = !radio && fps != null && fps > 0f
-        if (hasFps) {
-            binding.fpsBadge.text = String.format(Locale.US, "%.0f FPS", fps)
-            binding.fpsBadge.visibility = View.VISIBLE
-        } else {
-            binding.fpsBadge.visibility = View.GONE
-        }
-
         val activeSlots = booleanArrayOf(
             true,
             hasBitrate,
             radio || quality != null || info.isAdaptive,
-            hasFps,
             info.hasAudio,
             info.hasSubtitles,
             false,
@@ -2339,7 +2318,6 @@ class MainActivity : TvRemoteActivity() {
             binding.techSlotSource,
             binding.techSlotBitrate,
             binding.techSlotQualityBadge,
-            binding.techSlotFps,
             binding.techSlotAudio,
             binding.techSlotSubtitle,
             binding.techSlotTxt,
@@ -3280,7 +3258,10 @@ class MainActivity : TvRemoteActivity() {
 
     private fun startIptvOverlay(channel: LiveChannel) {
         if (!hasIptvAccess { startIptvOverlay(channel) }) return
-        if (currentChannel?.source != LiveChannel.Source.TIF) return
+        if (channel.source == LiveChannel.Source.TIF && currentChannel?.source == LiveChannel.Source.TIF) {
+            Toast.makeText(this, R.string.multiview_requires_single_tuner, Toast.LENGTH_LONG).show()
+            return
+        }
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
         iptvOverlayActive = true
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_OVERLAY)
@@ -3454,11 +3435,10 @@ class MainActivity : TvRemoteActivity() {
                     R.string.iptv_grid_empty,
                     Toast.LENGTH_SHORT,
                 ).show()
-                selectedChannels.size == 1 -> Toast.makeText(
-                    this,
-                    R.string.iptv_grid_empty,
-                    Toast.LENGTH_SHORT,
-                ).show()
+                selectedChannels.size == 1 -> {
+                    dialog.dismiss()
+                    startIptvOverlay(selectedChannels.first())
+                }
                 else -> {
                     gridSelectedKeys.clear()
                     gridSelectedKeys += selectedChannels.map { it.sourceKey }
@@ -5094,31 +5074,62 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         val channel = currentChannel
-        if (channel == null || channel.source != LiveChannel.Source.IPTV) {
+        if (channel == null) {
             binding.diagnosticsOverlay.visibility = View.GONE
             return
         }
-        val health = iptvPlayback.healthSnapshot()
-        val width = health.width ?: 0
-        val height = health.height ?: 0
-        val fps = health.framesPerSecond ?: 0f
-        val resText = if (width > 0 && height > 0) {
-            if (fps > 0f) "${width}x${height} @ ${String.format(Locale.US, "%.1f", fps)}fps"
-            else "${width}x${height}"
+        if (channel.source == LiveChannel.Source.IPTV) {
+            val health = iptvPlayback.healthSnapshot()
+            val width = health.width ?: 0
+            val height = health.height ?: 0
+            val fps = health.framesPerSecond ?: 0f
+            val resText = if (width > 0 && height > 0) {
+                if (fps > 0f) "${width}x${height} @ ${String.format(Locale.US, "%.1f", fps)}fps"
+                else "${width}x${height}"
+            } else {
+                "-"
+            }
+            binding.diagResFps.text = resText
+            binding.diagCodec.text = health.videoCodec?.substringAfterLast('/')?.take(16) ?: "-"
+            binding.diagBitrate.text = formatBitrate(health.bitrateBps)
+            binding.diagBandwidth.text = formatBitrate(health.estimatedBandwidthBps)
+            val bufferSec = (health.bufferedDurationMillis ?: 0L) / 1000.0
+            binding.diagBuffer.text = String.format(Locale.US, "%.1f s", bufferSec)
+            binding.diagDropped.text = (health.droppedFrames ?: 0L).toString()
+            val audioInfo = health.audioCodec?.substringAfterLast('/')?.take(10) ?: "-"
+            val ch = health.audioChannelCount ?: 2
+            binding.diagAudio.text = "$audioInfo (${ch}ch)"
+            binding.diagnosticsOverlay.visibility = View.VISIBLE
+        } else if (channel.source == LiveChannel.Source.TIF) {
+            val tracks = playback.allTracks()
+            val videoTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_VIDEO }
+            val videoState = playback.currentVideoState()
+            val width = if (videoState.width > 0) videoState.width else videoTrack?.videoWidth ?: 0
+            val height = if (videoState.height > 0) videoState.height else videoTrack?.videoHeight ?: 0
+            val fps = videoTrack?.videoFrameRate?.takeIf { it > 0f } ?: 0f
+            val resText = if (width > 0 && height > 0) {
+                val mode = if (height >= 1080) "1080i" else if (height >= 720) "720p" else "${height}p"
+                if (fps > 0f) "${width}x${height} ($mode) @ ${String.format(Locale.US, "%.1f", fps)}fps"
+                else "${width}x${height} ($mode)"
+            } else {
+                channel.videoFormat?.takeIf { it.isNotBlank() } ?: "-"
+            }
+            binding.diagResFps.text = resText
+            val videoCodec = videoTrack?.extra?.toString()?.takeIf { it.isNotBlank() } ?: "DVB Tuner"
+            binding.diagCodec.text = videoCodec.take(16)
+            binding.diagBitrate.text = "Tuner Direct"
+            binding.diagBandwidth.text = "Hardware RF"
+            binding.diagBuffer.text = "Tuner Sync"
+            binding.diagDropped.text = "0"
+            val audioTrack = tracks.firstOrNull { it.type == TvTrackInfo.TYPE_AUDIO }
+            val audioCodec = audioTrack?.extra?.toString()?.takeIf { it.isNotBlank() }
+                ?: audioTrack?.language ?: "Stereo"
+            val audioCh = audioTrack?.audioChannelCount?.takeIf { it > 0 } ?: 2
+            binding.diagAudio.text = "${audioCodec.take(10)} (${audioCh}ch)"
+            binding.diagnosticsOverlay.visibility = View.VISIBLE
         } else {
-            "-"
+            binding.diagnosticsOverlay.visibility = View.GONE
         }
-        binding.diagResFps.text = resText
-        binding.diagCodec.text = health.videoCodec?.substringAfterLast('/')?.take(16) ?: "-"
-        binding.diagBitrate.text = formatBitrate(health.bitrateBps)
-        binding.diagBandwidth.text = formatBitrate(health.estimatedBandwidthBps)
-        val bufferSec = (health.bufferedDurationMillis ?: 0L) / 1000.0
-        binding.diagBuffer.text = String.format(Locale.US, "%.1f s", bufferSec)
-        binding.diagDropped.text = (health.droppedFrames ?: 0L).toString()
-        val audioInfo = health.audioCodec?.substringAfterLast('/')?.take(10) ?: "-"
-        val ch = health.audioChannelCount ?: 2
-        binding.diagAudio.text = "$audioInfo (${ch}ch)"
-        binding.diagnosticsOverlay.visibility = View.VISIBLE
     }
 
     private fun startDiagnosticsObservation() {
@@ -5784,7 +5795,7 @@ class MainActivity : TvRemoteActivity() {
                 greenLongPressJob?.cancel()
                 if (!greenLongPressHandled) {
                     focusedTuneJob?.cancel()
-                    showIptvPipPicker()
+                    showIptvGridPicker()
                 }
                 greenLongPressHandled = false
             }

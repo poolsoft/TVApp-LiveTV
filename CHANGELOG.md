@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### TIF Tanı (Diagnostics) Desteği, Net Çözünürlük Rozeti, EPG Yatay Kayma Düzeltmesi ve Birleşik PiP/MultiView
+* **TIF Tanı Paneli:** Canlı tanı OSD paneli DVB/ATV (TIF) kanallarında da aktif hale getirildi; tuner video track çözünürlüğü, formatı ve ses bilgileri yansıtıldı.
+* **Net Çözünürlük Rozeti:** İnfobardaki FPS rozeti yerine televizyon standardında net çözünürlük rozeti getirildi (TIF için `1080i`, `720p`, `576i`; IPTV için `1080p`, `720p`, `4K`).
+* **EPG Yatay Gezinme Sabitlemesi:** Program rehberinde aynı satırda sağa/sola geçiş yaparken oluşan mikro dikey kaymalar önlendi; liste dikeyde sabit tutuldu.
+* **Birleşik PiP ve MultiView Seçicisi:** Yeşil tuşa basıldığında açılan seçicide 1 kanal seçildiğinde PiP açılması, 2 veya daha fazla kanal seçildiğinde MultiView (Grid) başlatılması sağlandı.
+
 ### İnfobarda FPS Rozeti ve Canlı Tanı (Diagnostics) Paneli
 * İnfobara kalite rozetinin hemen sağına canlı kare hızını gösteren FPS rozeti eklendi (IPTV Media3 ve DTV/ATV TIF video track desteği).
 * Ayarlar menüsüne ("Gelişmiş Tanı Bilgilerini Göster") ve ekranda transparan canlı yayın istatistik paneli (çözünürlük, FPS, bitrate, buffer boyutu, düşen kare sayısı) entegre edildi.
