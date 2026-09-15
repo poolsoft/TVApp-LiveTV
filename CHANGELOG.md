@@ -6,6 +6,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Program Rehberi (EPG) Tam Ekran Modern TV Arayüzü ve Üst Detay Kartı
+* **Tam Ekran Smart TV Deneyimi:** Program rehberi ekranı tam ekran (16:9 safe margins) olarak yeniden modellendi; sağ taraftaki boşluk kaldırıldı.
+* **Göz Hizasında Üst Detay Kartı:** Odaklanılan kanalın büyük logosu, numarası, adı; odaklanılan programın başlığı, "CANLI" rozeti, kalan süresi, zaman aralığı ve detaylı konusu ekranın üst kısmındaki modern koyu cam kartta dinamik ve anlık olarak sunuldu.
+* **Kanal Numarası Kırılmalarının Giderilmesi:** Dar sabit piksel sınırları kaldırılarak tek satır (`maxLines="1"`, `singleLine="true"`, `minWidth="50dp"`) garantisi sağlandı; 3-4 basamaklı numaraların alt satıra bölünmesi engellendi.
+* **Zaman Cetveli ve Canlı Çizgi Milimetrik Hizalaması:** Soldaki 240dp sabit kanal sütunu ile cetvelin "Kanallar" başlığı eşitlendi; canlı yayın ibresi (dikey mavi çizgi) cetvelden aşağıdaki satırlara kesintisiz aktarıldı.
+* **Doğal Kumanda ve Odak Akışı:** `dispatchKeyEvent` içindeki yapay DPAD engellemeleri temizlenerek Android TV doğal odak sistemine geçildi; kumandayla satırlar ve programlar arasında gezinirken anında üst kart senkronizasyonu sağlandı.
+
 ### Program Rehberi (EPG) Tek Dikey Grid Mimarisi ve Kararlı Kaydırma
 * **Tek Dikey Grid Mimarisi:** Sol kanal listesi ve sağ program listesini iki ayrı RecyclerView olarak senkronize etmeye çalışan yapı tamamen kaldırıldı; her satırda sol tarafta kanal hücresi, sağ tarafta program hücreleri bulunan tek birleşik `RecyclerView` (`program_list`) ve `GuideScheduleAdapter` mimarisine geçildi.
 * **Kayma ve Zıplamaların Önlenmesi:** Odaklanma sırasında oluşan mikro dikey kaymalar, gecikmeler ve scale animasyon uyumsuzlukları giderildi. Dikey yukarı/aşağı ve yatay gezinme tek liste üzerinden donanımsal pürüzsüzlükle çalışır hale getirildi.

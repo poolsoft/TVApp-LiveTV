@@ -186,13 +186,6 @@ class GuideScheduleAdapter(
         }
 
         private fun bindChannelCell(channel: LiveChannel, row: Int, rowHeight: Int) = with(binding) {
-            channelLogo.layoutParams = channelLogo.layoutParams.apply {
-                width = (rowHeight * LOGO_WIDTH_FRACTION).toInt()
-                height = (rowHeight * LOGO_HEIGHT_FRACTION).toInt()
-            }
-            channelNumber.layoutParams = channelNumber.layoutParams.apply {
-                width = (rowHeight * NUMBER_WIDTH_FRACTION).toInt()
-            }
             channelNumber.text = channel.displayNumber
             channelName.text = channel.displayName
             bindChannelCurrentProgram(channel)
@@ -323,12 +316,13 @@ class GuideScheduleAdapter(
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
             setPadding(dp(12), 0, dp(12), 0)
-            setText(R.string.no_epg_data)
+            setText(R.string.no_program_information)
             setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             textSize = 12f
             setOnFocusChangeListener { _, focused ->
                 if (focused) onChannelFocused(row, channel)
             }
+            setOnClickListener { onChannelSelected(channel) }
             setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     binding.channelCell.requestFocus()

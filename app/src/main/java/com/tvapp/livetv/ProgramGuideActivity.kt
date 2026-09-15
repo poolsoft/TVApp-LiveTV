@@ -7,6 +7,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Bundle
+import android.media.tv.TvContract
+import coil.dispose
+import com.tvapp.livetv.image.ChannelLogoLoader
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -125,6 +128,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         updateEpgSourceLabel()
         updateTimelineRuler(timelineWindowStartMillis)
         binding.timelineRuler.post(::updateCurrentTimeIndicator)
+        binding.timelineGridTrack.post(::updateCurrentTimeIndicator)
         loadChannels()
     }
 
@@ -152,23 +156,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
     }
 
     private fun applyPercentageGeometry() {
-        val width = resources.displayMetrics.widthPixels
-        val height = resources.displayMetrics.heightPixels
-        binding.guideOverlay.layoutParams = binding.guideOverlay.layoutParams.apply {
-            this.width = (width * OVERLAY_WIDTH_FRACTION).toInt()
-        }
-        binding.guideHeader.layoutParams = binding.guideHeader.layoutParams.apply {
-            this.height = (height * HEADER_HEIGHT_FRACTION).toInt()
-        }
-        binding.guideHeader.setPadding(
-            (width * OUTER_HORIZONTAL_PADDING_FRACTION).toInt(),
-            0,
-            (width * OUTER_HORIZONTAL_PADDING_FRACTION).toInt(),
-            0,
-        )
-        binding.programDetail.layoutParams = binding.programDetail.layoutParams.apply {
-            this.height = (height * DETAIL_HEIGHT_FRACTION).toInt()
-        }
+        // Tam ekran arayuz, ek geometrik olceklendirme gerekmez.
     }
 
     private fun loadChannels() {
@@ -205,8 +193,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
             .coerceAtLeast(0)
         focusedChannelIndex = target
         scheduleAdapter.selectChannel(channel.sourceKey)
-        binding.selectedChannelNumber.text = channel.displayNumber
-        binding.selectedChannelName.text = channel.displayName
+        updateSelectedChannelHeader(channel)
         syncScrollToRow(target)
         focusJob?.cancel()
         focusJob = lifecycleScope.launch {
@@ -222,8 +209,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         preferredTimeMillis: Long? = null,
     ) {
         focusedChannel = channel
-        binding.selectedChannelNumber.text = channel.displayNumber
-        binding.selectedChannelName.text = channel.displayName
+        updateSelectedChannelHeader(channel)
         scheduleJob?.cancel()
         scheduleJob = lifecycleScope.launch {
             val now = System.currentTimeMillis()
@@ -270,7 +256,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
                 binding.detailTime.text = ""
                 binding.detailDescription.text = ""
                 binding.detailDescription.visibility = View.GONE
-                binding.detailDescriptionScroll.visibility = View.GONE
                 if (focusTimeline) scheduleAdapter.focusRow(binding.programList, center)
             } else {
                 val targetTime = preferredTimeMillis ?: now
@@ -295,8 +280,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         focusedProgramIndex = 0
         programs = programSchedules[channel.sourceKey].orEmpty()
         scheduleAdapter.selectChannel(channel.sourceKey)
-        binding.selectedChannelNumber.text = channel.displayNumber
-        binding.selectedChannelName.text = channel.displayName
+        updateSelectedChannelHeader(channel)
         syncScrollToRow(row)
         if (!programSchedules.containsKey(channel.sourceKey)) loadPrograms(channel)
     }
@@ -312,12 +296,26 @@ class ProgramGuideActivity : TvRemoteActivity() {
         programs = programSchedules[channel.sourceKey].orEmpty()
         focusedProgramIndex = programs.indexOf(program).coerceAtLeast(0)
         scheduleAdapter.selectChannel(channel.sourceKey)
-        binding.selectedChannelNumber.text = channel.displayNumber
-        binding.selectedChannelName.text = channel.displayName
+        updateSelectedChannelHeader(channel)
         if (rowChanged) {
             syncScrollToRow(row)
         }
         showProgramDetail(program)
+    }
+
+    private fun updateSelectedChannelHeader(channel: LiveChannel) {
+        binding.selectedChannelNumber.text = channel.displayNumber
+        binding.selectedChannelName.text = channel.displayName
+        if (channel.source == LiveChannel.Source.IPTV) {
+            ChannelLogoLoader.load(binding.selectedChannelLogo, channel.logoUrl, R.drawable.ic_tv)
+        } else {
+            binding.selectedChannelLogo.dispose()
+            binding.selectedChannelLogo.setImageResource(R.drawable.ic_tv)
+            runCatching { binding.selectedChannelLogo.setImageURI(TvContract.buildChannelLogoUri(channel.id)) }
+            if (binding.selectedChannelLogo.drawable == null) {
+                binding.selectedChannelLogo.setImageResource(R.drawable.ic_tv)
+            }
+        }
     }
 
     private fun showProgramDetail(program: ProgramSummary) {
@@ -329,7 +327,9 @@ class ProgramGuideActivity : TvRemoteActivity() {
         val endStr = format.format(Date(program.endTimeMillis))
         val durationMin = ((program.endTimeMillis - program.startTimeMillis) / 60_000L).coerceAtLeast(1L)
         val now = System.currentTimeMillis()
-        val timeStr = if (now in program.startTimeMillis until program.endTimeMillis) {
+        val isLive = now in program.startTimeMillis until program.endTimeMillis
+        binding.detailBadgeLive.visibility = if (isLive) View.VISIBLE else View.GONE
+        val timeStr = if (isLive) {
             val remainMin = ((program.endTimeMillis - now) / 60_000L).coerceAtLeast(1L)
             getString(
                 R.string.program_time_duration_remaining,
@@ -348,8 +348,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
         } else {
             View.VISIBLE
         }
-        binding.detailDescriptionScroll.visibility = binding.detailDescription.visibility
-        binding.detailDescriptionScroll.scrollTo(0, 0)
     }
 
     private fun updateTimelineRuler(startMillis: Long) {
@@ -372,13 +370,15 @@ class ProgramGuideActivity : TvRemoteActivity() {
         listOf(binding.currentTimeHeaderLine, binding.currentTimeGridLine).forEach { line ->
             line.visibility = if (visible) View.VISIBLE else View.GONE
         }
-        if (!visible || binding.timelineRuler.width <= 0 || binding.programList.width <= 0) return
+        if (!visible || binding.timelineRuler.width <= 0) return
         val fraction = ((now - timelineWindowStartMillis).toFloat() / TIMELINE_WINDOW_MS)
             .coerceIn(0f, 1f)
         binding.currentTimeHeaderLine.x =
             (binding.timelineRuler.width - binding.currentTimeHeaderLine.width) * fraction
-        binding.currentTimeGridLine.x =
-            (binding.programList.width - binding.currentTimeGridLine.width) * fraction
+        if (binding.timelineGridTrack.width > 0) {
+            binding.currentTimeGridLine.x =
+                (binding.timelineGridTrack.width - binding.currentTimeGridLine.width) * fraction
+        }
     }
 
     private fun openChannel(channel: LiveChannel) {
@@ -452,7 +452,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
                 binding.detailTime.text = ""
                 binding.detailDescription.text = ""
                 binding.detailDescription.visibility = View.GONE
-                binding.detailDescriptionScroll.visibility = View.GONE
                 scheduleAdapter.focusRow(binding.programList, target)
             }
             loadPrograms(channel, preferredTimeMillis = preferredTime)
@@ -665,39 +664,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
         val event = rawEvent.asTvRemoteEvent()
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (binding.programList.hasFocus()) {
-                        focusScheduleChannel(-1)
-                        return true
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (binding.programList.hasFocus()) {
-                        focusScheduleChannel(1)
-                        return true
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (binding.programList.hasFocus()) {
-                        moveScheduleProgram(1)
-                        return true
-                    }
-                }
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (binding.programList.hasFocus()) {
-                        moveScheduleProgram(-1)
-                        return true
-                    } else if (binding.detailDescriptionScroll.hasFocus()) {
-                        scheduleAdapter.focusProgram(
-                            binding.programList,
-                            focusedChannelIndex,
-                            programs.getOrNull(focusedProgramIndex)?.startTimeMillis
-                                ?: System.currentTimeMillis(),
-                            allowScroll = false,
-                        )
-                        return true
-                    }
-                }
                 KeyEvent.KEYCODE_CHANNEL_UP -> {
                     focusScheduleChannel(-1)
                     return true
@@ -707,17 +673,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_INFO -> {
-                    if (binding.detailDescriptionScroll.hasFocus()) {
-                        scheduleAdapter.focusProgram(
-                            binding.programList,
-                            focusedChannelIndex,
-                            programs.getOrNull(focusedProgramIndex)?.startTimeMillis
-                                ?: System.currentTimeMillis(),
-                            allowScroll = false,
-                        )
-                    } else if (binding.detailDescriptionScroll.visibility == View.VISIBLE) {
-                        binding.detailDescriptionScroll.requestFocus()
-                    }
                     return true
                 }
                 KeyEvent.KEYCODE_GUIDE -> {
