@@ -135,12 +135,17 @@ class IptvPlaybackController(
         onEngineChanged?.invoke(IptvPlaybackEngine.MEDIA3, null)
         val renderersFactory = DefaultRenderersFactory(appContext).apply {
             setEnableDecoderFallback(true)
+            // EXTENSION_RENDERER_MODE_ON orders software extension renderers after
+            // the built-in hardware renderers, so they are only consulted when a
+            // hardware decoder cannot be selected for the track. (Media3 1.8.0 has
+            // no ON_FAIL mode; ON is the closest available discipline.) Grid cells
+            // additionally cap resolution/bitrate via IptvPlaybackProfile.
             setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         }
         val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
             (targetBufferSeconds * 1_000).coerceAtLeast(MIN_BUFFER_MS)
         } else {
-            MAX_BUFFER_MS
+            SECONDARY_MAX_BUFFER_MS
         }
         val loadControl = DefaultLoadControl.Builder().apply {
             setBufferDurationsMs(
@@ -797,7 +802,7 @@ class IptvPlaybackController(
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
         const val MIN_BUFFER_MS = 15_000
-        const val MAX_BUFFER_MS = 45_000
+        const val SECONDARY_MAX_BUFFER_MS = 10_000
         const val BUFFER_FOR_PLAYBACK_MS = 1_500
         const val BUFFER_AFTER_REBUFFER_MS = 4_000
         const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
@@ -842,6 +847,18 @@ enum class IptvPlaybackProfile(
     SECONDARY(1_280, 720, 3_000_000),
     GRID(960, 540, 1_500_000),
 }
+
+/**
+ * Chooses the playback profile for a Multi-View cell based on how many cells
+ * are visible. Four cells must fit low-end SoCs, so they get a tighter cap,
+ * while a two-cell layout can afford the secondary (720p) profile.
+ */
+fun gridProfileForCellCount(cellCount: Int): IptvPlaybackProfile = when {
+    cellCount >= FOUR_CELL_GRID_STREAMS -> IptvPlaybackProfile.GRID
+    else -> IptvPlaybackProfile.SECONDARY
+}
+
+private const val FOUR_CELL_GRID_STREAMS = 4
 
 data class IptvPlaybackSnapshot(
     val positionMillis: Long,

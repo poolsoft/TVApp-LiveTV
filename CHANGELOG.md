@@ -6,6 +6,28 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### MultiView (Grid) Codec ve Stabilite İyileştirmeleri
+* **Codec tabanlı grid limiti:** `MediaCodecList(REGULAR_CODECS)` üzerinden H.264 ve H.265 için
+  ayrı eşzamanlı decoder instance sayıları algılanır; `maximumGridStreams` artık gerçek donanım
+  kapasitesinden türetilir. HEVC-only cihazlarda genel kapasite sınırı uygulanır, rapor eksikse
+  asgari 2 akış garanti edilir; "kapasite 1'e kilitlenme" sorunu engellenir.
+* **Hücre sayısına göre oynatma profili:** 4 hücreli grid 960×540/1.5 Mbps GRID profili, 2-3
+  hücreli düzenler 1280×720/3 Mbps SECONDARY profili kullanır; düşük donanımda 4 kanal birlikte
+  daha stabil açılır, az kanalda görüntü kalitesi korunur. Yazılım extension decoder'ları mevcut
+  `EXTENSION_RENDERER_MODE_ON` sıralamasıyla yalnız donanım decoder seçilemediğinde devreye girer.
+* **Grid buffer azaltma:** Grid/secondary hücrelerde maksimum buffer 45 sn'den 10 sn'ye indirildi;
+  hücre başına bellek kullanımı ve kanal değiştirme gecikmesi düşer.
+* **TIF pencere yerleşimi güvenliği:** MultiView'daki DVB penceresi, grid yerleşim değişimlerini
+  layout listener ile izler ve aynı konum için gereksiz surface güncellemesi yapmaz; siyah/yer
+  değiştirmiş DVB penceresi düzeltilir.
+* **Güvenli grid odak gezinmesi:** Odak matematiği `MultiViewFocusResolver`'a taşındı; 4 hücreli
+  gridde yukarı/aşağı sınır dışına çıkmak yerine sütun içinde ilk/son satıra sarar, 2/3/4 hücreli
+  düzenlerin gerçek geometrisine göre hareket eder.
+* **Grid sessize alma koruması:** Grid kapalıyken hücrelerin ses durumu değiştirilmez; MultiView
+  çıkışında ana yayın sesi her zaman geri açılır.
+* **Seçici odak restorasyonu:** MultiView seçicide filtre değişimi ve arama sonrasında odak,
+  görünen ilk öğeye sabitlenir.
+
 ### Program Rehberi (EPG) Tam Ekran Modern TV Arayüzü ve Üst Detay Kartı
 * **Tam Ekran Smart TV Deneyimi:** Program rehberi ekranı tam ekran (16:9 safe margins) olarak yeniden modellendi; sağ taraftaki boşluk kaldırıldı.
 * **Göz Hizasında Üst Detay Kartı:** Odaklanılan kanalın büyük logosu, numarası, adı; odaklanılan programın başlığı, "CANLI" rozeti, kalan süresi, zaman aralığı ve detaylı konusu ekranın üst kısmındaki modern koyu cam kartta dinamik ve anlık olarak sunuldu.

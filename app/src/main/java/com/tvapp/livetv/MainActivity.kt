@@ -62,6 +62,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
+import com.tvapp.livetv.playback.gridProfileForCellCount
 import com.tvapp.livetv.playback.IptvBufferingState
 import com.tvapp.livetv.playback.IptvPlaybackProfile
 import com.tvapp.livetv.playback.IptvPlaybackHealthSnapshot
@@ -114,6 +115,7 @@ import com.tvapp.livetv.ui.RemoteKeyPhase
 import com.tvapp.livetv.ui.RemoteUiContext
 import com.tvapp.livetv.ui.VideoQuality
 import com.tvapp.livetv.ui.MultiViewChannelAdapter
+import com.tvapp.livetv.ui.MultiViewFocusResolver
 import com.tvapp.livetv.ui.TvUiComponents
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
@@ -253,6 +255,7 @@ class MainActivity : TvRemoteActivity() {
     private val gridControllers = mutableListOf<IptvPlaybackController>()
     private val renderedGridKeys = mutableListOf<String?>()
     private var renderedGridTifKey: String? = null
+    private var gridTifSurfaceLayoutListenerAttached = false
     private val unlockedChannels = mutableSetOf<String>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
@@ -3205,6 +3208,13 @@ class MainActivity : TvRemoteActivity() {
                 setMargins(3.dp, 3.dp, 3.dp, 3.dp)
             }
             binding.iptvGrid.addView(cell)
+            cell.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                // Cell bounds change on every grid layout transition (2/3/4
+                // cells, fullscreen). Re-position the shared TIF surface then;
+                // a single post() misses later layout passes and leaves the
+                // DVB picture black or misplaced.
+                if (iptvGridActive) positionGridTifSurface()
+            }
             gridCells += cell
             gridPlayerViews += playerView
             gridLabels += label
@@ -3212,7 +3222,7 @@ class MainActivity : TvRemoteActivity() {
             gridControllers += IptvPlaybackController(
                 this,
                 playerView,
-                IptvPlaybackProfile.GRID,
+                gridProfileForCellCount(deviceResourcePolicy.maximumGridStreams),
                 enableIjkFallback = true,
             ).apply {
                 onPlaybackError = { error ->
@@ -3380,7 +3390,15 @@ class MainActivity : TvRemoteActivity() {
                 (sourceFilter.ordinal + 1) % MultiViewPickerFilter.entries.size
             ]
             refresh()
-            recyclerView.scrollToPosition(0)
+            recyclerView.post {
+                val firstVisible = (recyclerView.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager)
+                    ?.findFirstCompletelyVisibleItemPosition() ?: 0
+                val target = if (firstVisible in 0 until visibleChoices.size) firstVisible else 0
+                recyclerView.scrollToPosition(target)
+                recyclerView.findViewHolderForAdapterPosition(target)
+                    ?.itemView
+                    ?.requestFocus()
+            }
         }
 
         startSelected = {
@@ -3434,7 +3452,12 @@ class MainActivity : TvRemoteActivity() {
                     showMultiViewSearchDialog(query) { newQuery ->
                         query = newQuery
                         refresh()
-                        recyclerView.scrollToPosition(0)
+                        recyclerView.post {
+                            recyclerView.scrollToPosition(0)
+                            recyclerView.findViewHolderForAdapterPosition(0)
+                                ?.itemView
+                                ?.requestFocus()
+                        }
                     }
                     true
                 }
@@ -3536,6 +3559,7 @@ class MainActivity : TvRemoteActivity() {
         }
         applyIptvGridLayout()
         updateIptvGridFocus()
+        binding.iptvGrid.post(::positionGridTifSurface)
     }
 
     private fun applyIptvGridLayout() {
@@ -3577,6 +3601,14 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         binding.iptvGrid.requestLayout()
+        if (!gridTifSurfaceLayoutListenerAttached) {
+            gridTifSurfaceLayoutListenerAttached = true
+            // Catches grid-wide layout passes (view visibility, grid position
+            // or bounds changes) that individual cell listeners do not see.
+            binding.iptvGrid.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                if (iptvGridActive) positionGridTifSurface()
+            }
+        }
         binding.iptvGrid.post(::positionGridTifSurface)
     }
 
@@ -3589,11 +3621,25 @@ class MainActivity : TvRemoteActivity() {
         }
         val cell = gridCells[tifIndex]
         if (cell.width <= 0 || cell.height <= 0) return
-        binding.tvView.layoutParams = (binding.tvView.layoutParams as FrameLayout.LayoutParams).apply {
+        val targetLeft = (binding.iptvGrid.x + cell.x).toInt()
+        val targetTop = (binding.iptvGrid.y + cell.y).toInt()
+        val params = binding.tvView.layoutParams as FrameLayout.LayoutParams
+        if (
+            binding.tvView.visibility == View.VISIBLE &&
+            params.width == cell.width &&
+            params.height == cell.height &&
+            params.leftMargin == targetLeft &&
+            params.topMargin == targetTop
+        ) {
+            // Already positioned for this layout; skip the redundant update so
+            // repeated layout passes cannot flip the surface into rebuild loops.
+            return
+        }
+        binding.tvView.layoutParams = params.apply {
             width = cell.width
             height = cell.height
-            leftMargin = (binding.iptvGrid.x + cell.x).toInt()
-            topMargin = (binding.iptvGrid.y + cell.y).toInt()
+            leftMargin = targetLeft
+            topMargin = targetTop
             rightMargin = 0
             bottomMargin = 0
             gravity = Gravity.TOP or Gravity.START
@@ -3614,6 +3660,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateIptvGridFocus() {
         val tifIndex = gridChannels.indexOfFirst { it.source == LiveChannel.Source.TIF }
+        if (!iptvGridActive) return
         gridCells.forEachIndexed { index, cell ->
             cell.background = ContextCompat.getDrawable(
                 this,
@@ -3632,34 +3679,12 @@ class MainActivity : TvRemoteActivity() {
 
     private fun moveIptvGridFocus(keyCode: Int) {
         if (gridFullscreenIndex != null) return
-        val candidate = when (gridChannels.size) {
-            2 -> when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> 0
-                KeyEvent.KEYCODE_DPAD_RIGHT -> 1
-                else -> gridActiveIndex
-            }
-            3 -> when (gridActiveIndex) {
-                0 -> if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else 0
-                1 -> when (keyCode) {
-                    KeyEvent.KEYCODE_DPAD_LEFT -> 0
-                    KeyEvent.KEYCODE_DPAD_DOWN -> 2
-                    else -> 1
-                }
-                else -> when (keyCode) {
-                    KeyEvent.KEYCODE_DPAD_LEFT -> 0
-                    KeyEvent.KEYCODE_DPAD_UP -> 1
-                    else -> 2
-                }
-            }
-            else -> when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (gridActiveIndex % 2 == 1) gridActiveIndex - 1 else gridActiveIndex
-                KeyEvent.KEYCODE_DPAD_RIGHT -> if (gridActiveIndex % 2 == 0) gridActiveIndex + 1 else gridActiveIndex
-                KeyEvent.KEYCODE_DPAD_UP -> gridActiveIndex - 2
-                KeyEvent.KEYCODE_DPAD_DOWN -> gridActiveIndex + 2
-                else -> gridActiveIndex
-            }
-        }
-        if (candidate in gridChannels.indices && candidate != gridActiveIndex) {
+        val candidate = MultiViewFocusResolver.nextFocus(
+            keyCode,
+            gridActiveIndex,
+            gridChannels.size,
+        )
+        if (candidate != gridActiveIndex) {
             gridActiveIndex = candidate
             updateIptvGridFocus()
         }

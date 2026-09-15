@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaCodecList
 import android.media.tv.TvInputManager
+import androidx.media3.common.MimeTypes
 import androidx.core.content.ContextCompat
 import com.tvapp.livetv.data.TifRepository
 
@@ -20,6 +21,8 @@ data class DeviceCapabilities(
     val memoryClassMegabytes: Int,
     val hardwareVideoDecoderCount: Int,
     val maximumConcurrentVideoDecoders: Int,
+    val maximumConcurrentH264Decoders: Int = 0,
+    val maximumConcurrentH265Decoders: Int = 0,
 ) {
     val hasVendorTuner: Boolean
         get() = hasTvInputManager && vendorTunerInputCount > 0
@@ -58,27 +61,66 @@ class DeviceCapabilitiesDetector(context: Context) {
             ) && runCatching { PictureInPictureParams.Builder().build() }.isSuccess,
             isLowRamDevice = activityManager?.isLowRamDevice == true,
             memoryClassMegabytes = activityManager?.memoryClass ?: 0,
-            hardwareVideoDecoderCount = decoderSummary.first,
-            maximumConcurrentVideoDecoders = decoderSummary.second,
+            hardwareVideoDecoderCount = decoderSummary.hardwareDecoderCount,
+            maximumConcurrentVideoDecoders = decoderSummary.maximumConcurrentInstances,
+            maximumConcurrentH264Decoders = decoderSummary.maximumConcurrentH264Instances,
+            maximumConcurrentH265Decoders = decoderSummary.maximumConcurrentH265Instances,
         )
     }
 
-    private fun detectVideoDecoders(): Pair<Int, Int> = runCatching {
-        val decoders = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos.filter { info ->
+    private data class VideoDecoderSummary(
+        val hardwareDecoderCount: Int,
+        val maximumConcurrentInstances: Int,
+        val maximumConcurrentH264Instances: Int,
+        val maximumConcurrentH265Instances: Int,
+    )
+
+    private fun detectVideoDecoders(): VideoDecoderSummary = runCatching {
+        // REGULAR_CODECS excludes vendor-internal pseudo codecs whose instance
+        // limits are unreliable for concurrent playback planning.
+        val codecInfos = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+        val decoders = codecInfos.filter { info ->
             !info.isEncoder && info.isHardwareAccelerated &&
                 info.supportedTypes.any { it.startsWith("video/", ignoreCase = true) }
         }
-        val maximumInstances = decoders.maxOfOrNull { info ->
-            info.supportedTypes.asSequence()
-                .filter { it.startsWith("video/", ignoreCase = true) }
-                .mapNotNull { type ->
-                    runCatching { info.getCapabilitiesForType(type).maxSupportedInstances }
-                        .getOrNull()
-                }
-                .maxOrNull() ?: 1
-        } ?: 1
-        decoders.size to maximumInstances.coerceAtLeast(1)
-    }.getOrDefault(0 to 1)
+        fun maximumInstancesFor(mimeType: String): Int = decoders
+            .map { info ->
+                info.supportedTypes
+                    .filter { it.equals(mimeType, ignoreCase = true) }
+                    .mapNotNull { type ->
+                        runCatching { info.getCapabilitiesForType(type).maxSupportedInstances }
+                            .getOrNull()
+                    }
+                    .maxOrNull()
+            }
+            .filterNotNull()
+            .maxOrNull() ?: 0
+        val maximumConcurrent = decoders
+            .map { info ->
+                info.supportedTypes.asSequence()
+                    .filter { it.startsWith("video/", ignoreCase = true) }
+                    .mapNotNull { type ->
+                        runCatching { info.getCapabilitiesForType(type).maxSupportedInstances }
+                            .getOrNull()
+                    }
+                    .maxOrNull()
+            }
+            .filterNotNull()
+            .maxOrNull() ?: 1
+        VideoDecoderSummary(
+            hardwareDecoderCount = decoders.size,
+            maximumConcurrentInstances = maximumConcurrent.coerceAtLeast(1),
+            maximumConcurrentH264Instances = maximumInstancesFor(MimeTypes.VIDEO_H264),
+            maximumConcurrentH265Instances = maximumInstancesFor(MimeTypes.VIDEO_H265),
+        )
+    }.getOrDefault(
+        VideoDecoderSummary(
+            hardwareDecoderCount = 0,
+            maximumConcurrentInstances = 1,
+            maximumConcurrentH264Instances = 0,
+            maximumConcurrentH265Instances = 0,
+        ),
+    )
 
     private companion object {
         const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
