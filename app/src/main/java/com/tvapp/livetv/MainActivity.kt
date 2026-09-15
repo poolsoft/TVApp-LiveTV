@@ -19,6 +19,7 @@ import android.graphics.Typeface
 import android.util.Rational
 import android.text.InputType
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.ContextThemeWrapper
 import android.view.GestureDetector
 import android.view.KeyEvent
@@ -111,6 +112,7 @@ import com.tvapp.livetv.ui.RemoteKey
 import com.tvapp.livetv.ui.RemoteKeyPhase
 import com.tvapp.livetv.ui.RemoteUiContext
 import com.tvapp.livetv.ui.VideoQuality
+import com.tvapp.livetv.ui.MultiViewChannelAdapter
 import com.tvapp.livetv.ui.TvUiComponents
 import com.tvapp.livetv.ui.isRadioChannel
 import kotlinx.coroutines.Dispatchers
@@ -3265,6 +3267,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvGridPicker() {
+        if (!deviceResourcePolicy.supportsMultiView || deviceResourcePolicy.maximumGridStreams < 2) {
+            Toast.makeText(this, R.string.multiview_device_limit, Toast.LENGTH_LONG).show()
+            return
+        }
         val choices = availableMultiViewChannels()
         if (choices.isEmpty()) {
             Toast.makeText(this, R.string.iptv_grid_no_channels, Toast.LENGTH_LONG).show()
@@ -3272,31 +3278,24 @@ class MainActivity : TvRemoteActivity() {
         }
         channelPanelJob?.cancel()
         val selected = linkedMapOf<String, LiveChannel>()
+        choices.filter { it.sourceKey in gridSelectedKeys }.forEach { selected[it.sourceKey] = it }
+        if (selected.isEmpty()) {
+            currentChannel?.let { current ->
+                choices.firstOrNull { it.sourceKey == current.sourceKey }
+                    ?.let { selected[it.sourceKey] = it }
+            }
+        }
         var sourceFilter = MultiViewPickerFilter.ALL
         var query = ""
         var visibleChoices = choices
         val themedContext = ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)
-        val filterLabel = TextView(themedContext).apply {
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent))
-            textSize = 15f
-            setPadding(dp(16), dp(10), dp(16), dp(5))
-        }
-        val selectionLabel = TextView(themedContext).apply {
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-            textSize = 13f
-            setPadding(dp(16), dp(5), dp(16), dp(10))
-        }
-        val listView = ListView(themedContext).apply {
-            choiceMode = ListView.CHOICE_MODE_MULTIPLE
-            isFocusable = true
-            isFocusableInTouchMode = true
-        }
-        val adapter = ArrayAdapter<String>(
-            themedContext,
-            android.R.layout.simple_list_item_multiple_choice,
-            mutableListOf(),
-        )
-        listView.adapter = adapter
+        val dialogView = LayoutInflater.from(themedContext).inflate(R.layout.dialog_multiview_picker, null)
+        val filterLabel: TextView = dialogView.findViewById(R.id.picker_filter_label)
+        val selectionLabel: TextView = dialogView.findViewById(R.id.picker_selection_label)
+        val recyclerView: androidx.recyclerview.widget.RecyclerView = dialogView.findViewById(R.id.picker_recycler)
+        val hintGreenLabel: TextView = dialogView.findViewById(R.id.hint_green_label)
+
+        recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(themedContext)
         lateinit var dialog: AlertDialog
         lateinit var refresh: () -> Unit
         lateinit var startSelected: () -> Unit
@@ -3308,19 +3307,59 @@ class MainActivity : TvRemoteActivity() {
             MultiViewPickerFilter.SELECTED -> getString(R.string.multiview_selected_filter)
         }
 
-        fun rowLabel(channel: LiveChannel): String {
-            val slot = selected.keys.indexOf(channel.sourceKey).takeIf { it >= 0 }?.plus(1)
-            val source = if (channel.source == LiveChannel.Source.TIF) {
-                getString(R.string.tif_source)
+        fun updateLabels() {
+            filterLabel.text = getString(
+                R.string.multiview_picker_filter,
+                filterTitle(),
+                visibleChoices.size,
+            )
+            selectionLabel.text = if (selected.isEmpty()) {
+                getString(R.string.multiview_picker_none_selected)
             } else {
-                getString(R.string.iptv_source)
+                val names = selected.values.mapIndexed { index, channel ->
+                    "${index + 1}. ${channel.displayName}"
+                }.joinToString("   ")
+                if (selected.size == 1) {
+                    "$names   (${getString(R.string.pip_hint)})"
+                } else {
+                    "$names   (MultiView)"
+                }
             }
-            return if (slot != null) {
-                getString(R.string.multiview_picker_selected_row, slot, channel.displayName, source)
+            hintGreenLabel.text = if (selected.size <= 1) {
+                getString(R.string.pip_start_action)
             } else {
-                getString(R.string.multiview_picker_row, channel.displayName, source)
+                getString(R.string.iptv_grid_start)
             }
         }
+
+        lateinit var adapter: MultiViewChannelAdapter
+        adapter = MultiViewChannelAdapter { channel, _ ->
+            if (channel.sourceKey in selected) {
+                selected.remove(channel.sourceKey)
+            } else {
+                if (selected.size >= 4) {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.iptv_grid_maximum, 4),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@MultiViewChannelAdapter
+                }
+                if (channel.source == LiveChannel.Source.TIF && selected.values.any { it.source == LiveChannel.Source.TIF }) {
+                    Toast.makeText(
+                        this,
+                        R.string.multiview_requires_single_tuner,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@MultiViewChannelAdapter
+                }
+                selected[channel.sourceKey] = channel
+            }
+            adapter.updateSelectedKeys(selected)
+            adapter.notifyDataSetChanged()
+            updateLabels()
+        }
+        recyclerView.adapter = adapter
 
         refresh = {
             val normalizedQuery = normalizeSearchText(query)
@@ -3337,48 +3376,8 @@ class MainActivity : TvRemoteActivity() {
                         normalizeSearchText(channel.displayNumber).contains(normalizedQuery)
                     )
             }
-            adapter.clear()
-            adapter.addAll(visibleChoices.map(::rowLabel))
-            adapter.notifyDataSetChanged()
-            listView.clearChoices()
-            visibleChoices.forEachIndexed { index, channel ->
-                listView.setItemChecked(index, channel.sourceKey in selected)
-            }
-            filterLabel.text = getString(
-                R.string.multiview_picker_filter,
-                filterTitle(),
-                visibleChoices.size,
-            )
-            selectionLabel.text = if (selected.isEmpty()) {
-                getString(R.string.multiview_picker_none_selected)
-            } else {
-                selected.values.mapIndexed { index, channel ->
-                    "${index + 1}. ${channel.displayName}"
-                }.joinToString("   ")
-            }
-        }
-
-        fun toggle(channel: LiveChannel) {
-            if (selected.remove(channel.sourceKey) == null) {
-                if (channel.source == LiveChannel.Source.TIF) {
-                    selected.entries.firstOrNull { it.value.source == LiveChannel.Source.TIF }
-                        ?.key
-                        ?.let(selected::remove)
-                }
-                if (selected.size >= deviceResourcePolicy.maximumGridStreams) {
-                    Toast.makeText(
-                        this,
-                        getString(
-                            R.string.iptv_grid_maximum,
-                            deviceResourcePolicy.maximumGridStreams,
-                        ),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                } else {
-                    selected[channel.sourceKey] = channel
-                }
-            }
-            refresh()
+            adapter.submitList(visibleChoices, selected)
+            updateLabels()
         }
 
         fun cycleFilter() {
@@ -3386,7 +3385,7 @@ class MainActivity : TvRemoteActivity() {
                 (sourceFilter.ordinal + 1) % MultiViewPickerFilter.entries.size
             ]
             refresh()
-            listView.setSelection(0)
+            recyclerView.scrollToPosition(0)
         }
 
         startSelected = {
@@ -3402,112 +3401,68 @@ class MainActivity : TvRemoteActivity() {
                     startIptvOverlay(selectedChannels.first())
                 }
                 else -> {
-                    gridSelectedKeys.clear()
-                    gridSelectedKeys += selectedChannels.map { it.sourceKey }
                     dialog.dismiss()
                     startIptvGrid(selectedChannels)
                 }
             }
         }
 
-        listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            visibleChoices.getOrNull(position)?.let(::toggle)
-        }
-        val actionRow = LinearLayout(themedContext).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(5), dp(10), dp(8))
-            fun addAction(drawable: Int, label: Int, action: () -> Unit) {
-                addView(
-                    TvUiComponents.colorAction(
-                        themedContext,
-                        drawable,
-                        getString(label),
-                        interactive = true,
-                        clicked = action,
-                    ),
-                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
-                )
-            }
-            addAction(R.drawable.key_red, R.string.clear_selection) {
-                selected.clear()
-                refresh()
-            }
-            addAction(R.drawable.key_green, R.string.iptv_grid_start) { startSelected() }
-            addAction(R.drawable.key_yellow, R.string.channel_source_short) { cycleFilter() }
-            addAction(R.drawable.key_blue, R.string.search_short) {
-                showMultiViewSearchDialog(query) { value ->
-                    query = value
-                    refresh()
-                }
-            }
-        }
-        val content = LinearLayout(themedContext).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(filterLabel)
-            addView(selectionLabel)
-            addView(
-                listView,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    0,
-                    1f,
-                ),
-            )
-            addView(actionRow)
-        }
-        dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.iptv_grid_title)
-            .setView(content)
-            .setNegativeButton(R.string.close, null)
+        dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
+            .setView(dialogView)
             .create()
+
         dialog.setOnShowListener {
             refresh()
-            listView.requestFocus()
+            recyclerView.requestFocus()
         }
+
         dialog.setOnKeyListener { _, keyCode, event ->
             if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
-                KeyEvent.KEYCODE_PROG_RED -> true.also {
+                KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_F9 -> {
                     selected.clear()
-                    refresh()
+                    adapter.updateSelectedKeys(selected)
+                    adapter.notifyDataSetChanged()
+                    updateLabels()
+                    true
                 }
-                KeyEvent.KEYCODE_PROG_GREEN -> true.also { startSelected() }
-                KeyEvent.KEYCODE_PROG_YELLOW -> true.also { cycleFilter() }
-                KeyEvent.KEYCODE_PROG_BLUE -> true.also {
-                    showMultiViewSearchDialog(query) { value ->
-                        query = value
+                KeyEvent.KEYCODE_PROG_GREEN, KeyEvent.KEYCODE_F10 -> {
+                    startSelected()
+                    true
+                }
+                KeyEvent.KEYCODE_PROG_YELLOW, KeyEvent.KEYCODE_F11 -> {
+                    cycleFilter()
+                    true
+                }
+                KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_F12 -> {
+                    showMultiViewSearchDialog(query) { newQuery ->
+                        query = newQuery
                         refresh()
+                        recyclerView.scrollToPosition(0)
                     }
-                }
-                KeyEvent.KEYCODE_CHANNEL_UP,
-                KeyEvent.KEYCODE_PAGE_UP -> true.also {
-                    listView.setSelection((listView.selectedItemPosition - listView.childCount.coerceAtLeast(1)).coerceAtLeast(0))
-                }
-                KeyEvent.KEYCODE_CHANNEL_DOWN,
-                KeyEvent.KEYCODE_PAGE_DOWN -> true.also {
-                    listView.setSelection(
-                        (listView.selectedItemPosition + listView.childCount.coerceAtLeast(1))
-                            .coerceAtMost((visibleChoices.size - 1).coerceAtLeast(0)),
-                    )
+                    true
                 }
                 else -> false
             }
         }
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
     }
 
     private fun showMultiViewSearchDialog(initialQuery: String, onApply: (String) -> Unit) {
-        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
-            inputType = InputType.TYPE_CLASS_TEXT
-            hint = getString(R.string.channel_search_hint)
+        val themedContext = ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)
+        val input = EditText(themedContext).apply {
             setText(initialQuery)
-            selectAll()
+            setSelection(text.length)
+            hint = getString(R.string.channel_search_hint)
+            setTextColor(ContextCompat.getColor(themedContext, R.color.dialog_text_primary))
+            setHintTextColor(ContextCompat.getColor(themedContext, R.color.dialog_text_secondary))
         }
-        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+        val dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.search_channels)
             .setView(input)
-            .setPositiveButton(R.string.apply, null)
+            .setPositiveButton(android.R.string.ok, null)
             .setNeutralButton(R.string.clear_search, null)
             .setNegativeButton(R.string.close, null)
             .create()

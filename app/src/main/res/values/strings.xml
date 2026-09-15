@@ -611,6 +611,8 @@
     <string name="search_channels">Kanal ara</string>
     <string name="search_short">Ara</string>
     <string name="iptv_pip_grid_short_long">PiP / MultiView</string>
+    <string name="pip_start_action">PiP Başlat</string>
+    <string name="pip_hint">1 kanal · PiP olarak açılır</string>
     <string name="channel_search_hint">Kanal adı, numarası veya kategori</string>
     <string name="clear_search">Aramayı temizle</string>
     <string name="catchup_unavailable">Bu program sağlayıcının arşivinde bulunmuyor.</string>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic Dialog & OSD Tokens (Dark/Night) -->
+    <color name="dialog_bg">#E610171E</color>
+    <color name="dialog_bg_surface">#F216181C</color>
+    <color name="dialog_text_primary">#FFFFFF</color>
+    <color name="dialog_text_secondary">#B7BBC4</color>
+    <color name="dialog_item_selected">#4033B5E5</color>
+    <color name="dialog_item_focus">#B8202A32</color>
+    <color name="dialog_divider">#2A3644</color>
+    <color name="badge_tif">#1E88E5</color>
+    <color name="badge_iptv">#43A047</color>
+</resources>

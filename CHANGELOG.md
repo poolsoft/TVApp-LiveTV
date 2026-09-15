@@ -6,6 +6,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### MultiView/PiP Seçici Day/Night Desteği, Odak/Kontrast İyileştirmeleri ve 4 Kanal/1 TIF Kuralı
+* **Açık/Karanlık Tema ve Yüksek Kontrast:** Diyaloglar için semantik renk tokenları (`dialog_bg`, `dialog_text_primary`, `dialog_text_secondary`, `badge_tif`, `badge_iptv`) ve `values-night` desteği tanımlandı; beyaz zemin üzerine beyaz metin okunmama sorunu giderildi.
+* **Slot Numaralı Çoklu Seçim:** Kumanda ile odaklanılabilir `MultiViewChannelAdapter` ve `RecyclerView` yapısına geçildi; seçilen kanallar 1, 2, 3, 4 rozetleriyle numaralandırıldı.
+* **4 Kanal ve Maksimum 1 TIF Kuralı:** Donanımsal tek tuner kısıtına uygun olarak en fazla 1 adet DVB/ATV (TIF) kanal seçimine izin verildi. 1 kanal seçildiğinde doğrudan PiP, 2-4 kanal seçildiğinde MultiView (Grid) başlatılması sağlandı.
+* **Kumanda Renk Rehberi Uyumu:** AGENTS.md TV UI kurallarına aykırı olan büyük butonlar kaldırılarak odak almayan ince kumanda renk rehberi yerleştirildi (Kırmızı: Temizle, Yeşil: Başlat/PiP, Sarı: Kaynak Filtresi, Mavi: Ara).
+
 ### PiP seçimi, TIF tanı alanları ve kanal editörü araç çubuğu
 * Birleşik PiP/MultiView seçicisinin düşük kaynaklı cihazlarda da açılması sağlandı; başlangıç
   seçimi temizlenerek tek IPTV kanalının doğrudan PiP için seçilebilmesi sağlandı.

@@ -611,6 +611,8 @@
     <string name="search_channels">Search channels</string>
     <string name="search_short">Search</string>
     <string name="iptv_pip_grid_short_long">PiP / MultiView</string>
+    <string name="pip_start_action">Start PiP</string>
+    <string name="pip_hint">1 channel · Opens as PiP</string>
     <string name="channel_search_hint">Channel name, number, or category</string>
     <string name="clear_search">Clear search</string>
     <string name="catchup_unavailable">This programme is not available in the provider archive.</string>

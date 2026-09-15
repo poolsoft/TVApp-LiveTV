@@ -13,4 +13,15 @@
     <color name="remote_yellow">#FFD43B</color>
     <color name="remote_blue">#2693FF</color>
     <color name="system_info_row">#282F3945</color>
+
+    <!-- Semantic Dialog & OSD Tokens (Light / Default) -->
+    <color name="dialog_bg">#FFF8F9FA</color>
+    <color name="dialog_bg_surface">#FFF0F2F5</color>
+    <color name="dialog_text_primary">#1C1E21</color>
+    <color name="dialog_text_secondary">#606770</color>
+    <color name="dialog_item_selected">#2533B5E5</color>
+    <color name="dialog_item_focus">#15000000</color>
+    <color name="dialog_divider">#D8DCE2</color>
+    <color name="badge_tif">#1565C0</color>
+    <color name="badge_iptv">#2E7D32</color>
 </resources>
