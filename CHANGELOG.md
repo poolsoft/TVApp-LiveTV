@@ -11,6 +11,7 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * **Slot Numaralı Çoklu Seçim:** Kumanda ile odaklanılabilir `MultiViewChannelAdapter` ve `RecyclerView` yapısına geçildi; seçilen kanallar 1, 2, 3, 4 rozetleriyle numaralandırıldı.
 * **4 Kanal ve Maksimum 1 TIF Kuralı:** Donanımsal tek tuner kısıtına uygun olarak en fazla 1 adet DVB/ATV (TIF) kanal seçimine izin verildi. 1 kanal seçildiğinde doğrudan PiP, 2-4 kanal seçildiğinde MultiView (Grid) başlatılması sağlandı.
 * **Kumanda Renk Rehberi Uyumu:** AGENTS.md TV UI kurallarına aykırı olan büyük butonlar kaldırılarak odak almayan ince kumanda renk rehberi yerleştirildi (Kırmızı: Temizle, Yeşil: Başlat/PiP, Sarı: Kaynak Filtresi, Mavi: Ara).
+* **MultiView Akış Limiti ve Cihaz Uyumluluğu:** Donanım dekoderi raporunun eksik veya 1 bildirdiği TV donanımlarında MultiView kapasitesinin 1 kanala kilitlenmesi önlendi; taban sınır 4 akış olarak sabitlendi ve seçici açılışındaki limit engeli kaldırıldı.
 
 ### PiP seçimi, TIF tanı alanları ve kanal editörü araç çubuğu
 * Birleşik PiP/MultiView seçicisinin düşük kaynaklı cihazlarda da açılması sağlandı; başlangıç

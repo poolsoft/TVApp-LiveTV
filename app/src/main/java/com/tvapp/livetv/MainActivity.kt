@@ -3267,10 +3267,6 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvGridPicker() {
-        if (!deviceResourcePolicy.supportsMultiView || deviceResourcePolicy.maximumGridStreams < 2) {
-            Toast.makeText(this, R.string.multiview_device_limit, Toast.LENGTH_LONG).show()
-            return
-        }
         val choices = availableMultiViewChannels()
         if (choices.isEmpty()) {
             Toast.makeText(this, R.string.iptv_grid_no_channels, Toast.LENGTH_LONG).show()

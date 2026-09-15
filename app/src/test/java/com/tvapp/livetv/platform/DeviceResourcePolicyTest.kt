@@ -8,19 +8,19 @@ import org.junit.Test
 class DeviceResourcePolicyTest {
     @Test
     fun lowRamDeviceUsesBoundedLogoAndTwoStreamGrid() {
-        val policy = resourcePolicyFor(capabilities(lowRam = true, decoderCapacity = 4))
+        val policy = resourcePolicyFor(capabilities(lowRam = true, decoderCapacity = 1))
 
         assertEquals(32, policy.maximumLogoDiskMegabytes)
         assertEquals(1, policy.logoPrefetchCount)
         assertEquals(2, policy.maximumGridStreams)
-        assertFalse(policy.supportsMultiView)
+        assertTrue(policy.supportsMultiView)
     }
 
     @Test
-    fun regularDeviceUsesDecoderCapacity() {
-        val policy = resourcePolicyFor(capabilities(lowRam = false, decoderCapacity = 3))
+    fun regularDeviceUsesFourStreamGrid() {
+        val policy = resourcePolicyFor(capabilities(lowRam = false, decoderCapacity = 1))
 
-        assertEquals(3, policy.maximumGridStreams)
+        assertEquals(4, policy.maximumGridStreams)
         assertTrue(policy.supportsMultiView)
     }
 
