@@ -25,7 +25,6 @@ import com.tvapp.livetv.reminder.ProgramReminderScheduler
 import com.tvapp.livetv.reminder.ProgramReminderStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.GuideScheduleAdapter
-import com.tvapp.livetv.ui.ProgramGuideChannelAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,7 +39,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private lateinit var channelRepository: ChannelRepository
     private lateinit var programRepository: ProgramRepository
     private lateinit var parentalControlStore: ParentalControlStore
-    private lateinit var channelAdapter: ProgramGuideChannelAdapter
     private lateinit var scheduleAdapter: GuideScheduleAdapter
     private var channels: List<LiveChannel> = emptyList()
     private var focusedChannel: LiveChannel? = null
@@ -59,7 +57,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private val programGuideHandler = Handler(Looper.getMainLooper())
     private var currentPrograms: Map<String, ProgramSummary> = emptyMap()
     private var epgSourceMode = EpgSourceMode.MERGED
-    private var isSyncingScroll = false
     private val programGuideRefresh = object : Runnable {
         override fun run() {
             refreshCurrentPrograms()
@@ -94,27 +91,30 @@ class ProgramGuideActivity : TvRemoteActivity() {
         parentalControlStore = ParentalControlStore(this)
         reminderStore = ProgramReminderStore(this)
         reminderScheduler = ProgramReminderScheduler(this)
-        channelAdapter = ProgramGuideChannelAdapter(
-            ::scheduleChannelPrograms,
-            ::openChannel,
-        ) { channel -> parentalControlStore.isLocked(channel.sourceKey) }
         scheduleAdapter = GuideScheduleAdapter(
-            ::onScheduleRowFocused,
-            ::onScheduleProgramFocused,
-            { channel, program ->
+            onChannelFocused = { row, channel ->
+                scheduleChannelPrograms(channel)
+            },
+            onChannelSelected = { channel ->
+                openChannel(channel)
+            },
+            isParentalLocked = { channel ->
+                parentalControlStore.isLocked(channel.sourceKey)
+            },
+            onProgramFocused = { row, channel, program ->
+                onScheduleProgramFocused(row, channel, program)
+            },
+            onProgramSelected = { channel, program ->
                 focusedChannel = channel
                 openProgram(program)
             },
-            { channel, program ->
+            onReminderToggle = { channel, program ->
                 focusedChannel = channel
                 toggleReminder(program)
             },
         )
-        binding.guideChannelList.layoutManager = LinearLayoutManager(this)
-        binding.guideChannelList.adapter = channelAdapter
         binding.programList.layoutManager = LinearLayoutManager(this)
         binding.programList.adapter = scheduleAdapter
-        setupScrollSynchronization()
         applyPercentageGeometry()
         binding.guideDate.text = SimpleDateFormat(
             "EEEE, d MMMM",
@@ -138,43 +138,17 @@ class ProgramGuideActivity : TvRemoteActivity() {
         super.onPause()
     }
 
-    private fun setupScrollSynchronization() {
-        binding.guideChannelList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (isSyncingScroll || dy == 0) return
-                isSyncingScroll = true
-                binding.programList.scrollBy(0, dy)
-                isSyncingScroll = false
-            }
-        })
-
-        binding.programList.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (isSyncingScroll || dy == 0) return
-                isSyncingScroll = true
-                binding.guideChannelList.scrollBy(0, dy)
-                isSyncingScroll = false
-            }
-        })
-    }
-
     private fun syncScrollToRow(row: Int) {
         if (row !in channels.indices) return
-        val channelLayout = binding.guideChannelList.layoutManager as? LinearLayoutManager ?: return
-        val programLayout = binding.programList.layoutManager as? LinearLayoutManager ?: return
-
-        val view = channelLayout.findViewByPosition(row) ?: programLayout.findViewByPosition(row)
+        val layout = binding.programList.layoutManager as? LinearLayoutManager ?: return
+        val view = layout.findViewByPosition(row)
         val offset = view?.top ?: run {
-            val rowHeight = (74 * resources.displayMetrics.density).toInt()
-            val listHeight = binding.guideChannelList.height.takeIf { it > 0 }
+            val rowHeight = (binding.root.resources.displayMetrics.heightPixels * 0.072f).toInt()
+            val listHeight = binding.programList.height.takeIf { it > 0 }
                 ?: (resources.displayMetrics.heightPixels * 0.5f).toInt()
             ((listHeight - rowHeight) / 2).coerceAtLeast(0)
         }
-
-        isSyncingScroll = true
-        channelLayout.scrollToPositionWithOffset(row, offset)
-        programLayout.scrollToPositionWithOffset(row, offset)
-        isSyncingScroll = false
+        layout.scrollToPositionWithOffset(row, offset)
     }
 
     private fun applyPercentageGeometry() {
@@ -192,12 +166,6 @@ class ProgramGuideActivity : TvRemoteActivity() {
             (width * OUTER_HORIZONTAL_PADDING_FRACTION).toInt(),
             0,
         )
-        binding.guideChannelColumn.setPadding(
-            (width * COLUMN_PADDING_FRACTION).toInt(),
-            0,
-            (width * COLUMN_PADDING_FRACTION).toInt(),
-            0,
-        )
         binding.programDetail.layoutParams = binding.programDetail.layoutParams.apply {
             this.height = (height * DETAIL_HEIGHT_FRACTION).toInt()
         }
@@ -210,9 +178,9 @@ class ProgramGuideActivity : TvRemoteActivity() {
             }
             channels = loaded
             currentPrograms = emptyMap()
-            channelAdapter.submitList(loaded, currentPrograms)
             scheduleAdapter.submitChannels(
                 loaded,
+                currentPrograms,
                 timelineWindowStartMillis,
                 timelineWindowStartMillis + TIMELINE_WINDOW_MS,
             )
@@ -225,7 +193,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
             val initial = loaded.firstOrNull { it.sourceKey == preferredKey } ?: loaded.first()
             focusedChannelIndex = loaded.indexOf(initial).coerceAtLeast(0)
             refreshCurrentPrograms()
-            channelAdapter.select(initial.sourceKey)
+            scheduleAdapter.selectChannel(initial.sourceKey)
             loadPrograms(initial)
             focusChannel(initial.sourceKey)
         }
@@ -236,7 +204,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         val target = channels.indexOfFirst { it.sourceKey == channel.sourceKey }
             .coerceAtLeast(0)
         focusedChannelIndex = target
-        channelAdapter.select(channel.sourceKey)
+        scheduleAdapter.selectChannel(channel.sourceKey)
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
         syncScrollToRow(target)
@@ -292,7 +260,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
                     if (current == null) remove(sourceKey) else put(sourceKey, current)
                 }
             }
-            channelAdapter.submitPrograms(currentPrograms)
+            scheduleAdapter.updateCurrentPrograms(currentPrograms)
             programs = loadedSchedules[channel.sourceKey].orEmpty()
             // Empty schedules are represented in their own channel row. A full-screen empty
             // state here would hide useful schedules belonging to the other visible channels.
@@ -326,7 +294,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         focusedChannel = channel
         focusedProgramIndex = 0
         programs = programSchedules[channel.sourceKey].orEmpty()
-        channelAdapter.select(channel.sourceKey)
+        scheduleAdapter.selectChannel(channel.sourceKey)
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
         syncScrollToRow(row)
@@ -343,7 +311,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         focusedChannel = channel
         programs = programSchedules[channel.sourceKey].orEmpty()
         focusedProgramIndex = programs.indexOf(program).coerceAtLeast(0)
-        channelAdapter.select(channel.sourceKey)
+        scheduleAdapter.selectChannel(channel.sourceKey)
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
         if (rowChanged) {
@@ -447,9 +415,10 @@ class ProgramGuideActivity : TvRemoteActivity() {
             program.endTimeMillis >= now - catchUpDays * DAY_MILLIS
 
     private fun focusChannel(sourceKey: String?, allowScroll: Boolean = true) {
-        val position = channelAdapter.positionOf(sourceKey).takeIf { it >= 0 } ?: 0
+        val position = scheduleAdapter.positionOf(sourceKey).takeIf { it >= 0 } ?: 0
+        focusedChannelIndex = position
         returnToChannelOnNextLeft = false
-        focusRecyclerPosition(binding.guideChannelList, position, allowScroll)
+        scheduleAdapter.focusChannel(binding.programList, position, allowScroll)
     }
 
     private fun focusScheduleChannel(offset: Int) {
@@ -460,7 +429,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
             ?: System.currentTimeMillis()
         focusedChannelIndex = target
         focusedChannel = channel
-        channelAdapter.select(channel.sourceKey)
+        scheduleAdapter.selectChannel(channel.sourceKey)
         binding.selectedChannelNumber.text = channel.displayNumber
         binding.selectedChannelName.text = channel.displayName
         syncScrollToRow(target)
@@ -522,21 +491,13 @@ class ProgramGuideActivity : TvRemoteActivity() {
     private fun moveRecyclerFocus(recyclerView: RecyclerView, offset: Int): Boolean {
         val count = recyclerView.adapter?.itemCount ?: 0
         if (count == 0) return false
-        val current = if (recyclerView === binding.guideChannelList) {
-            focusedChannelIndex
-        } else {
-            focusedProgramIndex
-        }
+        val current = focusedChannelIndex
         val target = when {
             offset < 0 && current == 0 -> count - 1
             offset > 0 && current == count - 1 -> 0
             else -> (current + offset).coerceIn(0, count - 1)
         }
-        if (recyclerView === binding.guideChannelList) {
-            focusedChannelIndex = target
-        } else {
-            focusedProgramIndex = target
-        }
+        focusedChannelIndex = target
         focusRecyclerPosition(recyclerView, target)
         return true
     }
@@ -670,7 +631,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
                 key !in windowKeys || key in fresh ||
                     now in program.startTimeMillis until program.endTimeMillis
             } + fresh
-            channelAdapter.submitPrograms(currentPrograms)
+            scheduleAdapter.updateCurrentPrograms(currentPrograms)
         }
     }
 
@@ -679,9 +640,9 @@ class ProgramGuideActivity : TvRemoteActivity() {
         epgSourceMode = mode
         currentPrograms = emptyMap()
         programSchedules.clear()
-        channelAdapter.submitPrograms(emptyMap())
         scheduleAdapter.submitChannels(
             channels,
+            emptyMap(),
             timelineWindowStartMillis,
             timelineWindowStartMillis + TIMELINE_WINDOW_MS,
         )
@@ -704,54 +665,45 @@ class ProgramGuideActivity : TvRemoteActivity() {
         val event = rawEvent.asTvRemoteEvent()
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> when {
-                    binding.programList.hasFocus() -> true.also { focusScheduleChannel(-1) }
-                    binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, -1)
-                    else -> false
-                }.also { handled -> if (handled) return true }
-                KeyEvent.KEYCODE_DPAD_DOWN -> when {
-                    binding.programList.hasFocus() -> true.also { focusScheduleChannel(1) }
-                    binding.guideChannelList.hasFocus() -> moveRecyclerFocus(binding.guideChannelList, 1)
-                    else -> false
-                }.also { handled -> if (handled) return true }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> when {
-                    binding.guideChannelList.hasFocus() -> {
-                        if (programs.isEmpty()) {
-                            scheduleAdapter.focusRow(
-                                binding.programList,
-                                focusedChannelIndex,
-                                allowScroll = false,
-                            )
-                        } else {
-                            scheduleAdapter.focusProgram(
-                                binding.programList,
-                                focusedChannelIndex,
-                                programs.getOrNull(focusedProgramIndex)?.startTimeMillis
-                                    ?: System.currentTimeMillis(),
-                                allowScroll = false,
-                            )
-                        }
-                        returnToChannelOnNextLeft = true
-                        true
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (binding.programList.hasFocus()) {
+                        focusScheduleChannel(-1)
+                        return true
                     }
-                    binding.programList.hasFocus() -> moveScheduleProgram(1)
-                    else -> false
-                }.also { handled -> if (handled) return true }
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (binding.programList.hasFocus()) {
-                    if (returnToChannelOnNextLeft) {
-                        focusChannel(focusedChannel?.sourceKey, allowScroll = false)
-                    } else {
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (binding.programList.hasFocus()) {
+                        focusScheduleChannel(1)
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (binding.programList.hasFocus()) {
+                        moveScheduleProgram(1)
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (binding.programList.hasFocus()) {
                         moveScheduleProgram(-1)
+                        return true
+                    } else if (binding.detailDescriptionScroll.hasFocus()) {
+                        scheduleAdapter.focusProgram(
+                            binding.programList,
+                            focusedChannelIndex,
+                            programs.getOrNull(focusedProgramIndex)?.startTimeMillis
+                                ?: System.currentTimeMillis(),
+                            allowScroll = false,
+                        )
+                        return true
                     }
+                }
+                KeyEvent.KEYCODE_CHANNEL_UP -> {
+                    focusScheduleChannel(-1)
                     return true
-                } else if (binding.detailDescriptionScroll.hasFocus()) {
-                    scheduleAdapter.focusProgram(
-                        binding.programList,
-                        focusedChannelIndex,
-                        programs.getOrNull(focusedProgramIndex)?.startTimeMillis
-                            ?: System.currentTimeMillis(),
-                        allowScroll = false,
-                    )
+                }
+                KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                    focusScheduleChannel(1)
                     return true
                 }
                 KeyEvent.KEYCODE_INFO -> {
