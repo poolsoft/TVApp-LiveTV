@@ -3284,13 +3284,10 @@ class MainActivity : TvRemoteActivity() {
         }
         channelPanelJob?.cancel()
         val selected = linkedMapOf<String, LiveChannel>()
-        choices.filter { it.sourceKey in gridSelectedKeys }.forEach { selected[it.sourceKey] = it }
-        if (selected.isEmpty()) {
-            currentChannel?.let { current ->
-                choices.firstOrNull { it.sourceKey == current.sourceKey }
-                    ?.let { selected[it.sourceKey] = it }
-            }
-        }
+        val maximumSelections = deviceResourcePolicy.maximumGridStreams
+        choices.filter { it.sourceKey in gridSelectedKeys }
+            .take(maximumSelections)
+            .forEach { selected[it.sourceKey] = it }
         var sourceFilter = MultiViewPickerFilter.ALL
         var query = ""
         var visibleChoices = choices
@@ -3325,17 +3322,9 @@ class MainActivity : TvRemoteActivity() {
                 val names = selected.values.mapIndexed { index, channel ->
                     "${index + 1}. ${channel.displayName}"
                 }.joinToString("   ")
-                if (selected.size == 1) {
-                    "$names   (${getString(R.string.pip_hint)})"
-                } else {
-                    "$names   (MultiView)"
-                }
+                "$names   (MultiView)"
             }
-            hintGreenLabel.text = if (selected.size <= 1) {
-                getString(R.string.pip_start_action)
-            } else {
-                getString(R.string.iptv_grid_start)
-            }
+            hintGreenLabel.text = getString(R.string.iptv_grid_start)
         }
 
         lateinit var adapter: MultiViewChannelAdapter
@@ -3343,10 +3332,10 @@ class MainActivity : TvRemoteActivity() {
             if (channel.sourceKey in selected) {
                 selected.remove(channel.sourceKey)
             } else {
-                if (selected.size >= 4) {
+                if (selected.size >= maximumSelections) {
                     Toast.makeText(
                         this,
-                        getString(R.string.iptv_grid_maximum, 4),
+                        getString(R.string.iptv_grid_maximum, maximumSelections),
                         Toast.LENGTH_SHORT,
                     ).show()
                     return@MultiViewChannelAdapter
@@ -3402,10 +3391,11 @@ class MainActivity : TvRemoteActivity() {
                     R.string.iptv_grid_empty,
                     Toast.LENGTH_SHORT,
                 ).show()
-                selectedChannels.size == 1 -> {
-                    dialog.dismiss()
-                    startIptvOverlay(selectedChannels.first())
-                }
+                selectedChannels.size == 1 -> Toast.makeText(
+                    this,
+                    R.string.iptv_grid_empty,
+                    Toast.LENGTH_SHORT,
+                ).show()
                 else -> {
                     dialog.dismiss()
                     startIptvGrid(selectedChannels)
@@ -3846,6 +3836,7 @@ class MainActivity : TvRemoteActivity() {
             if (channel.sourceKey == currentChannel?.sourceKey) {
                 action(getString(R.string.iptv_quality_action)) { showIptvVideoQuality() }
             }
+            action(getString(R.string.iptv_pip)) { startIptvOverlay(channel) }
             action(getString(R.string.open_external_player)) { openExternalPlayer(channel) }
             action(getString(R.string.add_external_subtitle)) {
                 openExternalSubtitle.launch(

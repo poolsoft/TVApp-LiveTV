@@ -608,10 +608,10 @@
     <string name="reminder_needs_notification_permission">Hatırlatıcı için bildirim izni gerekli</string>
     <string name="reminder_badge_description">Bu program için hatırlatıcı kurulu</string>
     <string name="program_time_duration_remaining">%1$s - %2$s (%3$d dk · Bitmesine %4$d dk)</string>
-    <string name="user_guide_search_archive">ARAMA VE ARŞİV\nKanal panelinin başlığındaki arama simgesi, SEARCH tuşu veya normal kanal listesindeki mavi tuş kanal adı, numarası ve kategori içinde arar. Yeşil kısa basış PiP, uzun basış MultiView seçimini açar. MultiView sıfır veya bir DVB ve cihaz kapasitesine kadar IPTV yayını kullanabilir. Saat simgeli geçmiş IPTV programında OK arşivi oynatır; kırmızı oynatıcı eylemi canlı yayına döner.</string>
+    <string name="user_guide_search_archive">ARAMA VE ARŞİV\nKanal panelinin başlığındaki arama simgesi, SEARCH tuşu veya normal kanal listesindeki mavi tuş kanal adı, numarası ve kategori içinde arar. Yeşil tuş MultiView seçimini açar. PiP, kanal listesinde IPTV kanalına uzun basıp açılan menüden başlatılır. MultiView sıfır veya bir DVB ve cihaz kapasitesine kadar IPTV yayını kullanabilir. Saat simgeli geçmiş IPTV programında OK arşivi oynatır; kırmızı oynatıcı eylemi canlı yayına döner.</string>
     <string name="search_channels">Kanal ara</string>
     <string name="search_short">Ara</string>
-    <string name="iptv_pip_grid_short_long">PiP / MultiView</string>
+    <string name="iptv_pip_grid_short_long">MultiView</string>
     <string name="pip_start_action">PiP Başlat</string>
     <string name="pip_hint">1 kanal · PiP olarak açılır</string>
     <string name="channel_search_hint">Kanal adı, numarası veya kategori</string>
