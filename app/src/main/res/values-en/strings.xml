@@ -488,6 +488,7 @@
     <string name="detected_working_mode">Active operating mode</string>
     <string name="device_resource_summary">%1$d MB memory class · %2$d hardware video decoders · up to %3$d concurrent streams</string>
     <string name="device_resources">Device resources</string>
+    <string name="multiview_force_four_streams">Force 4 MultiView streams</string>
     <string name="iptv_grid_empty">Select at least two channels for MultiView.</string>
     <string name="iptv_pip_requires_iptv">Select an IPTV channel for PiP.</string>
     <string name="iptv_pip_requires_different_channel">Select an IPTV channel other than the current channel for PiP.</string>

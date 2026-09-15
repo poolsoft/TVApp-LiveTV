@@ -501,6 +501,7 @@
     <string name="detected_working_mode">Etkin çalışma modu</string>
     <string name="device_resource_summary">%1$d MB bellek sınıfı · %2$d donanım video çözücü · en fazla %3$d eşzamanlı akış</string>
     <string name="device_resources">Cihaz kaynakları</string>
+    <string name="multiview_force_four_streams">MultiView’da 4 kanalı zorla</string>
     <string name="iptv_grid_empty">MultiView için en az iki kanal seçin.</string>
     <string name="iptv_pip_requires_iptv">PiP için bir IPTV kanalı seçin.</string>
     <string name="iptv_pip_requires_different_channel">PiP için açık kanaldan farklı bir IPTV kanalı seçin.</string>

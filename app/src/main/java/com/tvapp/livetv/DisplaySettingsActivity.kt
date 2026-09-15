@@ -46,6 +46,7 @@ import com.tvapp.livetv.platform.resourcePolicyFor
 import com.tvapp.livetv.platform.resolveExperienceMode
 import com.tvapp.livetv.settings.ExperienceModeOverride
 import com.tvapp.livetv.settings.ExperienceModePreferencesStore
+import com.tvapp.livetv.settings.MultiViewPreferencesStore
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
@@ -67,6 +68,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var externalPlayerStore: ExternalPlayerPreferencesStore
     private lateinit var iptvPlaybackStore: IptvPlaybackPreferencesStore
     private lateinit var experienceModeStore: ExperienceModePreferencesStore
+    private lateinit var multiViewPreferencesStore: MultiViewPreferencesStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
@@ -103,6 +105,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         externalPlayerStore = ExternalPlayerPreferencesStore(this)
         iptvPlaybackStore = IptvPlaybackPreferencesStore(this)
         experienceModeStore = ExperienceModePreferencesStore(this)
+        multiViewPreferencesStore = MultiViewPreferencesStore(this)
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
@@ -401,7 +404,10 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             override = experienceModeStore.load(),
         )
         info(R.string.detected_working_mode, experienceModeLabel(resolvedMode))
-        val policy = resourcePolicyFor(capabilities)
+        val policy = resourcePolicyFor(
+            capabilities,
+            forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
+        )
         info(
             R.string.device_resources,
             getString(
@@ -411,6 +417,15 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 policy.maximumGridStreams,
             ),
         )
+        toggle(
+            R.string.multiview_force_four_streams,
+            multiViewPreferencesStore.forceFourStreams(),
+        ) { enabled ->
+            multiViewPreferencesStore.setForceFourStreams(enabled)
+            markChanged()
+            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+            content.post { firstContentFocusable?.requestFocus() }
+        }
 
         section(R.string.playback_settings)
         val timerValues = listOf(0, 15, 30, 60, 90, 120)

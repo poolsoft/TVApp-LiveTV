@@ -97,6 +97,7 @@ import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
 import com.tvapp.livetv.settings.ExperienceModePreferencesStore
+import com.tvapp.livetv.settings.MultiViewPreferencesStore
 import com.tvapp.livetv.billing.IptvAccessDialogs
 import com.tvapp.livetv.billing.IptvEntitlementManager
 import com.tvapp.livetv.ui.ChannelAdapter
@@ -195,6 +196,7 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var debugLog: CrashReportStore
     private lateinit var deviceCapabilities: DeviceCapabilities
     private lateinit var deviceResourcePolicy: DeviceResourcePolicy
+    private lateinit var multiViewPreferencesStore: MultiViewPreferencesStore
     private var experienceMode = ExperienceMode.IPTV_ONLY_TV
     private lateinit var adapter: ChannelAdapter
     private lateinit var osdCoordinator: OsdCoordinator
@@ -343,6 +345,10 @@ class MainActivity : TvRemoteActivity() {
     private val displaySettings = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
+        deviceResourcePolicy = resourcePolicyFor(
+            deviceCapabilities,
+            forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
+        )
         applyDisplayPreferences()
         scheduleSleepTimer()
         if (
@@ -404,7 +410,11 @@ class MainActivity : TvRemoteActivity() {
         programRepository = ProgramRepository(this)
         debugLog = CrashReportStore(this)
         deviceCapabilities = DeviceCapabilitiesSession.get(this)
-        deviceResourcePolicy = resourcePolicyFor(deviceCapabilities)
+        multiViewPreferencesStore = MultiViewPreferencesStore(this)
+        deviceResourcePolicy = resourcePolicyFor(
+            deviceCapabilities,
+            forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
+        )
         ChannelLogoLoader.configure(this, deviceCapabilities)
         applyExperienceMode()
         playback = TifPlaybackController(binding.tvView)
