@@ -6,6 +6,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 
 ## [Geliştirme / En Son Değişiklikler]
 
+### Program Rehberi (EPG) Tek Dikey Grid Mimarisi ve Kararlı Kaydırma
+* **Tek Dikey Grid Mimarisi:** Sol kanal listesi ve sağ program listesini iki ayrı RecyclerView olarak senkronize etmeye çalışan yapı tamamen kaldırıldı; her satırda sol tarafta kanal hücresi, sağ tarafta program hücreleri bulunan tek birleşik `RecyclerView` (`program_list`) ve `GuideScheduleAdapter` mimarisine geçildi.
+* **Kayma ve Zıplamaların Önlenmesi:** Odaklanma sırasında oluşan mikro dikey kaymalar, gecikmeler ve scale animasyon uyumsuzlukları giderildi. Dikey yukarı/aşağı ve yatay gezinme tek liste üzerinden donanımsal pürüzsüzlükle çalışır hale getirildi.
+* **Kod Sadeleştirme:** Çift RecyclerView senkronizasyon mantığı ve gereksiz kalan `ProgramGuideChannelAdapter` repodan temizlendi.
+
 ### MultiView/PiP Seçici Day/Night Desteği, Odak/Kontrast İyileştirmeleri ve 4 Kanal/1 TIF Kuralı
 * **Açık/Karanlık Tema ve Yüksek Kontrast:** Diyaloglar için semantik renk tokenları (`dialog_bg`, `dialog_text_primary`, `dialog_text_secondary`, `badge_tif`, `badge_iptv`) ve `values-night` desteği tanımlandı; beyaz zemin üzerine beyaz metin okunmama sorunu giderildi.
 * **Slot Numaralı Çoklu Seçim:** Kumanda ile odaklanılabilir `MultiViewChannelAdapter` ve `RecyclerView` yapısına geçildi; seçilen kanallar 1, 2, 3, 4 rozetleriyle numaralandırıldı.
