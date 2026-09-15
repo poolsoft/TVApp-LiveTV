@@ -65,9 +65,16 @@ class GuideScheduleAdapter(
         ?.let { schedules[it.sourceKey] }
         .orEmpty()
 
-    fun focusProgram(recyclerView: RecyclerView, row: Int, preferredTimeMillis: Long) {
+    fun focusProgram(
+        recyclerView: RecyclerView,
+        row: Int,
+        preferredTimeMillis: Long,
+        allowScroll: Boolean = true,
+    ) {
         if (row !in channels.indices) return
-        recyclerView.scrollToPosition(row)
+        if (allowScroll || recyclerView.findViewHolderForAdapterPosition(row) == null) {
+            recyclerView.scrollToPosition(row)
+        }
         recyclerView.post {
             val holder = recyclerView.findViewHolderForAdapterPosition(row) as? ViewHolder
             if (holder?.focusNearestProgram(preferredTimeMillis) != true) {
@@ -76,9 +83,11 @@ class GuideScheduleAdapter(
         }
     }
 
-    fun focusRow(recyclerView: RecyclerView, row: Int) {
+    fun focusRow(recyclerView: RecyclerView, row: Int, allowScroll: Boolean = true) {
         if (row !in channels.indices) return
-        recyclerView.scrollToPosition(row)
+        if (allowScroll || recyclerView.findViewHolderForAdapterPosition(row) == null) {
+            recyclerView.scrollToPosition(row)
+        }
         recyclerView.post {
             (recyclerView.findViewHolderForAdapterPosition(row) as? ViewHolder)?.focusRow()
         }
