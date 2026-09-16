@@ -350,6 +350,24 @@ class IptvPlaybackController(
         }
     }
 
+    val currentPosition: Long
+        get() = player?.currentPosition ?: 0L
+
+    val duration: Long
+        get() = player?.duration?.takeUnless { it == C.TIME_UNSET } ?: 0L
+
+    fun isCurrentStreamLive(): Boolean {
+        val current = player ?: return true
+        return current.isCurrentMediaItemLive || current.duration == C.TIME_UNSET
+    }
+
+    fun seekTo(positionMillis: Long): Boolean {
+        val current = player ?: return false
+        val total = current.duration.takeUnless { it == C.TIME_UNSET } ?: Long.MAX_VALUE
+        current.seekTo(positionMillis.coerceIn(0L, total))
+        return true
+    }
+
     fun seekBy(offsetMillis: Long): Boolean {
         val current = player ?: return false
         if (contentKind() != IptvContentKind.VOD && !current.isCurrentMediaItemSeekable) return false

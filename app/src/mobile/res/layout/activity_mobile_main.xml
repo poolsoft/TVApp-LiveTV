@@ -149,7 +149,7 @@
                     android:background="@drawable/bg_mobile_overlay_control"
                     android:contentDescription="@null"
                     android:padding="12dp"
-                    android:src="@drawable/ic_archive"
+                    android:src="@drawable/ic_replay_10"
                     android:visibility="gone" />
 
                 <ImageView
@@ -170,7 +170,7 @@
                     android:background="@drawable/bg_mobile_overlay_control"
                     android:contentDescription="@null"
                     android:padding="12dp"
-                    android:src="@drawable/ic_clock_small"
+                    android:src="@drawable/ic_forward_10"
                     android:visibility="gone" />
             </LinearLayout>
 
@@ -182,8 +182,12 @@
                 android:layout_gravity="bottom"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:padding="8dp">
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="8dp">
 
+                <!-- Canlı Yayın Rozeti -->
                 <TextView
                     android:id="@+id/overlay_live_badge"
                     android:layout_width="wrap_content"
@@ -200,7 +204,48 @@
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
+                <!-- VOD Süre & SeekBar Paneli -->
+                <LinearLayout
+                    android:id="@+id/overlay_vod_container"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/overlay_time_current"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:text="00:00" />
+
+                    <SeekBar
+                        android:id="@+id/overlay_seek_bar"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:maxHeight="4dp"
+                        android:minHeight="4dp"
+                        android:progressTint="#2196F3"
+                        android:thumbTint="#2196F3" />
+
+                    <TextView
+                        android:id="@+id/overlay_time_duration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#B0BEC5"
+                        android:textSize="12sp"
+                        android:text="00:00" />
+                </LinearLayout>
+
+                <!-- Canlı yayında esnek boşluk -->
                 <View
+                    android:id="@+id/overlay_bottom_spacer"
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1" />
@@ -209,6 +254,7 @@
                     android:id="@+id/overlay_btn_fullscreen"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
+                    android:layout_marginStart="8dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@null"
                     android:padding="6dp"

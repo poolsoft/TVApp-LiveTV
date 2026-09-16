@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,8 +42,12 @@ import com.tvapp.livetv.playback.IptvPlaybackPhase
 import com.tvapp.livetv.ui.MobileCategoryAdapter
 import com.tvapp.livetv.ui.MobileChannelAdapter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -66,6 +71,9 @@ class MobileMainActivity : AppCompatActivity() {
     private var currentSearchQuery = ""
     private var sideCategory = "Tümü"
     private var sideSearchQuery = ""
+
+    private var playbackProgressJob: Job? = null
+    private var isUserTrackingSeekBar = false
 
     private val hideControlsHandler = Handler(Looper.getMainLooper())
     private val hideHudHandler = Handler(Looper.getMainLooper())
@@ -121,6 +129,7 @@ class MobileMainActivity : AppCompatActivity() {
         iptvPlayback.onPlaybackReady = {
             binding.mobileBuffering.visibility = View.GONE
             binding.overlayBtnPlayPause.setImageResource(R.drawable.ic_pause)
+            updatePlaybackProgress()
         }
 
         iptvPlayback.onPlaybackError = { error ->
@@ -258,6 +267,45 @@ class MobileMainActivity : AppCompatActivity() {
             scheduleHideControls()
         }
 
+        binding.overlayBtnRewind.setOnClickListener {
+            iptvPlayback.seekBy(-10_000L)
+            updatePlaybackProgress()
+            scheduleHideControls()
+        }
+
+        binding.overlayBtnForward.setOnClickListener {
+            iptvPlayback.seekBy(10_000L)
+            updatePlaybackProgress()
+            scheduleHideControls()
+        }
+
+        binding.overlaySeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val duration = iptvPlayback.duration
+                    if (duration > 0) {
+                        val targetPos = (progress.toDouble() / 1000.0 * duration).toLong()
+                        binding.overlayTimeCurrent.text = formatTime(targetPos)
+                    }
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                isUserTrackingSeekBar = true
+                hideControlsHandler.removeCallbacksAndMessages(null)
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                isUserTrackingSeekBar = false
+                val duration = iptvPlayback.duration
+                if (duration > 0 && seekBar != null) {
+                    val targetPos = (seekBar.progress.toDouble() / 1000.0 * duration).toLong()
+                    iptvPlayback.seekTo(targetPos)
+                }
+                scheduleHideControls()
+            }
+        })
+
         binding.overlayBtnFullscreen.setOnClickListener {
             toggleFullscreen()
         }
@@ -289,6 +337,21 @@ class MobileMainActivity : AppCompatActivity() {
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                 toggleControlsOverlay()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val isLive = iptvPlayback.isCurrentStreamLive() || iptvPlayback.duration <= 0L
+                if (isLive) return false
+                val width = binding.mobileVideoContainer.width
+                if (e.x < width / 2) {
+                    iptvPlayback.seekBy(-10_000L)
+                    showSeekFeedback("-10s")
+                } else {
+                    iptvPlayback.seekBy(10_000L)
+                    showSeekFeedback("+10s")
+                }
+                updatePlaybackProgress()
                 return true
             }
 
@@ -477,6 +540,7 @@ class MobileMainActivity : AppCompatActivity() {
         binding.mobileBuffering.visibility = View.VISIBLE
 
         iptvPlayback.play(channel)
+        startProgressUpdates()
         scheduleHideControls()
     }
 
@@ -598,12 +662,82 @@ class MobileMainActivity : AppCompatActivity() {
         binding.mobileGestureHud.visibility = View.VISIBLE
         binding.hudIcon.setImageResource(iconRes)
         binding.hudText.text = text
+        binding.hudProgress.visibility = View.VISIBLE
         binding.hudProgress.progress = progress
 
         hideHudHandler.removeCallbacksAndMessages(null)
         hideHudHandler.postDelayed({
             binding.mobileGestureHud.visibility = View.GONE
         }, 1200)
+    }
+
+    private fun showSeekFeedback(text: String) {
+        binding.mobileGestureHud.visibility = View.VISIBLE
+        binding.hudProgress.visibility = View.GONE
+        binding.hudIcon.setImageResource(if (text.startsWith("-")) R.drawable.ic_replay_10 else R.drawable.ic_forward_10)
+        binding.hudText.text = text
+
+        hideHudHandler.removeCallbacksAndMessages(null)
+        hideHudHandler.postDelayed({
+            binding.mobileGestureHud.visibility = View.GONE
+        }, 800)
+    }
+
+    private fun formatTime(millis: Long): String {
+        if (millis <= 0L) return "00:00"
+        val totalSeconds = millis / 1000
+        val seconds = totalSeconds % 60
+        val minutes = (totalSeconds / 60) % 60
+        val hours = totalSeconds / 3600
+        return if (hours > 0) {
+            String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
+    }
+
+    private fun startProgressUpdates() {
+        playbackProgressJob?.cancel()
+        playbackProgressJob = lifecycleScope.launch {
+            while (isActive) {
+                updatePlaybackProgress()
+                delay(1000)
+            }
+        }
+    }
+
+    private fun stopProgressUpdates() {
+        playbackProgressJob?.cancel()
+        playbackProgressJob = null
+    }
+
+    private fun updatePlaybackProgress() {
+        val duration = iptvPlayback.duration
+        val isLive = iptvPlayback.isCurrentStreamLive() || duration <= 0L
+
+        if (isLive) {
+            binding.overlayLiveBadge.visibility = View.VISIBLE
+            binding.overlayBottomSpacer.visibility = View.VISIBLE
+            binding.overlayVodContainer.visibility = View.GONE
+            binding.overlayBtnRewind.visibility = View.GONE
+            binding.overlayBtnForward.visibility = View.GONE
+        } else {
+            binding.overlayLiveBadge.visibility = View.GONE
+            binding.overlayBottomSpacer.visibility = View.GONE
+            binding.overlayVodContainer.visibility = View.VISIBLE
+            binding.overlayBtnRewind.visibility = View.VISIBLE
+            binding.overlayBtnForward.visibility = View.VISIBLE
+
+            val currentPos = iptvPlayback.currentPosition
+            binding.overlayTimeCurrent.text = formatTime(currentPos)
+            binding.overlayTimeDuration.text = formatTime(duration)
+
+            if (!isUserTrackingSeekBar && duration > 0) {
+                val progress = ((currentPos.toDouble() / duration.toDouble()) * 1000).toInt()
+                binding.overlaySeekBar.max = 1000
+                binding.overlaySeekBar.progress = progress
+            }
+        }
     }
 
     override fun onUserLeaveHint() {
@@ -623,13 +757,17 @@ class MobileMainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (currentChannel != null && !iptvPlayback.playbackSnapshot().isPlaying) {
-            iptvPlayback.play()
+        if (currentChannel != null) {
+            if (!iptvPlayback.playbackSnapshot().isPlaying) {
+                iptvPlayback.play()
+            }
+            startProgressUpdates()
         }
     }
 
     override fun onPause() {
         super.onPause()
+        stopProgressUpdates()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
             // PiP modunda oynatmaya devam et
         } else {
@@ -639,6 +777,7 @@ class MobileMainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopProgressUpdates()
         hideControlsHandler.removeCallbacksAndMessages(null)
         hideHudHandler.removeCallbacksAndMessages(null)
         iptvPlayback.release()
