@@ -118,6 +118,15 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun configureWindow() {
+        if (BuildConfig.MOBILE_UI_ENABLED) {
+            window.setGravity(Gravity.CENTER)
+            window.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            return
+        }
         val metrics = resources.displayMetrics
         window.setGravity(Gravity.END or Gravity.CENTER_VERTICAL)
         window.setLayout(

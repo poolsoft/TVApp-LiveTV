@@ -237,6 +237,10 @@ class MobileMainActivity : AppCompatActivity() {
             iptvSelectionLauncher.launch(Intent(this, IptvChannelSelectionActivity::class.java))
         }
 
+        binding.mobileBtnSettings.setOnClickListener {
+            startActivity(Intent(this, DisplaySettingsActivity::class.java))
+        }
+
         binding.mobileEmptyActionButton.setOnClickListener {
             iptvSourcesLauncher.launch(Intent(this, IptvSourcesActivity::class.java))
         }
@@ -256,6 +260,10 @@ class MobileMainActivity : AppCompatActivity() {
 
         binding.overlayBtnFullscreen.setOnClickListener {
             toggleFullscreen()
+        }
+
+        binding.overlayBtnSettings.setOnClickListener {
+            startActivity(Intent(this, DisplaySettingsActivity::class.java))
         }
 
         binding.overlayBtnBack.setOnClickListener {
