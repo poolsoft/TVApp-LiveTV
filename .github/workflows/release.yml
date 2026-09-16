@@ -63,7 +63,7 @@ jobs:
           TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease \
+          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileDebug \
             -PtvappTargetAbis=arm64-v8a,armeabi-v7a
 
       - name: Prepare release assets
@@ -72,6 +72,7 @@ jobs:
         run: |
           cp app/build/outputs/apk/local/release/app-local-release.apk TVApp.apk
           cp app/build/outputs/apk/paid/debug/app-paid-debug.apk TVApp-Paid-Test.apk
+          cp app/build/outputs/apk/mobile/debug/app-mobile-debug.apk TVApp-Mobile.apk
           SHA256=$(sha256sum TVApp.apk | cut -d' ' -f1)
           PUBLISHED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           cat > version.json <<EOF
@@ -95,8 +96,8 @@ jobs:
         run: |
           TAG="dev-r${{ steps.version.outputs.revision }}"
           TITLE="TVApp Development"
-          NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }} · Paid test APK includes the local entitlement scenario screen."
-          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk version.json \
+          NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }} · TVApp.apk (TV Live), TVApp-Paid-Test.apk (Play Test), TVApp-Mobile.apk (Phone IPTV)."
+          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk TVApp-Mobile.apk version.json \
             --target "$(git rev-parse HEAD)" \
             --title "$TITLE" \
             --notes "$NOTES" \

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_mobile_test">TVApp Mobile Test</string>
+    <string name="app_name_mobile_test">TVApp Mobile</string>
+    <string name="channel_count_format">%1$d channels listed</string>
+    <string name="playback_error_template">Playback error: %1$s</string>
 </resources>

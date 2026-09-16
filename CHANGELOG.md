@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Telefon / Mobil IPTV Dokunmatik Arayüzü ve Release Entegrasyonu
+* **Telefonlara Özel Arayüz (src/mobile):** TV varyantı ve kodları (`MainActivity.kt`, TV Leanback OSD) hiçbir değişikliğe uğramadan korunarak, telefonlar için tamamen bağımsız `MobileMainActivity` ve dokunmatik IPTV arayüzü geliştirildi.
+* **Dikey Mod (Portrait):** Üstte 16:9 oranında canlı IPTV oynatıcısı; altta anlık kanal arama çubuğu, yatay kaydırılabilir kategori çipleri ve akıcı dokunmatik kanal kartları listesi eklendi. TV tuneri olmayan cihazlar için bilgilendirici durum ekranı ve doğrudan IPTV yönetim butonuna yer verildi.
+* **Yatay Mod (Landscape / Tam Ekran):** Tam ekran IPTV deneyimi, dokunulduğunda beliren modern OSD kontrolleri, sol ekranda parlaklık ve sağ ekranda ses seviyesi dokunmatik jest kontrolleri (HUD göstergeleriyle) eklendi.
+* **GitHub Release Entegrasyonu:** TV'nin dahili güncelleme akışı (`TVApp.apk` ve `version.json`) bozulmadan korunacak şekilde ana `release.yml` iş akışına `assembleMobileDebug` ve `TVApp-Mobile.apk` varlığı dahil edildi.
+
 ### Multi-View 4'lü Grid ve Yüksek Kontrastlı Kanal Seçici İyileştirmeleri
 * **4 Kanal Multi-View Kapasitesi ve Grid Yerleşimi:** TV'lerde `memoryClass <= 192` kontrolü nedeniyle `maximumGridStreams` değerinin 2'ye kısıtlanması sorunu giderildi (`DeviceResourcePolicy.kt`); sınır 4 akış olarak sabitlendi. 2x2 grid `GridLayout.LayoutParams` yapısında hücrelerin tam ekran yayılmasını sağlayan spec hizalaması (`FILL, 1f`) tamamlandı.
 * **Hücre Seçiminde Kesintisiz Tam Ekran Geçişi:** Bölünmüş ekranda hücreye tıklandığında/OK basıldığında oluşan donma sorunu giderildi; kanal doğrudan ana player'a devredilerek pürüzsüz tam ekran oynatıma geçiş sağlandı.
