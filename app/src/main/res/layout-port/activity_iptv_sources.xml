@@ -23,15 +23,15 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/close_button"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/iptv_btn_close"
+            android:layout_width="38dp"
             android:layout_height="38dp"
             android:background="@drawable/bg_focusable"
-            android:paddingHorizontal="16dp"
-            android:text="@string/close"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp" />
+            android:contentDescription="@string/close"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_close" />
     </LinearLayout>
 
     <!-- Kaynak Ekleme Butonları (Grid / Çiftli Yatay) -->

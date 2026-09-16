@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Mobil & TV Yönetim Ekranlarına Kapat / Geri (X) Butonu Entegrasyonu
+* **Ayarlar Ekranı Kapat Butonu:** `DisplaySettingsActivity` başlık satırına dokunmatik mobil ve kumanda için şık `settings_btn_close` (`ic_close`) butonu eklendi; kullanıcılar mobil cihazlarda geri jestine ihtiyaç duymadan doğrudan ayarlar ekranından çıkabilir.
+* **XMLTV ve EPG Editör Kapat Butonları:** `XmlTvSourcesActivity` ve `XmlTvEpgEditorActivity` başlık alanlarına standart `xmltv_btn_close` ve `epg_editor_btn_close` (X) butonları eklendi.
+* **IPTV Kaynakları ve Kanal Seçimi Kapat Butonları:** `IptvSourcesActivity` (hem varsayılan yatay hem de dikey modlar) ve `IptvChannelSelectionActivity` (hem varsayılan hem de dikey modlar) başlık satırlarına standart `ic_close` butonları eklenerek ekran kapatma akışı tek dokunuşla tutarlı hale getirildi.
+
 ### Mobil VOD Seekbar / İleri-Geri Sarma & Multi-View Grid Stabilizasyonu
 * **Mobil VOD ve Süre Kontrolleri:** Mobilde film, dizi ve VOD içeriklerde çalışan dinamik `SeekBar`, anlık geçen süre (`00:00`), toplam süre (`00:00`) ve 10 saniye ileri/geri sarma (`ic_forward_10`, `ic_replay_10`) kontrolleri eklendi. Canlı yayınlarda `SeekBar` ve sarma kontrolleri otomatik gizlenerek sade "CANLI" rozeti gösterilir; VOD yayına geçildiğinde "CANLI" rozeti gizlenip `SeekBar` ve süreler devreye girer.
 * **Mobilde Çift Dokunuşla Sarma:** Oynatıcı ekranının sol yarısına çift dokunulduğunda 10 saniye geri sarma, sağ yarısına çift dokunulduğunda 10 saniye ileri sarma desteği ve ekranda beliren şık görsel geri bildirim rozeti (HUD) eklendi.

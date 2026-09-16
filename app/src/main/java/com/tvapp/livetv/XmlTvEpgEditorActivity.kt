@@ -47,6 +47,7 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
         setContentView(binding.root)
         binding.list.layoutManager = LinearLayoutManager(this)
         binding.list.adapter = adapter
+        binding.epgEditorBtnClose.setOnClickListener { finish() }
         loadData()
     }
 

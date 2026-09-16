@@ -115,6 +115,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         ) { SettingsPage.APPEARANCE }
         buildTabs()
         showPage(selectedPage, moveFocusToTab = true)
+        findViewById<View>(R.id.settings_btn_close)?.setOnClickListener { finish() }
     }
 
     private fun configureWindow() {

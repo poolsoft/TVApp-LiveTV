@@ -5,16 +5,34 @@
     android:background="@drawable/bg_settings_osd"
     android:orientation="vertical">
 
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:paddingStart="26dp"
         android:paddingTop="22dp"
-        android:paddingEnd="26dp"
-        android:text="@string/settings_title"
-        android:textColor="@color/text_primary"
-        android:textSize="27sp"
-        android:textStyle="bold" />
+        android:paddingEnd="26dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_title"
+            android:textColor="@color/text_primary"
+            android:textSize="27sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/settings_btn_close"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_focusable"
+            android:contentDescription="@string/close"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/settings_tabs"

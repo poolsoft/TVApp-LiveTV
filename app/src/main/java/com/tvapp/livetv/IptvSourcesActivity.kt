@@ -77,7 +77,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         binding.importXtreamButton.setOnClickListener(::showXtreamDialog)
         binding.importStalkerButton.setOnClickListener(::showStalkerDialog)
-        binding.closeButton.setOnClickListener {
+        binding.closeButton?.setOnClickListener {
+            setResult(RESULT_OK)
+            finish()
+        }
+        binding.iptvBtnClose.setOnClickListener {
             setResult(RESULT_OK)
             finish()
         }

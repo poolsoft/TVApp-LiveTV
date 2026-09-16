@@ -50,6 +50,7 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
             startActivity(Intent(this, XmlTvEpgEditorActivity::class.java))
         }
         findViewById<View>(R.id.close).setOnClickListener { finish() }
+        findViewById<View>(R.id.xmltv_btn_close)?.setOnClickListener { finish() }
         sourceList.setOnItemClickListener { _, _, position, _ ->
             sources.getOrNull(position)?.let(::showSourceActions)
         }
