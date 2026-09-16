@@ -235,7 +235,6 @@ class MainActivity : TvRemoteActivity() {
     private var iptvOverlayActive = false
     private var iptvGridActive = false
     private var gridActiveIndex = 0
-    private var gridFullscreenIndex: Int? = null
     private var gridLongPressHandled = false
     private var gridLongPressJob: Job? = null
     private var yellowLongPressJob: Job? = null
@@ -3191,7 +3190,7 @@ class MainActivity : TvRemoteActivity() {
         get() = (this * resources.displayMetrics.density).toInt()
 
     private fun prepareIptvGrid() {
-        repeat(deviceResourcePolicy.maximumGridStreams) { index ->
+        repeat(4) { index ->
             val cell = layoutInflater.inflate(
                 R.layout.view_iptv_grid_cell,
                 binding.iptvGrid,
@@ -3200,12 +3199,19 @@ class MainActivity : TvRemoteActivity() {
             val playerView = cell.findViewById<PlayerView>(R.id.grid_player)
             val label = cell.findViewById<TextView>(R.id.grid_label)
             cell.layoutParams = GridLayout.LayoutParams(
-                GridLayout.spec(index / 2, 1, 1f),
-                GridLayout.spec(index % 2, 1, 1f),
+                GridLayout.spec(index / 2, 1, GridLayout.FILL, 1f),
+                GridLayout.spec(index % 2, 1, GridLayout.FILL, 1f),
             ).apply {
                 width = 0
                 height = 0
                 setMargins(3.dp, 3.dp, 3.dp, 3.dp)
+            }
+            cell.setOnClickListener {
+                if (index in gridChannels.indices) {
+                    gridActiveIndex = index
+                    updateIptvGridFocus()
+                    openActiveGridChannel()
+                }
             }
             binding.iptvGrid.addView(cell)
             cell.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -3511,9 +3517,10 @@ class MainActivity : TvRemoteActivity() {
         stopIptvOverlay()
         gridReturnChannel = currentChannel
         gridChannels = distinct
+        gridSelectedKeys.clear()
+        gridSelectedKeys += distinct.map { it.sourceKey }
         gridActiveIndex = distinct.indexOfFirst { it.sourceKey == currentChannel?.sourceKey }
             .takeIf { it >= 0 } ?: 0
-        gridFullscreenIndex = null
         iptvGridActive = true
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_GRID)
         playback.stop()
@@ -3563,35 +3570,38 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun applyIptvGridLayout() {
-        val fullscreen = gridFullscreenIndex
+        val count = gridChannels.size
         gridCells.forEachIndexed { index, cell ->
-            cell.visibility = when {
-                index !in gridChannels.indices -> View.INVISIBLE
-                fullscreen == null || fullscreen == index -> View.VISIBLE
-                else -> View.GONE
+            if (index !in gridChannels.indices) {
+                cell.visibility = View.GONE
+                cell.layoutParams = GridLayout.LayoutParams(
+                    GridLayout.spec(index / 2, 1, GridLayout.FILL, 0f),
+                    GridLayout.spec(index % 2, 1, GridLayout.FILL, 0f),
+                ).apply {
+                    width = 0
+                    height = 0
+                }
+                return@forEachIndexed
             }
+            cell.visibility = View.VISIBLE
             val rowSpec: GridLayout.Spec
             val columnSpec: GridLayout.Spec
             when {
-                fullscreen == index -> {
-                    rowSpec = GridLayout.spec(0, 2, 1f)
-                    columnSpec = GridLayout.spec(0, 2, 1f)
+                count <= 2 -> {
+                    rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
+                    columnSpec = GridLayout.spec(index.coerceIn(0, 1), 1, GridLayout.FILL, 1f)
                 }
-                gridChannels.size == 2 -> {
-                    rowSpec = GridLayout.spec(0, 2, 1f)
-                    columnSpec = GridLayout.spec(index, 1, 1f)
+                count == 3 && index == 0 -> {
+                    rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
+                    columnSpec = GridLayout.spec(0, 1, GridLayout.FILL, 1f)
                 }
-                gridChannels.size == 3 && index == 0 -> {
-                    rowSpec = GridLayout.spec(0, 2, 1f)
-                    columnSpec = GridLayout.spec(0, 1, 1f)
-                }
-                gridChannels.size == 3 -> {
-                    rowSpec = GridLayout.spec(index - 1, 1, 1f)
-                    columnSpec = GridLayout.spec(1, 1, 1f)
+                count == 3 -> {
+                    rowSpec = GridLayout.spec((index - 1).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
+                    columnSpec = GridLayout.spec(1, 1, GridLayout.FILL, 1f)
                 }
                 else -> {
-                    rowSpec = GridLayout.spec(index / 2, 1, 1f)
-                    columnSpec = GridLayout.spec(index % 2, 1, 1f)
+                    rowSpec = GridLayout.spec((index / 2).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
+                    columnSpec = GridLayout.spec((index % 2).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
                 }
             }
             cell.layoutParams = GridLayout.LayoutParams(rowSpec, columnSpec).apply {
@@ -3615,10 +3625,6 @@ class MainActivity : TvRemoteActivity() {
     private fun positionGridTifSurface() {
         val tifIndex = gridChannels.indexOfFirst { it.source == LiveChannel.Source.TIF }
         if (!iptvGridActive || tifIndex !in gridCells.indices) return
-        if (gridFullscreenIndex != null && gridFullscreenIndex != tifIndex) {
-            binding.tvView.visibility = View.GONE
-            return
-        }
         val cell = gridCells[tifIndex]
         if (cell.width <= 0 || cell.height <= 0) return
         val targetLeft = (binding.iptvGrid.x + cell.x).toInt()
@@ -3678,13 +3684,12 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun moveIptvGridFocus(keyCode: Int) {
-        if (gridFullscreenIndex != null) return
         val candidate = MultiViewFocusResolver.nextFocus(
             keyCode,
             gridActiveIndex,
             gridChannels.size,
         )
-        if (candidate != gridActiveIndex) {
+        if (candidate in gridChannels.indices && candidate != gridActiveIndex) {
             gridActiveIndex = candidate
             updateIptvGridFocus()
         }
@@ -3714,7 +3719,6 @@ class MainActivity : TvRemoteActivity() {
         gridChannels = gridChannels.toMutableList().apply { this[index] = replacement }
         gridSelectedKeys.clear()
         gridSelectedKeys += gridChannels.map { it.sourceKey }
-        if (gridFullscreenIndex != null) gridFullscreenIndex = index
         renderIptvGrid()
     }
 
@@ -3724,7 +3728,6 @@ class MainActivity : TvRemoteActivity() {
         val fallback = gridReturnChannel
         iptvGridActive = false
         gridLongPressJob?.cancel()
-        gridFullscreenIndex = null
         gridControllers.forEach(IptvPlaybackController::stop)
         renderedGridKeys.indices.forEach { renderedGridKeys[it] = null }
         renderedGridTifKey = null
@@ -3740,11 +3743,10 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug("MULTIVIEW_STOP | resume=$resumePrevious, channel=${focused?.sourceKey}")
     }
 
-    private fun openActiveGridChannelFullscreen() {
-        if (gridChannels.getOrNull(gridActiveIndex) == null) return
-        gridFullscreenIndex = gridActiveIndex
-        applyIptvGridLayout()
-        updateIptvGridFocus()
+    private fun openActiveGridChannel() {
+        val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
+        stopIptvGrid(resumePrevious = false)
+        selectChannel(channel, recordHistory = false)
     }
 
     private fun closeActiveGridChannel() {
@@ -3765,7 +3767,6 @@ class MainActivity : TvRemoteActivity() {
         gridSelectedKeys.clear()
         gridSelectedKeys += mutable.map { it.sourceKey }
         gridActiveIndex = gridActiveIndex.coerceAtMost(mutable.lastIndex)
-        gridFullscreenIndex = null
         renderIptvGrid()
     }
 
@@ -3793,7 +3794,6 @@ class MainActivity : TvRemoteActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.grid_channel_change)
             .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
-                gridFullscreenIndex = null
                 replaceIptvGridChannel(targetIndex, choices[which])
             }
             .setNegativeButton(R.string.close, null)
@@ -5399,13 +5399,7 @@ class MainActivity : TvRemoteActivity() {
         when (remoteActionRouter.route(remoteUiContext(), RemoteKey.BACK, RemoteKeyPhase.DOWN)) {
             RemoteAction.DISMISS_RECENT_CHANNELS -> hideRecentChannels()
             RemoteAction.HANDLE_IPTV_CONTROLS -> hideIptvPlaybackControls()
-            RemoteAction.HANDLE_GRID -> if (gridFullscreenIndex != null) {
-                gridFullscreenIndex = null
-                applyIptvGridLayout()
-                updateIptvGridFocus()
-            } else {
-                stopIptvGrid(resumePrevious = true)
-            }
+            RemoteAction.HANDLE_GRID -> stopIptvGrid(resumePrevious = true)
             RemoteAction.DISMISS_STATUS -> osdCoordinator.hideStatus()
             RemoteAction.HANDLE_CHANNEL_PANEL -> if (channelPanelExpanded) {
                 showChannelPanel(expanded = false)
@@ -5558,17 +5552,11 @@ class MainActivity : TvRemoteActivity() {
                         }
                     } else if (event.action == KeyEvent.ACTION_UP) {
                         gridLongPressJob?.cancel()
-                        if (!gridLongPressHandled) openActiveGridChannelFullscreen()
+                        if (!gridLongPressHandled) openActiveGridChannel()
                     }
                 }
                 KeyEvent.KEYCODE_BACK -> if (event.action == KeyEvent.ACTION_DOWN) {
-                    if (gridFullscreenIndex != null) {
-                        gridFullscreenIndex = null
-                        applyIptvGridLayout()
-                        updateIptvGridFocus()
-                    } else {
-                        stopIptvGrid(resumePrevious = true)
-                    }
+                    stopIptvGrid(resumePrevious = true)
                 }
                 KeyEvent.KEYCODE_CHANNEL_UP -> if (event.action == KeyEvent.ACTION_DOWN) {
                     zapIptvGridChannel(1)
@@ -5871,7 +5859,7 @@ class MainActivity : TvRemoteActivity() {
                         openChannelEditor()
                     }
                 }
-                KeyEvent.KEYCODE_PROG_GREEN -> Unit
+                KeyEvent.KEYCODE_PROG_GREEN -> showIptvGridPicker()
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility != View.VISIBLE) {
                     return super.dispatchKeyEvent(event)
                 }

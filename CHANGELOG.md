@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Multi-View 4'lü Grid ve Yüksek Kontrastlı Kanal Seçici İyileştirmeleri
+* **4 Kanal Multi-View Kapasitesi ve Grid Yerleşimi:** TV'lerde `memoryClass <= 192` kontrolü nedeniyle `maximumGridStreams` değerinin 2'ye kısıtlanması sorunu giderildi (`DeviceResourcePolicy.kt`); sınır 4 akış olarak sabitlendi. 2x2 grid `GridLayout.LayoutParams` yapısında hücrelerin tam ekran yayılmasını sağlayan spec hizalaması (`FILL, 1f`) tamamlandı.
+* **Hücre Seçiminde Kesintisiz Tam Ekran Geçişi:** Bölünmüş ekranda hücreye tıklandığında/OK basıldığında oluşan donma sorunu giderildi; kanal doğrudan ana player'a devredilerek pürüzsüz tam ekran oynatıma geçiş sağlandı.
+* **Kumanda OK ile Seçim ve Odak Koruma:** `MultiViewChannelAdapter` içine `setHasStableIds(true)` eklenerek seçim sırasında odak kaybı önlendi; kumanda `KEYCODE_DPAD_CENTER` ve `KEYCODE_ENTER` tuşları için dinleyici eklenerek seçim sağlandı.
+* **Kanal Seçici Yüksek Kontrast:** Koyu arkaplan üzerinde soluk kalan metinler bembeyaz ve kalın (`@color/text_primary`), kanal numaraları ise parlak mavi (`@color/accent`) yapılarak TV mesafesinden kristal netliğinde okunabilir hale getirildi.
 
 ### MultiView (Grid) Codec ve Stabilite İyileştirmeleri
 * **Codec tabanlı grid limiti:** `MediaCodecList(REGULAR_CODECS)` üzerinden H.264 ve H.265 için

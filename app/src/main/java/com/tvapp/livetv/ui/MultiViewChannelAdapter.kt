@@ -16,6 +16,12 @@ class MultiViewChannelAdapter(
     private val channels = mutableListOf<LiveChannel>()
     private val selectedKeys = linkedMapOf<String, Int>()
 
+    init {
+        setHasStableIds(true)
+    }
+
+    override fun getItemId(position: Int): Long = channels[position].id
+
     fun submitList(items: List<LiveChannel>, selected: Map<String, LiveChannel>) {
         channels.clear()
         channels.addAll(items)
@@ -53,6 +59,7 @@ class MultiViewChannelAdapter(
             holder.slotBadge.visibility = View.INVISIBLE
             holder.checkbox.isChecked = false
         }
+        holder.itemView.isSelected = slot != null
 
         val isTif = channel.source == LiveChannel.Source.TIF
         holder.sourceBadge.text = if (isTif) "DVB" else "IPTV"
@@ -65,6 +72,18 @@ class MultiViewChannelAdapter(
 
         holder.itemView.setOnClickListener {
             onChannelToggled(channel, holder.bindingAdapterPosition)
+        }
+        holder.itemView.setOnKeyListener { _, keyCode, event ->
+            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                 keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
+                 keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
+            ) {
+                holder.itemView.performClick()
+                true
+            } else {
+                false
+            }
         }
     }
 
