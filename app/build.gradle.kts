@@ -69,10 +69,10 @@ android {
         }
         create("mobile") {
             dimension = "distribution"
-            applicationIdSuffix = ".mobile"
-            versionNameSuffix = "-mobile-test"
-            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
-            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+            applicationId = "com.tvapp.mobile"
+            versionNameSuffix = "-mobile"
+            buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version-mobile.json\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")

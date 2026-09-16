@@ -56,7 +56,7 @@ jobs:
         run: |
           TAG="mobile-r${{ github.run_number }}"
           SHA256=$(sha256sum app/build/TVApp-Mobile-Test.apk | cut -d' ' -f1)
-          NOTES="Mobile test revision ${{ github.run_number }} · Separate package com.tvapp.livetv.mobile · SHA-256: $SHA256 · This prerelease is not used by TVApp's update manifest."
+          NOTES="Mobile test revision ${{ github.run_number }} · Separate package com.tvapp.mobile · SHA-256: $SHA256 · This prerelease is not used by TVApp's update manifest."
           gh release create "$TAG" app/build/TVApp-Mobile-Test.apk \
             --target "$(git rev-parse HEAD)" \
             --title "TVApp Mobile Test r${{ github.run_number }}" \

@@ -74,15 +74,44 @@ jobs:
           cp app/build/outputs/apk/paid/debug/app-paid-debug.apk TVApp-Paid-Test.apk
           cp app/build/outputs/apk/mobile/debug/app-mobile-debug.apk TVApp-Mobile.apk
           SHA256=$(sha256sum TVApp.apk | cut -d' ' -f1)
+          MOBILE_SHA256=$(sha256sum TVApp-Mobile.apk | cut -d' ' -f1)
           PUBLISHED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           cat > version.json <<EOF
           {
+            "package": "com.tvapp.livetv",
             "versionCode": ${{ steps.version.outputs.build }},
             "versionName": "${{ steps.version.outputs.version }}",
             "build": ${{ steps.version.outputs.build }},
             "revision": ${{ steps.version.outputs.revision }},
             "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp.apk",
             "sha256": "$SHA256",
+            "publishedAt": "$PUBLISHED_AT",
+            "mandatory": false,
+            "packages": {
+              "com.tvapp.livetv": {
+                "versionCode": ${{ steps.version.outputs.build }},
+                "versionName": "${{ steps.version.outputs.version }}",
+                "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp.apk",
+                "sha256": "$SHA256"
+              },
+              "com.tvapp.mobile": {
+                "versionCode": ${{ steps.version.outputs.build }},
+                "versionName": "${{ steps.version.outputs.version }}-mobile",
+                "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp-Mobile.apk",
+                "sha256": "$MOBILE_SHA256"
+              }
+            }
+          }
+          EOF
+          cat > version-mobile.json <<EOF
+          {
+            "package": "com.tvapp.mobile",
+            "versionCode": ${{ steps.version.outputs.build }},
+            "versionName": "${{ steps.version.outputs.version }}-mobile",
+            "build": ${{ steps.version.outputs.build }},
+            "revision": ${{ steps.version.outputs.revision }},
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp-Mobile.apk",
+            "sha256": "$MOBILE_SHA256",
             "publishedAt": "$PUBLISHED_AT",
             "mandatory": false
           }
@@ -96,8 +125,8 @@ jobs:
         run: |
           TAG="dev-r${{ steps.version.outputs.revision }}"
           TITLE="TVApp Development"
-          NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }} · TVApp.apk (TV Live), TVApp-Paid-Test.apk (Play Test), TVApp-Mobile.apk (Phone IPTV)."
-          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk TVApp-Mobile.apk version.json \
+          NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }} · TVApp.apk (com.tvapp.livetv), TVApp-Paid-Test.apk (Play Test), TVApp-Mobile.apk (com.tvapp.mobile)."
+          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk TVApp-Mobile.apk version.json version-mobile.json \
             --target "$(git rev-parse HEAD)" \
             --title "$TITLE" \
             --notes "$NOTES" \
