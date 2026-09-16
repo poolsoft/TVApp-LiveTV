@@ -20,6 +20,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
@@ -56,11 +57,15 @@ class MobileMainActivity : AppCompatActivity() {
 
     private lateinit var channelAdapter: MobileChannelAdapter
     private lateinit var categoryAdapter: MobileCategoryAdapter
+    private lateinit var sideChannelAdapter: MobileChannelAdapter
+    private lateinit var sideCategoryAdapter: MobileCategoryAdapter
 
     private val allChannels = mutableListOf<LiveChannel>()
     private var currentChannel: LiveChannel? = null
     private var currentCategory = "Tümü"
     private var currentSearchQuery = ""
+    private var sideCategory = "Tümü"
+    private var sideSearchQuery = ""
 
     private val hideControlsHandler = Handler(Looper.getMainLooper())
     private val hideHudHandler = Handler(Looper.getMainLooper())
@@ -97,9 +102,11 @@ class MobileMainActivity : AppCompatActivity() {
 
         setupPlayback()
         setupRecyclerViews()
+        setupSideChannelDrawer()
         setupSearchAndActions()
         setupPlayerControls()
         setupGestureDetector()
+        setupBackNavigation()
 
         loadChannels()
     }
@@ -158,6 +165,60 @@ class MobileMainActivity : AppCompatActivity() {
         binding.mobileChannelRecycler.adapter = channelAdapter
     }
 
+    private fun setupSideChannelDrawer() {
+        sideCategoryAdapter = MobileCategoryAdapter { selectedCat ->
+            sideCategory = selectedCat
+            applySideFilters()
+        }
+        binding.sideDrawerCategoryList.layoutManager = LinearLayoutManager(
+            this,
+            LinearLayoutManager.HORIZONTAL,
+            false,
+        )
+        binding.sideDrawerCategoryList.adapter = sideCategoryAdapter
+
+        sideChannelAdapter = MobileChannelAdapter(
+            onChannelClicked = { channel ->
+                playChannel(channel)
+            },
+            onFavoriteToggled = { channel ->
+                toggleFavorite(channel)
+            },
+        )
+        binding.sideDrawerChannelList.layoutManager = LinearLayoutManager(this)
+        binding.sideDrawerChannelList.adapter = sideChannelAdapter
+
+        binding.sideDrawerSearchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                sideSearchQuery = s?.toString()?.trim().orEmpty()
+                applySideFilters()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        binding.overlayBtnChannels.setOnClickListener {
+            toggleSideChannelDrawer()
+        }
+
+        binding.sideDrawerBtnClose.setOnClickListener {
+            closeSideChannelDrawer()
+        }
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(this) {
+            if (binding.mobileSideChannelDrawer.visibility == View.VISIBLE) {
+                closeSideChannelDrawer()
+            } else if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+    }
+
     private fun setupSearchAndActions() {
         binding.mobileSearchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -198,7 +259,9 @@ class MobileMainActivity : AppCompatActivity() {
         }
 
         binding.overlayBtnBack.setOnClickListener {
-            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            if (binding.mobileSideChannelDrawer.visibility == View.VISIBLE) {
+                closeSideChannelDrawer()
+            } else if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
@@ -295,6 +358,8 @@ class MobileMainActivity : AppCompatActivity() {
 
                         setupCategories()
                         applyFilters()
+                        setupSideCategories()
+                        applySideFilters()
 
                         if (currentChannel == null && allChannels.isNotEmpty()) {
                             playChannel(allChannels.first())
@@ -340,9 +405,63 @@ class MobileMainActivity : AppCompatActivity() {
         binding.mobileChannelCountText.text = getString(R.string.channel_count_format, resultList.size)
     }
 
+    private fun toggleSideChannelDrawer() {
+        if (binding.mobileSideChannelDrawer.visibility == View.VISIBLE) {
+            closeSideChannelDrawer()
+        } else {
+            openSideChannelDrawer()
+        }
+    }
+
+    private fun openSideChannelDrawer() {
+        binding.mobileSideChannelDrawer.visibility = View.VISIBLE
+        hideControlsHandler.removeCallbacksAndMessages(null)
+        setupSideCategories()
+        applySideFilters()
+    }
+
+    private fun closeSideChannelDrawer() {
+        binding.mobileSideChannelDrawer.visibility = View.GONE
+        scheduleHideControls()
+    }
+
+    private fun setupSideCategories() {
+        val categories = mutableListOf("Tümü", "Favoriler")
+        val groupTitles = allChannels.mapNotNull { it.groupTitle?.trim() }
+            .filter { it.isNotBlank() && it !in categories }
+            .distinct()
+            .sorted()
+        categories.addAll(groupTitles)
+        sideCategoryAdapter.submitCategories(categories, sideCategory)
+    }
+
+    private fun applySideFilters() {
+        var filtered = allChannels.asSequence()
+
+        if (sideCategory == "Favoriler") {
+            filtered = filtered.filter { it.favorite }
+        } else if (sideCategory != "Tümü" && sideCategory.isNotBlank()) {
+            filtered = filtered.filter { it.groupTitle == sideCategory }
+        }
+
+        if (sideSearchQuery.isNotBlank()) {
+            val queryLower = sideSearchQuery.lowercase()
+            filtered = filtered.filter { channel ->
+                channel.displayName.lowercase().contains(queryLower) ||
+                    channel.displayNumber.contains(queryLower)
+            }
+        }
+
+        val resultList = filtered.toList()
+        sideChannelAdapter.submitList(resultList)
+    }
+
     private fun playChannel(channel: LiveChannel) {
         currentChannel = channel
         channelAdapter.currentPlayingKey = channel.sourceKey
+        sideChannelAdapter.currentPlayingKey = channel.sourceKey
+        channelAdapter.notifyDataSetChanged()
+        sideChannelAdapter.notifyDataSetChanged()
 
         binding.overlayChannelTitle.text = channel.displayName
         binding.overlayChannelQuality.text = channel.videoFormat ?: ""
@@ -377,6 +496,7 @@ class MobileMainActivity : AppCompatActivity() {
                 allChannels[index] = updated
             }
             applyFilters()
+            applySideFilters()
         }
     }
 
@@ -402,14 +522,17 @@ class MobileMainActivity : AppCompatActivity() {
             binding.mobileContentContainer.visibility = View.GONE
             binding.mobileVideoContainer.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
             binding.overlayBtnBack.visibility = View.VISIBLE
+            binding.overlayBtnChannels.visibility = View.VISIBLE
             binding.overlayBtnFullscreen.setImageResource(R.drawable.ic_fullscreen_exit)
             windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
             windowInsetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
+            closeSideChannelDrawer()
             binding.mobileContentContainer.visibility = View.VISIBLE
             binding.mobileVideoContainer.layoutParams.height = dp(230)
             binding.overlayBtnBack.visibility = View.GONE
+            binding.overlayBtnChannels.visibility = View.GONE
             binding.overlayBtnFullscreen.setImageResource(R.drawable.ic_fullscreen)
             windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
         }
@@ -417,6 +540,10 @@ class MobileMainActivity : AppCompatActivity() {
     }
 
     private fun toggleControlsOverlay() {
+        if (binding.mobileSideChannelDrawer.visibility == View.VISIBLE) {
+            closeSideChannelDrawer()
+            return
+        }
         if (binding.mobileControlsOverlay.visibility == View.VISIBLE) {
             binding.mobileControlsOverlay.visibility = View.GONE
             hideControlsHandler.removeCallbacksAndMessages(null)

@@ -73,17 +73,11 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
 
     private fun optimizeMobileColorActions() {
         if (!BuildConfig.MOBILE_UI_ENABLED) return
-        val minimum = (48 * resources.displayMetrics.density).toInt()
-        listOf(
-            binding.clearButton,
-            binding.selectAllButton,
-            binding.categoryButton,
-            binding.selectedFilterButton,
-            binding.saveButton,
-        ).forEach { button ->
-            button.minimumHeight = minimum
-            button.isFocusable = false
-        }
+        val padHorizontal = (12 * resources.displayMetrics.density).toInt()
+        val padVertical = (8 * resources.displayMetrics.density).toInt()
+        binding.root.setPadding(padHorizontal, padVertical, padHorizontal, padVertical)
+        binding.actionSidebar.visibility = View.GONE
+        binding.helperText.visibility = View.GONE
     }
 
     private fun configurePreview() {
@@ -184,6 +178,23 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.saveButton.setOnClickListener { saveSelection() }
+
+        // Alt dokunmatik eylem çubuğu dinleyicileri
+        binding.actionBtnClear.setOnClickListener { applyBulkSelection(selected = false) }
+        binding.actionBtnSelectAll.setOnClickListener { applyBulkSelection(selected = true) }
+        binding.actionBtnCategory.setOnClickListener {
+            binding.categoryFilter.requestFocus()
+            binding.categoryFilter.performClick()
+        }
+        binding.actionBtnSelectedOnly.setOnClickListener {
+            lifecycleScope.launch {
+                flushSelectionOverrides()
+                selectedOnly = !selectedOnly
+                updateSelectedFilterUi()
+                reloadFromStart(requestFocus = true)
+            }
+        }
+        binding.actionBtnSave.setOnClickListener { saveSelection() }
 
         // Dikey bar buton odaklanma ve helper metinleri
         binding.selectAllButton.setOnFocusChangeListener { _, hasFocus ->
