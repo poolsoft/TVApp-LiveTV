@@ -63,6 +63,16 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         sourceId = intent.getLongExtra(EXTRA_SOURCE_ID, -1L)
         binding.title.text = intent.getStringExtra(EXTRA_SOURCE_NAME)
             ?: getString(R.string.select_iptv_channels)
+        if (savedInstanceState != null) {
+            @Suppress("UNCHECKED_CAST", "DEPRECATION")
+            val savedOverrides = savedInstanceState.getSerializable(KEY_SAVED_OVERRIDES) as? Map<String, Boolean>
+            if (savedOverrides != null) {
+                selectionOverrides.putAll(savedOverrides)
+            }
+            selectedCategory = savedInstanceState.getString(KEY_SAVED_CATEGORY)
+            searchQuery = savedInstanceState.getString(KEY_SAVED_QUERY).orEmpty()
+            selectedOnly = savedInstanceState.getBoolean(KEY_SAVED_SELECTED_ONLY, false)
+        }
         configureList()
         configureFilters()
         configureActions()
@@ -645,6 +655,14 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         else -> null
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putSerializable(KEY_SAVED_OVERRIDES, HashMap(selectionOverrides))
+        outState.putString(KEY_SAVED_CATEGORY, selectedCategory)
+        outState.putString(KEY_SAVED_QUERY, searchQuery)
+        outState.putBoolean(KEY_SAVED_SELECTED_ONLY, selectedOnly)
+    }
+
     override fun onDestroy() {
         previewJob?.cancel()
         pageJob?.cancel()
@@ -657,6 +675,10 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
     companion object {
         const val EXTRA_SOURCE_ID = "source_id"
         const val EXTRA_SOURCE_NAME = "source_name"
+        private const val KEY_SAVED_OVERRIDES = "saved_selection_overrides"
+        private const val KEY_SAVED_CATEGORY = "saved_selected_category"
+        private const val KEY_SAVED_QUERY = "saved_search_query"
+        private const val KEY_SAVED_SELECTED_ONLY = "saved_selected_only"
         private const val PAGE_SIZE = 200
         private const val SEARCH_DELAY_MS = 350L
         private const val PREVIEW_DELAY_MS = 900L

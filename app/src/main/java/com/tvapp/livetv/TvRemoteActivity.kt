@@ -1,9 +1,30 @@
 package com.tvapp.livetv
 
+import android.content.res.Configuration
+import android.os.Bundle
 import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
 
 open class TvRemoteActivity : AppCompatActivity() {
+    private var lastOrientation = Configuration.ORIENTATION_UNDEFINED
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        lastOrientation = resources.configuration.orientation
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (BuildConfig.MOBILE_UI_ENABLED && shouldRecreateOnOrientationChange()) {
+            if (newConfig.orientation != lastOrientation && newConfig.orientation != Configuration.ORIENTATION_UNDEFINED) {
+                lastOrientation = newConfig.orientation
+                recreate()
+            }
+        }
+    }
+
+    protected open fun shouldRecreateOnOrientationChange(): Boolean = true
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
         super.dispatchKeyEvent(event.asTvRemoteEvent())
 }
