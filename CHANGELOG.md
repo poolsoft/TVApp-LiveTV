@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Tek version.json ile Çoklu Varyant Güncelleme ve Mobil Sürüm Optimizasyonu
+* **Merkezi Çoklu Paket Sürüm Yönetimi (`version.json`):** Güncelleme mekanizması tek bir merkezi bildirim dosyası üzerinden hem TV (`com.tvapp.livetv`) hem Mobil (`com.tvapp.mobile`) hem de ileride eklenebilecek varyantları (Paid, Free vb.) yönetecek şekilde güncellendi. `AppUpdateManager` artık JSON içindeki `"packages"` sözlüğünden kendi paket kimliğine (`context.packageName`) ait sürüm ve APK indirme bilgilerini okur; eski TV sürümleriyle geriye dönük tam uyumluluk için kök dizin alanları da korunur.
+* **Mobil Optimize Release Derlemesi:** CI/CD iş akışında (`release.yml`) Mobil sürüm `assembleMobileDebug` yerine R8/ProGuard optimizasyonları ve küçültme aktif edilmiş `assembleMobileRelease` olarak imzalı derlenir (dosya boyutu ~23 MB'tan ~4.6 MB'a düşürüldü).
+* **CI/CD Sadeleştirmesi:** Ayrı `version-mobile.json` oluşturma ihtiyacı ve gereksiz `.github/workflows/mobile-test.yml` iş akışı kaldırılarak tüm derleme ve paketleme süreci tek bir standart GitHub Actions iş akışına bağlandı.
+
 ### Performans Optimizasyonları, Hızlı Kanal Geçişi ve Bellek İyileştirmeleri
 * **EPG ve Veritabanı Sorgu Hızlandırması (`nowAndNext`):** TIF (DVB/uydu) kanallarında mevcut ve sonraki yayın donanım tuner'ından başarıyla alındığında SQLite XMLTV veritabanı sorgusu tamamen atlanarak gecikme 0 ms'ye indirildi. XMLTV ve Xtream EPG için 78 saatlik tüm programları belleğe yüklemek yerine doğrudan anlık ve sıradaki programı çeken `LIMIT 2` Room sorguları (`nowAndNextPrograms`) entegre edildi.
 * **Eski EPG Kayıtlarının Otomatik Temizlenmesi (`purgeExpiredPrograms`):** Süresi 24 saatten eski olan geçmiş EPG programlarının veritabanında şişmesini önlemek için otomatik temizleme mekanizması eklendi; kanal yükleme ve EPG senkronizasyonu sırasında eski kayıtlar temizlenerek veritabanı sorgu süreleri hızlandırıldı.

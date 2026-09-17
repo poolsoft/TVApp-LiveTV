@@ -25,14 +25,7 @@ class AppUpdateManager(private val context: Context) {
     suspend fun check(): AppUpdate? = withContext(Dispatchers.IO) {
         check(BuildConfig.SELF_UPDATE_ENABLED) { "External updates are disabled for this build" }
         val json = readUrl(BuildConfig.UPDATE_MANIFEST_URL, MAX_MANIFEST_BYTES)
-        val root = JSONObject(json)
-        val update = AppUpdate(
-            versionCode = root.getInt("versionCode"),
-            versionName = root.getString("versionName"),
-            apkUrl = root.getString("apkUrl"),
-            sha256 = root.getString("sha256").lowercase(),
-            mandatory = root.optBoolean("mandatory", false),
-        )
+        val update = parseManifest(json, context.packageName)
         val installedApkHash = sha256(File(context.applicationInfo.sourceDir))
         update.takeIf {
             it.versionCode > BuildConfig.VERSION_CODE ||
@@ -111,10 +104,22 @@ class AppUpdateManager(private val context: Context) {
             disconnect()
         }
 
-    private companion object {
+    companion object {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 30_000
         const val MAX_MANIFEST_BYTES = 64 * 1024
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
+
+        fun parseManifest(json: String, packageName: String): AppUpdate {
+            val root = JSONObject(json)
+            val packageNode = root.optJSONObject("packages")?.optJSONObject(packageName) ?: root
+            return AppUpdate(
+                versionCode = packageNode.getInt("versionCode"),
+                versionName = packageNode.getString("versionName"),
+                apkUrl = packageNode.getString("apkUrl"),
+                sha256 = packageNode.getString("sha256").lowercase(),
+                mandatory = packageNode.optBoolean("mandatory", false),
+            )
+        }
     }
 }

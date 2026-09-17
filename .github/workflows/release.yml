@@ -63,7 +63,7 @@ jobs:
           TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileDebug \
+          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileRelease \
             -PtvappTargetAbis=arm64-v8a,armeabi-v7a
 
       - name: Prepare release assets
@@ -72,7 +72,7 @@ jobs:
         run: |
           cp app/build/outputs/apk/local/release/app-local-release.apk TVApp.apk
           cp app/build/outputs/apk/paid/debug/app-paid-debug.apk TVApp-Paid-Test.apk
-          cp app/build/outputs/apk/mobile/debug/app-mobile-debug.apk TVApp-Mobile.apk
+          cp app/build/outputs/apk/mobile/release/app-mobile-release.apk TVApp-Mobile.apk
           SHA256=$(sha256sum TVApp.apk | cut -d' ' -f1)
           MOBILE_SHA256=$(sha256sum TVApp-Mobile.apk | cut -d' ' -f1)
           PUBLISHED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -103,19 +103,6 @@ jobs:
             }
           }
           EOF
-          cat > version-mobile.json <<EOF
-          {
-            "package": "com.tvapp.mobile",
-            "versionCode": ${{ steps.version.outputs.build }},
-            "versionName": "${{ steps.version.outputs.version }}-mobile",
-            "build": ${{ steps.version.outputs.build }},
-            "revision": ${{ steps.version.outputs.revision }},
-            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/TVApp-Mobile.apk",
-            "sha256": "$MOBILE_SHA256",
-            "publishedAt": "$PUBLISHED_AT",
-            "mandatory": false
-          }
-          EOF
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
 
       - name: Publish development release
@@ -126,7 +113,7 @@ jobs:
           TAG="dev-r${{ steps.version.outputs.revision }}"
           TITLE="TVApp Development"
           NOTES="Revision ${{ steps.version.outputs.revision }} · versionCode ${{ steps.version.outputs.build }} · SHA-256: ${{ steps.assets.outputs.sha256 }} · TVApp.apk (com.tvapp.livetv), TVApp-Paid-Test.apk (Play Test), TVApp-Mobile.apk (com.tvapp.mobile)."
-          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk TVApp-Mobile.apk version.json version-mobile.json \
+          gh release create "$TAG" TVApp.apk TVApp-Paid-Test.apk TVApp-Mobile.apk version.json \
             --target "$(git rev-parse HEAD)" \
             --title "$TITLE" \
             --notes "$NOTES" \

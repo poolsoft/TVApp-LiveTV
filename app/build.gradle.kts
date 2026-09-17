@@ -72,7 +72,7 @@ android {
             applicationId = "com.tvapp.mobile"
             versionNameSuffix = "-mobile"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
-            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version-mobile.json\"")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
             buildConfigField("boolean", "DIAGNOSTICS_ENABLED", "true")
@@ -146,6 +146,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test:core-ktx:1.6.1")
     androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
