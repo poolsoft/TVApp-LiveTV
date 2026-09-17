@@ -28,10 +28,10 @@ class EpgSnapshotCacheTest {
         val now = 20_000L
         EpgSnapshotCache.putCurrent("iptv:1", null, now)
 
-        val cached = EpgSnapshotCache.current("iptv:1", now + 1_999L)
+        val cached = EpgSnapshotCache.current("iptv:1", now + EpgSnapshotCache.NEGATIVE_CACHE_MS - 1L)
         assertTrue(cached.found)
         assertNull(cached.program)
-        assertFalse(EpgSnapshotCache.current("iptv:1", now + 2_000L).found)
+        assertFalse(EpgSnapshotCache.current("iptv:1", now + EpgSnapshotCache.NEGATIVE_CACHE_MS).found)
     }
 
     @Test

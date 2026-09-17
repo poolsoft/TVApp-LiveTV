@@ -55,7 +55,7 @@ For workflow, signing, manifest, or release-specific changes also run:
 .\gradlew.bat assembleLocalRelease bundlePaidRelease
 ```
 
-Run `git diff --check` before committing. A successful compilation is not a substitute for
+Run `git diff --check` before committing. Always run unit tests (`.\gradlew.bat testLocalDebugUnitTest testPaidDebugUnitTest`) before pushing any code to `main`. Never push code without verifying tests pass locally. A successful compilation is not a substitute for
 remote-control focus testing on the Android 11 Google TV device; explicitly mention when a change
 still needs device verification.
 

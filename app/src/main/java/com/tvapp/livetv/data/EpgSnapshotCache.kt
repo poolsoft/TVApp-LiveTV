@@ -6,7 +6,7 @@ internal data class CurrentProgramLookup(
 )
 
 internal object EpgSnapshotCache {
-    private const val NEGATIVE_CACHE_MS = 60_000L
+    internal const val NEGATIVE_CACHE_MS = 60_000L
     private const val MINIMUM_CACHE_MS = 5_000L
     private const val POSITIVE_CACHE_MAX_MS = 5 * 60_000L
     private const val MAX_ENTRIES = 256
