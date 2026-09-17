@@ -42,6 +42,16 @@
             android:screenOrientation="unspecified"
             tools:replace="android:screenOrientation" />
 
+        <activity
+            android:name=".XmlTvSourcesActivity"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
+
+        <activity
+            android:name=".XmlTvEpgEditorActivity"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"

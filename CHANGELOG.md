@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Mobil XMLTV Ekranları Dikey (Portrait) Mod ve Dokunmatik Buton Uyarlaması
+* **Mobil Dikey Mod ve Serbest Yönlendirme:** `XmlTvSourcesActivity` ve `XmlTvEpgEditorActivity` mobil manifestinde (`android:screenOrientation="unspecified"`) tanımlanarak mobil cihazlarda ekranın zorla yatay dönmesi engellendi; telefonun dikey kullanımı sağlandı.
+* **XMLTV Kaynakları Dikey Tasarımı (`layout-port/activity_xmltv_sources.xml`):** Mobil ekranda butonlar 46dp dokunmatik boyutta ikili yatay ("URL'den Ekle", "Dosyadan Ekle") ve tam genişlikte ("Eşleme Editörü") olacak şekilde düzenlendi; kaynak listesi dikey ekrana esnetilerek tek elle rahat kullanım sağlandı.
+* **XMLTV EPG Eşleme Listesi Mobil Uyumu (`layout-port/item_xmltv_match.xml` & `layout-port/activity_xmltv_epg_editor.xml`):** Sabit 360dp genişlikteki durum sütunu mobil ekranda taşma yapmayacak şekilde esnek genişliğe kavuşturuldu; kanal adı, numara ve eşleşme bilgileri dikey ekranda tam görünür ve okunabilir hale getirildi.
+* **Mobil Kaynak Listesi Satır Boyutu (`layout-port/item_iptv_source.xml`):** Kayıtlı XMLTV ve IPTV kaynak öğelerinin yüksekliği mobil ekrana uygun şekilde optimize edildi.
+
 ### Mobil & TV Yönetim Ekranlarına Kapat / Geri (X) Butonu Entegrasyonu
 * **Ayarlar Ekranı Kapat Butonu:** `DisplaySettingsActivity` başlık satırına dokunmatik mobil ve kumanda için şık `settings_btn_close` (`ic_close`) butonu eklendi; kullanıcılar mobil cihazlarda geri jestine ihtiyaç duymadan doğrudan ayarlar ekranından çıkabilir.
 * **XMLTV ve EPG Editör Kapat Butonları:** `XmlTvSourcesActivity` ve `XmlTvEpgEditorActivity` başlık alanlarına standart `xmltv_btn_close` ve `epg_editor_btn_close` (X) butonları eklendi.
