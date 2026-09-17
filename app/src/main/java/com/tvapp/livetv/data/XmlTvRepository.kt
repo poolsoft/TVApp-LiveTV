@@ -202,10 +202,34 @@ class XmlTvRepository(context: Context) {
     }
 
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
-        val programs = programs(channel, now - 6 * 60 * 60_000L, now + 72 * 60 * 60_000L)
+        val epgId = channel.epgId?.normalize().orEmpty()
+        val name = channel.displayName.normalize()
+        val xmlTvEntities = dao.nowAndNextPrograms(epgId, name, channel.epgSourceId, now)
+        val xtreamEntities = if (xmlTvEntities.size < 2) {
+            xtreamEpgDao.nowAndNextPrograms(epgId, name, now)
+        } else {
+            emptyList()
+        }
+        val xmlTv = xmlTvEntities.map {
+            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
+        }
+        val xtream = xtreamEntities.map {
+            ProgramSummary(it.title, it.startTimeMillis, it.endTimeMillis, it.description)
+        }
+        val programs = mergeProgramSources(xmlTv, xtream)
         val current = programs.firstOrNull { now in it.startTimeMillis until it.endTimeMillis }
         val next = programs.firstOrNull { it.startTimeMillis >= (current?.endTimeMillis ?: now) }
         return NowNextPrograms(current, next)
+    }
+
+    fun purgeExpiredPrograms(cutoffMillis: Long = System.currentTimeMillis() - EXPIRED_EPG_CUTOFF_MS) {
+        runCatching {
+            val xmlTvDeleted = dao.deleteExpiredPrograms(cutoffMillis)
+            val xtreamDeleted = xtreamEpgDao.deleteExpiredPrograms(cutoffMillis)
+            if (xmlTvDeleted > 0 || xtreamDeleted > 0) {
+                EpgSnapshotCache.clear()
+            }
+        }
     }
 
     fun programs(channel: LiveChannel, start: Long, end: Long): List<ProgramSummary> {
@@ -382,6 +406,7 @@ class XmlTvRepository(context: Context) {
             distinctPrograms.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
         }
         EpgSnapshotCache.clear()
+        purgeExpiredPrograms()
         if (queriedChannels > 0 && successfulQueries == queriedChannels) {
             preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
         }
@@ -458,6 +483,7 @@ class XmlTvRepository(context: Context) {
                 .forEach { dao.insertPrograms(it) }
         }
         EpgSnapshotCache.clear()
+        purgeExpiredPrograms()
         updateSourceSummary()
         preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
         legacyCacheFile.delete()
@@ -566,6 +592,7 @@ class XmlTvRepository(context: Context) {
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
         private const val NORMALIZATION_VERSION = 2
+        const val EXPIRED_EPG_CUTOFF_MS = 24 * 60 * 60 * 1_000L
     }
 }
 

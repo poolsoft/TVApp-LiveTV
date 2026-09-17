@@ -95,6 +95,25 @@ interface XmlTvDao {
         end: Long,
     ): List<XmlTvProgramEntity>
 
+    @Query("DELETE FROM xmltv_programs WHERE endTimeMillis < :cutoffMillis")
+    fun deleteExpiredPrograms(cutoffMillis: Long): Int
+
+    @Query(
+        "SELECT * FROM xmltv_programs WHERE sourceId IN " +
+            "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+            "AND endTimeMillis > :now " +
+            "AND (:sourceId IS NULL OR sourceId = :sourceId) " +
+            "AND ((:epgId != '' AND normalizedChannelId = :epgId) " +
+            "OR normalizedChannelName = :channelName OR normalizedChannelId = :channelName) " +
+            "ORDER BY startTimeMillis ASC LIMIT 2",
+    )
+    fun nowAndNextPrograms(
+        epgId: String,
+        channelName: String,
+        sourceId: Long?,
+        now: Long,
+    ): List<XmlTvProgramEntity>
+
     @Query(
         "SELECT * FROM xmltv_programs WHERE sourceId IN " +
             "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +

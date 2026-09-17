@@ -285,6 +285,7 @@ class MainActivity : TvRemoteActivity() {
     private var iptvControlsJob: Job? = null
     private var iptvNoticeJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
+    private var homeRecentPublishJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private var catchUpReturnChannel: LiveChannel? = null
     private var iptvManualTimeshift = false
@@ -753,6 +754,7 @@ class MainActivity : TvRemoteActivity() {
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
+                programRepository.purgeExpiredPrograms()
                 repository.channels(includeTif = includeTif)
             }
             result.fold(
@@ -966,7 +968,9 @@ class MainActivity : TvRemoteActivity() {
         osdCoordinator.hideParentalLock()
         if (recordHistory) {
             playbackHistory.record(channel.sourceKey)
-            lifecycleScope.launch(Dispatchers.IO) {
+            homeRecentPublishJob?.cancel()
+            homeRecentPublishJob = lifecycleScope.launch(Dispatchers.IO) {
+                delay(2_500L)
                 runCatching {
                     homeRecentChannelsPublisher.publish(channels, playbackHistory.keys())
                 }.onFailure { error ->

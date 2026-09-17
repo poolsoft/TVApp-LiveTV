@@ -5,6 +5,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Performans Optimizasyonları, Hızlı Kanal Geçişi ve Bellek İyileştirmeleri
+* **EPG ve Veritabanı Sorgu Hızlandırması (`nowAndNext`):** TIF (DVB/uydu) kanallarında mevcut ve sonraki yayın donanım tuner'ından başarıyla alındığında SQLite XMLTV veritabanı sorgusu tamamen atlanarak gecikme 0 ms'ye indirildi. XMLTV ve Xtream EPG için 78 saatlik tüm programları belleğe yüklemek yerine doğrudan anlık ve sıradaki programı çeken `LIMIT 2` Room sorguları (`nowAndNextPrograms`) entegre edildi.
+* **Eski EPG Kayıtlarının Otomatik Temizlenmesi (`purgeExpiredPrograms`):** Süresi 24 saatten eski olan geçmiş EPG programlarının veritabanında şişmesini önlemek için otomatik temizleme mekanizması eklendi; kanal yükleme ve EPG senkronizasyonu sırasında eski kayıtlar temizlenerek veritabanı sorgu süreleri hızlandırıldı.
+* **Asenkron ve Bloklamayan Loglama Sistemi:** `CrashReportStore.recordDebug()` metodu ana UI thread'ini ve kanal geçişlerini dondurmayacak şekilde arka plan I/O kuyruğuna geçirildi. Log dosyası için 2 MB sınır ve otomatik rotasyon eklenerek flaş bellek I/O baskısı giderildi.
+* **Hızlı Kanal Değişiminde (`zap`) Debounce Koruması:** CH+/CH- ile hızlı kanal zaplamalarında Google TV sistem servisine (`HomeRecentChannelsPublisher`) giden yoğun IPC çağrıları debounce edilerek sistemin kilitlenmesi önlendi.
+* **FinalizerWatchdogDaemon Çökme Koruması:** Düşük donanımlı Android TV işlemcilerinde bellek baskısı ve GC gecikmelerinde oluşan `FinalizerWatchdogDaemon TimeoutException` istisnası için koruma sağlandı.
+* **EPG Negatif Önbellek Süresi:** EPG'si bulunmayan kanallarda işlemciyi ve diski sürekli meşgul etmemek için negatif önbellek süresi 2 saniyeden 60 saniyeye çıkarıldı.
 ### Mobil XMLTV Ekranları Dikey (Portrait) Mod ve Dokunmatik Buton Uyarlaması
 * **Mobil Dikey Mod ve Serbest Yönlendirme:** `XmlTvSourcesActivity` ve `XmlTvEpgEditorActivity` mobil manifestinde (`android:screenOrientation="unspecified"`) tanımlanarak mobil cihazlarda ekranın zorla yatay dönmesi engellendi; telefonun dikey kullanımı sağlandı.
 * **XMLTV Kaynakları Dikey Tasarımı (`layout-port/activity_xmltv_sources.xml`):** Mobil ekranda butonlar 46dp dokunmatik boyutta ikili yatay ("URL'den Ekle", "Dosyadan Ekle") ve tam genişlikte ("Eşleme Editörü") olacak şekilde düzenlendi; kaynak listesi dikey ekrana esnetilerek tek elle rahat kullanım sağlandı.

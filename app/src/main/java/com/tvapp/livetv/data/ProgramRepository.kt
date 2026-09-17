@@ -39,6 +39,10 @@ class ProgramRepository(context: Context) {
     private val xmlTvRepository = XmlTvRepository(context)
     private val debugLog = CrashReportStore(context)
 
+    fun purgeExpiredPrograms() {
+        xmlTvRepository.purgeExpiredPrograms()
+    }
+
     fun nowAndNext(channel: LiveChannel, now: Long = System.currentTimeMillis()): NowNextPrograms {
         EpgSnapshotCache.nowNext(channel.sourceKey, now)?.let { return it }
         val startedAt = SystemClock.elapsedRealtime()
@@ -46,13 +50,18 @@ class ProgramRepository(context: Context) {
         val tif = if (channel.source == LiveChannel.Source.TIF) nowAndNext(channel.id, now)
         else NowNextPrograms(null, null)
         val tifDuration = SystemClock.elapsedRealtime() - tifStartedAt
-        val xmlTvStartedAt = SystemClock.elapsedRealtime()
-        val fallback = xmlTvRepository.nowAndNext(channel, now)
-        val xmlTvDuration = SystemClock.elapsedRealtime() - xmlTvStartedAt
-        val resolved = NowNextPrograms(
-            current = tif.current ?: fallback.current,
-            next = tif.next ?: fallback.next,
-        )
+        var xmlTvDuration = 0L
+        val resolved = if (tif.current != null && tif.next != null) {
+            tif
+        } else {
+            val xmlTvStartedAt = SystemClock.elapsedRealtime()
+            val fallback = xmlTvRepository.nowAndNext(channel, now)
+            xmlTvDuration = SystemClock.elapsedRealtime() - xmlTvStartedAt
+            NowNextPrograms(
+                current = tif.current ?: fallback.current,
+                next = tif.next ?: fallback.next,
+            )
+        }
         EpgSnapshotCache.putNowNext(channel.sourceKey, resolved, now)
         debugLog.recordDebug(
             "PERF | operation=epg_now_next, durationMs=${SystemClock.elapsedRealtime() - startedAt}, " +

@@ -23,6 +23,12 @@ class TvAppApplication : Application() {
         IptvInputSyncScheduler.schedulePeriodic(this)
         IptvInputSyncScheduler.scheduleImmediate(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            if (thread.name == "FinalizerWatchdogDaemon" && error is java.util.concurrent.TimeoutException) {
+                runCatching {
+                    reportStore.recordDebug("FINALIZER_WATCHDOG_TIMEOUT_SUPPRESSED | ${error.message}")
+                }
+                return@setDefaultUncaughtExceptionHandler
+            }
             runCatching { reportStore.recordCrash(thread, error) }
             previousHandler?.uncaughtException(thread, error)
         }

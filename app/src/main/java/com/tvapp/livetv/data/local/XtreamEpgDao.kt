@@ -28,6 +28,22 @@ interface XtreamEpgDao {
         end: Long,
     ): List<XtreamEpgProgramEntity>
 
+    @Query("DELETE FROM xtream_epg_programs WHERE endTimeMillis < :cutoffMillis")
+    fun deleteExpiredPrograms(cutoffMillis: Long): Int
+
+    @Query(
+        "SELECT * FROM xtream_epg_programs " +
+            "WHERE endTimeMillis > :now " +
+            "AND ((:epgId != '' AND normalizedChannelId = :epgId) " +
+            "OR normalizedChannelName = :channelName OR normalizedChannelId = :channelName) " +
+            "ORDER BY startTimeMillis ASC LIMIT 2",
+    )
+    fun nowAndNextPrograms(
+        epgId: String,
+        channelName: String,
+        now: Long,
+    ): List<XtreamEpgProgramEntity>
+
     @Query(
         "SELECT * FROM xtream_epg_programs WHERE startTimeMillis <= :now AND endTimeMillis > :now " +
             "AND (normalizedChannelId IN (:channelKeys) OR normalizedChannelName IN (:channelKeys)) " +

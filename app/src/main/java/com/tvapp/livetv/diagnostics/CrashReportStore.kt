@@ -27,17 +27,28 @@ class CrashReportStore(context: Context) {
         recordDebug("EDITOR_EVENT | $event")
     }
 
-    @Synchronized
     fun recordDebug(event: String) {
         val line = "${timestamp()} | $event\n"
+        logExecutor.execute {
+            writeDebugLineInternal(line)
+        }
+    }
+
+    @Synchronized
+    private fun writeDebugLineInternal(line: String) {
         val existingUri = preferences.getString(KEY_DEBUG_LOG_URI, null)?.let(Uri::parse)
-        val appended = existingUri?.let { uri ->
-            runCatching {
-                checkNotNull(appContext.contentResolver.openOutputStream(uri, "wa"))
+        val currentBytes = preferences.getLong(KEY_DEBUG_LOG_BYTES, 0L)
+        val lineBytes = line.toByteArray(Charsets.UTF_8).size.toLong()
+        if (existingUri != null && currentBytes < MAX_DEBUG_LOG_BYTES) {
+            val appended = runCatching {
+                checkNotNull(appContext.contentResolver.openOutputStream(existingUri, "wa"))
                     .bufferedWriter().use { it.write(line) }
             }.isSuccess
-        } == true
-        if (appended) return
+            if (appended) {
+                preferences.edit().putLong(KEY_DEBUG_LOG_BYTES, currentBytes + lineBytes).apply()
+                return
+            }
+        }
 
         val fileName = "TVApp-debug-${SimpleDateFormat(
             "yyyyMMdd-HHmmss",
@@ -48,7 +59,8 @@ class CrashReportStore(context: Context) {
                 preferences.edit()
                     .putString(KEY_DEBUG_LOG_URI, uri.toString())
                     .putString(KEY_DEBUG_LOG_LOCATION, location)
-                    .commit()
+                    .putLong(KEY_DEBUG_LOG_BYTES, lineBytes)
+                    .apply()
             }
     }
 
@@ -205,12 +217,17 @@ class CrashReportStore(context: Context) {
     ).format(Date())
 
     private companion object {
+        val logExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "CrashReportLogWriter").apply { isDaemon = true }
+        }
+        const val MAX_DEBUG_LOG_BYTES = 2 * 1024 * 1024L
         const val PREFERENCES_NAME = "diagnostic-reports"
         const val KEY_LAST_EDITOR_EVENT = "last-editor-event"
         const val KEY_PENDING_REPORT = "pending-report"
         const val KEY_PENDING_LOG_LOCATION = "pending-log-location"
         const val KEY_DEBUG_LOG_URI = "debug-log-uri"
         const val KEY_DEBUG_LOG_LOCATION = "debug-log-location"
+        const val KEY_DEBUG_LOG_BYTES = "debug-log-bytes"
         const val KEY_TIF_DIAGNOSTICS_HASH = "tif-diagnostics-hash"
     }
 }
