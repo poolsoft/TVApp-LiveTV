@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Mobil IPTV Deneyimi: Son Kanalı Hatırlama, Otomatik Canlı Kanallar ve TV Ayarlarını Gizleme
+* **Açılışta Son İzlenen IPTV Kanalını Geri Yükleme:** Mobilde IPTV kütüphanesinden veya kanal listesinden izlenen kanalların geçmişe kaydedilmesi sağlandı. Uygulama açılışında (`MainActivity`) son izlenen kanal doğrudan veritabanından sorgulanıp anında oynatılarak TV'deki kesintisiz açılış deneyimi mobilde de IPTV ile sağlandı.
+* **Mobilde 'Kanal Seçimi' Menüsünün Kaldırılması ve Otomatik Seçim:** Mobilde `IptvSourcesActivity` üzerinden kaynak tıklandığında çıkan gereksiz "Kanal Seçimi" seçeneği gizlendi. İçe aktarılan kaynakların tüm canlı kanalları mobilde otomatik olarak seçili işaretlenerek kullanıcıyı binlerce kanalı tek tek seçme zahmetinden kurtaran akıcı bir mobil deneyim sunuldu.
+* **Mobilde TV Ayarlarının Gizlenmesi:** Ayarlar ekranında (`DisplaySettingsActivity`) cep telefonlarında işlevsiz olan TV Canlı Kanallar Girişi Senkronizasyonu (`iptv_input_sync`), Hibrit TV Çalışma Modu seçimi (`working_mode`), MultiView 4 akış testi (`multiview_force_four_streams`), Cihaz Açılışında Başlat (`launch_tvapp_on_boot`), Kumanda Odakla Kanal Geçişi (`channel_focus_auto_tune`) ve OSD Bilgi Barı Konumu tercihi mobilde gizlenerek sadeleştirildi.
+
 ### Tek version.json ile Çoklu Varyant Güncelleme ve Mobil Sürüm Optimizasyonu
 * **Merkezi Çoklu Paket Sürüm Yönetimi (`version.json`):** Güncelleme mekanizması tek bir merkezi bildirim dosyası üzerinden hem TV (`com.tvapp.livetv`) hem Mobil (`com.tvapp.mobile`) hem de ileride eklenebilecek varyantları (Paid, Free vb.) yönetecek şekilde güncellendi. `AppUpdateManager` artık JSON içindeki `"packages"` sözlüğünden kendi paket kimliğine (`context.packageName`) ait sürüm ve APK indirme bilgilerini okur; eski TV sürümleriyle geriye dönük tam uyumluluk için kök dizin alanları da korunur.
 * **Mobil Optimize Release Derlemesi:** CI/CD iş akışında (`release.yml`) Mobil sürüm `assembleMobileDebug` yerine R8/ProGuard optimizasyonları ve küçültme aktif edilmiş `assembleMobileRelease` olarak imzalı derlenir (dosya boyutu ~23 MB'tan ~4.6 MB'a düşürüldü).

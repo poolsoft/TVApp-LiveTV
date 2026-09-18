@@ -361,6 +361,16 @@ interface IptvDao {
     )
     suspend fun getEnabledChannels(): List<IptvChannelEntity>
 
+    @Query(
+        "SELECT c.* FROM iptv_channels c " +
+            "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
+            "WHERE s.enabled = 1 AND c.contentType = 'LIVE' ORDER BY s.name, c.originalIndex",
+    )
+    suspend fun getAllLiveChannels(): List<IptvChannelEntity>
+
+    @Query("UPDATE iptv_channels SET selected = 1 WHERE sourceId = :sourceId AND contentType = 'LIVE'")
+    suspend fun selectAllLiveChannels(sourceId: Long)
+
     @Query("DELETE FROM iptv_channels WHERE sourceId = :sourceId")
     suspend fun deleteChannelsForSource(sourceId: Long)
 

@@ -89,7 +89,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 _, _, position, _ ->
             selectedSourcePosition = position
             sources.getOrNull(position)?.let { summary ->
-                if (summary.source.kind == IptvRepository.KIND_URL) {
+                if (summary.source.kind == IptvRepository.KIND_URL || BuildConfig.MOBILE_UI_ENABLED) {
                     showSourceActions(summary)
                 } else {
                     openChannelSelection(summary.source.id, summary.source.name)
@@ -306,7 +306,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun showSourceActions(summary: IptvSourceSummary) {
         val actions = buildList {
-            add(SourceAction.SELECT to getString(R.string.select_iptv_channels))
+            if (!BuildConfig.MOBILE_UI_ENABLED) {
+                add(SourceAction.SELECT to getString(R.string.select_iptv_channels))
+            }
             if (summary.source.kind != IptvRepository.KIND_DOCUMENT) {
                 add(SourceAction.REFRESH to getString(R.string.refresh_iptv_source))
             }
@@ -321,16 +323,18 @@ class IptvSourcesActivity : TvRemoteActivity() {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(padding, padding / 2, padding, 0)
-            addView(TextView(this@IptvSourcesActivity).apply {
-                text = getString(
-                    R.string.iptv_source_selection_summary,
-                    summary.selectedChannelCount,
-                    summary.channelCount,
-                )
-                setTextColor(getColor(R.color.text_secondary))
-                textSize = 14f
-                setPadding(4, 0, 4, padding / 2)
-            })
+            if (!BuildConfig.MOBILE_UI_ENABLED) {
+                addView(TextView(this@IptvSourcesActivity).apply {
+                    text = getString(
+                        R.string.iptv_source_selection_summary,
+                        summary.selectedChannelCount,
+                        summary.channelCount,
+                    )
+                    setTextColor(getColor(R.color.text_secondary))
+                    textSize = 14f
+                    setPadding(4, 0, 4, padding / 2)
+                })
+            }
             actions.forEach { (_, label) ->
                 addView(TextView(this@IptvSourcesActivity).apply {
                     text = label

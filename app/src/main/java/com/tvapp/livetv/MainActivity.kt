@@ -788,15 +788,29 @@ class MainActivity : TvRemoteActivity() {
                     if (editorChannel != null) {
                         restoredInitialChannel = true
                         selectChannel(editorChannel)
-                    } else if (!restoredInitialChannel && loaded.isNotEmpty()) {
+                    } else if (!restoredInitialChannel) {
                         restoredInitialChannel = true
                         val startupChannels = panelChannels().ifEmpty { loaded }
-                        val startupChannel = playbackHistory.keys()
-                            .firstNotNullOfOrNull { key ->
-                                startupChannels.firstOrNull { it.sourceKey == key }
+                        val lastKey = playbackHistory.keys().firstOrNull()
+                        val matchedChannel = lastKey?.let { key ->
+                            startupChannels.firstOrNull { it.sourceKey == key }
+                        }
+                        if (matchedChannel != null) {
+                            selectChannel(matchedChannel)
+                        } else if (lastKey != null && (lastKey.startsWith("iptv:") || BuildConfig.MOBILE_UI_ENABLED)) {
+                            lifecycleScope.launch {
+                                val resolved = withContext(Dispatchers.IO) {
+                                    iptvRepository.channel(lastKey)
+                                }
+                                if (resolved != null) {
+                                    selectChannel(resolved)
+                                } else if (startupChannels.isNotEmpty()) {
+                                    selectChannel(startupChannels.first())
+                                }
                             }
-                            ?: startupChannels.first()
-                        selectChannel(startupChannel)
+                        } else if (startupChannels.isNotEmpty()) {
+                            selectChannel(startupChannels.first())
+                        }
                     }
                 },
                 onFailure = {
@@ -1134,7 +1148,7 @@ class MainActivity : TvRemoteActivity() {
         focusedTuneJob?.cancel()
         focusedAutoTunePreviousChannel = null
         focusedAutoTuneTargetKey = null
-        val recordHistory = channelPanelContent == ChannelPanelContent.NORMAL
+        val recordHistory = channelPanelContent == ChannelPanelContent.NORMAL || BuildConfig.MOBILE_UI_ENABLED
         if (channel.sourceKey != currentChannel?.sourceKey) selectChannel(channel, recordHistory)
         hideChannelPanel()
     }
@@ -3151,7 +3165,7 @@ class MainActivity : TvRemoteActivity() {
         }
         if (iptvLibraryContentType == IptvLibraryContentType.CONTINUE) {
             val channel = iptvLibraryChannels.getOrNull(index) ?: return
-            selectChannel(channel, recordHistory = false)
+            selectChannel(channel, recordHistory = BuildConfig.MOBILE_UI_ENABLED)
             hideChannelPanel()
             return
         }
@@ -3168,7 +3182,7 @@ class MainActivity : TvRemoteActivity() {
                 )
             }
             val channel = page.channels.firstOrNull() ?: return@launch
-            selectChannel(channel.copy(displayNumber = number.toString()), recordHistory = false)
+            selectChannel(channel.copy(displayNumber = number.toString()), recordHistory = BuildConfig.MOBILE_UI_ENABLED)
             hideChannelPanel()
         }
     }

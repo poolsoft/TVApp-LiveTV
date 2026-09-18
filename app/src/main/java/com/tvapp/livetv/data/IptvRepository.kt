@@ -1,6 +1,7 @@
 package com.tvapp.livetv.data
 
 import android.content.Context
+import com.tvapp.livetv.BuildConfig
 import android.net.Uri
 import android.os.SystemClock
 import androidx.room.withTransaction
@@ -283,8 +284,14 @@ class IptvRepository(context: Context) {
         if (sourceKeys.isNotEmpty()) xmlTvRepository.requestXtreamRefresh(force = true)
     }
 
-    suspend fun channels(): List<LiveChannel> = dao.getEnabledChannels().map { channel ->
-        channel.toLiveChannel()
+    suspend fun channels(): List<LiveChannel> {
+        val channels = dao.getEnabledChannels()
+        val effective = if (BuildConfig.MOBILE_UI_ENABLED && channels.isEmpty()) {
+            dao.getAllLiveChannels()
+        } else {
+            channels
+        }
+        return effective.map { it.toLiveChannel() }
     }
 
     private fun IptvChannelEntity.toLiveChannel() =
@@ -683,6 +690,9 @@ class IptvRepository(context: Context) {
                     selectionFinishedAt = SystemClock.elapsedRealtime()
                     dao.deleteSourceChannels(sourceId)
                     dao.insertStagedAsSource(sessionId, sourceId, now)
+                    if (BuildConfig.MOBILE_UI_ENABLED) {
+                        dao.selectAllLiveChannels(sourceId)
+                    }
                     replacementFinishedAt = SystemClock.elapsedRealtime()
                     onProgress(IptvImportProgress(IptvImportStage.FINISHING, channelCount))
                     IptvImportResult(sourceId, source.name, dao.channelCount(sourceId))

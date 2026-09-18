@@ -225,11 +225,13 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         }
 
         section(R.string.info_bar_content)
-        choice(
-            R.string.info_bar_position,
-            listOf(getString(R.string.top), getString(R.string.bottom)),
-            if (current.infoBarPosition == InfoBarPosition.TOP) 0 else 1,
-        ) { index -> update { copy(infoBarPosition = InfoBarPosition.entries[index]) } }
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            choice(
+                R.string.info_bar_position,
+                listOf(getString(R.string.top), getString(R.string.bottom)),
+                if (current.infoBarPosition == InfoBarPosition.TOP) 0 else 1,
+            ) { index -> update { copy(infoBarPosition = InfoBarPosition.entries[index]) } }
+        }
         toggle(R.string.show_current_program, current.showCurrentProgram) {
             update { copy(showCurrentProgram = it) }
         }
@@ -301,18 +303,20 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         toggle(R.string.show_channel_source_badge, current.showChannelSourceBadge) {
             update { copy(showChannelSourceBadge = it) }
         }
-        toggle(R.string.channel_focus_auto_tune, current.channelFocusAutoTune) {
-            update { copy(channelFocusAutoTune = it) }
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            toggle(R.string.channel_focus_auto_tune, current.channelFocusAutoTune) {
+                update { copy(channelFocusAutoTune = it) }
+            }
+            val focusDelays = listOf(500, 1_000, 1_500, 2_000, 3_000, 5_000)
+            val focusDelayIndex = focusDelays.indices.minByOrNull {
+                abs(focusDelays[it] - current.channelFocusTuneDelayMillis)
+            } ?: 2
+            choice(
+                R.string.channel_focus_tune_delay,
+                focusDelays.map(::millisecondsLabel),
+                focusDelayIndex,
+            ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
         }
-        val focusDelays = listOf(500, 1_000, 1_500, 2_000, 3_000, 5_000)
-        val focusDelayIndex = focusDelays.indices.minByOrNull {
-            abs(focusDelays[it] - current.channelFocusTuneDelayMillis)
-        } ?: 2
-        choice(
-            R.string.channel_focus_tune_delay,
-            focusDelays.map(::millisecondsLabel),
-            focusDelayIndex,
-        ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
     }
 
     private fun buildIptvEpgSettings() {
@@ -327,11 +331,13 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             xmlTvSettingRow = row
             manageXmlTvSources.launch(Intent(this, XmlTvSourcesActivity::class.java))
         }
-        action(
-            R.string.iptv_input_name,
-            getString(R.string.iptv_input_sync),
-            ::syncIptvInput,
-        )
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            action(
+                R.string.iptv_input_name,
+                getString(R.string.iptv_input_sync),
+                ::syncIptvInput,
+            )
+        }
 
         section(R.string.playback_settings)
         val iptvPlaybackPreferences = iptvPlaybackStore.load()
@@ -391,50 +397,52 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun buildSystemSettings() {
-        section(R.string.device_mode_settings)
-        val capabilities = DeviceCapabilitiesSession.get(this)
-        val modeOptions = ExperienceModeOverride.entries
-        choice(
-            R.string.working_mode,
-            listOf(
-                getString(R.string.working_mode_automatic),
-                getString(R.string.working_mode_hybrid),
-                getString(R.string.working_mode_iptv_only),
-            ),
-            modeOptions.indexOf(experienceModeStore.load()).coerceAtLeast(0),
-        ) { index ->
-            experienceModeStore.save(modeOptions[index])
-            markChanged()
-            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
-            content.post { firstContentFocusable?.requestFocus() }
-        }
-        val resolvedMode = resolveExperienceMode(
-            capabilities,
-            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
-            override = experienceModeStore.load(),
-        )
-        info(R.string.detected_working_mode, experienceModeLabel(resolvedMode))
-        val policy = resourcePolicyFor(
-            capabilities,
-            forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
-        )
-        info(
-            R.string.device_resources,
-            getString(
-                R.string.device_resource_summary,
-                capabilities.memoryClassMegabytes,
-                capabilities.hardwareVideoDecoderCount,
-                policy.maximumGridStreams,
-            ),
-        )
-        toggle(
-            R.string.multiview_force_four_streams,
-            multiViewPreferencesStore.forceFourStreams(),
-        ) { enabled ->
-            multiViewPreferencesStore.setForceFourStreams(enabled)
-            markChanged()
-            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
-            content.post { firstContentFocusable?.requestFocus() }
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            section(R.string.device_mode_settings)
+            val capabilities = DeviceCapabilitiesSession.get(this)
+            val modeOptions = ExperienceModeOverride.entries
+            choice(
+                R.string.working_mode,
+                listOf(
+                    getString(R.string.working_mode_automatic),
+                    getString(R.string.working_mode_hybrid),
+                    getString(R.string.working_mode_iptv_only),
+                ),
+                modeOptions.indexOf(experienceModeStore.load()).coerceAtLeast(0),
+            ) { index ->
+                experienceModeStore.save(modeOptions[index])
+                markChanged()
+                showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+                content.post { firstContentFocusable?.requestFocus() }
+            }
+            val resolvedMode = resolveExperienceMode(
+                capabilities,
+                mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+                override = experienceModeStore.load(),
+            )
+            info(R.string.detected_working_mode, experienceModeLabel(resolvedMode))
+            val policy = resourcePolicyFor(
+                capabilities,
+                forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
+            )
+            info(
+                R.string.device_resources,
+                getString(
+                    R.string.device_resource_summary,
+                    capabilities.memoryClassMegabytes,
+                    capabilities.hardwareVideoDecoderCount,
+                    policy.maximumGridStreams,
+                ),
+            )
+            toggle(
+                R.string.multiview_force_four_streams,
+                multiViewPreferencesStore.forceFourStreams(),
+            ) { enabled ->
+                multiViewPreferencesStore.setForceFourStreams(enabled)
+                markChanged()
+                showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+                content.post { firstContentFocusable?.requestFocus() }
+            }
         }
 
         section(R.string.playback_settings)
@@ -448,9 +456,11 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             markChanged()
         }
 
-        section(R.string.startup_settings)
-        toggle(R.string.launch_tvapp_on_boot, current.launchOnBoot) {
-            update { copy(launchOnBoot = it) }
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            section(R.string.startup_settings)
+            toggle(R.string.launch_tvapp_on_boot, current.launchOnBoot) {
+                update { copy(launchOnBoot = it) }
+            }
         }
 
         section(R.string.application_settings)
