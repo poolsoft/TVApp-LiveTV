@@ -36,10 +36,13 @@ class CrashReportStore(context: Context) {
 
     @Synchronized
     private fun writeDebugLineInternal(line: String) {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(Date())
+        val lastDate = preferences.getString(KEY_DEBUG_LOG_DATE, null)
         val existingUri = preferences.getString(KEY_DEBUG_LOG_URI, null)?.let(Uri::parse)
         val currentBytes = preferences.getLong(KEY_DEBUG_LOG_BYTES, 0L)
         val lineBytes = line.toByteArray(Charsets.UTF_8).size.toLong()
-        if (existingUri != null && currentBytes < MAX_DEBUG_LOG_BYTES) {
+
+        if (lastDate == today && existingUri != null && currentBytes < MAX_DEBUG_LOG_BYTES) {
             val appended = runCatching {
                 checkNotNull(appContext.contentResolver.openOutputStream(existingUri, "wa"))
                     .bufferedWriter().use { it.write(line) }
@@ -50,18 +53,25 @@ class CrashReportStore(context: Context) {
             }
         }
 
-        val fileName = "TVApp-debug-${SimpleDateFormat(
-            "yyyyMMdd-HHmmss",
-            Locale.ROOT,
-        ).format(Date())}.log"
+        val part = if (lastDate == today) preferences.getInt(KEY_DEBUG_LOG_PART, 0) + 1 else 0
+        val fileName = if (part == 0) {
+            "TVApp-debug-$today.log"
+        } else {
+            "TVApp-debug-$today-$part.log"
+        }
+
         runCatching { createDebugLog(fileName, line) }
             .onSuccess { (uri, location) ->
                 preferences.edit()
+                    .putString(KEY_DEBUG_LOG_DATE, today)
+                    .putInt(KEY_DEBUG_LOG_PART, part)
                     .putString(KEY_DEBUG_LOG_URI, uri.toString())
                     .putString(KEY_DEBUG_LOG_LOCATION, location)
                     .putLong(KEY_DEBUG_LOG_BYTES, lineBytes)
                     .apply()
             }
+
+        checkAndPurgeExpiredLogs()
     }
 
     fun recordRecreation(detail: String) {
@@ -134,6 +144,7 @@ class CrashReportStore(context: Context) {
             .putString(KEY_PENDING_REPORT, report)
             .putString(KEY_PENDING_LOG_LOCATION, location)
             .commit()
+        checkAndPurgeExpiredLogs()
     }
 
     private fun writeToDownloads(report: String, category: String): String {
@@ -216,11 +227,110 @@ class CrashReportStore(context: Context) {
         Locale.ROOT,
     ).format(Date())
 
+    fun cleanExpiredLogs() {
+        checkAndPurgeExpiredLogs(force = true)
+    }
+
+    private fun checkAndPurgeExpiredLogs(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val lastPurge = preferences.getLong(KEY_LAST_PURGE_TIME, 0L)
+        if (!force && now - lastPurge < PURGE_CHECK_INTERVAL_MS) return
+        preferences.edit().putLong(KEY_LAST_PURGE_TIME, now).apply()
+
+        val cutoffMillis = now - RETENTION_PERIOD_MS
+        logExecutor.execute {
+            purgeExternalFiles(cutoffMillis)
+            purgeMediaStoreDownloads(cutoffMillis)
+        }
+    }
+
+    private fun purgeExternalFiles(cutoffMillis: Long) {
+        val directory = appContext.getExternalFilesDir("logs") ?: return
+        val files = directory.listFiles() ?: return
+        for (file in files) {
+            val name = file.name
+            if (name.startsWith("TVApp-") && isExpired(file.lastModified(), name, cutoffMillis)) {
+                runCatching { file.delete() }
+            }
+        }
+    }
+
+    private fun purgeMediaStoreDownloads(cutoffMillis: Long) {
+        val resolver = appContext.contentResolver
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.DATE_MODIFIED,
+        )
+        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("%Download/TVApp%", "TVApp-%")
+        runCatching {
+            resolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null,
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                val dateModifiedColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+
+                val toDelete = mutableListOf<Uri>()
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val name = cursor.getString(nameColumn)
+                    val dateModified = cursor.getLong(dateModifiedColumn) * 1000L
+
+                    if (name.startsWith("TVApp-") && isExpired(dateModified, name, cutoffMillis)) {
+                        toDelete.add(
+                            android.content.ContentUris.withAppendedId(
+                                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                                id,
+                            ),
+                        )
+                    }
+                }
+                toDelete.forEach { uri ->
+                    runCatching { resolver.delete(uri, null, null) }
+                }
+            }
+        }
+        runCatching {
+            val downloadDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "TVApp",
+            )
+            if (downloadDir.exists() && downloadDir.isDirectory) {
+                downloadDir.listFiles()?.forEach { file ->
+                    val name = file.name
+                    if (name.startsWith("TVApp-") && isExpired(file.lastModified(), name, cutoffMillis)) {
+                        runCatching { file.delete() }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isExpired(lastModifiedMillis: Long, fileName: String, cutoffMillis: Long): Boolean {
+        if (lastModifiedMillis in 1..cutoffMillis) return true
+        val dateMatch = Regex("""\b(20\d{6})\b""").find(fileName)?.value
+        if (dateMatch != null) {
+            val parsed = runCatching {
+                SimpleDateFormat("yyyyMMdd", Locale.ROOT).parse(dateMatch)?.time
+            }.getOrNull()
+            if (parsed != null && parsed < cutoffMillis) return true
+        }
+        return false
+    }
+
     private companion object {
         val logExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "CrashReportLogWriter").apply { isDaemon = true }
         }
         const val MAX_DEBUG_LOG_BYTES = 2 * 1024 * 1024L
+        const val RETENTION_PERIOD_MS = 7L * 24 * 60 * 60 * 1_000L
+        const val PURGE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         const val PREFERENCES_NAME = "diagnostic-reports"
         const val KEY_LAST_EDITOR_EVENT = "last-editor-event"
         const val KEY_PENDING_REPORT = "pending-report"
@@ -228,6 +338,9 @@ class CrashReportStore(context: Context) {
         const val KEY_DEBUG_LOG_URI = "debug-log-uri"
         const val KEY_DEBUG_LOG_LOCATION = "debug-log-location"
         const val KEY_DEBUG_LOG_BYTES = "debug-log-bytes"
+        const val KEY_DEBUG_LOG_DATE = "debug-log-date"
+        const val KEY_DEBUG_LOG_PART = "debug-log-part"
+        const val KEY_LAST_PURGE_TIME = "last-log-purge-time"
         const val KEY_TIF_DIAGNOSTICS_HASH = "tif-diagnostics-hash"
     }
 }

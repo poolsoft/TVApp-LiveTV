@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### TV Açılış Hızlandırması, Mobil Filtre Butonu Düzenlemesi ve 7 Günlük Log Rotasyonu
+* **TV Açılışında 20-30 Sn Boş Ekran Kilitlenmesinin Giderilmesi:** `MainActivity` açılışında kanal listesinin ekrana gelmesini 20-34 saniye boyunca kitleyen senkron `purgeExpiredPrograms` çağrısı kritik yoldan kaldırıldı. Kanallar artık milisaniyeler içinde anında yüklenir; EPG temizliği ise kanallar ekrana geldikten sonra düşük öncelikli arka plan iş parçacığına aktarıldı. Açılıştaki EPG otomatik kontrol gecikmesi 5 saniyeden 25 saniyeye çıkarılarak ilk açılışta donanım ve oynatıcı kaynaklarının rahatlaması sağlandı.
+* **Mobilde Kanal Seçim Filtre Butonunun Kaldırılması:** Mobil ana ekranda (`activity_mobile_main.xml`) arama çubuğunun sağında yer alan ve mobilde tüm canlı kanallar otomatik seçildiği için işlevsiz kalan filtre butonu (`mobile_btn_channel_select`) gizlenerek arayüz sadeleştirildi.
+* **Tarih Bazlı Günlük Loglama ve 7 Günlük Otomatik Temizlik:** `CrashReportStore` sistemi gün bazlı isimlendirmeye (`TVApp-debug-yyyyMMdd.log`) geçirildi; gün değiştiğinde otomatik yeni log dosyası açılır. Debug ve exception/çökme logları için 7 günlük saklama süresi tanımlandı; hem harici depolama hem de MediaStore Downloads dizinlerindeki 7 günden eski tüm log dosyaları otomatik taranıp silinerek dosya şişmesi ve disk dolması tamamen engellendi.
+
 ### Akıllı ve Donmayan XMLTV EPG Mimarisi: Otomatik Arka Plan Güncellemesi ve Streaming Parse
 * **Açılışta Sessiz Otomatik EPG Güncellemesi:** TVApp açılışında kayıtlı XMLTV kaynaklarının son güncellenme zamanı (`shouldAutoRefresh`) kontrol edilir; veriler 12 saatten eskiyse kullanıcıyı hiç bekletmeden ve arayüzü kilitlemeden arka planda (`Dispatchers.IO`) sessizce indirme ve yenileme başlatılır. Güncelleme bittiğinde aktif kanalın infobarı otomatik yeni verilerle beslenir.
 * **Akıllı Kanal Filtreleme:** XMLTV dosyasında bulunan binlerce yabancı kanalın programları doğrudan ayıklanır; yalnızca kullanıcının TV ve IPTV listesinde kayıtlı kanallarına ait programlar işlenir (`activeChannelKeys`). Listede olmayan yabancı kanallar XML parse seviyesinde anında atlanır (`skipTag`).

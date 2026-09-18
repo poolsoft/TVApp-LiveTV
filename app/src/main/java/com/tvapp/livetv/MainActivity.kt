@@ -756,7 +756,6 @@ class MainActivity : TvRemoteActivity() {
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                programRepository.purgeExpiredPrograms()
                 repository.channels(includeTif = includeTif)
             }
             result.fold(
@@ -775,6 +774,9 @@ class MainActivity : TvRemoteActivity() {
                     applyChannelFilter(requestFocus = false)
                     startEpgRefresh()
                     checkAndScheduleEpgAutoRefresh()
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        programRepository.purgeExpiredPrograms()
+                    }
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null
@@ -1461,7 +1463,7 @@ class MainActivity : TvRemoteActivity() {
     private fun checkAndScheduleEpgAutoRefresh() {
         if (epgAutoRefreshJob?.isActive == true) return
         epgAutoRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
-            delay(5_000L)
+            delay(25_000L)
             val xmlTvRepo = XmlTvRepository(this@MainActivity)
             if (xmlTvRepo.shouldAutoRefresh()) {
                 debugLog.recordDebug("EPG_AUTO_REFRESH_START | source=xmltv")

@@ -433,7 +433,8 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@null"
                 android:padding="8dp"
-                android:src="@drawable/ic_filter_list" />
+                android:src="@drawable/ic_filter_list"
+                android:visibility="gone" />
 
             <ImageView
                 android:id="@+id/mobile_btn_settings"
