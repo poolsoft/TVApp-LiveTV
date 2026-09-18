@@ -19,6 +19,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 class XmlTvRepository(context: Context) {
     private val appContext = context.applicationContext
@@ -55,8 +57,35 @@ class XmlTvRepository(context: Context) {
     fun sourceLabel(): String? = preferences.getString(KEY_SOURCE_SUMMARY, null)
         ?: preferences.getString(KEY_SOURCE, null)
 
-    fun importUrl(url: String, nameOverride: String? = null): Int =
-        importUrlInternal(url, nameOverride, null)
+    fun shouldAutoRefresh(): Boolean {
+        val urls = sources().filter { it.kind == KIND_URL && it.enabled }
+        if (urls.isEmpty()) return false
+        val lastUpdated = preferences.getLong(KEY_UPDATED, 0L)
+        val now = System.currentTimeMillis()
+        return (now - lastUpdated) >= AUTO_REFRESH_THRESHOLD_MS
+    }
+
+    fun activeChannelKeys(): Set<String> = runCatching {
+        runBlocking(Dispatchers.IO) {
+            val userChannels = database.channelDao().getAllChannels()
+            val iptvChannels = database.iptvDao().getEnabledChannels()
+            buildSet {
+                userChannels.forEach { channel ->
+                    channel.lastKnownName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    channel.customName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    channel.epgIdOverride?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                }
+                iptvChannels.forEach { channel ->
+                    channel.displayName.normalize().takeIf(String::isNotBlank)?.let(::add)
+                    channel.tvgName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    channel.tvgId?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                }
+            }
+        }
+    }.getOrDefault(emptySet())
+
+    fun importUrl(url: String, nameOverride: String? = null, targetKeys: Set<String>? = null): Int =
+        importUrlInternal(url, nameOverride, null, targetKeys)
 
     fun updateUrl(source: XmlTvSourceEntity, url: String): Int {
         require(source.kind == KIND_URL) { "Yalniz URL kaynaklari duzenlenebilir." }
@@ -74,6 +103,7 @@ class XmlTvRepository(context: Context) {
         url: String,
         nameOverride: String?,
         replacementSource: XmlTvSourceEntity?,
+        targetKeys: Set<String>? = null,
     ): Int {
         val normalizedUrl = url.trim()
         require(normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://"))
@@ -93,7 +123,7 @@ class XmlTvRepository(context: Context) {
             }
             val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: sourceName(normalizedUrl)
             connection.inputStream.use {
-                importStream(it, normalizedUrl, name, KIND_URL, replacementSource)
+                importStream(it, normalizedUrl, name, KIND_URL, replacementSource, targetKeys ?: activeChannelKeys())
             }.also {
                 ensurePeriodicRefresh()
             }
@@ -102,27 +132,28 @@ class XmlTvRepository(context: Context) {
         }
     }
 
-    fun refreshSavedUrls(): Int {
-        val urls = sources().filter { it.kind == KIND_URL }
+    fun refreshSavedUrls(targetKeys: Set<String>? = null): Int {
+        val urls = sources().filter { it.kind == KIND_URL && it.enabled }
+        val effectiveKeys = targetKeys ?: activeChannelKeys()
         if (urls.isEmpty()) {
             val legacy = preferences.getString(KEY_SOURCE, null)?.takeIf {
                 it.startsWith("http://") || it.startsWith("https://")
             }
-            return legacy?.let(::importUrl) ?: 0
+            return legacy?.let { importUrl(it, targetKeys = effectiveKeys) } ?: 0
         }
         var count = 0
         var firstError: Throwable? = null
         urls.forEach { source ->
-            runCatching { refreshSource(source) }
+            runCatching { refreshSource(source, effectiveKeys) }
                 .onSuccess { count += it }
                 .onFailure { if (firstError == null) firstError = it }
         }
-        if (count == 0) firstError?.let { throw it }
+        if (count == 0 && firstError != null) throw firstError!!
         return count
     }
 
-    fun importDocument(uri: Uri): Int = appContext.contentResolver.openInputStream(uri)?.use {
-        importStream(it, uri.toString(), documentName(uri), KIND_FILE)
+    fun importDocument(uri: Uri, targetKeys: Set<String>? = null): Int = appContext.contentResolver.openInputStream(uri)?.use {
+        importStream(it, uri.toString(), documentName(uri), KIND_FILE, targetChannelKeys = targetKeys ?: activeChannelKeys())
     } ?: error("XMLTV dosyası açılamadı")
 
     fun deleteSource(sourceId: Long) {
@@ -135,9 +166,9 @@ class XmlTvRepository(context: Context) {
         if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
     }
 
-    fun refreshSource(source: XmlTvSourceEntity): Int = runCatching {
+    fun refreshSource(source: XmlTvSourceEntity, targetKeys: Set<String>? = null): Int = runCatching {
         when (source.kind) {
-            KIND_URL -> importUrlInternal(source.location, source.name, source)
+            KIND_URL -> importUrlInternal(source.location, source.name, source, targetKeys ?: activeChannelKeys())
             else -> error("Dosya kaynağı yeniden seçilmelidir")
         }
     }.onFailure { error ->
@@ -413,33 +444,76 @@ class XmlTvRepository(context: Context) {
         return distinctPrograms.size
     }
 
+    private fun skipTag(parser: org.xmlpull.v1.XmlPullParser) {
+        var depth = 1
+        while (depth != 0) {
+            when (parser.next()) {
+                org.xmlpull.v1.XmlPullParser.END_TAG -> depth--
+                org.xmlpull.v1.XmlPullParser.START_TAG -> depth++
+            }
+        }
+    }
+
     private fun importStream(
         stream: InputStream,
         location: String,
         name: String,
         kind: String,
         replacementSource: XmlTvSourceEntity? = null,
+        targetChannelKeys: Set<String>? = null,
     ): Int {
         val parser = Xml.newPullParser().apply { setInput(stream.openXmlTvContent(), null) }
         val channelNames = mutableMapOf<String, String>()
-        val programs = mutableListOf<XmlTvProgramEntity>()
+        val matchedChannelIds = mutableSetOf<String>()
+        val filterEnabled = !targetChannelKeys.isNullOrEmpty()
+
+        val now = System.currentTimeMillis()
+        val existing = replacementSource ?: dao.sourceByLocation(location)
+        val sourceId = existing?.id ?: dao.insertSource(
+            XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
+        )
+
+        val batch = ArrayList<XmlTvProgramEntity>(INSERT_BATCH_SIZE)
+        var totalImported = 0
+
         var event = parser.eventType
         while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
             if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
                 when (parser.name) {
                     "channel" -> {
                         val id = parser.getAttributeValue(null, "id").orEmpty()
-                        var name = id
+                        var displayName = id
                         while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "channel")) {
                             parser.next()
                             if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "display-name") {
-                                name = parser.nextText().ifBlank { id }
+                                displayName = parser.nextText().ifBlank { id }
                             }
                         }
-                        channelNames[id] = name
+                        channelNames[id] = displayName
+                        if (filterEnabled) {
+                            val idNormalized = id.normalize()
+                            val nameNormalized = displayName.normalize()
+                            if (idNormalized in targetChannelKeys!! || nameNormalized in targetChannelKeys) {
+                                matchedChannelIds += id
+                            }
+                        }
                     }
                     "programme" -> {
                         val channelId = parser.getAttributeValue(null, "channel").orEmpty()
+                        val channelName = channelNames[channelId] ?: channelId
+
+                        if (filterEnabled && matchedChannelIds.isNotEmpty() && channelId !in matchedChannelIds) {
+                            val idNormalized = channelId.normalize()
+                            val nameNormalized = channelName.normalize()
+                            if (idNormalized !in targetChannelKeys!! && nameNormalized !in targetChannelKeys) {
+                                skipTag(parser)
+                                event = parser.eventType
+                                continue
+                            } else {
+                                matchedChannelIds += channelId
+                            }
+                        }
+
                         val start = parseTime(parser.getAttributeValue(null, "start"))
                         val stop = parseTime(parser.getAttributeValue(null, "stop"))
                         var title = ""
@@ -454,8 +528,7 @@ class XmlTvRepository(context: Context) {
                             }
                         }
                         if (channelId.isNotBlank() && start > 0 && stop > start) {
-                            val channelName = channelNames[channelId] ?: channelId
-                            programs += XmlTvProgramEntity(
+                            batch += XmlTvProgramEntity(
                                 channelId = channelId,
                                 channelName = channelName,
                                 normalizedChannelId = channelId.normalize(),
@@ -464,30 +537,56 @@ class XmlTvRepository(context: Context) {
                                 description = description,
                                 startTimeMillis = start,
                                 endTimeMillis = stop,
+                                sourceId = sourceId,
                             )
+                            totalImported++
+                            if (batch.size >= INSERT_BATCH_SIZE) {
+                                if (totalImported == batch.size) {
+                                    database.runInTransaction {
+                                        dao.updateSource(sourceId, name, location, kind, now)
+                                        dao.clearPrograms(sourceId)
+                                        dao.insertPrograms(batch)
+                                    }
+                                } else {
+                                    database.runInTransaction {
+                                        dao.insertPrograms(batch)
+                                    }
+                                }
+                                batch.clear()
+                            }
                         }
                     }
                 }
             }
             event = parser.next()
         }
-        val now = System.currentTimeMillis()
-        val existing = replacementSource ?: dao.sourceByLocation(location)
-        val sourceId = existing?.id ?: dao.insertSource(
-            XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
-        )
-        database.runInTransaction {
-            dao.updateSource(sourceId, name, location, kind, now)
-            dao.clearPrograms(sourceId)
-            programs.asSequence().map { it.copy(sourceId = sourceId) }.chunked(INSERT_BATCH_SIZE)
-                .forEach { dao.insertPrograms(it) }
+
+        if (batch.isNotEmpty()) {
+            if (totalImported == batch.size) {
+                database.runInTransaction {
+                    dao.updateSource(sourceId, name, location, kind, now)
+                    dao.clearPrograms(sourceId)
+                    dao.insertPrograms(batch)
+                }
+            } else {
+                database.runInTransaction {
+                    dao.insertPrograms(batch)
+                }
+            }
+            batch.clear()
+        } else if (totalImported == 0) {
+            database.runInTransaction {
+                dao.updateSource(sourceId, name, location, kind, now)
+                dao.clearPrograms(sourceId)
+            }
         }
+
         EpgSnapshotCache.clear()
         purgeExpiredPrograms()
         updateSourceSummary()
         preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
         legacyCacheFile.delete()
-        return programs.size
+        return totalImported
     }
 
     private fun migrateLegacyCacheIfNeeded() {
@@ -590,6 +689,7 @@ class XmlTvRepository(context: Context) {
         const val XTREAM_MIN_INTERVAL_MS = 6 * 60 * 60 * 1_000L
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
+        const val AUTO_REFRESH_THRESHOLD_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
         private const val NORMALIZATION_VERSION = 2
         const val EXPIRED_EPG_CUTOFF_MS = 24 * 60 * 60 * 1_000L

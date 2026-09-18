@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.ActivityNotFoundException
 import android.content.DialogInterface
 import android.content.Intent
+import com.tvapp.livetv.data.XmlTvRepository
 import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
 import android.media.tv.TvTrackInfo
@@ -281,6 +282,7 @@ class MainActivity : TvRemoteActivity() {
     private var visibleProgramsJob: Job? = null
     private var visibleProgramsRequestId = 0L
     private var epgRefreshJob: Job? = null
+    private var epgAutoRefreshJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var iptvControlsJob: Job? = null
     private var iptvNoticeJob: Job? = null
@@ -772,6 +774,7 @@ class MainActivity : TvRemoteActivity() {
                         ?: playingChannel.takeIf { preserveCurrentPlayback }
                     applyChannelFilter(requestFocus = false)
                     startEpgRefresh()
+                    checkAndScheduleEpgAutoRefresh()
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null
@@ -1451,6 +1454,29 @@ class MainActivity : TvRemoteActivity() {
             while (true) {
                 delay(EPG_REFRESH_INTERVAL_MS)
                 refreshCurrentPrograms()
+            }
+        }
+    }
+
+    private fun checkAndScheduleEpgAutoRefresh() {
+        if (epgAutoRefreshJob?.isActive == true) return
+        epgAutoRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
+            delay(5_000L)
+            val xmlTvRepo = XmlTvRepository(this@MainActivity)
+            if (xmlTvRepo.shouldAutoRefresh()) {
+                debugLog.recordDebug("EPG_AUTO_REFRESH_START | source=xmltv")
+                val activeKeys = xmlTvRepo.activeChannelKeys()
+                runCatching {
+                    val count = xmlTvRepo.refreshSavedUrls(activeKeys)
+                    debugLog.recordDebug("EPG_AUTO_REFRESH_SUCCESS | count=$count")
+                    withContext(Dispatchers.Main) {
+                        currentChannel?.let(::loadPrograms)
+                    }
+                }.onFailure { error ->
+                    debugLog.recordDebug(
+                        "EPG_AUTO_REFRESH_FAILURE | ${error.javaClass.simpleName}: ${error.message}",
+                    )
+                }
             }
         }
     }

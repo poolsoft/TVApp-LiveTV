@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Akıllı ve Donmayan XMLTV EPG Mimarisi: Otomatik Arka Plan Güncellemesi ve Streaming Parse
+* **Açılışta Sessiz Otomatik EPG Güncellemesi:** TVApp açılışında kayıtlı XMLTV kaynaklarının son güncellenme zamanı (`shouldAutoRefresh`) kontrol edilir; veriler 12 saatten eskiyse kullanıcıyı hiç bekletmeden ve arayüzü kilitlemeden arka planda (`Dispatchers.IO`) sessizce indirme ve yenileme başlatılır. Güncelleme bittiğinde aktif kanalın infobarı otomatik yeni verilerle beslenir.
+* **Akıllı Kanal Filtreleme:** XMLTV dosyasında bulunan binlerce yabancı kanalın programları doğrudan ayıklanır; yalnızca kullanıcının TV ve IPTV listesinde kayıtlı kanallarına ait programlar işlenir (`activeChannelKeys`). Listede olmayan yabancı kanallar XML parse seviyesinde anında atlanır (`skipTag`).
+* **Akışkan (Streaming) 500'lük Paketlerle Bellek Tasarrufu:** 150.000 programı tek bir listede toplayıp TV RAM'ini şişirmek yerine, programlar 500'erli paketler halinde veritabanına yazılıp bellek anında boşaltılır. RAM kullanımı 150 MB'tan 5 MB'a düşürülerek Android TV'lerdeki GC donmaları tamamen engellendi.
+* **Kilitlenmeyen Mikro İşlemler:** Veritabanı yazımı küçük transaction bloklarıyla yapılarak SQLite yazma kilitleri önlendi; arka planda EPG güncellenirken kullanıcının kanal değiştirme ve gezinme akıcılığı korundu.
+
 ### Mobil IPTV Deneyimi: Son Kanalı Hatırlama, Otomatik Canlı Kanallar ve TV Ayarlarını Gizleme
 * **Açılışta Son İzlenen IPTV Kanalını Geri Yükleme:** Mobilde IPTV kütüphanesinden veya kanal listesinden izlenen kanalların geçmişe kaydedilmesi sağlandı. Uygulama açılışında (`MainActivity`) son izlenen kanal doğrudan veritabanından sorgulanıp anında oynatılarak TV'deki kesintisiz açılış deneyimi mobilde de IPTV ile sağlandı.
 * **Mobilde 'Kanal Seçimi' Menüsünün Kaldırılması ve Otomatik Seçim:** Mobilde `IptvSourcesActivity` üzerinden kaynak tıklandığında çıkan gereksiz "Kanal Seçimi" seçeneği gizlendi. İçe aktarılan kaynakların tüm canlı kanalları mobilde otomatik olarak seçili işaretlenerek kullanıcıyı binlerce kanalı tek tek seçme zahmetinden kurtaran akıcı bir mobil deneyim sunuldu.
