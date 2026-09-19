@@ -124,6 +124,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
         binding.channelList.adapter = adapter
         setupEditorSidebar()
         setupMobileColorActions()
+        updateModeLabels()
         loadChannels(
             syncMessage = false,
             preferredKey = restoredFocusedKey
@@ -256,13 +257,18 @@ class ChannelEditorActivity : TvRemoteActivity() {
 
     private fun onChannelFocused(channel: LiveChannel) {
         focusedChannel = channel
-        binding.previewNumber.text = channel.displayNumber
+        val index = channels.indexOfFirst { it.sourceKey == channel.sourceKey }
+        val displayNumber = if (index >= 0) (index + 1).toString() else channel.displayNumber
+        binding.previewNumber.text = displayNumber
         binding.previewName.text = channel.displayName
         binding.previewState.text = when {
             parentalControlStore.isLocked(channel.sourceKey) -> getString(R.string.locked_channel)
             channel.hidden -> getString(R.string.channel_skipped)
             channel.favorite -> getString(R.string.channel_favorite)
             else -> getString(R.string.channel_active)
+        }
+        if (mode == Mode.NORMAL) {
+            updateModeLabels()
         }
         previewJob?.cancel()
         if (parentalControlStore.isLocked(channel.sourceKey)) {
@@ -345,6 +351,24 @@ class ChannelEditorActivity : TvRemoteActivity() {
 
     private fun moveBlock(offset: Int) {
         if (movingKeys.isEmpty()) return
+        if (movingKeys.size == 1) {
+            val movingKey = movingKeys.first()
+            val currentIndex = channels.indexOfFirst { it.sourceKey == movingKey }
+            if (currentIndex < 0) return
+            val targetIndex = (currentIndex + offset).coerceIn(0, channels.lastIndex)
+            if (targetIndex == currentIndex) return
+
+            val movingChannel = channels.removeAt(currentIndex)
+            channels.add(targetIndex, movingChannel)
+            adapter.moveItem(currentIndex, targetIndex)
+
+            focusedChannel = movingChannel
+            binding.previewNumber.text = (targetIndex + 1).toString()
+            binding.previewName.text = movingChannel.displayName
+            binding.channelList.scrollToPosition(targetIndex)
+            return
+        }
+
         val moving = channels.filter { it.sourceKey in movingKeys }
         val firstIndex = channels.indexOfFirst { it.sourceKey in movingKeys }
         val remaining = channels.filterNot { it.sourceKey in movingKeys }
@@ -355,7 +379,13 @@ class ChannelEditorActivity : TvRemoteActivity() {
         channels.addAll(reordered)
         adapter.submitList(reordered)
         adapter.setSelection(selectedKeys, movingKeys)
-        focusChannel(moving.first().sourceKey)
+        val targetFirstIndex = channels.indexOfFirst { it.sourceKey in movingKeys }
+        if (targetFirstIndex >= 0) {
+            focusedChannel = channels[targetFirstIndex]
+            binding.previewNumber.text = (targetFirstIndex + 1).toString()
+            binding.previewName.text = focusedChannel?.displayName
+            focusChannel(channels[targetFirstIndex].sourceKey)
+        }
     }
 
     private fun commitMove() {
@@ -364,7 +394,13 @@ class ChannelEditorActivity : TvRemoteActivity() {
             return
         }
         val order = channels.map { it.sourceKey }
-        persistOrder(focusedChannel?.sourceKey) { repository.replaceOrder(order) }
+        val preferredKey = focusedChannel?.sourceKey
+        mode = Mode.NORMAL
+        movingKeys.clear()
+        adapter.setSelection(selectedKeys)
+        updateModeLabels()
+        binding.syncStatus.setText(R.string.order_saved)
+        persistOrder(preferredKey) { repository.replaceOrder(order) }
     }
 
     private fun appendMoveTargetDigit(digit: Int) {
@@ -505,6 +541,14 @@ class ChannelEditorActivity : TvRemoteActivity() {
             Mode.MULTI_SELECT -> getString(R.string.move_selected_to_number)
             Mode.MOVE -> getString(R.string.cancel)
         }
+
+        val isMoveMode = mode == Mode.MOVE
+        val blueAlpha = if (isMoveMode) 0.35f else 1.0f
+        binding.blueAction.alpha = blueAlpha
+        binding.blueActionIcon.alpha = blueAlpha
+        binding.sidebarBlueButton.isEnabled = !isMoveMode
+        binding.sidebarBlueButton.alpha = blueAlpha
+
         binding.sidebarRedButton.contentDescription = binding.redAction.text
         binding.sidebarGreenButton.contentDescription = binding.greenAction.text
         binding.sidebarYellowButton.contentDescription = binding.yellowAction.text

@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Kanal Düzenleyicide Senkron Tek Kanal Taşıma ve Renk Butonları Tepki Optimizasyonu
+* **Senkron `notifyItemMoved` ile Sıfır Gecikmeli Kanal Taşıma:** Kanal düzenleyicisinde (`ChannelEditorAdapter`) asenkron `AsyncListDiffer` kuyruğu yerine senkron liste yönetimi ve Android RecyclerView'ın yerel `notifyItemMoved` mekanizmasına geçildi. Kumandadan Yukarı/Aşağı tuşlarına hızlıca basılsa dahi taşınan kanalın odağı (`itemView`) asla kaybolmaz ve yerine geçen kanalın seçili görünmesi sorunu tamamen çözüldü.
+* **Anlık Dinamik Sıra Numarası ve Önizleme Takibi:** Kanal taşınırken liste pozisyonuna göre kanal numarası anında dinamik olarak (`position + 1`) güncellenir (`PAYLOAD_NUMBER`). Sağ taraftaki önizleme panelinde taşınan kanalın adı ve güncel sıra numarası gecikmesiz olarak takip edilir.
+* **Sırayı Kaydetme Esnasında Anlık Geri Bildirim (Optimistic UI):** Kullanıcı "Yeşil · Sırayı kaydet" tuşuna bastığı anda ekran beklemeden derhal Normal moda döner ve alttaki butonlar anında güncellenir. Arka planda veritabanı yazımı sessizce tamamlanarak butonların kumandanın gerisinde kalması hissi ortadan kaldırıldı.
+* **Dinamik Renk Butonları ve Pasif Buton Yönetimi:** Taşıma modunda işlevsiz olan Mavi buton soluklaştırılarak (`alpha = 0.35f`) pasife alındı. Odaklanan kanala göre buton durumlarının anlık güncellenmesi sağlandı.
+
 ### Google TV "Devam Et" (Watch Next) VOD Entegrasyonu & Otomatik Ana Ekran Kanal Satırı
 * **Google TV "Devam Et" Satırında VOD İlerlemesi:** TVApp içinde izlenen VOD (Film, Dizi vb.) içerikleri duraklatıldığında veya çıkıldığında Android TV / Google TV'nin ana ekranındaki "Devam Et" (Watch Next) satırına afişi, başlığı, toplam süresi ve kalınan izleme konumu ile birlikte eklenir (`WATCH_NEXT_TYPE_CONTINUE`, `TYPE_MOVIE`). Google TV kartı üzerinde izleme ilerleme çubuğu dinamik olarak gösterilir.
 * **Mevcut Yarım Kalan VOD'ların Açılışta Otomatik Senkronizasyonu:** Daha önceden TVApp içinde izlenip yarım bırakılmış tüm VOD içerikleri uygulama açılışında taranır (`syncResumeVods`) ve Google TV "Devam Et" satırına afişleri ve kalınan dakika bilgileriyle otomatik olarak yerleştirilir.
