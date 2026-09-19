@@ -21,7 +21,6 @@ class TvAppApplication : Application() {
         val reportStore = CrashReportStore(this)
         reportStore.recordDebug("APPLICATION_START | process=${android.os.Process.myPid()}")
         IptvInputSyncScheduler.schedulePeriodic(this)
-        IptvInputSyncScheduler.scheduleImmediate(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             if (thread.name == "FinalizerWatchdogDaemon" && error is java.util.concurrent.TimeoutException) {
                 runCatching {

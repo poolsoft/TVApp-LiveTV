@@ -5,6 +5,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### TV Başlangıç Veritabanı Kilitlenmesinin Kökten Çözülmesi (Room WAL Modu & Kilitlenmeyen Kanal Yükleme)
+* **Room Veritabanında WAL (Write-Ahead Logging) Modu:** Room SQLite veritabanı `JournalMode.WRITE_AHEAD_LOGGING` yapılandırmasına geçirildi. Rollback Journal modundaki tüm veritabanını donduran kilitlenme ortadan kalktı; arka planda EPG veya IPTV senkronizasyonu yazma yaparken kanal listesi ve arayüz okumaları sıfır gecikmeyle anında döner.
+* **Açılıştaki Ağır TvProvider IPC Senkronizasyonunun Kaldırılması:** `TvAppApplication` başlatılırken çağrılan ve Android TV'nin sistem `TvProvider`'ına 1000 IPTV kanalını tek tek IPC ile yazmaya çalışarak CPU/RAM'i tüketen ve 97 saniye kilitlenmeye yol açan `IptvInputSyncScheduler.scheduleImmediate` açılış rotasından kaldırıldı; senkronizasyon yalnızca periyodik arka plan işine devredildi.
+* **Kanal Listesi Okumasında Dış Transaction Kilidinin Kaldırılması:** `ChannelRepository` içindeki kanal listeleme okuması `database.withTransaction` kilidinden çıkarıldı. SELECT sorgusu ve liste eşlemesi serbestçe okunur; yalnızca değişen kayıtlar varsa (`changed.isNotEmpty()`) kısa ve dar bir transaction açılır.
+* **Hafıza İçi Kanal Önbelleği (`cachedChannels`) ile Anında Panel Açılışı:** Bellekte tutulan kanal listesi sayesinde kullanıcı kumandadan panel açtığında veritabanı okuması beklenmeden kanallar anında ekrana gelir.
+* **Açılıştaki Ağır EPG Temizlik (Purge) Tetiklemesinin Kaldırılması:** `MainActivity` kanal yüklemesinde her seferinde tetiklenen ve on binlerce satırlık DELETE çalıştıran `purgeExpiredPrograms` çağrısı kritik yoldan kaldırıldı.
+
 ### TV Açılış Hızlandırması, Mobil Filtre Butonu Düzenlemesi ve 7 Günlük Log Rotasyonu
 * **TV Açılışında 20-30 Sn Boş Ekran Kilitlenmesinin Giderilmesi:** `MainActivity` açılışında kanal listesinin ekrana gelmesini 20-34 saniye boyunca kitleyen senkron `purgeExpiredPrograms` çağrısı kritik yoldan kaldırıldı. Kanallar artık milisaniyeler içinde anında yüklenir; EPG temizliği ise kanallar ekrana geldikten sonra düşük öncelikli arka plan iş parçacığına aktarıldı. Açılıştaki EPG otomatik kontrol gecikmesi 5 saniyeden 25 saniyeye çıkarılarak ilk açılışta donanım ve oynatıcı kaynaklarının rahatlaması sağlandı.
 * **Mobilde Kanal Seçim Filtre Butonunun Kaldırılması:** Mobil ana ekranda (`activity_mobile_main.xml`) arama çubuğunun sağında yer alan ve mobilde tüm canlı kanallar otomatik seçildiği için işlevsiz kalan filtre butonu (`mobile_btn_channel_select`) gizlenerek arayüz sadeleştirildi.

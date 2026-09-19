@@ -44,40 +44,45 @@ class ChannelRepository(context: Context) {
         }
         val source = tifChannels + iptvChannels
         val afterTif = SystemClock.elapsedRealtime()
-        val merged = database.withTransaction {
-            val now = System.currentTimeMillis()
-            val existingRows = channelDao.getAllChannels()
-            val existing = existingRows.associateBy { it.sourceKey }
-            var nextSortOrder = (existingRows.maxOfOrNull { it.sortOrder } ?: -1) + 1
-            val synchronized = source.map { channel ->
-                val saved = existing[channel.sourceKey]
-                if (saved == null) {
-                    UserChannelEntity(
-                        sourceKey = channel.sourceKey,
-                        sourceType = channel.source.name,
-                        originalDisplayNumber = channel.displayNumber,
-                        lastKnownName = channel.displayName,
-                        sortOrder = nextSortOrder++,
-                        lastSeenAt = now,
-                    )
-                } else if (
-                    saved.sourceType != channel.source.name ||
-                    saved.originalDisplayNumber != channel.displayNumber ||
-                    saved.lastKnownName != channel.displayName
-                ) {
-                    saved.copy(
-                        sourceType = channel.source.name,
-                        originalDisplayNumber = channel.displayNumber,
-                        lastKnownName = channel.displayName,
-                        lastSeenAt = now,
-                    )
-                } else {
-                    saved
-                }
+        val now = System.currentTimeMillis()
+        val existingRows = channelDao.getAllChannels()
+        val existing = existingRows.associateBy { it.sourceKey }
+        var nextSortOrder = (existingRows.maxOfOrNull { it.sortOrder } ?: -1) + 1
+        val synchronized = source.map { channel ->
+            val saved = existing[channel.sourceKey]
+            if (saved == null) {
+                UserChannelEntity(
+                    sourceKey = channel.sourceKey,
+                    sourceType = channel.source.name,
+                    originalDisplayNumber = channel.displayNumber,
+                    lastKnownName = channel.displayName,
+                    sortOrder = nextSortOrder++,
+                    lastSeenAt = now,
+                )
+            } else if (
+                saved.sourceType != channel.source.name ||
+                saved.originalDisplayNumber != channel.displayNumber ||
+                saved.lastKnownName != channel.displayName
+            ) {
+                saved.copy(
+                    sourceType = channel.source.name,
+                    originalDisplayNumber = channel.displayNumber,
+                    lastKnownName = channel.displayName,
+                    lastSeenAt = now,
+                )
+            } else {
+                saved
             }
-            val changed = synchronized.filter { entity -> existing[entity.sourceKey] != entity }
-            if (changed.isNotEmpty()) channelDao.upsertChannels(changed)
-            ChannelMerger.merge(source, synchronized, includeHidden)
+        }
+        val changed = synchronized.filter { entity -> existing[entity.sourceKey] != entity }
+        if (changed.isNotEmpty()) {
+            database.withTransaction {
+                channelDao.upsertChannels(changed)
+            }
+        }
+        val merged = ChannelMerger.merge(source, synchronized, includeHidden)
+        if (merged.isNotEmpty()) {
+            cachedChannels = merged
         }
         val finishedAt = SystemClock.elapsedRealtime()
         debugLog.recordDebug(
@@ -182,5 +187,12 @@ class ChannelRepository(context: Context) {
             byKey[sourceKey]?.copy(sortOrder = index)
         }
         if (updated.isNotEmpty()) channelDao.upsertChannels(updated)
+    }
+
+    companion object {
+        @Volatile
+        private var cachedChannels: List<LiveChannel> = emptyList()
+
+        fun cachedChannels(): List<LiveChannel> = cachedChannels
     }
 }

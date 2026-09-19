@@ -753,6 +753,15 @@ class MainActivity : TvRemoteActivity() {
             inputs.size,
         )
 
+        if (channels.isEmpty()) {
+            val cached = ChannelRepository.cachedChannels()
+            if (cached.isNotEmpty()) {
+                channels = cached
+                applyChannelFilter(requestFocus = false)
+                showChannels(cached)
+            }
+        }
+
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -774,9 +783,6 @@ class MainActivity : TvRemoteActivity() {
                     applyChannelFilter(requestFocus = false)
                     startEpgRefresh()
                     checkAndScheduleEpgAutoRefresh()
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        programRepository.purgeExpiredPrograms()
-                    }
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null

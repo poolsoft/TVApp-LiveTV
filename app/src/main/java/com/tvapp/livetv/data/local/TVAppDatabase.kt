@@ -62,6 +62,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_22_23,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
+                .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
         }
