@@ -797,6 +797,10 @@ class MainActivity : TvRemoteActivity() {
                     startEpgRefresh()
                     checkAndScheduleEpgAutoRefresh()
                     if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        homeRecentChannelsPublisher.ensurePreviewChannel(loaded)
+                        homeRecentChannelsPublisher.syncResumeVods(iptvRepository, iptvResumeStore)
+                    }
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null
                     val requestedKey = pendingHomeChannelKey ?: editorChannelKey

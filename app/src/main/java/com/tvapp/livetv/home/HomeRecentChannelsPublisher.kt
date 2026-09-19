@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.tvprovider.media.tv.PreviewChannel
 import androidx.tvprovider.media.tv.PreviewChannelHelper
+import androidx.tvprovider.media.tv.PreviewProgram
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
 import com.tvapp.livetv.R
@@ -64,6 +65,20 @@ class HomeRecentChannelsPublisher(context: Context) {
         }
     }
 
+    suspend fun syncResumeVods(
+        iptvRepository: com.tvapp.livetv.data.IptvRepository,
+        resumeStore: com.tvapp.livetv.playback.IptvResumeStore,
+    ) {
+        val entries = resumeStore.entries().take(MAX_WATCH_NEXT_PROGRAMS)
+        entries.forEach { entry ->
+            val channel = iptvRepository.channel(entry.sourceKey)
+            if (channel != null) {
+                val duration = if (entry.durationMillis > 0L) entry.durationMillis else resumeStore.duration(entry.sourceKey)
+                publishVod(channel, entry.positionMillis, duration)
+            }
+        }
+    }
+
     fun removeVod(sourceKey: String) {
         val ids = watchNextIds()
         val id = ids.remove(sourceKey) ?: return
@@ -101,20 +116,59 @@ class HomeRecentChannelsPublisher(context: Context) {
     }
 
     @SuppressLint("RestrictedApi")
-    fun ensurePreviewChannel() {
+    fun ensurePreviewChannel(channels: List<LiveChannel> = emptyList()) {
         runCatching {
             val existingChannels = helper.allChannels
-            if (existingChannels.isNotEmpty()) return
-            val logoBitmap = BitmapFactory.decodeResource(appContext.resources, R.drawable.app_banner)
-            val previewChannel = PreviewChannel.Builder()
-                .setDisplayName(appContext.getString(R.string.app_name))
-                .setDescription(appContext.getString(R.string.iptv_library_continue))
-                .setAppLinkIntentUri(channelIntentUri("home"))
-                .setLogo(logoBitmap)
-                .build()
-            val channelId = helper.publishChannel(previewChannel)
-            if (channelId > 0L) {
-                TvContractCompat.requestChannelBrowsable(appContext, channelId)
+            val channelId = if (existingChannels.isNotEmpty()) {
+                existingChannels.first().id
+            } else {
+                val logoBitmap = BitmapFactory.decodeResource(appContext.resources, R.drawable.app_banner)
+                val previewChannel = PreviewChannel.Builder()
+                    .setDisplayName(appContext.getString(R.string.app_name))
+                    .setDescription(appContext.getString(R.string.iptv_library_continue))
+                    .setAppLinkIntentUri(channelIntentUri("home"))
+                    .setLogo(logoBitmap)
+                    .build()
+                val id = runCatching { helper.publishDefaultChannel(previewChannel) }.getOrDefault(0L)
+                val finalId = if (id <= 0L) runCatching { helper.publishChannel(previewChannel) }.getOrDefault(0L) else id
+                if (finalId > 0L) {
+                    TvContractCompat.requestChannelBrowsable(appContext, finalId)
+                }
+                finalId
+            }
+            if (channelId > 0L && channels.isNotEmpty()) {
+                updatePreviewPrograms(channelId, channels)
+            }
+        }
+    }
+
+    @SuppressLint("RestrictedApi")
+    private fun updatePreviewPrograms(channelId: Long, channels: List<LiveChannel>) {
+        runCatching {
+            val targetChannels = channels.take(10)
+            if (targetChannels.isEmpty()) return
+            appContext.contentResolver.delete(
+                TvContractCompat.buildPreviewProgramsUriForChannel(channelId),
+                null,
+                null,
+            )
+            targetChannels.forEachIndexed { index, channel ->
+                val program = PreviewProgram.Builder()
+                    .setChannelId(channelId)
+                    .setType(TvContractCompat.PreviewPrograms.TYPE_CHANNEL)
+                    .setTitle(channel.displayName)
+                    .setDescription(
+                        channel.groupTitle?.takeIf(String::isNotBlank)
+                            ?: channel.displayNumber,
+                    )
+                    .setPosterArtUri(posterUri(channel))
+                    .setIntentUri(channelIntentUri(channel.sourceKey))
+                    .setInternalProviderId(channel.sourceKey)
+                    .setContentId(channel.sourceKey)
+                    .setWeight(100 - index)
+                    .setLive(true)
+                    .build()
+                runCatching { helper.publishPreviewProgram(program) }
             }
         }
     }
@@ -123,7 +177,7 @@ class HomeRecentChannelsPublisher(context: Context) {
     @SuppressLint("RestrictedApi")
     fun publish(channels: List<LiveChannel>, historyKeys: List<String>) {
         cleanupLegacyLiveChannels()
-        ensurePreviewChannel()
+        ensurePreviewChannel(channels)
     }
 
     private fun posterUri(channel: LiveChannel): Uri = channel.logoUrl
