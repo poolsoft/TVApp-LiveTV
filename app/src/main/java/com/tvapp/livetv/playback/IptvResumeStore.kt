@@ -17,6 +17,8 @@ class IptvResumeStore(context: Context) {
             ?: 0L
     }
 
+    fun duration(sourceKey: String): Long = preferences.getLong(durationKey(sourceKey), 0L)
+
     fun save(sourceKey: String, positionMillis: Long, durationMillis: Long) {
         if (
             positionMillis < MINIMUM_RESUME_POSITION_MS ||
@@ -28,6 +30,7 @@ class IptvResumeStore(context: Context) {
         }
         preferences.edit()
             .putLong(positionKey(sourceKey), positionMillis)
+            .putLong(durationKey(sourceKey), durationMillis)
             .putLong(updatedKey(sourceKey), System.currentTimeMillis())
             .remove(sourceKey)
             .apply()
@@ -36,6 +39,7 @@ class IptvResumeStore(context: Context) {
     fun clear(sourceKey: String) {
         preferences.edit()
             .remove(positionKey(sourceKey))
+            .remove(durationKey(sourceKey))
             .remove(updatedKey(sourceKey))
             .remove(sourceKey)
             .apply()
@@ -52,6 +56,7 @@ class IptvResumeStore(context: Context) {
             if (position < MINIMUM_RESUME_POSITION_MS) null else IptvResumeEntry(
                 sourceKey = sourceKey,
                 positionMillis = position,
+                durationMillis = preferences.getLong(durationKey(sourceKey), 0L),
                 updatedAt = preferences.getLong(updatedKey(sourceKey), 0L),
             )
         }
@@ -61,11 +66,14 @@ class IptvResumeStore(context: Context) {
 
     private fun positionKey(sourceKey: String) = "$POSITION_PREFIX$sourceKey"
 
+    private fun durationKey(sourceKey: String) = "$DURATION_PREFIX$sourceKey"
+
     private fun updatedKey(sourceKey: String) = "$UPDATED_PREFIX$sourceKey"
 
     private companion object {
         const val PREFERENCES_NAME = "iptv-resume"
         const val POSITION_PREFIX = "position:"
+        const val DURATION_PREFIX = "duration:"
         const val UPDATED_PREFIX = "updated:"
         const val MINIMUM_RESUME_POSITION_MS = 30_000L
         const val RESUME_REWIND_MS = 5_000L
@@ -76,5 +84,6 @@ class IptvResumeStore(context: Context) {
 data class IptvResumeEntry(
     val sourceKey: String,
     val positionMillis: Long,
+    val durationMillis: Long = 0L,
     val updatedAt: Long,
 )

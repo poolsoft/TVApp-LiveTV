@@ -2,7 +2,9 @@ package com.tvapp.livetv.home
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.tvprovider.media.tv.PreviewChannel
 import androidx.tvprovider.media.tv.PreviewChannelHelper
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
@@ -16,27 +18,74 @@ class HomeRecentChannelsPublisher(context: Context) {
     private val helper = PreviewChannelHelper(appContext)
     private val preferences = appContext.getSharedPreferences("home-recents", Context.MODE_PRIVATE)
 
-    // These builders are the documented TvProvider API despite 1.0.0's restrictive annotations.
     @SuppressLint("RestrictedApi")
-    fun publish(channels: List<LiveChannel>, historyKeys: List<String>) {
-        val recent = historyKeys.mapNotNull { key -> channels.firstOrNull { it.sourceKey == key } }
-            .take(MAX_PROGRAMS)
-        if (recent.isEmpty()) return
-        // Google TV uses Watch Next. Publishing a legacy preview channel without a bitmap logo
-        // creates an unusable provider row and retries on every channel change.
-        publishWatchNext(recent)
+    fun publishVod(channel: LiveChannel, positionMillis: Long, durationMillis: Long) {
+        if (channel.sourceKey in suppressedSourceKeys()) return
+        if (
+            positionMillis < MINIMUM_RESUME_POSITION_MS ||
+            durationMillis <= 0L ||
+            positionMillis >= durationMillis - FINISHED_MARGIN_MS
+        ) {
+            removeVod(channel.sourceKey)
+            return
+        }
+        val ids = watchNextIds()
+        val now = System.currentTimeMillis()
+        val program = WatchNextProgram.Builder()
+            .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+            .setLastEngagementTimeUtcMillis(now)
+            .setType(TvContractCompat.WatchNextPrograms.TYPE_MOVIE)
+            .setTitle(channel.displayName)
+            .setDescription(
+                channel.groupTitle?.takeIf(String::isNotBlank)
+                    ?: appContext.getString(R.string.iptv_library_vod),
+            )
+            .setPosterArtUri(posterUri(channel))
+            .setDurationMillis(durationMillis.coerceAtLeast(0L).toInt())
+            .setLastPlaybackPositionMillis(positionMillis.coerceAtLeast(0L).toInt())
+            .setIntentUri(channelIntentUri(channel.sourceKey))
+            .setInternalProviderId(channel.sourceKey)
+            .setContentId(channel.sourceKey)
+            .build()
+
+        val savedId = ids[channel.sourceKey]
+        val existing = savedId?.let {
+            runCatching { helper.getWatchNextProgram(it) }.getOrNull()
+        }
+        val id = if (savedId != null && existing != null) {
+            runCatching { helper.updateWatchNextProgram(program, savedId) }
+            savedId
+        } else {
+            runCatching { helper.publishWatchNextProgram(program) }.getOrNull()
+        }
+        if (id != null && id > 0L) {
+            ids[channel.sourceKey] = id
+            saveWatchNextIds(ids)
+        }
+    }
+
+    fun removeVod(sourceKey: String) {
+        val ids = watchNextIds()
+        val id = ids.remove(sourceKey) ?: return
+        saveWatchNextIds(ids)
+        runCatching {
+            appContext.contentResolver.delete(
+                TvContractCompat.buildWatchNextProgramUri(id),
+                null,
+                null,
+            )
+        }
     }
 
     @SuppressLint("RestrictedApi")
-    private fun publishWatchNext(recent: List<LiveChannel>) {
-        val desired = recent.take(MAX_WATCH_NEXT_PROGRAMS)
-            .filterNot { it.sourceKey in suppressedSourceKeys() }
-        val desiredKeys = desired.mapTo(mutableSetOf()) { it.sourceKey }
-        val ids = watchNextIds()
-
-        ids.keys.filterNot { it in desiredKeys }.forEach { sourceKey ->
-            ids.remove(sourceKey)?.let { id ->
-                runCatching {
+    fun cleanupLegacyLiveChannels() {
+        runCatching {
+            val ids = watchNextIds()
+            val toRemove = mutableListOf<String>()
+            ids.forEach { (sourceKey, id) ->
+                val program = runCatching { helper.getWatchNextProgram(id) }.getOrNull()
+                if (program != null && program.type == TvContractCompat.PreviewPrograms.TYPE_CHANNEL) {
+                    toRemove.add(sourceKey)
                     appContext.contentResolver.delete(
                         TvContractCompat.buildWatchNextProgramUri(id),
                         null,
@@ -44,40 +93,37 @@ class HomeRecentChannelsPublisher(context: Context) {
                     )
                 }
             }
+            if (toRemove.isNotEmpty()) {
+                toRemove.forEach { ids.remove(it) }
+                saveWatchNextIds(ids)
+            }
         }
+    }
 
-        val now = System.currentTimeMillis()
-        desired.forEachIndexed { index, channel ->
-            val program = WatchNextProgram.Builder()
-                .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
-                .setLastEngagementTimeUtcMillis(now - index)
-                .setType(TvContractCompat.PreviewPrograms.TYPE_CHANNEL)
-                .setTitle(channel.displayName)
-                .setDescription(
-                    appContext.getString(
-                        R.string.home_watch_next_description,
-                        channel.displayNumber,
-                    ),
-                )
-                .setPosterArtUri(posterUri(channel))
-                .setIntentUri(channelIntentUri(channel.sourceKey))
-                .setInternalProviderId(channel.sourceKey)
-                .setContentId(channel.sourceKey)
-                .setLive(true)
+    @SuppressLint("RestrictedApi")
+    fun ensurePreviewChannel() {
+        runCatching {
+            val existingChannels = helper.allChannels
+            if (existingChannels.isNotEmpty()) return
+            val logoBitmap = BitmapFactory.decodeResource(appContext.resources, R.drawable.app_banner)
+            val previewChannel = PreviewChannel.Builder()
+                .setDisplayName(appContext.getString(R.string.app_name))
+                .setDescription(appContext.getString(R.string.iptv_library_continue))
+                .setAppLinkIntentUri(channelIntentUri("home"))
+                .setLogo(logoBitmap)
                 .build()
-            val savedId = ids[channel.sourceKey]
-            val existing = savedId?.let {
-                runCatching { helper.getWatchNextProgram(it) }.getOrNull()
+            val channelId = helper.publishChannel(previewChannel)
+            if (channelId > 0L) {
+                TvContractCompat.requestChannelBrowsable(appContext, channelId)
             }
-            val id = if (savedId != null && existing != null) {
-                runCatching { helper.updateWatchNextProgram(program, savedId) }
-                savedId
-            } else {
-                runCatching { helper.publishWatchNextProgram(program) }.getOrNull()
-            }
-            if (id != null && id > 0L) ids[channel.sourceKey] = id
         }
-        saveWatchNextIds(ids)
+    }
+
+    // Retained for backward compatibility
+    @SuppressLint("RestrictedApi")
+    fun publish(channels: List<LiveChannel>, historyKeys: List<String>) {
+        cleanupLegacyLiveChannels()
+        ensurePreviewChannel()
     }
 
     private fun posterUri(channel: LiveChannel): Uri = channel.logoUrl
@@ -90,6 +136,7 @@ class HomeRecentChannelsPublisher(context: Context) {
         .authority("channel")
         .appendPath("open")
         .appendQueryParameter("sourceKey", sourceKey)
+        .appendQueryParameter("resume", "true")
         .build()
 
     private fun watchNextIds(): MutableMap<String, Long> = readWatchNextIds(preferences)
@@ -104,13 +151,13 @@ class HomeRecentChannelsPublisher(context: Context) {
     }.getOrDefault(emptySet())
 
     companion object {
-        fun suppressWatchNext(context: Context, programId: Long) {
+        fun suppressWatchNext(context: Context, programId: Long): String? {
             val preferences = context.applicationContext.getSharedPreferences(
                 "home-recents",
                 Context.MODE_PRIVATE,
             )
             val ids = readWatchNextIds(preferences)
-            val removedKey = ids.entries.firstOrNull { it.value == programId }?.key ?: return
+            val removedKey = ids.entries.firstOrNull { it.value == programId }?.key ?: return null
             ids.remove(removedKey)
             val suppressed = runCatching {
                 val array = JSONArray(preferences.getString(KEY_SUPPRESSED_SOURCE_KEYS, "[]"))
@@ -120,6 +167,7 @@ class HomeRecentChannelsPublisher(context: Context) {
                 .putString(KEY_WATCH_NEXT_IDS, ids.toJson().toString())
                 .putString(KEY_SUPPRESSED_SOURCE_KEYS, JSONArray(suppressed.toList()).toString())
                 .apply()
+            return removedKey
         }
 
         private fun readWatchNextIds(preferences: android.content.SharedPreferences): MutableMap<String, Long> =
@@ -140,5 +188,7 @@ class HomeRecentChannelsPublisher(context: Context) {
         const val KEY_PROGRAM_IDS = "program-ids"
         private const val KEY_WATCH_NEXT_IDS = "watch-next-ids"
         private const val KEY_SUPPRESSED_SOURCE_KEYS = "suppressed-watch-next-source-keys"
+        private const val MINIMUM_RESUME_POSITION_MS = 30_000L
+        private const val FINISHED_MARGIN_MS = 60_000L
     }
 }

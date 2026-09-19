@@ -88,6 +88,7 @@ class IptvPlaybackController(
     }
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
     var onPlaybackReady: (() -> Unit)? = null
+    var onPlaybackEnded: (() -> Unit)? = null
     var onBuffering: ((IptvBufferingState) -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
@@ -207,6 +208,9 @@ class IptvPlaybackController(
                                 },
                             )
                             onBuffering?.invoke(IptvBufferingState.NONE)
+                            if (playbackState == Player.STATE_ENDED) {
+                                onPlaybackEnded?.invoke()
+                            }
                             if (
                                 playbackState == Player.STATE_ENDED &&
                                 !currentChannel?.iptvContentType.equals("VOD", ignoreCase = true)

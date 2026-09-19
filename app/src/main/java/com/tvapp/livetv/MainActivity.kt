@@ -449,6 +449,10 @@ class MainActivity : TvRemoteActivity() {
         iptvViewPreferencesStore = IptvViewPreferencesStore(this)
         applyIptvAspectMode(iptvViewPreferencesStore.aspectMode())
         homeRecentChannelsPublisher = HomeRecentChannelsPublisher(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            homeRecentChannelsPublisher.cleanupLegacyLiveChannels()
+            homeRecentChannelsPublisher.ensurePreviewChannel()
+        }
         pendingHomeChannelKey = intent.data?.getQueryParameter("sourceKey")
         pendingExternalChannelUri = intent.getStringExtra(TvChannelViewActivity.EXTRA_TIF_CHANNEL_URI)
         sourceFilter = ChannelSourceFilter.ALL
@@ -536,6 +540,15 @@ class MainActivity : TvRemoteActivity() {
                 currentChannel?.let { channel ->
                     recordTuneReady(channel)
                     updateTechnicalBadgesForIptv(channel)
+                }
+            }
+        }
+        iptvPlayback.onPlaybackEnded = {
+            val channel = currentChannel
+            if (channel != null && currentIptvContentKind == IptvContentKind.VOD) {
+                iptvResumeStore.clear(channel.sourceKey)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    homeRecentChannelsPublisher.removeVod(channel.sourceKey)
                 }
             }
         }
@@ -799,6 +812,37 @@ class MainActivity : TvRemoteActivity() {
                     if (editorChannel != null) {
                         restoredInitialChannel = true
                         selectChannel(editorChannel)
+                    } else if (requestedKey != null && requestedKey.startsWith("iptv:")) {
+                        val startupChannels = panelChannels().ifEmpty { loaded }
+                        lifecycleScope.launch {
+                            val resolved = withContext(Dispatchers.IO) {
+                                iptvRepository.channel(requestedKey)
+                            }
+                            if (resolved != null) {
+                                restoredInitialChannel = true
+                                selectChannel(resolved)
+                            } else if (!restoredInitialChannel) {
+                                restoredInitialChannel = true
+                                val lastKey = playbackHistory.keys().firstOrNull()
+                                val matchedChannel = lastKey?.let { key ->
+                                    startupChannels.firstOrNull { it.sourceKey == key }
+                                }
+                                if (matchedChannel != null) {
+                                    selectChannel(matchedChannel)
+                                } else if (lastKey != null && (lastKey.startsWith("iptv:") || BuildConfig.MOBILE_UI_ENABLED)) {
+                                    val fallbackResolved = withContext(Dispatchers.IO) {
+                                        iptvRepository.channel(lastKey)
+                                    }
+                                    if (fallbackResolved != null) {
+                                        selectChannel(fallbackResolved)
+                                    } else if (startupChannels.isNotEmpty()) {
+                                        selectChannel(startupChannels.first())
+                                    }
+                                } else if (startupChannels.isNotEmpty()) {
+                                    selectChannel(startupChannels.first())
+                                }
+                            }
+                        }
                     } else if (!restoredInitialChannel) {
                         restoredInitialChannel = true
                         val startupChannels = panelChannels().ifEmpty { loaded }
@@ -1643,6 +1687,13 @@ class MainActivity : TvRemoteActivity() {
         }
         val snapshot = iptvPlayback.playbackSnapshot()
         iptvResumeStore.save(channel.sourceKey, snapshot.positionMillis, snapshot.durationMillis)
+        lifecycleScope.launch(Dispatchers.IO) {
+            if (snapshot.durationMillis > 0L && snapshot.positionMillis >= snapshot.durationMillis - 60_000L) {
+                homeRecentChannelsPublisher.removeVod(channel.sourceKey)
+            } else {
+                homeRecentChannelsPublisher.publishVod(channel, snapshot.positionMillis, snapshot.durationMillis)
+            }
+        }
     }
 
     private fun handleIptvMediaKey(keyCode: Int) {
@@ -1669,7 +1720,16 @@ class MainActivity : TvRemoteActivity() {
                     KeyEvent.KEYCODE_MEDIA_NEXT -> iptvPlayback.seekBy(IPTV_VOD_SEEK_STEP_MS)
                     KeyEvent.KEYCODE_MEDIA_REWIND,
                     KeyEvent.KEYCODE_MEDIA_PREVIOUS -> iptvPlayback.seekBy(-IPTV_VOD_SEEK_STEP_MS)
-                    KeyEvent.KEYCODE_MEDIA_STOP -> iptvPlayback.stopVod()
+                    KeyEvent.KEYCODE_MEDIA_STOP -> {
+                        iptvPlayback.stopVod()
+                        val stoppedChannel = currentChannel
+                        if (stoppedChannel != null) {
+                            iptvResumeStore.clear(stoppedChannel.sourceKey)
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                homeRecentChannelsPublisher.removeVod(stoppedChannel.sourceKey)
+                            }
+                        }
+                    }
                     else -> return
                 }
                 showIptvPlaybackControls(
@@ -6144,9 +6204,19 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         intent.data?.getQueryParameter("sourceKey")?.let { sourceKey ->
-            channels.firstOrNull { it.sourceKey == sourceKey }?.let(::selectChannel) ?: run {
-                pendingHomeChannelKey = sourceKey
-                loadChannels(preserveCurrentPlayback = true)
+            val inList = channels.firstOrNull { it.sourceKey == sourceKey }
+            if (inList != null) {
+                selectChannel(inList)
+            } else {
+                lifecycleScope.launch {
+                    val vod = withContext(Dispatchers.IO) { iptvRepository.channel(sourceKey) }
+                    if (vod != null) {
+                        selectChannel(vod)
+                    } else {
+                        pendingHomeChannelKey = sourceKey
+                        loadChannels(preserveCurrentPlayback = true)
+                    }
+                }
             }
         }
     }

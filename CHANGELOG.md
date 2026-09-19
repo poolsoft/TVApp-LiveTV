@@ -5,6 +5,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Google TV "Devam Et" (Watch Next / Play Next) VOD Entegrasyonu & Ana Ekran Kanal Desteği
+* **Google TV "Devam Et" Satırında VOD İlerlemesi:** TVApp içinde izlenen VOD (Film, Dizi vb.) içerikleri duraklatıldığında veya çıkıldığında Android TV / Google TV'nin ana ekranındaki "Devam Et" (Watch Next) satırına afişi, başlığı, toplam süresi ve kalınan izleme konumu ile birlikte eklenir (`WATCH_NEXT_TYPE_CONTINUE`, `TYPE_MOVIE`). Google TV kartı üzerinde izleme ilerleme çubuğu (%40 izlendi gibi) dinamik olarak gösterilir.
+* **Doğrudan Kaldığı Yerden Başlatma (Deep Link):** Kullanıcı Google TV ana ekranındaki filme tıkladığında TVApp açılır; içerik normal canlı kanal listesinde olmasa bile doğrudan IPTV kütüphanesinden yüklenerek tam kaldığı saniyeden oynatılmaya devam eder.
+* **İzleme Bittiğinde ve Menüden Kaldırıldığında Otomatik Senkronizasyon:** Film tamamlandığında (veya son 60 saniyesi kaldığında / STOP tuşuna basıldığında) kart Google TV Watch Next satırından otomatik olarak silinir. Kullanıcı Google TV arayüzünden "Listeden kaldır" dediğinde `WatchNextRemovedReceiver` tetiklenerek hem Google TV'den hem de TVApp `IptvResumeStore`'dan kayıt senkronize olarak temizlenir.
+* **Google TV / Android TV Resmi Uygulama Kanalı (`PreviewChannel`):** Google TV ve Android TV ana ekranında TVApp'in "Kanalları Özelleştir" menüsünde listelenmesi ve ana ekranda bir kanal satırı oluşturulabilmesi için varsayılan `PreviewChannel` kaydı entegre edildi.
+* **Eski Canlı Yayın (Live Stream) Kayıtlarının Temizlenmesi:** Google TV standartlarına uymayan ve ana ekranı bozan eski canlı kanal kayıtları (`cleanupLegacyLiveChannels`) açılışta taranıp temizlenerek Google TV ana ekranı tertemiz hale getirildi.
+
 ### TV Başlangıç Veritabanı Kilitlenmesinin Kökten Çözülmesi (Room WAL Modu & Kilitlenmeyen Kanal Yükleme)
 * **Room Veritabanında WAL (Write-Ahead Logging) Modu:** Room SQLite veritabanı `JournalMode.WRITE_AHEAD_LOGGING` yapılandırmasına geçirildi. Rollback Journal modundaki tüm veritabanını donduran kilitlenme ortadan kalktı; arka planda EPG veya IPTV senkronizasyonu yazma yaparken kanal listesi ve arayüz okumaları sıfır gecikmeyle anında döner.
 * **Açılıştaki Ağır TvProvider IPC Senkronizasyonunun Kaldırılması:** `TvAppApplication` başlatılırken çağrılan ve Android TV'nin sistem `TvProvider`'ına 1000 IPTV kanalını tek tek IPC ile yazmaya çalışarak CPU/RAM'i tüketen ve 97 saniye kilitlenmeye yol açan `IptvInputSyncScheduler.scheduleImmediate` açılış rotasından kaldırıldı; senkronizasyon yalnızca periyodik arka plan işine devredildi.
