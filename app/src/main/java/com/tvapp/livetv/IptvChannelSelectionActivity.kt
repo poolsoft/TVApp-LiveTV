@@ -188,7 +188,6 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.saveButton.setOnClickListener { saveSelection() }
-<<<<<<< HEAD
         binding.selectionBtnClose.setOnClickListener { finish() }
 
         // Alt dokunmatik eylem çubuğu dinleyicileri
