@@ -330,6 +330,11 @@ class IptvPlaybackController(
         updateHealthPhase(IptvPlaybackPhase.IDLE)
     }
 
+    /** Source key this controller is currently tuned to, or null when idle.
+     *  Used by the UI to discard stale callbacks that were queued for a
+     *  previous channel while a single shared player instance is reused. */
+    fun tunedSourceKey(): String? = currentChannel?.sourceKey
+
     fun contentKind(): IptvContentKind {
         val current = player ?: return IptvContentKind.UNKNOWN
         return when {

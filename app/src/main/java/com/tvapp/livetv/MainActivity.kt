@@ -515,8 +515,15 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         iptvPlayback.onPlaybackError = { error ->
-            binding.iptvBufferingContainer.visibility = View.GONE
-            handleIptvPlaybackError(error)
+            if (currentChannel?.sourceKey != iptvPlayback.tunedSourceKey()) {
+                debugLog.recordDebug(
+                    "IPTV_STALE_ERROR_DROPPED | tuned=${iptvPlayback.tunedSourceKey()}, " +
+                        "current=${currentChannel?.sourceKey}",
+                )
+            } else {
+                setIptvBufferingVisible(false)
+                handleIptvPlaybackError(error)
+            }
         }
         iptvPlayback.onExternalFallbackRecommended = { error ->
             debugLog.recordDebug(
@@ -532,18 +539,18 @@ class MainActivity : TvRemoteActivity() {
             updateIptvPlaybackControls()
         }
         iptvPlayback.onPlaybackReady = {
-            val recoveredFromFailure = iptvPlaybackFailed
-            iptvPlaybackFailed = false
-            binding.iptvBufferingContainer.visibility = View.GONE
-            if (recoveredFromFailure) {
-                hideIptvPlaybackControls()
-            }
-            if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS &&
-                currentChannel?.source == LiveChannel.Source.IPTV
-            ) {
-                osdCoordinator.hideStatus()
-            }
-            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey()) {
+                val recoveredFromFailure = iptvPlaybackFailed
+                iptvPlaybackFailed = false
+                setIptvBufferingVisible(false)
+                if (recoveredFromFailure) {
+                    hideIptvPlaybackControls()
+                }
+                if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS &&
+                    currentChannel?.source == LiveChannel.Source.IPTV
+                ) {
+                    osdCoordinator.hideStatus()
+                }
                 currentChannel?.let { channel ->
                     recordTuneReady(channel)
                     updateTechnicalBadgesForIptv(channel)
@@ -560,28 +567,34 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         iptvPlayback.onBuffering = { state ->
-            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey() &&
+                currentChannel?.source == LiveChannel.Source.IPTV
+            ) {
                 when (state) {
-                    IptvBufferingState.NONE -> binding.iptvBufferingContainer.visibility = View.GONE
+                    IptvBufferingState.NONE -> setIptvBufferingVisible(false)
                     IptvBufferingState.LOADING -> {
                         updateIptvBufferingStatus(R.string.iptv_opening)
-                        binding.iptvBufferingContainer.visibility = View.VISIBLE
+                        setIptvBufferingVisible(true)
                     }
                     IptvBufferingState.BUFFERING -> {
                         updateIptvBufferingStatus(R.string.iptv_buffering)
-                        binding.iptvBufferingContainer.visibility = View.VISIBLE
+                        setIptvBufferingVisible(true)
                     }
                 }
             }
         }
         iptvPlayback.onContentKindChanged = { kind ->
-            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey() &&
+                currentChannel?.source == LiveChannel.Source.IPTV
+            ) {
                 currentIptvContentKind = kind
                 startIptvPlaybackMonitor(kind)
             }
         }
         iptvPlayback.onTracksChanged = {
-            if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey() &&
+                currentChannel?.source == LiveChannel.Source.IPTV
+            ) {
                 applyPreferredIptvTracks()
                 currentChannel?.let(::updateTechnicalBadgesForIptv)
             }
@@ -1102,7 +1115,7 @@ class MainActivity : TvRemoteActivity() {
                             "serviceType=${channel.serviceType}, encrypted=${channel.encrypted}, " +
                             "locked=${channel.locked}",
                     )
-                    binding.iptvBufferingContainer.visibility = View.GONE
+                    setIptvBufferingVisible(false)
                     iptvPlayback.stop()
                     binding.iptvPlayerView.visibility = View.GONE
                     binding.tvView.visibility = View.VISIBLE
@@ -1113,7 +1126,7 @@ class MainActivity : TvRemoteActivity() {
                     binding.tvView.visibility = View.GONE
                     binding.iptvPlayerView.visibility = View.VISIBLE
                     updateIptvBufferingStatus(R.string.iptv_connecting)
-                    binding.iptvBufferingContainer.visibility = View.VISIBLE
+                    setIptvBufferingVisible(true)
                     val resumePosition = if (channel.iptvContentType == "VOD") {
                         iptvResumeStore.position(channel.sourceKey)
                     } else {
@@ -1129,7 +1142,7 @@ class MainActivity : TvRemoteActivity() {
             }
         }
             .onFailure {
-                binding.iptvBufferingContainer.visibility = View.GONE
+                setIptvBufferingVisible(false)
                 debugLog.recordDebug("PLAYBACK_FAILURE | ${it.javaClass.name}: ${it.message}")
                 if (channel.source == LiveChannel.Source.IPTV) {
                     showIptvPlaybackFailure()
@@ -1137,6 +1150,15 @@ class MainActivity : TvRemoteActivity() {
                     showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
                 }
             }
+    }
+
+    /** Shows or hides the IPTV spinner, but never lets a stale callback from a
+     *  previous channel keep it on screen: when no IPTV channel is currently
+     *  tuned, the spinner is always hidden. */
+    private fun setIptvBufferingVisible(visible: Boolean) {
+        val shouldShow = visible && currentChannel?.source == LiveChannel.Source.IPTV
+        binding.iptvBufferingContainer.visibility =
+            if (shouldShow) View.VISIBLE else View.GONE
     }
 
     private fun updateIptvBufferingStatus(statusResId: Int) {
