@@ -70,6 +70,7 @@ import com.tvapp.livetv.playback.IptvPlaybackHealthSnapshot
 import com.tvapp.livetv.playback.IptvPlaybackEngine
 import com.tvapp.livetv.playback.IptvRecoveryAction
 import com.tvapp.livetv.playback.IptvContentKind
+import com.tvapp.livetv.playback.IptvPlaybackPhase
 import com.tvapp.livetv.playback.IptvTrackOption
 import com.tvapp.livetv.playback.ExternalPlayerLauncher
 import com.tvapp.livetv.playback.IptvResumeStore
@@ -1037,6 +1038,17 @@ class MainActivity : TvRemoteActivity() {
         ) return
         if (iptvOverlayActive) stopIptvOverlay()
         if (iptvGridActive) stopIptvGrid(resumePrevious = false)
+        // Repeat OK presses on the channel that is already connecting must not
+        // restart playback and reset the retry/alternative-stream cycle.
+        if (channel.sourceKey == currentChannel?.sourceKey) {
+            val phase = iptvPlayback.healthSnapshot().phase
+            if (phase == IptvPlaybackPhase.PREPARING || phase == IptvPlaybackPhase.BUFFERING) {
+                debugLog.recordDebug(
+                    "CHANNEL_SELECT_IGNORED | key=${channel.sourceKey}, phase=$phase",
+                )
+                return
+            }
+        }
         saveCurrentIptvResumePosition()
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",

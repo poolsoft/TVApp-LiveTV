@@ -229,8 +229,19 @@ class IptvPlaybackController(
                     lastErrorCode = error.errorCodeName
                     lastFailureClass = classifyIptvPlaybackFailure(error.errorCodeName)
                     updateHealthPhase(IptvPlaybackPhase.FAILED)
-                    if (!released && retryCount < MAX_RETRY_COUNT) {
-                        val delay = RETRY_BASE_DELAY_MS * (1L shl retryCount)
+                    // Connection-type failures (DNS, timeout, HTTP status) rarely
+                    // recover by re-preparing the same URI: retry once quickly so a
+                    // transient blip is covered, then surface the error so the
+                    // alternative-stream path in the app can take over instead of
+                    // stalling the screen in silent retries for several seconds.
+                    val isConnectionFailure = lastFailureClass in CONNECTION_FAILURE_CLASSES
+                    val maxRetries = if (isConnectionFailure) 1 else MAX_RETRY_COUNT
+                    if (!released && retryCount < maxRetries) {
+                        val delay = if (isConnectionFailure) {
+                            CONNECTION_RETRY_DELAY_MS
+                        } else {
+                            RETRY_BASE_DELAY_MS * (1L shl retryCount)
+                        }
                         retryCount++
                         retryHandler.removeCallbacks(retryRunnable)
                         retryHandler.postDelayed(retryRunnable, delay)
@@ -823,6 +834,12 @@ class IptvPlaybackController(
     private companion object {
         const val MAX_RETRY_COUNT = 3
         const val RETRY_BASE_DELAY_MS = 1_000L
+        private val CONNECTION_FAILURE_CLASSES = setOf(
+            IptvPlaybackFailureClass.NETWORK,
+            IptvPlaybackFailureClass.HTTP,
+            IptvPlaybackFailureClass.TIMEOUT,
+        )
+        const val CONNECTION_RETRY_DELAY_MS = 300L
         const val MIN_BUFFER_MS = 15_000
         const val SECONDARY_MAX_BUFFER_MS = 10_000
         const val BUFFER_FOR_PLAYBACK_MS = 1_500

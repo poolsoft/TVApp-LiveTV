@@ -606,5 +606,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * GitHub Actions üzerinden otomatik derleme (`dev-r<run>`) ve uygulama içi SHA-256 kontrollü self-update.
 ## Unreleased
 
+- Faster IPTV channel switch: connection-type stream failures (network, HTTP, timeout) now retry once after 300 ms and then surface to the alternative-stream path instead of silently re-preparing the same URI for up to ~7 seconds.
+- Repeated OK presses on a channel that is already connecting are ignored, so panicking extra presses no longer restart playback and reset the retry cycle.
+- Immediate infobar/selection feedback when selecting an IPTV channel while playing a TIF channel (channel resolution continues asynchronously).
+
 - UIINPUT grubunu tamamladık: remote olay sahipliği için `RemoteActionRouter`, güvenli Back/dialog yönlendirmesi ve Android TV UiAutomator smoke testleri eklendi.
 - Ayarlar Görünüm ve Kanal sekmelerine video üstü canlı görünüm önizlemesi eklendi; ortak odak çerçevesi, renk eylemi ve ikon yuvası bileşenleri kullanıma alındı.
