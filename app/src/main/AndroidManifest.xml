@@ -170,6 +170,13 @@
         </activity>
 
         <activity
+            android:name=".VodHomeActivity"
+            android:exported="false"
+            android:label="@string/vod_home_title"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.TVApp" />
+
+        <activity
             android:name=".MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
             android:exported="true"

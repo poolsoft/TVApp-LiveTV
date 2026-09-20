@@ -78,6 +78,22 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * **Kumanda OK ile Seçim ve Odak Koruma:** `MultiViewChannelAdapter` içine `setHasStableIds(true)` eklenerek seçim sırasında odak kaybı önlendi; kumanda `KEYCODE_DPAD_CENTER` ve `KEYCODE_ENTER` tuşları için dinleyici eklenerek seçim sağlandı.
 * **Kanal Seçici Yüksek Kontrast:** Koyu arkaplan üzerinde soluk kalan metinler bembeyaz ve kalın (`@color/text_primary`), kanal numaraları ise parlak mavi (`@color/accent`) yapılarak TV mesafesinden kristal netliğinde okunabilir hale getirildi.
 
+### VOD Ana Sayfa ve Devam Et
+* **Ayrı VOD ana sayfası (`VodHomeActivity`):** "Devam Et" yatay şeridi, sayfalı VOD ızgarası ve
+  arama alanı içeren özel VOD ekranı eklendi. IPTV kanal seçim ekranının araç çubuğundan açılır.
+  15.000+ katalog kuralına uygun olarak kaynak bazlı, sınırlı sayfalama kullanır; tam katalog
+  belleğe alınmaz.
+* **Devam Et şeridi:** `PlaybackHistoryStore` + `IptvResumeStore` birleşimi
+  (`ContinueWatchingRepository`, birim testli) ile en fazla 8 VOD öğesi, kaldığı süre gösterimiyle
+  listelenir. Uzun OK ile "Baştan oynat" ve "Listeden kaldır" eylemleri sunar.
+* **VOD derin bağlantı:** VOD oynatma, `EXTRA_VOD_SOURCE_KEY` ile `MainActivity`'e devredilir;
+  kanal ana listede yoksa IPTV deposundan çözümlenir.
+* **Watch Next teşhis düzeltmeleri:** `HomeRecentChannelsPublisher` artık publish/update/delete
+  hatalarını `HOME_WATCH_NEXT_FAILURE` olarak debug log'a yazar; poster 16:9 oranı ve etkileşim
+  türü açıkça bildirilir; bastırılan kanal listesi 64 kayıtla sınırlanır. Not: Google TV
+  launcher'daki "Devam Et" satırı Google sertifikasyonu gerektirir; Android TV launcher
+  etkilenmez.
+
 ### MultiView (Grid) Codec ve Stabilite İyileştirmeleri
 * **Codec tabanlı grid limiti:** `MediaCodecList(REGULAR_CODECS)` üzerinden H.264 ve H.265 için
   ayrı eşzamanlı decoder instance sayıları algılanır; `maximumGridStreams` artık gerçek donanım

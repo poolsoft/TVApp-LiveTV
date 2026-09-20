@@ -635,4 +635,11 @@
     <string name="diagnostics_tif_track_counts">%1$d video / %2$d ses / %3$d altyazı</string>
     <string name="diagnostics_tif_audio_rate">Ses örnekleme</string>
     <string name="diagnostics_tif_pixel_aspect">Piksel oranı</string>
+    <string name="vod_home_title">VOD Ana Sayfa</string>
+    <string name="continue_watching">Devam Et</string>
+    <string name="vod_search_hint">VOD ara</string>
+    <string name="vod_empty">VOD içerik bulunamadı</string>
+    <string name="vod_resume_from_start">Baştan oynat</string>
+    <string name="vod_remove_from_continue">Devam Et listesinden kaldır</string>
+    <string name="vod_home_sidebar">VOD Ana Sayfa</string>
 </resources>

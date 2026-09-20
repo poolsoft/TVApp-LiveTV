@@ -188,6 +188,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.saveButton.setOnClickListener { saveSelection() }
+<<<<<<< HEAD
         binding.selectionBtnClose.setOnClickListener { finish() }
 
         // Alt dokunmatik eylem çubuğu dinleyicileri
@@ -206,6 +207,9 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             }
         }
         binding.actionBtnSave.setOnClickListener { saveSelection() }
+        binding.vodHomeButton.setOnClickListener {
+            startActivity(android.content.Intent(this, VodHomeActivity::class.java))
+        }
 
         // Dikey bar buton odaklanma ve helper metinleri
         binding.selectAllButton.setOnFocusChangeListener { _, hasFocus ->
@@ -240,6 +244,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                 binding.helperText.setText(R.string.save_iptv_selection)
             }
         }
+        binding.vodHomeButton.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                lastSidebarFocusedId = R.id.vod_home_button
+                binding.helperText.setText(R.string.vod_home_sidebar)
+            }
+        }
 
         // Dikey bardan sag ok ile kanal listesine geri donus
         listOf(
@@ -248,6 +258,7 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
             binding.categoryButton,
             binding.selectedFilterButton,
             binding.saveButton,
+            binding.vodHomeButton,
         ).forEach { button ->
             button.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {

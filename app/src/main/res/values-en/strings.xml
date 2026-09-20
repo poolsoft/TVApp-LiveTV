@@ -635,4 +635,11 @@
     <string name="diagnostics_tif_track_counts">%1$d video / %2$d audio / %3$d subtitle</string>
     <string name="diagnostics_tif_audio_rate">Audio sample rate</string>
     <string name="diagnostics_tif_pixel_aspect">Pixel aspect ratio</string>
+    <string name="vod_home_title">VOD Home</string>
+    <string name="continue_watching">Continue Watching</string>
+    <string name="vod_search_hint">Search VOD</string>
+    <string name="vod_empty">No VOD content found</string>
+    <string name="vod_resume_from_start">Play from start</string>
+    <string name="vod_remove_from_continue">Remove from Continue Watching</string>
+    <string name="vod_home_sidebar">VOD Home</string>
 </resources>

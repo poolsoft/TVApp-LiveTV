@@ -17,6 +17,11 @@ class PlaybackHistoryStore(context: Context) {
         preferences.edit().putString(KEY_HISTORY, JSONArray(updated).toString()).apply()
     }
 
+    fun remove(sourceKey: String) {
+        val updated = keys().filterNot { it == sourceKey }
+        preferences.edit().putString(KEY_HISTORY, JSONArray(updated).toString()).apply()
+    }
+
     fun keys(): List<String> = runCatching {
         val array = JSONArray(preferences.getString(KEY_HISTORY, "[]"))
         buildList {

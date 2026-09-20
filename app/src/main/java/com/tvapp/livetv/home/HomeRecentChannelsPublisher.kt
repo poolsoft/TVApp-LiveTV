@@ -14,7 +14,10 @@ import com.tvapp.livetv.model.LiveChannel
 import org.json.JSONArray
 import org.json.JSONObject
 
-class HomeRecentChannelsPublisher(context: Context) {
+class HomeRecentChannelsPublisher(
+    context: Context,
+    private val onOperationFailed: (op: String, sourceKey: String, error: Throwable) -> Unit = { _, _, _ -> },
+) {
     private val appContext = context.applicationContext
     private val helper = PreviewChannelHelper(appContext)
     private val preferences = appContext.getSharedPreferences("home-recents", Context.MODE_PRIVATE)
@@ -42,6 +45,8 @@ class HomeRecentChannelsPublisher(context: Context) {
                     ?: appContext.getString(R.string.iptv_library_vod),
             )
             .setPosterArtUri(posterUri(channel))
+            .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
+            .setInteractionType(TvContractCompat.PreviewProgramColumns.INTERACTION_TYPE_VIEWS)
             .setDurationMillis(durationMillis.coerceAtLeast(0L).toInt())
             .setLastPlaybackPositionMillis(positionMillis.coerceAtLeast(0L).toInt())
             .setIntentUri(channelIntentUri(channel.sourceKey))
@@ -55,9 +60,12 @@ class HomeRecentChannelsPublisher(context: Context) {
         }
         val id = if (savedId != null && existing != null) {
             runCatching { helper.updateWatchNextProgram(program, savedId) }
+                .onFailure { error -> onOperationFailed("update", channel.sourceKey, error) }
             savedId
         } else {
-            runCatching { helper.publishWatchNextProgram(program) }.getOrNull()
+            runCatching { helper.publishWatchNextProgram(program) }
+                .onFailure { error -> onOperationFailed("publish", channel.sourceKey, error) }
+                .getOrNull()
         }
         if (id != null && id > 0L) {
             ids[channel.sourceKey] = id
@@ -89,7 +97,7 @@ class HomeRecentChannelsPublisher(context: Context) {
                 null,
                 null,
             )
-        }
+        }.onFailure { error -> onOperationFailed("removeVod", sourceKey, error) }
     }
 
     @SuppressLint("RestrictedApi")
@@ -202,7 +210,7 @@ class HomeRecentChannelsPublisher(context: Context) {
     private fun suppressedSourceKeys(): Set<String> = runCatching {
         val array = JSONArray(preferences.getString(KEY_SUPPRESSED_SOURCE_KEYS, "[]"))
         buildSet { for (index in 0 until array.length()) add(array.getString(index)) }
-    }.getOrDefault(emptySet())
+    }.getOrDefault(emptySet()).take(MAX_SUPPRESSED_KEYS).toSet()
 
     companion object {
         fun suppressWatchNext(context: Context, programId: Long): String? {
@@ -244,5 +252,6 @@ class HomeRecentChannelsPublisher(context: Context) {
         private const val KEY_SUPPRESSED_SOURCE_KEYS = "suppressed-watch-next-source-keys"
         private const val MINIMUM_RESUME_POSITION_MS = 30_000L
         private const val FINISHED_MARGIN_MS = 60_000L
+        private const val MAX_SUPPRESSED_KEYS = 64
     }
 }
