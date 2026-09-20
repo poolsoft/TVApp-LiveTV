@@ -951,6 +951,18 @@ class MainActivity : TvRemoteActivity() {
     private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
         val generation = ++channelResolutionGeneration
         if (channel.source == LiveChannel.Source.IPTV) {
+            // Give immediate visual feedback before the asynchronous resolution
+            // completes: update the infobar and selection so the UI reacts on
+            // the first key press instead of appearing unresponsive over TIF.
+            if (channel.sourceKey != currentChannel?.sourceKey) {
+                currentChannel = channel
+                adapter.select(channel.sourceKey)
+                binding.nowChannel.text = channel.displayName
+                binding.nowNumber.text = channel.displayNumber
+                updateTechnicalBadges(channel, emptyList())
+                showInfoBar()
+                loadPrograms(channel)
+            }
             lifecycleScope.launch {
                 val (resolved, preference) = withContext(Dispatchers.IO) {
                     val resolvedChannel = if (channel.uri.isBlank()) {
