@@ -606,6 +606,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 * GitHub Actions üzerinden otomatik derleme (`dev-r<run>`) ve uygulama içi SHA-256 kontrollü self-update.
 ## Unreleased
 
+- TXT/Teletext remote key now opens the subtitle/teletext track picker on the playback screen and while the channel panel is visible, for both TIF and IPTV sources; a TXT hint was added to the infobar technical row (TR/EN).
+
 - Root-cause fix for stale IPTV playback events: the playback controller now tags every queued retry/watchdog/recovery action and player callback with a tune generation, cancelling pending work and dropping events from a previous channel at dispatch time (the UI-side filters remain as a second line of defence).
 
 - Fixed the IPTV spinner sticking on screen after switching channels: spinner visibility is now tied to the currently tuned channel, stale buffering events from a previous channel are discarded, and a failed stream hides the spinner before showing the failure notice.

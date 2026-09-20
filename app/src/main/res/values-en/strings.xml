@@ -642,4 +642,5 @@
     <string name="vod_resume_from_start">Play from start</string>
     <string name="vod_remove_from_continue">Remove from Continue Watching</string>
     <string name="vod_home_sidebar">VOD Home</string>
+    <string name="txt_key_hint">TXT: Subtitles/Teletext</string>
 </resources>

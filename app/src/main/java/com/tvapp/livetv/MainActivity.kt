@@ -2562,6 +2562,20 @@ class MainActivity : TvRemoteActivity() {
             .show()
     }
 
+    /** TXT/Teletext remote key: opens the subtitle/teletext track picker for
+     *  the active source. Works on the playback screen and while the channel
+     *  panel is visible (the key event reaches dispatchKeyEvent in both). */
+    private fun showTxtTracks() {
+        if (iptvGridActive) return
+        if (binding.iptvPlaybackContainer.visibility == View.VISIBLE &&
+            iptvControlsInteractive
+        ) {
+            showIptvSubtitleTracks()
+            return
+        }
+        showSubtitleTracks()
+    }
+
     private fun showSubtitleTracks() {
         if (currentChannel?.source == LiveChannel.Source.IPTV) {
             showIptvSubtitleTracks()
@@ -4935,6 +4949,14 @@ class MainActivity : TvRemoteActivity() {
         }
         action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvGridPicker)
         action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
+        // TXT hint inside the technical row, far right, next to the badges.
+        binding.infoColorActions.addView(TextView(this).apply {
+            text = getString(R.string.txt_key_hint)
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+            textSize = 9f
+            setPadding(dp(10), 0, 0, 0)
+            setSingleLine(true)
+        })
     }
 
     private fun updateIptvControlHints() = updateInfoColorActions()
@@ -6099,6 +6121,7 @@ class MainActivity : TvRemoteActivity() {
                 KeyEvent.KEYCODE_TV_AUDIO_DESCRIPTION -> showAudioTracks()
                 KeyEvent.KEYCODE_CAPTIONS,
                 175 -> showSubtitleTracks()
+                KeyEvent.KEYCODE_TV_TELETEXT, 233 -> showTxtTracks()
                 KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
                 KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
                 KeyEvent.KEYCODE_SEARCH -> {
