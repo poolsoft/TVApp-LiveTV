@@ -697,6 +697,9 @@ class MainActivity : TvRemoteActivity() {
         startClock()
         scheduleSleepTimer()
         ensurePermissionAndLoad()
+        // Cold-start deep link from VodHomeActivity (singleTop may deliver via
+        // onCreate instead of onNewIntent when the task is freshly created).
+        handleVodSourceDeepLink(intent)
         recordPerformance("activity_create", activityStartAt, "mode=$experienceMode")
     }
 
@@ -6246,30 +6249,34 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+    /** Handles the VOD_SOURCE_KEY deep link from VodHomeActivity on both cold
+     *  start (onCreate) and warm delivery (onNewIntent, singleTop). */
+    private fun handleVodSourceDeepLink(intent: Intent?) {
+        val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY) ?: return
+        if (currentChannel?.sourceKey == sourceKey) return
+        channels.firstOrNull { it.sourceKey == sourceKey }?.let { channel ->
+            selectChannel(channel, recordHistory = true)
+            return
+        }
+        // VOD items usually live outside the main channel list; resolve
+        // directly from the IPTV repository so the deep link always works.
+        lifecycleScope.launch {
+            val channel = withContext(Dispatchers.IO) {
+                runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
+            }
+            if (channel != null) {
+                selectChannel(channel, recordHistory = true)
+            } else {
+                pendingHomeChannelKey = sourceKey
+                loadChannels(preserveCurrentPlayback = true)
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.getStringExtra(EXTRA_VOD_SOURCE_KEY)?.let { sourceKey ->
-            if (currentChannel?.sourceKey == sourceKey) return
-            channels.firstOrNull { it.sourceKey == sourceKey }?.let { channel ->
-                selectChannel(channel, recordHistory = true)
-            } ?: run {
-                // VOD items usually live outside the main channel list; resolve
-                // directly from the IPTV repository so the deep link always works.
-                lifecycleScope.launch {
-                    val channel = withContext(Dispatchers.IO) {
-                        runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
-                    }
-                    if (channel != null) {
-                        selectChannel(channel, recordHistory = true)
-                    } else {
-                        pendingHomeChannelKey = sourceKey
-                        loadChannels(preserveCurrentPlayback = true)
-                    }
-                }
-            }
-            return
-        }
+        handleVodSourceDeepLink(intent)
         val requestedUri = intent.getStringExtra(TvChannelViewActivity.EXTRA_TIF_CHANNEL_URI)
         if (requestedUri != null) {
             if (currentChannel?.uri == requestedUri) return
