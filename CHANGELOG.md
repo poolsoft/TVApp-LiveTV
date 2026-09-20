@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Senkronizasyon Bellek İyileştirmesi ve TV OSD / Infobar Açılış Akıcılığı
+* **Infobar Açılışında Gereksiz Layout Ölçümünün (Relayout) Engellenmesi:** `MainActivity` içinde her kanal değişiminde ve infobar açılışında `updateInfoBarHeight` çağrılırken, hesaplanan hedef yükseklik mevcut `layoutParams.height` ile aynıysa yeniden atama yapılması engellendi. Böylece kanal geçişlerinde tüm OSD ağacının baştan ölçülmesi (measure/layout pass) ve kumanda gecikmesi tamamen ortadan kalktı.
+* **Teknik Rozet ve Bilgilerde Şartlı Güncelleme:** `updateTechnicalBadges` ve `updateTechnicalBadgesForIptv` fonksiyonlarında slot görünürlükleri ve metin atamaları yalnızca değer değiştiğinde (`text != newText` / `visibility != targetVisibility`) yapılacak şekilde optimize edildi; gereksiz Android arayüz çizimleri elendi.
+* **IPTV Toplu Aktarımında Bellek Kopyalamasının Kaldırılması:** `IptvRepository` içinde binlerce kanalın staging tablosuna yazılması esnasında her 500'lük parçada yapılan gereksiz `batch.toList()` bellek kopyalaması kaldırılarak doğrudan liste referansı ile çalışılması sağlandı; çöp toplayıcı (GC) baskısı azaltıldı.
+* **Kanal Anahtarı Normalizasyon Koruması:** `selectionName` optimize edilirken `XmlTvMatcher` ve EPG isim normalizasyon kuralları %100 aynen korunarak binlerce kanalın sorunsuz eşleşmesi garanti altına alındı.
+
 ### IPTV Oynatıcı Tampon ve Kanal Geçiş (Zapping) Hızlandırması
 * **Hızlı Kanal Başlatma (Zapping):** `IptvPlaybackController` içinde ilk oynatma başlangıç tamponu (`BUFFER_FOR_PLAYBACK_MS`) 1.500 ms'den 800 ms'ye düşürülerek kumandadan kanal değiştirildiğinde veya listeden seçildiğinde yayının ekrana gelme süresi yaklaşık 700 ms hızlandırıldı.
 * **Hızlı Rebuffer Toparlanması:** Yayın duraksadığında toparlanma süresi (`BUFFER_AFTER_REBUFFER_MS`) 4.000 ms'den 2.500 ms'ye indirilerek ağ dalgalanmalarında bekleme süresi kısaltıldı.

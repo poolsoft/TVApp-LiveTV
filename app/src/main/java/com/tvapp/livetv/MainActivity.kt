@@ -2302,13 +2302,15 @@ class MainActivity : TvRemoteActivity() {
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
         val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format)
-        binding.qualityBadge.visibility = View.GONE
-        binding.radioBadge.visibility = View.GONE
+        val targetRadioVis = if (radio) View.VISIBLE else View.GONE
+        if (binding.radioBadge.visibility != targetRadioVis) binding.radioBadge.visibility = targetRadioVis
         if (radio) {
-            binding.radioBadge.visibility = View.VISIBLE
+            if (binding.qualityBadge.visibility != View.GONE) binding.qualityBadge.visibility = View.GONE
         } else if (quality != null) {
-            binding.qualityBadge.text = quality
-            binding.qualityBadge.visibility = View.VISIBLE
+            if (binding.qualityBadge.text != quality) binding.qualityBadge.text = quality
+            if (binding.qualityBadge.visibility != View.VISIBLE) binding.qualityBadge.visibility = View.VISIBLE
+        } else {
+            if (binding.qualityBadge.visibility != View.GONE) binding.qualityBadge.visibility = View.GONE
         }
         binding.sourceBadgeIcon.setImageResource(
             if (channel.source == LiveChannel.Source.IPTV) {
@@ -2317,13 +2319,11 @@ class MainActivity : TvRemoteActivity() {
                 R.drawable.ic_source_tif
             },
         )
-        binding.lockBadge.visibility = if (
+        val targetLockVis = if (
             channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey)
-        ) {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
+        ) View.VISIBLE else View.GONE
+        if (binding.lockBadge.visibility != targetLockVis) binding.lockBadge.visibility = targetLockVis
+
         val audioTracks = tracks.filter { it.type == TvTrackInfo.TYPE_AUDIO }
         val subtitleTracks = tracks.filter { it.type == TvTrackInfo.TYPE_SUBTITLE }
         val trackMetadata = tracks.joinToString(" ") { track ->
@@ -2331,22 +2331,25 @@ class MainActivity : TvRemoteActivity() {
         }.lowercase(Locale.ROOT)
         val dolby = listOf("dolby", "ac3", "ac-3", "eac3", "e-ac-3")
             .any(trackMetadata::contains)
-        binding.dolbyBadge.visibility = if (dolby) View.VISIBLE else View.GONE
+        val targetDolbyVis = if (dolby) View.VISIBLE else View.GONE
+        if (binding.dolbyBadge.visibility != targetDolbyVis) binding.dolbyBadge.visibility = targetDolbyVis
 
-        binding.audioBadge.text = audioTracks.firstOrNull()?.language?.let(::displayLanguage)
+        val audioText = audioTracks.firstOrNull()?.language?.let(::displayLanguage)
             ?: audioTracks.size.takeIf { it > 0 }?.toString()
-        binding.audioBadge.visibility = if (audioTracks.isEmpty() || dolby) {
-            View.GONE
-        } else {
-            View.VISIBLE
-        }
-        binding.subtitleBadge.text = subtitleTracks.firstOrNull()?.language
-            ?.let(::displayLanguage)
+        if (binding.audioBadge.text != audioText) binding.audioBadge.text = audioText
+        val targetAudioVis = if (audioTracks.isEmpty() || dolby) View.GONE else View.VISIBLE
+        if (binding.audioBadge.visibility != targetAudioVis) binding.audioBadge.visibility = targetAudioVis
+
+        val subText = subtitleTracks.firstOrNull()?.language?.let(::displayLanguage)
             ?: subtitleTracks.size.takeIf { it > 0 }?.toString()
-        binding.subtitleBadge.visibility = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
+        if (binding.subtitleBadge.text != subText) binding.subtitleBadge.text = subText
+        val targetSubVis = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
+        if (binding.subtitleBadge.visibility != targetSubVis) binding.subtitleBadge.visibility = targetSubVis
+
         val hasTeletext = listOf("teletext", "teletekst", "txt")
             .any(trackMetadata::contains)
-        binding.txtBadge.visibility = if (hasTeletext) View.VISIBLE else View.GONE
+        val targetTxtVis = if (hasTeletext) View.VISIBLE else View.GONE
+        if (binding.txtBadge.visibility != targetTxtVis) binding.txtBadge.visibility = targetTxtVis
 
         val activeSlots = booleanArrayOf(
             true,
@@ -2368,7 +2371,8 @@ class MainActivity : TvRemoteActivity() {
             binding.techSlotLock,
         )
         slots.forEachIndexed { index, slot ->
-            slot.visibility = if (activeSlots[index]) View.VISIBLE else View.GONE
+            val targetVis = if (activeSlots[index]) View.VISIBLE else View.GONE
+            if (slot.visibility != targetVis) slot.visibility = targetVis
         }
     }
 
@@ -2455,41 +2459,50 @@ class MainActivity : TvRemoteActivity() {
         val format = channel.videoFormat.orEmpty().uppercase(Locale.ROOT)
         val radio = channel.isRadioChannel()
         val quality = if (radio) null else VideoQuality.resolutionLabel(width, height, format)
-        binding.qualityBadge.visibility = View.GONE
-        binding.radioBadge.visibility = View.GONE
+        val targetRadioVis = if (radio) View.VISIBLE else View.GONE
+        if (binding.radioBadge.visibility != targetRadioVis) binding.radioBadge.visibility = targetRadioVis
         if (radio) {
-            binding.radioBadge.visibility = View.VISIBLE
+            if (binding.qualityBadge.visibility != View.GONE) binding.qualityBadge.visibility = View.GONE
         } else if (quality != null || info.isAdaptive) {
             val qualityText = if (info.isAdaptive) {
                 if (quality != null) "$quality · ABR" else "ABR"
             } else {
                 quality
             }
-            binding.qualityBadge.text = qualityText
-            binding.qualityBadge.visibility = View.VISIBLE
+            if (binding.qualityBadge.text != qualityText) binding.qualityBadge.text = qualityText
+            if (binding.qualityBadge.visibility != View.VISIBLE) binding.qualityBadge.visibility = View.VISIBLE
+        } else {
+            if (binding.qualityBadge.visibility != View.GONE) binding.qualityBadge.visibility = View.GONE
         }
         binding.sourceBadgeIcon.setImageResource(R.drawable.ic_source_iptv)
         val bitrateText = formatBitrate(info.bitrate?.toLong() ?: info.estimatedBandwidthBps)
         val hasBitrate = !radio && bitrateText != "-"
         if (hasBitrate) {
-            binding.bitrateBadge.text = bitrateText
-            binding.bitrateBadge.visibility = View.VISIBLE
+            if (binding.bitrateBadge.text != bitrateText) binding.bitrateBadge.text = bitrateText
+            if (binding.bitrateBadge.visibility != View.VISIBLE) binding.bitrateBadge.visibility = View.VISIBLE
         } else {
-            binding.bitrateBadge.visibility = View.GONE
+            if (binding.bitrateBadge.visibility != View.GONE) binding.bitrateBadge.visibility = View.GONE
         }
-        binding.lockBadge.visibility = if (
+        val targetLockVis = if (
             channel.encrypted || channel.locked || parentalControlStore.isLocked(channel.sourceKey)
         ) View.VISIBLE else View.GONE
+        if (binding.lockBadge.visibility != targetLockVis) binding.lockBadge.visibility = targetLockVis
 
-        binding.dolbyBadge.visibility = if (info.hasDolby) View.VISIBLE else View.GONE
+        val targetDolbyVis = if (info.hasDolby) View.VISIBLE else View.GONE
+        if (binding.dolbyBadge.visibility != targetDolbyVis) binding.dolbyBadge.visibility = targetDolbyVis
+
         val audioLang = info.audioLanguage?.let(::displayLanguage)
-        binding.audioBadge.text = audioLang ?: if (info.hasAudio) "1" else null
-        binding.audioBadge.visibility = if (!info.hasAudio || info.hasDolby) View.GONE else View.VISIBLE
+        val audioText = audioLang ?: if (info.hasAudio) "1" else null
+        if (binding.audioBadge.text != audioText) binding.audioBadge.text = audioText
+        val targetAudioVis = if (!info.hasAudio || info.hasDolby) View.GONE else View.VISIBLE
+        if (binding.audioBadge.visibility != targetAudioVis) binding.audioBadge.visibility = targetAudioVis
 
         val subLang = info.subtitleLanguage?.let(::displayLanguage)
-        binding.subtitleBadge.text = subLang ?: if (info.hasSubtitles) "1" else null
-        binding.subtitleBadge.visibility = if (info.hasSubtitles) View.VISIBLE else View.GONE
-        binding.txtBadge.visibility = View.GONE
+        val subText = subLang ?: if (info.hasSubtitles) "1" else null
+        if (binding.subtitleBadge.text != subText) binding.subtitleBadge.text = subText
+        val targetSubVis = if (info.hasSubtitles) View.VISIBLE else View.GONE
+        if (binding.subtitleBadge.visibility != targetSubVis) binding.subtitleBadge.visibility = targetSubVis
+        if (binding.txtBadge.visibility != View.GONE) binding.txtBadge.visibility = View.GONE
 
         val activeSlots = booleanArrayOf(
             true,
@@ -2510,7 +2523,8 @@ class MainActivity : TvRemoteActivity() {
             binding.techSlotLock,
         )
         slots.forEachIndexed { index, slot ->
-            slot.visibility = if (activeSlots[index]) View.VISIBLE else View.GONE
+            val targetVis = if (activeSlots[index]) View.VISIBLE else View.GONE
+            if (slot.visibility != targetVis) slot.visibility = targetVis
         }
     }
 
@@ -4606,8 +4620,12 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showInfoBarForChannel(channel: LiveChannel) {
-        binding.nowChannel.text = channel.displayName
-        binding.nowNumber.text = channel.displayNumber
+        if (binding.nowChannel.text != channel.displayName) {
+            binding.nowChannel.text = channel.displayName
+        }
+        if (binding.nowNumber.text != channel.displayNumber) {
+            binding.nowNumber.text = channel.displayNumber
+        }
         showInfoBar()
     }
 
@@ -5201,8 +5219,14 @@ class MainActivity : TvRemoteActivity() {
     private fun updateInfoBarHeight() {
         val screenHeight = binding.root.height.takeIf { it > 0 }
             ?: resources.displayMetrics.heightPixels
-        binding.infoBar.layoutParams = binding.infoBar.layoutParams.apply {
-            height = currentInfoBarHeight(screenHeight)
+        val targetHeight = currentInfoBarHeight(screenHeight)
+        val lp = binding.infoBar.layoutParams
+        if (lp != null && lp.height == targetHeight) return
+        binding.infoBar.layoutParams = (lp ?: FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            targetHeight,
+        )).apply {
+            height = targetHeight
         }
     }
 

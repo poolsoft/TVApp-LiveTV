@@ -634,7 +634,7 @@ class IptvRepository(context: Context) {
                     )
                     channelCount++
                     if (batch.size >= IMPORT_BATCH_SIZE) {
-                        dao.insertStagedChannels(batch.toList())
+                        dao.insertStagedChannels(batch)
                         batch.clear()
                         onProgress(IptvImportProgress(IptvImportStage.READING, channelCount))
                     }
@@ -750,9 +750,11 @@ class IptvRepository(context: Context) {
         return result or Long.MIN_VALUE
     }
 
-    private fun selectionName(name: String, group: String?): String =
-        "${group.orEmpty().trim().lowercase(Locale.ROOT)}|" +
-            name.trim().lowercase(Locale.ROOT)
+    private fun selectionName(name: String, group: String?): String {
+        val trimmedGroup = group?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        val trimmedName = name.trim().lowercase(Locale.ROOT)
+        return if (trimmedGroup.isEmpty()) "|$trimmedName" else "$trimmedGroup|$trimmedName"
+    }
 
     companion object {
         const val KIND_URL = "URL"
