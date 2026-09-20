@@ -16,3 +16,4 @@ keystore.properties
 *.m3u
 *.m3u8
 TVApp-backup-*.json
+.freebuff/project-id

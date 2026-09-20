@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Kayıtlı Liste Düzeni, Zapping Kararlılığı ve Ekran Ortası Hata / Tanılama Gösterimi
+* **Kayıtlı IPTV Listelerinde Adres Taşması Düzeltmesi:** Kayıtlı listeler ekranında uzun URL'ye sahip kaynaklarda istatistiklerin ve güncelleme tarihlerinin ekrandan kaybolması önlendi. Liste öğesi 3 satırlı yapılandırılmış düzene (`item_iptv_source.xml`) geçirilerek adres tek satırda sınırlandırıldı (`singleLine`, `ellipsize="end"`), istatistik ve tarihler her zaman net şekilde görünür kılındı.
+* **Kanal Gezinirken (Zapping) Spinner Takılması ve Panel Kapanmasının Önlenmesi:** Hızlı kanal geçişlerinde eski kanalın "yükleniyor spinnerı"nın ekranda takılı kalması engellendi; kanal değişimi ve callback doğrulamalarında stale durumlar temizlendi. Yayın toparlandığında veya kontroller tetiklendiğinde açık olan kanal listesi panelinin istemsizce kapanması tamamen önlendi.
+* **Ekran Ortasında Kullanıcı Dostu Hata ve Teknik Tanılama Gösterimi:** Bir IPTV kanalı açılamadığında ortadaki dönen spinner gizlenerek yerine yayının neden açılamadığı kullanıcı dostu yerelleştirilmiş mesajlarla (Ağ hatası, zaman aşımı, HTTP 401/403, 404, sunucu hataları vb.) gösterilir. Ayarlar menüsünden "Oynatma istatistikleri (Stats OSD)" etkinleştirilmiş ise mesajın altına teknik hata kodu ve ayrıntısı eklenir.
+
 ### IPTV Senkronizasyon Bellek İyileştirmesi ve TV OSD / Infobar Açılış Akıcılığı
 * **Infobar Açılışında Gereksiz Layout Ölçümünün (Relayout) Engellenmesi:** `MainActivity` içinde her kanal değişiminde ve infobar açılışında `updateInfoBarHeight` çağrılırken, hesaplanan hedef yükseklik mevcut `layoutParams.height` ile aynıysa yeniden atama yapılması engellendi. Böylece kanal geçişlerinde tüm OSD ağacının baştan ölçülmesi (measure/layout pass) ve kumanda gecikmesi tamamen ortadan kalktı.
 * **Teknik Rozet ve Bilgilerde Şartlı Güncelleme:** `updateTechnicalBadges` ve `updateTechnicalBadgesForIptv` fonksiyonlarında slot görünürlükleri ve metin atamaları yalnızca değer değiştiğinde (`text != newText` / `visibility != targetVisibility`) yapılacak şekilde optimize edildi; gereksiz Android arayüz çizimleri elendi.

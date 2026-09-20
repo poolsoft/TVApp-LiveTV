@@ -521,7 +521,6 @@ class MainActivity : TvRemoteActivity() {
                         "current=${currentChannel?.sourceKey}",
                 )
             } else {
-                setIptvBufferingVisible(false)
                 handleIptvPlaybackError(error)
             }
         }
@@ -543,11 +542,12 @@ class MainActivity : TvRemoteActivity() {
                 val recoveredFromFailure = iptvPlaybackFailed
                 iptvPlaybackFailed = false
                 setIptvBufferingVisible(false)
-                if (recoveredFromFailure) {
+                if (recoveredFromFailure && binding.channelPanel.visibility != View.VISIBLE) {
                     hideIptvPlaybackControls()
                 }
                 if (osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS &&
-                    currentChannel?.source == LiveChannel.Source.IPTV
+                    currentChannel?.source == LiveChannel.Source.IPTV &&
+                    binding.channelPanel.visibility != View.VISIBLE
                 ) {
                     osdCoordinator.hideStatus()
                 }
@@ -581,6 +581,8 @@ class MainActivity : TvRemoteActivity() {
                         setIptvBufferingVisible(true)
                     }
                 }
+            } else {
+                setIptvBufferingVisible(false)
             }
         }
         iptvPlayback.onContentKindChanged = { kind ->
@@ -979,6 +981,9 @@ class MainActivity : TvRemoteActivity() {
                 updateTechnicalBadges(channel, emptyList())
                 showInfoBar()
                 loadPrograms(channel)
+                setIptvBufferingVisible(false)
+                iptvPlayback.stop()
+                updateIptvBufferingStatus(R.string.iptv_connecting)
             }
             lifecycleScope.launch {
                 val (resolved, preference) = withContext(Dispatchers.IO) {
@@ -989,8 +994,12 @@ class MainActivity : TvRemoteActivity() {
                     }
                     resolvedChannel to repository.channelPreference(channel.sourceKey)
                 }
-                if (generation != channelResolutionGeneration) return@launch
+                if (generation != channelResolutionGeneration) {
+                    setIptvBufferingVisible(false)
+                    return@launch
+                }
                 if (resolved == null) {
+                    setIptvBufferingVisible(false)
                     debugLog.recordDebug("IPTV_CHANNEL_RESOLVE_MISSING | key=${channel.sourceKey}")
                     showIptvNotice(R.string.channel_not_found)
                     return@launch
@@ -1145,11 +1154,11 @@ class MainActivity : TvRemoteActivity() {
             }
         }
             .onFailure {
-                setIptvBufferingVisible(false)
                 debugLog.recordDebug("PLAYBACK_FAILURE | ${it.javaClass.name}: ${it.message}")
                 if (channel.source == LiveChannel.Source.IPTV) {
-                    showIptvPlaybackFailure()
+                    showIptvPlaybackFailure(it)
                 } else {
+                    setIptvBufferingVisible(false)
                     showPlaybackError(channel, it.message ?: it.javaClass.simpleName)
                 }
             }
@@ -1160,8 +1169,13 @@ class MainActivity : TvRemoteActivity() {
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean) {
         val shouldShow = visible && currentChannel?.source == LiveChannel.Source.IPTV
-        binding.iptvBufferingContainer.visibility =
-            if (shouldShow) View.VISIBLE else View.GONE
+        if (shouldShow) {
+            binding.iptvBufferingSpinner.visibility = View.VISIBLE
+            binding.iptvBufferingContainer.visibility = View.VISIBLE
+        } else {
+            binding.iptvBufferingContainer.visibility = View.GONE
+            binding.iptvBufferingSpinner.visibility = View.VISIBLE
+        }
     }
 
     private fun updateIptvBufferingStatus(statusResId: Int) {
@@ -1217,7 +1231,7 @@ class MainActivity : TvRemoteActivity() {
             if (currentChannel?.sourceKey != channel.sourceKey) return@launch
             val alternative = alternatives.getOrNull(iptvAlternativeIndex++)
             if (alternative == null) {
-                showIptvPlaybackFailure()
+                showIptvPlaybackFailure(error)
                 return@launch
             }
             val snapshot = iptvPlayback.playbackSnapshot()
@@ -1241,13 +1255,86 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
-    private fun showIptvPlaybackFailure() {
+    private fun showIptvPlaybackFailure(error: Throwable? = null) {
         iptvPlaybackFailed = true
         osdCoordinator.hideStatus()
         showIptvPlaybackControls(R.string.iptv_stream_failed, autoHide = false)
+        if (currentChannel?.source == LiveChannel.Source.IPTV) {
+            binding.iptvBufferingSpinner.visibility = View.GONE
+            binding.iptvBufferingText.text = formatIptvErrorMessage(error)
+            binding.iptvBufferingContainer.visibility = View.VISIBLE
+        }
+    }
+
+    private fun formatIptvErrorMessage(error: Throwable?): String {
+        val channelName = currentChannel
+            ?.takeIf { it.source == LiveChannel.Source.IPTV }
+            ?.displayName
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+
+        val baseReason = when (error) {
+            is androidx.media3.common.PlaybackException -> {
+                val httpCode = findHttpErrorCode(error)
+                when {
+                    httpCode == 403 || httpCode == 401 -> getString(R.string.iptv_error_http_forbidden, httpCode)
+                    httpCode == 404 -> getString(R.string.iptv_error_http_not_found)
+                    httpCode != null && httpCode >= 500 -> getString(R.string.iptv_error_http_server, httpCode)
+                    httpCode != null -> getString(R.string.iptv_error_http_generic, httpCode)
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
+                        getString(R.string.iptv_error_network)
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+                        getString(R.string.iptv_error_timeout)
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
+                        getString(R.string.iptv_error_decoder)
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ||
+                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED ->
+                        getString(R.string.iptv_error_format)
+                    else -> getString(R.string.iptv_error_generic)
+                }
+            }
+            null -> getString(R.string.iptv_error_generic)
+            else -> error.localizedMessage ?: getString(R.string.iptv_error_generic)
+        }
+
+        val fullMessage = if (channelName != null) {
+            getString(R.string.iptv_playback_status, channelName, baseReason)
+        } else {
+            baseReason
+        }
+
+        return if (displayPreferences.showDiagnosticsOverlay && error != null) {
+            val techDetail = if (error is androidx.media3.common.PlaybackException) {
+                "${error.errorCodeName} (${error.errorCode})"
+            } else {
+                "${error.javaClass.simpleName}: ${error.message}"
+            }
+            "$fullMessage\n[$techDetail]"
+        } else {
+            fullMessage
+        }
+    }
+
+    private fun findHttpErrorCode(throwable: Throwable): Int? {
+        var current: Throwable? = throwable
+        while (current != null) {
+            if (current is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                return current.responseCode
+            }
+            current = current.cause
+        }
+        return null
     }
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
+        if (binding.channelPanel.visibility == View.VISIBLE || osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
+            showIptvNotice(R.string.iptv_stream_failed)
+            return
+        }
         osdCoordinator.showStatus()
         binding.statusTitle.setText(R.string.playback_error_title)
         binding.inputSummary.text = channel?.displayName.orEmpty()
@@ -1868,6 +1955,13 @@ class MainActivity : TvRemoteActivity() {
         autoHide: Boolean = true,
         activateControls: Boolean = iptvControlsInteractive,
     ) {
+        if (binding.channelPanel.visibility == View.VISIBLE || osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
+            if (stateText != null && stateText != 0) {
+                showIptvNotice(stateText)
+            }
+            updateIptvPlaybackControls()
+            return
+        }
         val wasHidden = binding.iptvPlaybackContainer.visibility != View.VISIBLE
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()

@@ -506,16 +506,42 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         convertView: View?,
                         parent: android.view.ViewGroup,
                     ): View {
-                        val view = super.getView(position, convertView, parent) as TextView
+                        val view = convertView ?: layoutInflater.inflate(R.layout.item_iptv_source, parent, false)
                         val summary = getItem(position) ?: return view
-                        view.text = sourceRowText(summary)
-                        view.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        val nameView = view.findViewById<TextView>(R.id.source_item_name)
+                        val locationView = view.findViewById<TextView>(R.id.source_item_location)
+                        val detailsView = view.findViewById<TextView>(R.id.source_item_details)
+
+                        val title = "${summary.source.name} · ${sourceTypeLabel(summary.source.kind)}"
+                        nameView.text = title
+                        nameView.setCompoundDrawablesRelativeWithIntrinsicBounds(
                             sourceIcon(summary.source.kind),
                             0,
                             0,
                             0,
                         )
-                        view.compoundDrawablePadding = (8 * resources.displayMetrics.density).toInt()
+                        nameView.compoundDrawablePadding = (8 * resources.displayMetrics.density).toInt()
+
+                        val isUrlOrHasLocation = summary.source.kind == IptvRepository.KIND_URL ||
+                            summary.source.location.startsWith("http://") ||
+                            summary.source.location.startsWith("https://")
+                        if (isUrlOrHasLocation && summary.source.location.isNotBlank()) {
+                            locationView.text = summary.source.location
+                            locationView.visibility = View.VISIBLE
+                        } else {
+                            locationView.visibility = View.GONE
+                        }
+
+                        val updatedAt = summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
+                            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                        } ?: getString(R.string.never)
+
+                        detailsView.text = getString(
+                            R.string.iptv_source_stats_line,
+                            summary.channelCount,
+                            summary.selectedChannelCount,
+                            updatedAt,
+                        )
                         return view
                     }
                 }

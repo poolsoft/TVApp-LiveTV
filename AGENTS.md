@@ -6,6 +6,7 @@ and `MARKET_LISTING.md`; this file contains implementation and workflow constrai
 
 ## Working Tree And Git
 
+- Benimle Türkçe konuş!
 - The user may edit the project concurrently. Inspect `git status` and the relevant diff before
   every group of edits and again before committing.
 - Never discard, overwrite, reformat, stage, or commit unrelated changes. Work with concurrent

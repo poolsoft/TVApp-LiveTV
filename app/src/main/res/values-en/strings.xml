@@ -504,6 +504,15 @@
     <string name="iptv_loading">Loading…</string>
     <string name="iptv_opening">Opening…</string>
     <string name="iptv_playback_status">%1$s\n%2$s</string>
+    <string name="iptv_error_network">Network connection failed</string>
+    <string name="iptv_error_timeout">Connection timed out</string>
+    <string name="iptv_error_http_forbidden">Access forbidden (HTTP %1$d)</string>
+    <string name="iptv_error_http_not_found">Stream not found (HTTP 404)</string>
+    <string name="iptv_error_http_server">Server error (HTTP %1$d)</string>
+    <string name="iptv_error_http_generic">Server error (HTTP %1$d)</string>
+    <string name="iptv_error_decoder">Audio/video decoding failed</string>
+    <string name="iptv_error_format">Unsupported or malformed stream format</string>
+    <string name="iptv_error_generic">Playback failed</string>
     <string name="iptv_buffer_target">Buffer target: %1$d seconds</string>
     <string name="iptv_buffer_target_short">Target %1$d sec</string>
     <string name="iptv_buffer_target_auto">Buffer target: Auto (ABR)</string>
@@ -580,6 +589,7 @@
     <string name="edit_iptv_source_url">Edit playlist address</string>
     <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d channels · %4$d selected · %5$s</string>
     <string name="iptv_source_row_url_detailed">%1$s · %2$s\n%3$s\n%4$d channels · %5$d selected · %6$s</string>
+    <string name="iptv_source_stats_line">%1$d channels · %2$d selected · %3$s</string>
     <string name="iptv_source_progress">%1$s · %2$s</string>
     <string name="iptv_source_import_complete">%1$s updated · %2$d IPTV items</string>
     <string name="never">Not yet</string>
