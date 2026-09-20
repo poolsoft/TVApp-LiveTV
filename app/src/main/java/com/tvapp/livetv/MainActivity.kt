@@ -2562,18 +2562,12 @@ class MainActivity : TvRemoteActivity() {
             .show()
     }
 
-    /** TXT/Teletext remote key: opens the subtitle/teletext track picker for
-     *  the active source. Works on the playback screen and while the channel
-     *  panel is visible (the key event reaches dispatchKeyEvent in both). */
+    /** TXT/Teletext remote key. Temporary behavior until a real teletext
+     *  page view exists: opens the VOD home screen. Swap the body for the
+     *  teletext view when it is implemented. */
     private fun showTxtTracks() {
         if (iptvGridActive) return
-        if (binding.iptvPlaybackContainer.visibility == View.VISIBLE &&
-            iptvControlsInteractive
-        ) {
-            showIptvSubtitleTracks()
-            return
-        }
-        showSubtitleTracks()
+        startActivity(android.content.Intent(this, VodHomeActivity::class.java))
     }
 
     private fun showSubtitleTracks() {
