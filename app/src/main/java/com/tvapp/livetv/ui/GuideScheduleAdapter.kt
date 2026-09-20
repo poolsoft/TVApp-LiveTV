@@ -254,35 +254,41 @@ class GuideScheduleAdapter(
         }
 
         fun bindScheduleCells(channel: LiveChannel, row: Int) {
-            binding.programCells.removeAllViews()
             programViews.clear()
             val visiblePrograms = schedules[channel.sourceKey].orEmpty()
                 .asSequence()
                 .filter { it.endTimeMillis > windowStartMillis && it.startTimeMillis < windowEndMillis }
                 .sortedBy { it.startTimeMillis }
                 .toList()
+
+            var childIndex = 0
+
             if (visiblePrograms.isEmpty()) {
-                binding.programCells.addView(emptyCell(channel, row))
+                obtainEmptyCell(childIndex, channel, row)
+                childIndex++
+                trimExcessViews(childIndex)
                 return
             }
+
             var cursor = windowStartMillis
             visiblePrograms.forEach { program ->
                 val clippedStart = maxOf(program.startTimeMillis, windowStartMillis)
                 val clippedEnd = minOf(program.endTimeMillis, windowEndMillis)
-                if (clippedStart > cursor) addSpacer(clippedStart - cursor)
-                val view = programCell(channel, program, row)
-                binding.programCells.addView(
-                    view,
-                    LinearLayout.LayoutParams(
-                        0,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        durationWeight(clippedEnd - clippedStart),
-                    ),
-                )
+                if (clippedStart > cursor) {
+                    obtainSpacer(childIndex, durationWeight(clippedStart - cursor))
+                    childIndex++
+                }
+                val weight = durationWeight(clippedEnd - clippedStart)
+                val view = obtainProgramCell(childIndex, channel, program, row, weight)
+                childIndex++
                 programViews += program to view
                 cursor = maxOf(cursor, clippedEnd)
             }
-            if (cursor < windowEndMillis) addSpacer(windowEndMillis - cursor)
+            if (cursor < windowEndMillis) {
+                obtainSpacer(childIndex, durationWeight(windowEndMillis - cursor))
+                childIndex++
+            }
+            trimExcessViews(childIndex)
             refreshLiveState()
         }
 
@@ -315,8 +321,65 @@ class GuideScheduleAdapter(
                 ?.requestFocus() == true
         }
 
-        private fun emptyCell(channel: LiveChannel, row: Int): TextView = TextView(binding.root.context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        private fun trimExcessViews(keepCount: Int) {
+            val total = binding.programCells.childCount
+            if (total > keepCount) {
+                binding.programCells.removeViews(keepCount, total - keepCount)
+            }
+        }
+
+        private fun obtainSpacer(index: Int, weight: Float): View {
+            val existing = binding.programCells.getChildAt(index)
+            if (existing != null && existing.tag == TAG_SPACER) {
+                val lp = existing.layoutParams as? LinearLayout.LayoutParams
+                if (lp == null || lp.weight != weight) {
+                    existing.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
+                }
+                return existing
+            }
+            val spacer = View(binding.root.context).apply {
+                tag = TAG_SPACER
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
+            }
+            if (existing != null) {
+                binding.programCells.removeViewAt(index)
+            }
+            binding.programCells.addView(spacer, index)
+            return spacer
+        }
+
+        private fun obtainEmptyCell(index: Int, channel: LiveChannel, row: Int): TextView {
+            val existing = binding.programCells.getChildAt(index) as? TextView
+            val cell = if (existing != null && existing.tag == TAG_EMPTY_CELL) {
+                existing
+            } else {
+                if (existing != null) binding.programCells.removeViewAt(index)
+                createEmptyCell().also { binding.programCells.addView(it, index) }
+            }
+            updateEmptyCell(cell, channel, row)
+            return cell
+        }
+
+        private fun obtainProgramCell(
+            index: Int,
+            channel: LiveChannel,
+            program: ProgramSummary,
+            row: Int,
+            weight: Float,
+        ): TextView {
+            val existing = binding.programCells.getChildAt(index) as? TextView
+            val cell = if (existing != null && existing.tag == TAG_PROGRAM_CELL) {
+                existing
+            } else {
+                if (existing != null) binding.programCells.removeViewAt(index)
+                createProgramCell().also { binding.programCells.addView(it, index) }
+            }
+            updateProgramCell(cell, channel, program, row, weight)
+            return cell
+        }
+
+        private fun createEmptyCell(): TextView = TextView(binding.root.context).apply {
+            tag = TAG_EMPTY_CELL
             background = ContextCompat.getDrawable(context, R.drawable.bg_guide_item)
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
@@ -324,11 +387,18 @@ class GuideScheduleAdapter(
             setText(R.string.no_program_information)
             setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             textSize = 12f
-            setOnFocusChangeListener { _, focused ->
+        }
+
+        private fun updateEmptyCell(cell: TextView, channel: LiveChannel, row: Int) {
+            val lp = cell.layoutParams as? LinearLayout.LayoutParams
+            if (lp == null || lp.weight != 1f) {
+                cell.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            }
+            cell.setOnFocusChangeListener { _, focused ->
                 if (focused) onChannelFocused(row, channel)
             }
-            setOnClickListener { onChannelSelected(channel) }
-            setOnKeyListener { _, keyCode, event ->
+            cell.setOnClickListener { onChannelSelected(channel) }
+            cell.setOnKeyListener { _, keyCode, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     binding.channelCell.requestFocus()
                     return@setOnKeyListener true
@@ -337,66 +407,68 @@ class GuideScheduleAdapter(
             }
         }
 
-        private fun programCell(channel: LiveChannel, program: ProgramSummary, row: Int): TextView =
-            TextView(binding.root.context).apply {
-                background = ContextCompat.getDrawable(context, R.drawable.bg_guide_program_cell)
-                gravity = Gravity.CENTER_VERTICAL
-                isClickable = true
-                isFocusable = true
-                maxLines = 2
-                setPadding(dp(10), dp(5), dp(10), dp(5))
-                text = program.title.ifBlank { context.getString(R.string.untitled_program) }
-                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
-                textSize = 13f
-                val now = System.currentTimeMillis()
-                val archived = channel.source == LiveChannel.Source.IPTV &&
-                    channel.catchUpDays > 0 &&
-                    (!channel.catchUpSource.isNullOrBlank() || channel.catchUpMode == "xtream") &&
-                    program.endTimeMillis <= now &&
-                    program.endTimeMillis >= now - channel.catchUpDays * DAY_MILLIS
-                val reminded = program.startTimeMillis in reminders[channel.sourceKey].orEmpty()
-                setCompoundDrawablesWithIntrinsicBounds(
-                    if (archived) R.drawable.ic_archive else 0,
-                    0,
-                    if (reminded) R.drawable.ic_clock_small else 0,
-                    0,
-                )
-                compoundDrawablePadding = if (archived || reminded) dp(5) else 0
-                isSelected = channel.sourceKey == selectedChannelKey &&
-                    program.startTimeMillis == selectedProgramStart
-                setOnFocusChangeListener { _, focused ->
-                    if (focused) {
-                        selectedChannelKey = channel.sourceKey
-                        selectedProgramStart = program.startTimeMillis
-                        onProgramFocused(row, channel, program)
-                    }
-                }
-                setOnKeyListener { _, keyCode, event ->
-                    if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                        val isFirst = programViews.firstOrNull()?.second === this
-                        if (isFirst) {
-                            binding.channelCell.requestFocus()
-                            return@setOnKeyListener true
-                        }
-                    }
-                    false
-                }
-                setOnClickListener { onProgramSelected(channel, program) }
-                setOnLongClickListener {
-                    onReminderToggle(channel, program)
-                    true
+        private fun createProgramCell(): TextView = TextView(binding.root.context).apply {
+            tag = TAG_PROGRAM_CELL
+            background = ContextCompat.getDrawable(context, R.drawable.bg_guide_program_cell)
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+            maxLines = 2
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            textSize = 13f
+        }
+
+        private fun updateProgramCell(
+            cell: TextView,
+            channel: LiveChannel,
+            program: ProgramSummary,
+            row: Int,
+            weight: Float,
+        ) {
+            val lp = cell.layoutParams as? LinearLayout.LayoutParams
+            if (lp == null || lp.weight != weight) {
+                cell.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
+            }
+            cell.text = program.title.ifBlank { cell.context.getString(R.string.untitled_program) }
+            val now = System.currentTimeMillis()
+            val archived = channel.source == LiveChannel.Source.IPTV &&
+                channel.catchUpDays > 0 &&
+                (!channel.catchUpSource.isNullOrBlank() || channel.catchUpMode == "xtream") &&
+                program.endTimeMillis <= now &&
+                program.endTimeMillis >= now - channel.catchUpDays * DAY_MILLIS
+            val reminded = program.startTimeMillis in reminders[channel.sourceKey].orEmpty()
+            cell.setCompoundDrawablesWithIntrinsicBounds(
+                if (archived) R.drawable.ic_archive else 0,
+                0,
+                if (reminded) R.drawable.ic_clock_small else 0,
+                0,
+            )
+            cell.compoundDrawablePadding = if (archived || reminded) dp(5) else 0
+            cell.isSelected = channel.sourceKey == selectedChannelKey &&
+                program.startTimeMillis == selectedProgramStart
+            cell.setOnFocusChangeListener { _, focused ->
+                if (focused) {
+                    selectedChannelKey = channel.sourceKey
+                    selectedProgramStart = program.startTimeMillis
+                    onProgramFocused(row, channel, program)
                 }
             }
-
-        private fun addSpacer(durationMillis: Long) {
-            binding.programCells.addView(
-                View(binding.root.context),
-                LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    durationWeight(durationMillis),
-                ),
-            )
+            cell.setOnKeyListener { _, keyCode, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    val isFirst = programViews.firstOrNull()?.second === cell
+                    if (isFirst) {
+                        binding.channelCell.requestFocus()
+                        return@setOnKeyListener true
+                    }
+                }
+                false
+            }
+            cell.setOnClickListener { onProgramSelected(channel, program) }
+            cell.setOnLongClickListener {
+                onReminderToggle(channel, program)
+                true
+            }
         }
 
         private fun durationWeight(durationMillis: Long): Float =
@@ -412,6 +484,9 @@ class GuideScheduleAdapter(
         const val LOGO_HEIGHT_FRACTION = 0.46f
         const val NUMBER_WIDTH_FRACTION = 0.78f
         const val DAY_MILLIS = 24L * 60L * 60L * 1_000L
+        const val TAG_SPACER = "guide_spacer"
+        const val TAG_EMPTY_CELL = "guide_empty_cell"
+        const val TAG_PROGRAM_CELL = "guide_program_cell"
         const val PAYLOAD_SELECTION = "selection"
         const val PAYLOAD_CHANNEL_PROGRAM = "channel_program"
         const val PAYLOAD_SCHEDULES = "schedules"
