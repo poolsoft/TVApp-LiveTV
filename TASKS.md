@@ -254,6 +254,16 @@ Bu maddeler ileride kullanıcı talebi ve ölçülmüş fayda varsa ayrı epic o
   R8 ve resource shrinking'i local/paid release üzerinde kademeli etkinleştir.
   **Kabul:** TIF service, Room, Media3 ve deep link kuralları release smoke testini geçer.
 
+- [ ] **TXT-001 (P3): Teletext stratejisi — TIF araştırması tamamlandı**
+  AOSP TIF kuralı gereği teletext çözümü vendor TV Input'un sorumluluğudur; `TvTrackInfo`'da
+  teletext ayrı bir tip yoktur (yalnızca VIDEO/AUDIO/SUBTITLE) ve üçüncü parti uygulamaların
+  vendor input'a sayfa isteği/event gönderme API'si bulunmaz. Bu yüzden TvView üzerinden gerçek
+  sayfa görünümü mümkün değildir. Kabul edilen geçici davranış: TXT tuşu (KEYCODE_TV_TELETEXT,
+  233) tüm kaynaklarda VOD Ana Sayfa'yı açar. İleride: vendor bir SUBTITLE track'i teletext
+  olarak bildiriyorsa TIF'te o track'i seçen + "teletext yok" OSD'si düşen bir tespit katmanı
+  (`TifPlaybackController.teletextTrack()`), gerçek sayfalar içinse IPTV/HTTP teletext kaynağı
+  değerlendirilir.
+
 - [ ] **STORE-003 (P2): İlk kurulum ve gizlilik**
   Çalışma modu, IPTV kaynağı, EPG ve kumanda kontrolünü içeren kısa kurulum akışı oluştur.
   **Kabul:** Kullanıcı TIF olmayan cihazda neden yalnız IPTV gördüğünü anlayabilir.
