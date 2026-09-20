@@ -19,7 +19,7 @@ import com.tvapp.livetv.settings.LogoCachePreferencesStore
 object ChannelLogoLoader {
     private var holder: LoaderHolder? = null
     private var configuredPolicy: DeviceResourcePolicy? = null
-    private val failedRequests = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val failedRequests = FailedLogoTracker()
 
     fun load(imageView: ImageView, data: Any?, fallbackRes: Int) {
         if (data == null || data is String && data.isBlank()) {
@@ -28,7 +28,7 @@ object ChannelLogoLoader {
             return
         }
         val requestKey = data.toString()
-        if (requestKey in failedRequests) {
+        if (failedRequests.isFailed(requestKey)) {
             imageView.dispose()
             imageView.setImageResource(fallbackRes)
             return
@@ -39,8 +39,8 @@ object ChannelLogoLoader {
             error(fallbackRes)
             fallback(fallbackRes)
             listener(
-                onSuccess = { _, _ -> failedRequests.remove(requestKey) },
-                onError = { _, _ -> failedRequests.add(requestKey) },
+                onSuccess = { _, _ -> failedRequests.recordSuccess(requestKey) },
+                onError = { _, _ -> failedRequests.recordFailure(requestKey) },
             )
             diskCachePolicy(if (current.diskEnabled) CachePolicy.ENABLED else CachePolicy.DISABLED)
         }

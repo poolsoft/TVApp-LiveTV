@@ -288,8 +288,8 @@ internal class XtreamClient(
         private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
         private fun encodePath(value: String) = encode(value).replace("+", "%20")
         const val SHORT_EPG_LISTING_LIMIT = 4
-        private const val CONNECTION_TIMEOUT_MS = 15_000
-        private const val READ_TIMEOUT_MS = 60_000
+        private const val CONNECTION_TIMEOUT_MS = 10_000
+        private const val READ_TIMEOUT_MS = 20_000
         private const val USER_AGENT = "TVApp/0.1 AndroidTV"
     }
 }

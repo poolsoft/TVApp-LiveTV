@@ -759,8 +759,8 @@ class IptvRepository(context: Context) {
         const val KIND_DOCUMENT = "DOCUMENT"
         const val KIND_XTREAM = "XTREAM"
         const val KIND_STALKER = "STALKER"
-        private const val CONNECTION_TIMEOUT_MS = 15_000
-        private const val READ_TIMEOUT_MS = 30_000
+        private const val CONNECTION_TIMEOUT_MS = 10_000
+        private const val READ_TIMEOUT_MS = 20_000
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
         private const val IMPORT_BATCH_SIZE = 500

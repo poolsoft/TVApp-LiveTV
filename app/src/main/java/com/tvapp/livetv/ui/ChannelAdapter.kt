@@ -25,6 +25,7 @@ class ChannelAdapter(
     private var rowOptions = ChannelRowOptions()
     private var showIptvMembership = false
     private var selectedId: Long? = null
+    private var lastFocusedPosition: Int = RecyclerView.NO_POSITION
 
     fun submitList(items: List<LiveChannel>) {
         val previous = channels.toList()
@@ -214,7 +215,12 @@ class ChannelAdapter(
             root.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     onFocused(channel)
-                    if (rowOptions.showLogo) prefetchAround(root, bindingAdapterPosition)
+                    val pos = bindingAdapterPosition
+                    if (rowOptions.showLogo && pos in channels.indices) {
+                        val movingUp = lastFocusedPosition != RecyclerView.NO_POSITION && pos < lastFocusedPosition
+                        lastFocusedPosition = pos
+                        prefetchAround(root, pos, movingUp)
+                    }
                 }
             }
         }
@@ -237,14 +243,23 @@ class ChannelAdapter(
             binding.root.isSelected = channel.id == selectedId
         }
 
-        private fun prefetchAround(view: View, position: Int) {
+        private fun prefetchAround(view: View, position: Int, movingUp: Boolean) {
             if (position !in channels.indices) return
-            val candidates = channels.asSequence()
-                .drop(position + 1)
-                .map { candidate ->
-                    if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
-                    else TvContract.buildChannelLogoUri(candidate.id)
-                }
+            val candidates = if (movingUp) {
+                (position - 1 downTo 0).asSequence()
+                    .map { channels[it] }
+                    .map { candidate ->
+                        if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                        else TvContract.buildChannelLogoUri(candidate.id)
+                    }
+            } else {
+                channels.asSequence()
+                    .drop(position + 1)
+                    .map { candidate ->
+                        if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                        else TvContract.buildChannelLogoUri(candidate.id)
+                    }
+            }
             ChannelLogoLoader.prefetch(view.context, candidates)
         }
     }

@@ -35,6 +35,7 @@ class GuideScheduleAdapter(
     private var windowEndMillis = 0L
     private var selectedChannelKey: String? = null
     private var selectedProgramStart: Long? = null
+    private var lastFocusedPosition: Int = RecyclerView.NO_POSITION
 
     init {
         setHasStableIds(true)
@@ -212,13 +213,17 @@ class GuideScheduleAdapter(
                     onChannelFocused(row, channel)
                     val pos = bindingAdapterPosition
                     if (pos in channels.indices) {
-                        ChannelLogoLoader.prefetch(
-                            root.context,
-                            channels.asSequence().drop(pos + 1).map { candidate ->
-                                if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
-                                else TvContract.buildChannelLogoUri(candidate.id)
-                            },
-                        )
+                        val movingUp = lastFocusedPosition != RecyclerView.NO_POSITION && pos < lastFocusedPosition
+                        lastFocusedPosition = pos
+                        val candidates = if (movingUp) {
+                            (pos - 1 downTo 0).asSequence().map { channels[it] }
+                        } else {
+                            channels.asSequence().drop(pos + 1)
+                        }.map { candidate ->
+                            if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                            else TvContract.buildChannelLogoUri(candidate.id)
+                        }
+                        ChannelLogoLoader.prefetch(root.context, candidates)
                     }
                 }
             }

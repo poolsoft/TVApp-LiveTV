@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Logo Önbelleği (TTL & LRU), Çift Yönlü Prefetch ve HTTP Zaman Aşımı Optimizasyonları
+* **Logo İndirme Hatalarında Bellek Sınırı ve 5 Dakika TTL (`FailedLogoTracker`):** İndirilemeyen logolar için tutulan sınırsız küme yerine, LRU mantığıyla çalışan maksimum 200 kapasiteli ve 5 dakika zaman aşımlı (`FailedLogoTracker`) mekanizmasına geçildi. Geçici ağ kesintilerinde inemeyen logolar 5 dakika sonra otomatik affedilir ve tekrar denenir; bellek sızıntısı riski ortadan kaldırıldı.
+* **Kanal Listesi ve EPG Kılavuzunda Çift Yönlü Logo Prefetch:** Hem `ChannelAdapter` hem de `GuideScheduleAdapter` içinde kumanda yönü (Yukarı/Aşağı) takip edilerek, kullanıcı yukarı kaydırırken önceki kanalların logoları da önceden yüklenir hale getirildi.
+* **IPTV HTTP Bağlantı ve Okuma Zaman Aşımlarının İyileştirilmesi:** `XtreamClient`, `StalkerClient` ve `IptvRepository` içindeki okuma zaman aşımı süreleri 60s/30s değerlerinden TV için optimize edilmiş 20s değerine, bağlantı zaman aşımı süreleri ise 10s değerine çekilerek yanıt vermeyen sunucularda arayüzün askıda kalması önlendi.
+
 ### Kanal Düzenleyicide Senkron Tek Kanal Taşıma ve Renk Butonları Tepki Optimizasyonu
 * **Senkron `notifyItemMoved` ile Sıfır Gecikmeli Kanal Taşıma:** Kanal düzenleyicisinde (`ChannelEditorAdapter`) asenkron `AsyncListDiffer` kuyruğu yerine senkron liste yönetimi ve Android RecyclerView'ın yerel `notifyItemMoved` mekanizmasına geçildi. Kumandadan Yukarı/Aşağı tuşlarına hızlıca basılsa dahi taşınan kanalın odağı (`itemView`) asla kaybolmaz ve yerine geçen kanalın seçili görünmesi sorunu tamamen çözüldü.
 * **Anlık Dinamik Sıra Numarası ve Önizleme Takibi:** Kanal taşınırken liste pozisyonuna göre kanal numarası anında dinamik olarak (`position + 1`) güncellenir (`PAYLOAD_NUMBER`). Sağ taraftaki önizleme panelinde taşınan kanalın adı ve güncel sıra numarası gecikmesiz olarak takip edilir.
