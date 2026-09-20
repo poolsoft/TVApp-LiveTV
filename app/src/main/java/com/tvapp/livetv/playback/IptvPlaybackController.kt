@@ -69,8 +69,16 @@ class IptvPlaybackController(
     private var muted = false
     private var fallbackReason: String? = null
     private var lastFallbackPositionMillis = 0L
+
+    /** Incremented on every play()/stop()/release(). Everything queued on
+     *  retryHandler and every player callback carries the generation it was
+     *  created under; work and events from an older generation are dropped at
+     *  dispatch time so a channel switch cannot be corrupted by stale state. */
+    private var tuneGeneration = 0L
     private val retryRunnable = Runnable {
+        val generation = tuneGeneration
         player?.let { current ->
+            if (generation != tuneGeneration || released) return@let
             explicitLoading = true
             tuneStartedAt = SystemClock.elapsedRealtime()
             bufferingStartedAt = null
@@ -81,9 +89,16 @@ class IptvPlaybackController(
     }
     private val watchdogRunnable = object : Runnable {
         override fun run() {
-            if (released || currentChannel == null) return
-            evaluateWatchdog(SystemClock.elapsedRealtime())?.let(::recoverFromWatchdog)
-            retryHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
+            val generation = tuneGeneration
+            if (released || currentChannel == null || generation != tuneGeneration) return
+            evaluateWatchdog(SystemClock.elapsedRealtime())?.let { reason ->
+                if (generation == tuneGeneration && !released) {
+                    recoverFromWatchdog(reason, generation)
+                }
+            }
+            if (generation == tuneGeneration && !released) {
+                retryHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
+            }
         }
     }
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
@@ -100,6 +115,7 @@ class IptvPlaybackController(
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
         released = false
+        tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
         fallbackReason = null
@@ -178,6 +194,7 @@ class IptvPlaybackController(
                 .build()
             created.addListener(object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (released) return
                     when (playbackState) {
                         Player.STATE_BUFFERING -> {
                             if (bufferingStartedAt == null) bufferingStartedAt = SystemClock.elapsedRealtime()
@@ -318,6 +335,7 @@ class IptvPlaybackController(
     }
 
     fun stop() {
+        tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
         retryCount = 0
@@ -692,6 +710,7 @@ class IptvPlaybackController(
     }
 
     fun release() {
+        tuneGeneration++
         released = true
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
@@ -795,8 +814,9 @@ class IptvPlaybackController(
         )
     }
 
-    private fun recoverFromWatchdog(reason: IptvRecoveryReason) {
+    private fun recoverFromWatchdog(reason: IptvRecoveryReason, generation: Long = tuneGeneration) {
         val current = player ?: return
+        if (generation != tuneGeneration || released) return
         recoveryAttempt++
         if (recoveryAttempt > MAX_WATCHDOG_RECOVERY_COUNT) {
             recoveryExhausted = true
