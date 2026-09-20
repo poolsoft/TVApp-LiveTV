@@ -5,6 +5,13 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Oynatıcı Tampon ve Kanal Geçiş (Zapping) Hızlandırması
+* **Hızlı Kanal Başlatma (Zapping):** `IptvPlaybackController` içinde ilk oynatma başlangıç tamponu (`BUFFER_FOR_PLAYBACK_MS`) 1.500 ms'den 800 ms'ye düşürülerek kumandadan kanal değiştirildiğinde veya listeden seçildiğinde yayının ekrana gelme süresi yaklaşık 700 ms hızlandırıldı.
+* **Hızlı Rebuffer Toparlanması:** Yayın duraksadığında toparlanma süresi (`BUFFER_AFTER_REBUFFER_MS`) 4.000 ms'den 2.500 ms'ye indirilerek ağ dalgalanmalarında bekleme süresi kısaltıldı.
+* **Geri Sarma Tamponu (Back Buffer):** Media3 LoadControl için 15 saniyelik `backBuffer` aktif edilerek (`setBackBuffer(15_000, true)`) yayını kısa süreli geri sararken veya atlama yaparken anında yeniden oynatma sağlandı.
+* **Canlı Yayın Bellek Yükünün Azaltılması:** Minimum tampon hedefi (`MIN_BUFFER_MS`) 15.000 ms'den 8.000 ms'ye optimize edilerek canlı akışlarda Android TV cihazının RAM ve ağ bant genişliğini gereksiz doldurması engellendi.
+* **Adaptif Bant Genişliği Oranı Artırımı:** Adaptif parça seçiminde kullanılan `ADAPTIVE_BANDWIDTH_FRACTION` %75'ten %82'ye yükseltilerek mevcut internet hızında daha yüksek kaliteli video ve ses profillerine daha hızlı geçilmesi sağlandı.
+
 ### EPG TV Rehberinde Hücre Yeniden Kullanımı (View Reuse) ile 60 FPS Kaydırma Akıcılığı
 * **Sıfırdan View Tahsisinin ve `removeAllViews` Çağrısının Kaldırılması:** EPG tablosunda (`GuideScheduleAdapter`) satır her bağlandığında tüm hücrelerin silinip yüzlerce yeni `TextView` ve `LayoutParams` nesnesinin sıfırdan üretilmesi sonlandırıldı. Satır içindeki mevcut `TextView` ve spacer hücreleri silinmeden yeniden kullanılan (*View Reuse*) hafif bir mekanizmaya geçildi.
 * **Garbage Collector Duraklamalarının (Jank) Önlenmesi:** Bellek tahsisi %90 azaltılarak düşük donanımlı Android TV cihazlarında dahi kumanda ile aşağı/yukarı basılı tutulduğunda yaşanan mikro donmalar ve kare düşmeleri tamamen ortadan kaldırıldı; EPG kaydırması akıcı 60 FPS standardına ulaştı.

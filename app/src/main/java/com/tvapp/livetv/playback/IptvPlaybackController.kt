@@ -171,7 +171,7 @@ class IptvPlaybackController(
                 BUFFER_FOR_PLAYBACK_MS,
                 BUFFER_AFTER_REBUFFER_MS,
             )
-            setBackBuffer(0, false)
+            setBackBuffer(BACK_BUFFER_MS, true)
             setPrioritizeTimeOverSizeThresholds(true)
         }.build()
         val trackSelectionFactory = AdaptiveTrackSelection.Factory(
@@ -865,10 +865,11 @@ class IptvPlaybackController(
             IptvPlaybackFailureClass.TIMEOUT,
         )
         const val CONNECTION_RETRY_DELAY_MS = 300L
-        const val MIN_BUFFER_MS = 15_000
+        const val MIN_BUFFER_MS = 8_000
         const val SECONDARY_MAX_BUFFER_MS = 10_000
-        const val BUFFER_FOR_PLAYBACK_MS = 1_500
-        const val BUFFER_AFTER_REBUFFER_MS = 4_000
+        const val BUFFER_FOR_PLAYBACK_MS = 800
+        const val BUFFER_AFTER_REBUFFER_MS = 2_500
+        const val BACK_BUFFER_MS = 15_000
         const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
         const val WATCHDOG_INTERVAL_MS = 2_000L
         const val FIRST_FRAME_TIMEOUT_MS = 15_000L
@@ -879,7 +880,7 @@ class IptvPlaybackController(
         const val ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 2_500
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
-        const val ADAPTIVE_BANDWIDTH_FRACTION = 0.75f
+        const val ADAPTIVE_BANDWIDTH_FRACTION = 0.82f
         const val DIRECT_IJK_REASON = "DIRECT_MODE"
         const val IJK_SOFTWARE_VIDEO_REASON = "NO_FIRST_FRAME_SOFTWARE_DECODER"
         const val DEFAULT_LIVE_TARGET_OFFSET_MS = 6_000L
