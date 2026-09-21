@@ -100,6 +100,20 @@ class IptvRepository(context: Context) {
     suspend fun sourceCategories(sourceId: Long): List<String> =
         dao.getCategoriesForSource(sourceId)
 
+    /** Distinct VOD categories across all sources (sourceId = 0) or one source. */
+    suspend fun vodCategories(sourceId: Long = 0L): List<String> =
+        dao.getVodCategories(sourceId)
+
+    /** Paged VOD entries across all sources (sourceId = 0) or one source, alpha-ordered. */
+    suspend fun vodPage(
+        sourceId: Long,
+        category: String?,
+        limit: Int,
+        offset: Int,
+        query: String = "",
+    ): List<LiveChannel> = dao.getVodPage(sourceId, category, IptvFtsQuery.from(query), limit, offset)
+        .map { it.toLiveChannel() }
+
     suspend fun selectionPage(
         sourceId: Long,
         category: String?,

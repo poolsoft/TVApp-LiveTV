@@ -5,6 +5,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### VOD Ana Sayfa Tür Filtreleri ve Universal Kategori Desteği
+* **Tür pill satırı:** Kaynak pill'lerinin altına ikinci filtre satırı eklendi: "Tümü | Filmler | Diziler" + katalogdaki en fazla 12 ham VOD kategorisi. Filmler/Diziler pill'leri grup adındaki film/dizi/season/sezon/bölüm işaretlerine göre sınıflandırır; ham kategoriler birebir eşleşir.
+* **Tek akışlı evrensel sayfalama:** Grid artık tek sorguyla tüm kaynaklardan (veya seçili kaynaktan) alfabetik, sınırlı sayfalı VOD akışı çeker — kaynak döngüsü kaldırıldı, kategori filtresi SQL seviyesinde.
+* **Kart tasarımı ayarı:** Poster alanı 124dp'ye büyütüldü, boşluklar ve scrim dengelendi.
 ### VOD Ana Sayfa Görsel Yenileme
 * **Poster tabanlı 16:9 kartlar:** VOD grid ve Devam Et şeridi, alt gradient scrim üzerine başlık taşıyan 16:9 kartlara geçti; odakta kart ölçeklenip (1.08x) vurgu çerçevesi gösteriyor.
 * **Devam Et ayrı kart tasarımı:** Devam Et kartlarında yüzde rozeti, ince ilerleme çubuğu ve kalan süre metni gösteriliyor.

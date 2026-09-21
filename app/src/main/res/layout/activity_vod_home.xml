@@ -57,6 +57,15 @@
             android:clipToPadding="false"
             android:orientation="horizontal" />
 
+        <!-- Genre/category filter pills row -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/vod_genre_pills"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal" />
+
         <!-- Hero: focused item detail -->
         <LinearLayout
             android:id="@+id/vod_hero"

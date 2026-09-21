@@ -48,21 +48,19 @@ class VodHomeActivity : TvRemoteActivity() {
     private lateinit var continueAdapter: VodHomeAdapter
     private lateinit var gridAdapter: VodHomeAdapter
     private lateinit var pillsAdapter: SourcePillsAdapter
+    private lateinit var genrePillsAdapter: SourcePillsAdapter
 
     private var searchQuery = ""
     private var searchJob: Job? = null
     private var loadJob: Job? = null
     private var loadGeneration = 0
 
-    // Source filter: null = all sources. Reset paging when changed.
-    private var allSourceIds: List<Long> = emptyList()
+    // Source filter: null = all sources. Genre/category filter: null = all VOD.
     private var selectedSourceId: Long? = null
+    private var selectedCategory: String? = null
 
-    // Sequential paging cursor across sources: index into activeIds plus the
-    // per-source offset. The full catalog is never held in memory.
-    private var activeSourceIds: List<Long> = emptyList()
-    private var nextSourceIndex = 0
-    private var nextSourceOffset = 0
+    // Paged VOD query cursor: one flat, alpha-ordered page stream.
+    private var nextOffset = 0
     private var exhausted = false
     private var loadingPage = false
 
@@ -87,10 +85,21 @@ class VodHomeActivity : TvRemoteActivity() {
             onFocusChanged = ::showHero,
             showResumeDetails = false,
         )
-        pillsAdapter = SourcePillsAdapter { sourceId ->
-            if (selectedSourceId != sourceId) {
+        pillsAdapter = SourcePillsAdapter { sourceId, _ ->
+            val changed = selectedSourceId != sourceId
+            if (changed) {
                 selectedSourceId = sourceId
                 pillsAdapter.selectedSourceId = sourceId
+                pillsAdapter.notifyDataSetChanged()
+                reloadGrid()
+            }
+        }
+        genrePillsAdapter = SourcePillsAdapter { _, category ->
+            val changed = selectedCategory != category
+            if (changed) {
+                selectedCategory = category
+                genrePillsAdapter.selectedCategory = category
+                genrePillsAdapter.notifyDataSetChanged()
                 reloadGrid()
             }
         }
@@ -102,6 +111,9 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodSourcePills.layoutManager =
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.vodSourcePills.adapter = pillsAdapter
+        binding.vodGenrePills.layoutManager =
+            LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+        binding.vodGenrePills.adapter = genrePillsAdapter
 
         binding.vodSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
@@ -132,9 +144,13 @@ class VodHomeActivity : TvRemoteActivity() {
             val sources = withContext(Dispatchers.IO) {
                 repository.sources().map { it.source.id to it.source.name }
             }
-            allSourceIds = sources.map { it.first }
-            pillsAdapter.submitSources(sources, selectedSourceId)
-            activeSourceIds = allSourceIds
+            val categories = withContext(Dispatchers.IO) {
+                repository.vodCategories().map { it to classifyCategory(it) }
+            }
+            pillsAdapter.mode = SourcePillsAdapter.PillMode.SOURCE
+            pillsAdapter.submitPills(sources, emptyList())
+            genrePillsAdapter.mode = SourcePillsAdapter.PillMode.GENRE
+            genrePillsAdapter.submitPills(emptyList(), categories)
             refreshContinueRow()
             reloadGrid()
         }
@@ -185,9 +201,7 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun reloadGrid() {
         loadGeneration++
-        activeSourceIds = selectedSourceId?.let { listOf(it) } ?: allSourceIds
-        nextSourceIndex = 0
-        nextSourceOffset = 0
+        nextOffset = 0
         exhausted = false
         showHero(null)
         gridAdapter.submitList(emptyList())
@@ -217,36 +231,37 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
-    /** Fetches one bounded page, walking across active sources when one runs out. */
+    /** Fetches one bounded, alpha-ordered VOD page for the current filters. */
     private suspend fun fetchNextGridPage(query: String): List<ContinueWatchingItem> {
-        val collected = mutableListOf<LiveChannel>()
-        while (nextSourceIndex < activeSourceIds.size && collected.size < PAGE_SIZE) {
-            val sourceId = activeSourceIds[nextSourceIndex]
-            val remaining = PAGE_SIZE - collected.size
-            val page = runCatching {
-                repository.libraryLiveChannelsPage(
-                    sourceId = sourceId,
-                    category = null,
-                    contentType = CONTENT_TYPE_VOD,
-                    limit = remaining,
-                    offset = nextSourceOffset,
-                    query = query,
-                )
-            }.getOrDefault(emptyList())
-            if (page.isEmpty()) {
-                nextSourceIndex++
-                nextSourceOffset = 0
-                continue
-            }
-            collected.addAll(page)
-            if (page.size < remaining) {
-                nextSourceIndex++
-                nextSourceOffset = 0
-            } else {
-                nextSourceOffset += page.size
-            }
+        // Built-in genre pills filter across categories by name; raw pills match exactly.
+        val rawCategory = selectedCategory?.takeUnless { it == GENRE_MOVIES || it == GENRE_SERIES }
+        var page = runCatching {
+            repository.vodPage(
+                sourceId = selectedSourceId ?: 0L,
+                category = rawCategory,
+                limit = PAGE_SIZE,
+                offset = nextOffset,
+                query = query,
+            )
+        }.getOrDefault(emptyList())
+        if (selectedCategory == GENRE_MOVIES || selectedCategory == GENRE_SERIES) {
+            val wanted = if (selectedCategory == GENRE_MOVIES) GENRE_MOVIES else GENRE_SERIES
+            page = page.filter { classifyCategory(it.groupTitle ?: "") == wanted }
         }
-        return collected.map { ContinueWatchingItem(channel = it, resumeEntry = null) }
+        nextOffset += PAGE_SIZE
+        return page.map { ContinueWatchingItem(channel = it, resumeEntry = null) }
+    }
+
+    /** Groups raw group titles into the built-in Movie/Series pills. */
+    private fun classifyCategory(title: String): String? {
+        val value = title.lowercase()
+        val seriesMarkers = listOf("dizi", "series", "sezon", "season", "episode", "bölüm")
+        val movieMarkers = listOf("film", "movie", "cinema", "sinema")
+        return when {
+            seriesMarkers.any(value::contains) -> GENRE_SERIES
+            movieMarkers.any(value::contains) -> GENRE_MOVIES
+            else -> null
+        }
     }
 
     private fun updateEmptyState() {
@@ -298,25 +313,60 @@ class VodHomeActivity : TvRemoteActivity() {
         super.onBackPressed()
     }
 
-    /** Horizontal source filter pills: "All" plus one pill per IPTV source. */
+    /**
+     * Two filter pill rows: source pills (All + one per source) and genre pills
+     * (All + Movies + Series + up to N raw VOD categories).
+     */
     class SourcePillsAdapter(
-        private val onSelect: (Long?) -> Unit,
+        private val onSelect: (Long?, String?) -> Unit,
     ) : RecyclerView.Adapter<SourcePillsAdapter.PillViewHolder>() {
 
-        private data class Pill(val id: Long?, val label: String)
+        sealed class Pill {
+            abstract val id: String
 
-        private val pills = mutableListOf<Pill>()
-        var selectedSourceId: Long? = null
+            data class Source(val sourceId: Long?) : Pill() {
+                override val id: String get() = "s$sourceId"
+            }
 
-        fun submitSources(sources: List<Pair<Long, String>>, selected: Long?) {
-            pills.clear()
-            pills.add(Pill(null, "")) // label replaced at bind time via string lookup
-            allLabels = sources
-            selectedSourceId = selected
-            notifyDataSetChanged()
+            data class Genre(val category: String?) : Pill() {
+                override val id: String get() = "g$category"
+            }
         }
 
-        private var allLabels: List<Pair<Long, String>> = emptyList()
+        enum class PillMode { SOURCE, GENRE }
+
+        private val pills = mutableListOf<Pill>()
+        private val sourceNames = mutableMapOf<Long, String>()
+        private val genreLabels = mutableMapOf<String?, String>()
+        var mode: PillMode = PillMode.SOURCE
+        var selectedSourceId: Long? = null
+        var selectedCategory: String? = null
+
+        fun submitPills(
+            sources: List<Pair<Long, String>>,
+            categories: List<Pair<String, String?>>,
+        ) {
+            sourceNames.clear()
+            sources.forEach { (id, name) -> sourceNames[id] = name }
+            genreLabels.clear()
+            pills.clear()
+            if (mode == PillMode.SOURCE) {
+                pills.add(Pill.Source(null))
+                sources.forEach { (id, _) -> pills.add(Pill.Source(id)) }
+            } else {
+                pills.add(Pill.Genre(null))
+                pills.add(Pill.Genre(GENRE_MOVIES))
+                pills.add(Pill.Genre(GENRE_SERIES))
+                // Raw categories that were not already mapped to Movies/Series pills.
+                categories.forEach { (title, mapped) ->
+                    if (mapped == null && genreLabels.size < MAX_RAW_CATEGORIES) {
+                        genreLabels[title] = title
+                        pills.add(Pill.Genre(title))
+                    }
+                }
+            }
+            notifyDataSetChanged()
+        }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PillViewHolder {
             val view = LayoutInflater.from(parent.context)
@@ -325,39 +375,67 @@ class VodHomeActivity : TvRemoteActivity() {
         }
 
         override fun onBindViewHolder(holder: PillViewHolder, position: Int) {
-            val pill = pills[position]
-            val label = if (pill.id == null) {
-                holder.itemView.context.getString(R.string.vod_source_all)
-            } else {
-                allLabels.firstOrNull { it.first == pill.id }?.second.orEmpty()
+            when (val pill = pills[position]) {
+                is Pill.Source -> {
+                    val label = pill.sourceId?.let { sourceNames[it] }
+                        ?: holder.itemView.context.getString(R.string.vod_source_all)
+                    holder.bind(pill, label, selectedSourceId == pill.sourceId)
+                }
+                is Pill.Genre -> {
+                    val label = pill.category?.let { genreLabels[it] }
+                        ?: holder.itemView.context.getString(R.string.vod_source_all)
+                    holder.bind(pill, label, selectedCategory == pill.category)
+                }
             }
-            holder.bind(pill.id, label, selectedSourceId == pill.id)
         }
 
         override fun getItemCount(): Int = pills.size
 
         inner class PillViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             private val label: TextView = itemView.findViewById(R.id.vod_pill_label)
-            private var pillId: Long? = null
+            private var pill: Pill? = null
 
             init {
-                itemView.setOnClickListener { onSelect(pillId) }
+                itemView.setOnClickListener {
+                    when (val p = pill) {
+                        is Pill.Source -> onSelect(p.sourceId, selectedCategory)
+                        is Pill.Genre -> onSelect(selectedSourceId, p.category)
+                        null -> Unit
+                    }
+                }
                 itemView.setOnFocusChangeListener { view, hasFocus ->
                     view.translationZ = if (hasFocus) 8f else 0f
                     view.scaleX = if (hasFocus) 1.06f else 1.0f
                     view.scaleY = if (hasFocus) 1.06f else 1.0f
+                    if (hasFocus) {
+                        val active = when (val p = pill) {
+                            is Pill.Source -> p.sourceId == selectedSourceId
+                            is Pill.Genre -> p.category == selectedCategory
+                            null -> false
+                        }
+                        itemView.setBackgroundResource(
+                            if (active) R.drawable.bg_vod_pill_active else R.drawable.bg_vod_pill_selected,
+                        )
+                    } else {
+                        val active = when (val p = pill) {
+                            is Pill.Source -> p.sourceId == selectedSourceId
+                            is Pill.Genre -> p.category == selectedCategory
+                            null -> false
+                        }
+                        itemView.setBackgroundResource(
+                            if (active) R.drawable.bg_vod_pill_active else R.drawable.bg_vod_pill,
+                        )
+                    }
                 }
             }
 
-            fun bind(id: Long?, text: String, active: Boolean) {
-                pillId = id
+            fun bind(item: SourcePillsAdapter.Pill, text: String, active: Boolean) {
+                pill = item
                 label.text = text
+                itemView.isFocusable = true
+                itemView.isClickable = true
                 itemView.setBackgroundResource(
-                    when {
-                        active -> R.drawable.bg_vod_pill_active
-                        itemView.isFocused -> R.drawable.bg_vod_pill_selected
-                        else -> R.drawable.bg_vod_pill
-                    },
+                    if (active) R.drawable.bg_vod_pill_active else R.drawable.bg_vod_pill,
                 )
             }
         }
@@ -367,7 +445,9 @@ class VodHomeActivity : TvRemoteActivity() {
         const val PAGE_SIZE = 60
         private const val PAGE_THRESHOLD = 12
         private const val SEARCH_DEBOUNCE_MS = 300L
-        private const val CONTENT_TYPE_VOD = "VOD"
         private const val GRID_SPAN = 5
+        private const val GENRE_MOVIES = "__movies__"
+        private const val GENRE_SERIES = "__series__"
+        private const val MAX_RAW_CATEGORIES = 12
     }
 }
