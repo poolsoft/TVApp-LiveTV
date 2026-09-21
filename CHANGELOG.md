@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### VOD Ana Sayfa Görsel Yenileme
+* **Poster tabanlı 16:9 kartlar:** VOD grid ve Devam Et şeridi, alt gradient scrim üzerine başlık taşıyan 16:9 kartlara geçti; odakta kart ölçeklenip (1.08x) vurgu çerçevesi gösteriyor.
+* **Devam Et ayrı kart tasarımı:** Devam Et kartlarında yüzde rozeti, ince ilerleme çubuğu ve kalan süre metni gösteriliyor.
+* **Kaynak filtre pilleri:** Üst satırda "Tümü" + kaynak başına pill; seçim sayfalama sıfırlanarak yeniden yükleniyor.
+* **Odak hero satırı:** Odaklı öğenin adı ve (Devam Et'te) kalan süresi üstte büyük başlıkla gösteriliyor, yanında OK/Uzun OK ipucu.
 ### IPTV Kayıtlı Liste Düzeni, Zapping Kararlılığı ve Ekran Ortası Hata / Tanılama Gösterimi
 * **Kayıtlı IPTV Listelerinde Adres Taşması Düzeltmesi:** Kayıtlı listeler ekranında uzun URL'ye sahip kaynaklarda istatistiklerin ve güncelleme tarihlerinin ekrandan kaybolması önlendi. Liste öğesi 3 satırlı yapılandırılmış düzene (`item_iptv_source.xml`) geçirilerek adres tek satırda sınırlandırıldı (`singleLine`, `ellipsize="end"`), istatistik ve tarihler her zaman net şekilde görünür kılındı.
 * **Kanal Gezinirken (Zapping) Spinner Takılması ve Panel Kapanmasının Önlenmesi:** Hızlı kanal geçişlerinde eski kanalın "yükleniyor spinnerı"nın ekranda takılı kalması engellendi; kanal değişimi ve callback doğrulamalarında stale durumlar temizlendi. Yayın toparlandığında veya kontroller tetiklendiğinde açık olan kanal listesi panelinin istemsizce kapanması tamamen önlendi.

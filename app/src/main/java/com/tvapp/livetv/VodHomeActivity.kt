@@ -4,8 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.tvapp.livetv.data.IptvRepository
@@ -28,9 +33,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Dedicated VOD home screen: Continue Watching strip plus a paged VOD grid.
- * Live TV playback stays untouched; selecting an item hands off to
- * MainActivity through [MainActivity.EXTRA_VOD_SOURCE_KEY].
+ * Dedicated VOD home screen: source filter pills, Continue Watching strip plus
+ * a paged 16:9 VOD grid with focus hero. Live TV playback stays untouched;
+ * selecting an item hands off to MainActivity through
+ * [MainActivity.EXTRA_VOD_SOURCE_KEY].
  */
 class VodHomeActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityVodHomeBinding
@@ -41,15 +47,20 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private lateinit var continueAdapter: VodHomeAdapter
     private lateinit var gridAdapter: VodHomeAdapter
+    private lateinit var pillsAdapter: SourcePillsAdapter
 
     private var searchQuery = ""
     private var searchJob: Job? = null
     private var loadJob: Job? = null
     private var loadGeneration = 0
 
-    // Sequential paging cursor across sources: index into sourceIds plus the
+    // Source filter: null = all sources. Reset paging when changed.
+    private var allSourceIds: List<Long> = emptyList()
+    private var selectedSourceId: Long? = null
+
+    // Sequential paging cursor across sources: index into activeIds plus the
     // per-source offset. The full catalog is never held in memory.
-    private var sourceIds: List<Long> = emptyList()
+    private var activeSourceIds: List<Long> = emptyList()
     private var nextSourceIndex = 0
     private var nextSourceOffset = 0
     private var exhausted = false
@@ -67,18 +78,30 @@ class VodHomeActivity : TvRemoteActivity() {
         continueAdapter = VodHomeAdapter(
             onItemClick = ::openItem,
             onItemLongClick = ::showItemActions,
-            onFocusChanged = {},
+            onFocusChanged = ::showHero,
+            showResumeDetails = true,
         )
         gridAdapter = VodHomeAdapter(
             onItemClick = ::openItem,
             onItemLongClick = ::showItemActions,
-            onFocusChanged = {},
+            onFocusChanged = ::showHero,
+            showResumeDetails = false,
         )
+        pillsAdapter = SourcePillsAdapter { sourceId ->
+            if (selectedSourceId != sourceId) {
+                selectedSourceId = sourceId
+                pillsAdapter.selectedSourceId = sourceId
+                reloadGrid()
+            }
+        }
         binding.continueWatchingRow.layoutManager =
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.continueWatchingRow.adapter = continueAdapter
         binding.vodGrid.adapter = gridAdapter
-        binding.vodGrid.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 4)
+        binding.vodGrid.layoutManager = GridLayoutManager(this, GRID_SPAN)
+        binding.vodSourcePills.layoutManager =
+            LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+        binding.vodSourcePills.adapter = pillsAdapter
 
         binding.vodSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
@@ -96,8 +119,7 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodGrid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy <= 0) return
-                val manager = recyclerView.layoutManager as? androidx.recyclerview.widget.GridLayoutManager
-                    ?: return
+                val manager = recyclerView.layoutManager as? GridLayoutManager ?: return
                 if (!exhausted && !loadingPage &&
                     manager.findLastVisibleItemPosition() >= gridAdapter.itemCount - PAGE_THRESHOLD
                 ) {
@@ -107,7 +129,12 @@ class VodHomeActivity : TvRemoteActivity() {
         })
 
         lifecycleScope.launch {
-            sourceIds = withContext(Dispatchers.IO) { repository.sources().map { it.source.id } }
+            val sources = withContext(Dispatchers.IO) {
+                repository.sources().map { it.source.id to it.source.name }
+            }
+            allSourceIds = sources.map { it.first }
+            pillsAdapter.submitSources(sources, selectedSourceId)
+            activeSourceIds = allSourceIds
             refreshContinueRow()
             reloadGrid()
         }
@@ -140,11 +167,29 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
+    private fun showHero(item: ContinueWatchingItem?) {
+        if (item == null) {
+            binding.vodHero.visibility = View.GONE
+            return
+        }
+        binding.vodHero.visibility = View.VISIBLE
+        binding.vodHeroTitle.text = item.channel.displayName
+        val entry = item.resumeEntry
+        binding.vodHeroSubtitle.text = if (entry != null && entry.durationMillis > 0L) {
+            val left = VodHomeAdapter.progressText(entry.positionMillis, entry.durationMillis)
+            getString(R.string.vod_hero_resume_left, left)
+        } else {
+            item.channel.displayName
+        }
+    }
+
     private fun reloadGrid() {
         loadGeneration++
+        activeSourceIds = selectedSourceId?.let { listOf(it) } ?: allSourceIds
         nextSourceIndex = 0
         nextSourceOffset = 0
         exhausted = false
+        showHero(null)
         gridAdapter.submitList(emptyList())
         loadNextGridPage()
     }
@@ -172,11 +217,11 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
-    /** Fetches one bounded page, walking across sources when one runs out. */
+    /** Fetches one bounded page, walking across active sources when one runs out. */
     private suspend fun fetchNextGridPage(query: String): List<ContinueWatchingItem> {
         val collected = mutableListOf<LiveChannel>()
-        while (nextSourceIndex < sourceIds.size && collected.size < PAGE_SIZE) {
-            val sourceId = sourceIds[nextSourceIndex]
+        while (nextSourceIndex < activeSourceIds.size && collected.size < PAGE_SIZE) {
+            val sourceId = activeSourceIds[nextSourceIndex]
             val remaining = PAGE_SIZE - collected.size
             val page = runCatching {
                 repository.libraryLiveChannelsPage(
@@ -253,10 +298,76 @@ class VodHomeActivity : TvRemoteActivity() {
         super.onBackPressed()
     }
 
+    /** Horizontal source filter pills: "All" plus one pill per IPTV source. */
+    class SourcePillsAdapter(
+        private val onSelect: (Long?) -> Unit,
+    ) : RecyclerView.Adapter<SourcePillsAdapter.PillViewHolder>() {
+
+        private data class Pill(val id: Long?, val label: String)
+
+        private val pills = mutableListOf<Pill>()
+        var selectedSourceId: Long? = null
+
+        fun submitSources(sources: List<Pair<Long, String>>, selected: Long?) {
+            pills.clear()
+            pills.add(Pill(null, "")) // label replaced at bind time via string lookup
+            allLabels = sources
+            selectedSourceId = selected
+            notifyDataSetChanged()
+        }
+
+        private var allLabels: List<Pair<Long, String>> = emptyList()
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PillViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_vod_source_pill, parent, false)
+            return PillViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: PillViewHolder, position: Int) {
+            val pill = pills[position]
+            val label = if (pill.id == null) {
+                holder.itemView.context.getString(R.string.vod_source_all)
+            } else {
+                allLabels.firstOrNull { it.first == pill.id }?.second.orEmpty()
+            }
+            holder.bind(pill.id, label, selectedSourceId == pill.id)
+        }
+
+        override fun getItemCount(): Int = pills.size
+
+        inner class PillViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            private val label: TextView = itemView.findViewById(R.id.vod_pill_label)
+            private var pillId: Long? = null
+
+            init {
+                itemView.setOnClickListener { onSelect(pillId) }
+                itemView.setOnFocusChangeListener { view, hasFocus ->
+                    view.translationZ = if (hasFocus) 8f else 0f
+                    view.scaleX = if (hasFocus) 1.06f else 1.0f
+                    view.scaleY = if (hasFocus) 1.06f else 1.0f
+                }
+            }
+
+            fun bind(id: Long?, text: String, active: Boolean) {
+                pillId = id
+                label.text = text
+                itemView.setBackgroundResource(
+                    when {
+                        active -> R.drawable.bg_vod_pill_active
+                        itemView.isFocused -> R.drawable.bg_vod_pill_selected
+                        else -> R.drawable.bg_vod_pill
+                    },
+                )
+            }
+        }
+    }
+
     companion object {
         const val PAGE_SIZE = 60
         private const val PAGE_THRESHOLD = 12
         private const val SEARCH_DEBOUNCE_MS = 300L
         private const val CONTENT_TYPE_VOD = "VOD"
+        private const val GRID_SPAN = 5
     }
 }

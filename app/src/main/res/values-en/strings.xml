@@ -651,6 +651,9 @@
     <string name="vod_empty">No VOD content found</string>
     <string name="vod_resume_from_start">Play from start</string>
     <string name="vod_remove_from_continue">Remove from Continue Watching</string>
+    <string name="vod_hero_hint">OK: Play · Long OK: Options</string>
+    <string name="vod_hero_resume_left">Left: %1$s</string>
+    <string name="vod_source_all">All</string>
     <string name="vod_home_sidebar">VOD Home</string>
     <string name="txt_key_hint">TXT: Subtitles/Teletext</string>
 </resources>
