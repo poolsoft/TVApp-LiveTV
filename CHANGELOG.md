@@ -5,6 +5,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### VOD Ana Sayfa Netflix Tarzı Kategori Sıraları
+* **Her kategori için yatay kayan kart sırası:** Grid yerine artık her VOD kategorisi kendi başlıklı yatay kart sırasında gösteriliyor; D-Pad sağ/sol ile kumandadan kaydırılıp OK ile seçilir. Sıra başına en fazla 20 kart, en fazla 10 kategori (15.000+ katalog bellek kuralı korunur).
+* **Arama modu ayrımı:** Arama yazılınca ekran sayfalı ızgara moduna geçer, arama temizlenince kategori sıralarına döner.
 ### VOD Ana Sayfa Otomatik Kategori Barı
 * **Kategori barında otomatik kaydırma:** Tür/kategori pill barı odak yokken her 3 saniyede bir pill kaydırarak sona varınca başa döner; kullanıcı bar üzerinde gezinince durur.
 ### VOD Ana Sayfa Tür Filtreleri ve Universal Kategori Desteği

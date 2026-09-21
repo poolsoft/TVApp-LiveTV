@@ -57,15 +57,6 @@
             android:clipToPadding="false"
             android:orientation="horizontal" />
 
-        <!-- Genre/category filter pills row -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/vod_genre_pills"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:clipToPadding="false"
-            android:orientation="horizontal" />
-
         <!-- Hero: focused item detail -->
         <LinearLayout
             android:id="@+id/vod_hero"
@@ -134,13 +125,25 @@
             android:orientation="horizontal"
             android:visibility="gone" />
 
+        <!-- Browsing mode: one horizontally scrolling card row per category -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/vod_rows"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:clipChildren="false" />
+
+        <!-- Search mode: paged grid across all sources -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/vod_grid"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="10dp"
             android:layout_weight="1"
-            android:clipToPadding="false" />
+            android:clipToPadding="false"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/vod_empty"
