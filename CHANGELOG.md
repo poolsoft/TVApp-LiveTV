@@ -5,6 +5,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### VOD Oynatma Modu ve Modern VOD Ana Sayfa
+* **VOD modunda kanal listesi gizlenir:** VOD içeriği oynatılırken kanal listesi ve son kanallar paneli açılmaz; `OK`/`MENU` bunun yerine oynatma kontrollerini açar. Ekran tamamen VOD modunda kalır.
+* **Geri tuşu VOD ana sayfasına döner:** VOD ana sayfasından açılan videoda `Back`, ilerleme konumunu kaydeder, önceki canlı kanal (varsa) arka planda oynamaya devam eder ve VOD ana sayfasına dönülür.
+* **Modern VOD ana sayfa arayüzü:** Ekran gradyan arka plana kavuştu; odaklanan içeriğin logosu hafif arkada gösterilen, yuvarlak köşeli hero paneli eklendi; başlık, arama alanı, kategori başlıkları ve kartlar aksan renkli vurgularla yenilendi (kart köşeleri 12dp).
 ### VOD Ana Sayfa Netflix Tarzı Kategori Sıraları
 * **Her kategori için yatay kayan kart sırası:** Grid yerine artık her VOD kategorisi kendi başlıklı yatay kart sırasında gösteriliyor; D-Pad sağ/sol ile kumandadan kaydırılıp OK ile seçilir. Sıra başına en fazla 20 kart, en fazla 10 kategori (15.000+ katalog bellek kuralı korunur).
 * **Arama modu ayrımı:** Arama yazılınca ekran sayfalı ızgara moduna geçer, arama temizlenince kategori sıralarına döner.

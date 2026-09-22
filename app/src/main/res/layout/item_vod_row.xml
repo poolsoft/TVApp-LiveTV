@@ -6,17 +6,31 @@
     android:orientation="vertical"
     android:paddingVertical="8dp">
 
-    <TextView
-        android:id="@+id/vod_row_title"
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textAllCaps="true"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+        android:layout_marginStart="2dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:layout_width="4dp"
+            android:layout_height="14dp"
+            android:background="@color/accent" />
+
+        <TextView
+            android:id="@+id/vod_row_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:ellipsize="end"
+            android:letterSpacing="0.06"
+            android:maxLines="1"
+            android:textAllCaps="true"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/vod_row_items"
