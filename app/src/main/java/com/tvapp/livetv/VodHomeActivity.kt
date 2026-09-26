@@ -219,23 +219,16 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun showHero(item: ContinueWatchingItem?) {
         if (item == null) {
             binding.vodHero.visibility = View.GONE
-            ChannelLogoLoader.load(binding.vodHeroBackdrop, null, R.drawable.app_banner)
             return
         }
         binding.vodHero.visibility = View.VISIBLE
         binding.vodHeroTitle.text = item.channel.displayName
-        ChannelLogoLoader.load(
-            binding.vodHeroBackdrop,
-            item.channel.logoUrl,
-            R.drawable.app_banner,
-        )
         val entry = item.resumeEntry
         binding.vodHeroSubtitle.text = if (entry != null && entry.durationMillis > 0L) {
             val left = VodHomeAdapter.progressText(entry.positionMillis, entry.durationMillis)
             getString(R.string.vod_hero_resume_left, left)
         } else {
-            item.channel.groupTitle?.takeIf { it.isNotBlank() }
-                ?: item.channel.displayName
+            item.channel.displayName
         }
     }
 

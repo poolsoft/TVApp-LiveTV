@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_vod_home">
+    android:background="#0E1621">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -28,25 +28,21 @@
                 android:maxLines="1"
                 android:text="@string/vod_home_title"
                 android:textAllCaps="true"
-                android:textColor="@color/accent"
-                android:letterSpacing="0.04"
-                android:textSize="26sp"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
             <EditText
                 android:id="@+id/vod_search"
-                android:layout_width="270dp"
-                android:layout_height="44dp"
-                android:background="@drawable/bg_vod_search"
-                android:drawableStart="@drawable/ic_search"
-                android:drawablePadding="8dp"
+                android:layout_width="260dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_vod_pill"
                 android:hint="@string/vod_search_hint"
                 android:imeOptions="actionDone"
                 android:importantForAutofill="no"
                 android:inputType="text"
                 android:maxLines="1"
-                android:paddingStart="40dp"
-                android:paddingEnd="14dp"
+                android:paddingHorizontal="14dp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_secondary"
                 android:textSize="14sp" />
@@ -62,75 +58,51 @@
             android:orientation="horizontal" />
 
         <!-- Hero: focused item detail -->
-        <FrameLayout
+        <LinearLayout
             android:id="@+id/vod_hero"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_vod_hero"
-            android:paddingStart="18dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="14dp"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:visibility="gone">
 
-            <ImageView
-                android:id="@+id/vod_hero_backdrop"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:alpha="0.16"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop" />
-
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/vod_hero_title"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_primary"
-                        android:textSize="22sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/vod_hero_subtitle"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-                </LinearLayout>
+                android:layout_weight="1"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/vod_hero_hint"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/vod_hero_title"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:background="@drawable/bg_vod_pill"
-                    android:paddingStart="12dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="6dp"
-                    android:text="@string/vod_hero_hint"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/vod_hero_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
             </LinearLayout>
-        </FrameLayout>
+
+            <TextView
+                android:id="@+id/vod_hero_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="@string/vod_hero_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/continue_watching_label"
@@ -139,9 +111,8 @@
             android:layout_marginTop="10dp"
             android:text="@string/continue_watching"
             android:textAllCaps="true"
-            android:textColor="@color/accent"
-            android:letterSpacing="0.08"
-            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:visibility="gone" />
 

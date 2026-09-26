@@ -291,10 +291,6 @@ class MainActivity : TvRemoteActivity() {
     private var iptvLiveHealthJob: Job? = null
     private var homeRecentPublishJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
-    /** True while VOD playback owns the screen (deep-linked from the VOD home). */
-    private var vodSessionActive = false
-    /** Channel that was playing before the VOD session; restored by Back. */
-    private var vodReturnChannel: LiveChannel? = null
     private var catchUpReturnChannel: LiveChannel? = null
     private var iptvManualTimeshift = false
     private var iptvPlaybackFailed = false
@@ -1085,11 +1081,6 @@ class MainActivity : TvRemoteActivity() {
         focusedTuneJob?.cancel()
         activePassthroughInputId = null
         currentPlaybackUsesIptvLibrary = !recordHistory
-        if (!channel.iptvContentType.equals("VOD", ignoreCase = true)) {
-            // Leaving VOD content ends the VOD session and its return channel.
-            vodSessionActive = false
-            vodReturnChannel = null
-        }
         currentChannel = channel
         if (!channel.iptvContentType.equals("CATCHUP", ignoreCase = true)) {
             catchUpReturnChannel = null
@@ -5153,17 +5144,11 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun toggleChannelPanel() {
-        if (isVodMode()) {
-            // VOD mode has no channel list; OK/MENU open the playback controls.
-            showIptvPlaybackControls(activateControls = true)
-            return
-        }
         if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
         else openMobileChannelPanel()
     }
 
     private fun showChannelPanel(expanded: Boolean) {
-        if (isVodMode()) return
         android.os.Trace.beginSection("channel_panel_open")
         val openedAt = SystemClock.elapsedRealtime()
         try {
@@ -5772,9 +5757,7 @@ class MainActivity : TvRemoteActivity() {
                 infoBarJob?.cancel()
                 setInfoBarVisible(false)
             }
-            RemoteAction.SHOW_RECENT_CHANNELS -> if (vodSessionActive) {
-                returnToVodHome()
-            } else when (osdCoordinator.state.playbackMode) {
+            RemoteAction.SHOW_RECENT_CHANNELS -> when (osdCoordinator.state.playbackMode) {
                 PlaybackSurfaceMode.IPTV_OVERLAY -> stopIptvOverlay()
                 PlaybackSurfaceMode.INTERNAL_MINI_PLAYER -> toggleInternalMiniPlayer()
                 else -> showRecentChannels()
@@ -6403,53 +6386,8 @@ class MainActivity : TvRemoteActivity() {
 
     /** Handles the VOD_SOURCE_KEY deep link from VodHomeActivity on both cold
      *  start (onCreate) and warm delivery (onNewIntent, singleTop). */
-    /**
-     * True while VOD content owns the screen: the channel list stays hidden and
-     * Back returns to the VOD home instead of the recent-channels list.
-     */
-    private fun isVodMode(): Boolean {
-        if (vodSessionActive) return true
-        val channel = currentChannel ?: return false
-        return channel.source == LiveChannel.Source.IPTV &&
-            channel.iptvContentType.equals("VOD", ignoreCase = true)
-    }
-
-    /** Leaves VOD playback back to the VOD home screen: saves the resume
-     *  position, restarts the pre-VOD channel behind the home screen when there
-     *  was one, and launches VodHomeActivity on top of this instance. */
-    private fun returnToVodHome() {
-        debugLog.recordDebug(
-            "VOD_RETURN_HOME | vod=${currentChannel?.sourceKey}, " +
-                "return=${vodReturnChannel?.sourceKey}",
-        )
-        saveCurrentIptvResumePosition()
-        val returnChannel = vodReturnChannel
-        vodReturnChannel = null
-        vodSessionActive = false
-        if (returnChannel != null) {
-            selectChannel(returnChannel, recordHistory = false)
-        } else {
-            iptvPlayback.pause()
-        }
-        if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
-        startActivity(android.content.Intent(this, VodHomeActivity::class.java))
-    }
-
     private fun handleVodSourceDeepLink(intent: Intent?) {
         val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY) ?: return
-        currentChannel?.takeIf {
-            it.sourceKey != sourceKey &&
-                !it.iptvContentType.equals("VOD", ignoreCase = true)
-        }?.let { vodReturnChannel = it }
-        vodSessionActive = true
-        debugLog.recordDebug(
-            "VOD_SESSION_START | key=$sourceKey, return=${vodReturnChannel?.sourceKey}",
-        )
-        // VOD playback must never show the channel list or recent channels.
-        if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
-        if (binding.recentChannelsPanel.visibility == View.VISIBLE) {
-            hideRecentChannels()
-        }
         if (currentChannel?.sourceKey == sourceKey) return
         channels.firstOrNull { it.sourceKey == sourceKey }?.let { channel ->
             selectChannel(channel, recordHistory = true)
