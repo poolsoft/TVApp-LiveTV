@@ -5,8 +5,6 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
-### VOD Ana Sayfa Otomatik Kategori Barı
-* **Kategori barında otomatik kaydırma:** Tür/kategori pill barı odak yokken her 3 saniyede bir pill kaydırarak sona varınca başa döner; kullanıcı bar üzerinde gezinince durur.
 ### VOD Ana Sayfa Tür Filtreleri ve Universal Kategori Desteği
 * **Tür pill satırı:** Kaynak pill'lerinin altına ikinci filtre satırı eklendi: "Tümü | Filmler | Diziler" + katalogdaki en fazla 12 ham VOD kategorisi. Filmler/Diziler pill'leri grup adındaki film/dizi/season/sezon/bölüm işaretlerine göre sınıflandırır; ham kategoriler birebir eşleşir.
 * **Tek akışlı evrensel sayfalama:** Grid artık tek sorguyla tüm kaynaklardan (veya seçili kaynaktan) alfabetik, sınırlı sayfalı VOD akışı çeker — kaynak döngüsü kaldırıldı, kategori filtresi SQL seviyesinde.

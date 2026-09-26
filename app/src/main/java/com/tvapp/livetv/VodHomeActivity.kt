@@ -63,7 +63,6 @@ class VodHomeActivity : TvRemoteActivity() {
     private var nextOffset = 0
     private var exhausted = false
     private var loadingPage = false
-    private var genreAutoScrollRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,24 +114,6 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodGenrePills.layoutManager =
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.vodGenrePills.adapter = genrePillsAdapter
-        // Auto-scroll the genre bar toward its end over time when nothing is focused there,
-        // so users discover the available categories without opening anything.
-        genreAutoScrollRunnable = object : Runnable {
-            override fun run() {
-                val manager = binding.vodGenrePills.layoutManager as? LinearLayoutManager ?: return
-                val target = genrePillsAdapter.itemCount - 1
-                if (target <= 0) return
-                if (binding.vodGenrePills.focusedChild == null) {
-                    val visible = manager.findLastCompletelyVisibleItemPosition()
-                    if (visible < target) {
-                        binding.vodGenrePills.smoothScrollToPosition(visible + 1)
-                    } else {
-                        binding.vodGenrePills.smoothScrollToPosition(0)
-                    }
-                }
-                binding.vodGenrePills.postDelayed(this, GENRE_SCROLL_INTERVAL_MS)
-            }
-        }
 
         binding.vodSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
@@ -182,12 +163,6 @@ class VodHomeActivity : TvRemoteActivity() {
         lifecycleScope.launch {
             refreshContinueRow()
         }
-        genreAutoScrollRunnable?.let { binding.vodGenrePills.postDelayed(it, GENRE_SCROLL_INTERVAL_MS) }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        genreAutoScrollRunnable?.let { binding.vodGenrePills.removeCallbacks(it) }
     }
 
     private suspend fun refreshContinueRow() {
@@ -471,7 +446,6 @@ class VodHomeActivity : TvRemoteActivity() {
         private const val PAGE_THRESHOLD = 12
         private const val SEARCH_DEBOUNCE_MS = 300L
         private const val GRID_SPAN = 5
-        private const val GENRE_SCROLL_INTERVAL_MS = 3000L
         private const val GENRE_MOVIES = "__movies__"
         private const val GENRE_SERIES = "__series__"
         private const val MAX_RAW_CATEGORIES = 12
