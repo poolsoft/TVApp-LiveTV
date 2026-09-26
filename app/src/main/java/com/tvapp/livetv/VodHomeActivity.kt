@@ -24,7 +24,6 @@ import com.tvapp.livetv.playback.IptvResumeStore
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.platform.DeviceCapabilitiesSession
 import com.tvapp.livetv.ui.VodHomeAdapter
-import com.tvapp.livetv.ui.VodRowsAdapter
 import com.tvapp.livetv.TvRemoteActivity
 import androidx.appcompat.app.AlertDialog
 import kotlinx.coroutines.Dispatchers
@@ -49,8 +48,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private lateinit var continueAdapter: VodHomeAdapter
     private lateinit var gridAdapter: VodHomeAdapter
     private lateinit var pillsAdapter: SourcePillsAdapter
-    private lateinit var rowsAdapter: VodRowsAdapter
-    private val rows = mutableListOf<VodRowsAdapter.VodRow>()
+    private lateinit var genrePillsAdapter: SourcePillsAdapter
 
     private var searchQuery = ""
     private var searchJob: Job? = null
@@ -94,7 +92,16 @@ class VodHomeActivity : TvRemoteActivity() {
                 selectedSourceId = sourceId
                 pillsAdapter.selectedSourceId = sourceId
                 pillsAdapter.notifyDataSetChanged()
-                loadCategoryRows()
+                reloadGrid()
+            }
+        }
+        genrePillsAdapter = SourcePillsAdapter { _, category ->
+            val changed = selectedCategory != category
+            if (changed) {
+                selectedCategory = category
+                genrePillsAdapter.selectedCategory = category
+                genrePillsAdapter.notifyDataSetChanged()
+                reloadGrid()
             }
         }
         binding.continueWatchingRow.layoutManager =
@@ -105,26 +112,27 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodSourcePills.layoutManager =
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.vodSourcePills.adapter = pillsAdapter
-        rowsAdapter = VodRowsAdapter(rows) { resumeDetails ->
-            VodHomeAdapter(
-                onItemClick = ::openItem,
-                onItemLongClick = ::showItemActions,
-                onFocusChanged = ::showHero,
-                showResumeDetails = resumeDetails,
-            )
-        }
-        binding.vodRows.layoutManager = LinearLayoutManager(this)
-        binding.vodRows.adapter = rowsAdapter
-        binding.vodRows.addItemDecoration(object : RecyclerView.ItemDecoration() {
-            override fun getItemOffsets(
-                outRect: android.graphics.Rect,
-                view: View,
-                parent: RecyclerView,
-                state: RecyclerView.State,
-            ) {
-                outRect.set(0, 0, 0, 0)
+        binding.vodGenrePills.layoutManager =
+            LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+        binding.vodGenrePills.adapter = genrePillsAdapter
+        // Auto-scroll the genre bar toward its end over time when nothing is focused there,
+        // so users discover the available categories without opening anything.
+        genreAutoScrollRunnable = object : Runnable {
+            override fun run() {
+                val manager = binding.vodGenrePills.layoutManager as? LinearLayoutManager ?: return
+                val target = genrePillsAdapter.itemCount - 1
+                if (target <= 0) return
+                if (binding.vodGenrePills.focusedChild == null) {
+                    val visible = manager.findLastCompletelyVisibleItemPosition()
+                    if (visible < target) {
+                        binding.vodGenrePills.smoothScrollToPosition(visible + 1)
+                    } else {
+                        binding.vodGenrePills.smoothScrollToPosition(0)
+                    }
+                }
+                binding.vodGenrePills.postDelayed(this, GENRE_SCROLL_INTERVAL_MS)
             }
-        })
+        }
 
         binding.vodSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
@@ -134,7 +142,7 @@ class VodHomeActivity : TvRemoteActivity() {
                 searchJob = lifecycleScope.launch {
                     delay(SEARCH_DEBOUNCE_MS)
                     searchQuery = s?.toString().orEmpty().trim()
-                    updateMode()
+                    reloadGrid()
                 }
             }
         })
@@ -155,37 +163,15 @@ class VodHomeActivity : TvRemoteActivity() {
             val sources = withContext(Dispatchers.IO) {
                 repository.sources().map { it.source.id to it.source.name }
             }
+            val categories = withContext(Dispatchers.IO) {
+                repository.vodCategories().map { it to classifyCategory(it) }
+            }
             pillsAdapter.mode = SourcePillsAdapter.PillMode.SOURCE
             pillsAdapter.submitPills(sources, emptyList())
+            genrePillsAdapter.mode = SourcePillsAdapter.PillMode.GENRE
+            genrePillsAdapter.submitPills(emptyList(), categories)
             refreshContinueRow()
-            loadCategoryRows()
-        }
-    }
-
-    /** Loads one horizontal card row per VOD category (bounded per row). */
-    private fun loadCategoryRows() {
-        lifecycleScope.launch {
-            val categories = withContext(Dispatchers.IO) {
-                repository.vodCategories(selectedSourceId ?: 0L).take(MAX_CATEGORY_ROWS)
-            }
-            val loadedRows = categories.map { category ->
-                val items = withContext(Dispatchers.IO) {
-                    runCatching {
-                        repository.vodPage(
-                            sourceId = selectedSourceId ?: 0L,
-                            category = category,
-                            limit = ROW_ITEM_LIMIT,
-                            offset = 0,
-                            query = "",
-                        )
-                    }.getOrDefault(emptyList())
-                }.map { ContinueWatchingItem(channel = it, resumeEntry = null) }
-                VodRowsAdapter.VodRow(category, items)
-            }.filter { it.items.isNotEmpty() }
-            rows.clear()
-            rows.addAll(loadedRows)
-            rowsAdapter.notifyDataSetChanged()
-            updateEmptyState()
+            reloadGrid()
         }
     }
 
@@ -196,6 +182,12 @@ class VodHomeActivity : TvRemoteActivity() {
         lifecycleScope.launch {
             refreshContinueRow()
         }
+        genreAutoScrollRunnable?.let { binding.vodGenrePills.postDelayed(it, GENRE_SCROLL_INTERVAL_MS) }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        genreAutoScrollRunnable?.let { binding.vodGenrePills.removeCallbacks(it) }
     }
 
     private suspend fun refreshContinueRow() {
@@ -232,18 +224,13 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
-    /** Switches to search/grid mode while a query is active; rows otherwise. */
-    private fun updateMode() {
-        val searching = searchQuery.isNotEmpty()
-        binding.vodRows.visibility = if (searching) View.GONE else View.VISIBLE
-        binding.vodGrid.visibility = if (searching) View.VISIBLE else View.GONE
+    private fun reloadGrid() {
         loadGeneration++
         nextOffset = 0
         exhausted = false
         showHero(null)
         gridAdapter.submitList(emptyList())
-        if (searching) loadNextGridPage()
-        updateEmptyState()
+        loadNextGridPage()
     }
 
     private fun loadNextGridPage() {
@@ -269,28 +256,42 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
-    /** Fetches one bounded, alpha-ordered VOD page for the search query. */
+    /** Fetches one bounded, alpha-ordered VOD page for the current filters. */
     private suspend fun fetchNextGridPage(query: String): List<ContinueWatchingItem> {
-        val page = runCatching {
+        // Built-in genre pills filter across categories by name; raw pills match exactly.
+        val rawCategory = selectedCategory?.takeUnless { it == GENRE_MOVIES || it == GENRE_SERIES }
+        var page = runCatching {
             repository.vodPage(
                 sourceId = selectedSourceId ?: 0L,
-                category = null,
+                category = rawCategory,
                 limit = PAGE_SIZE,
                 offset = nextOffset,
                 query = query,
             )
         }.getOrDefault(emptyList())
+        if (selectedCategory == GENRE_MOVIES || selectedCategory == GENRE_SERIES) {
+            val wanted = if (selectedCategory == GENRE_MOVIES) GENRE_MOVIES else GENRE_SERIES
+            page = page.filter { classifyCategory(it.groupTitle ?: "") == wanted }
+        }
         nextOffset += PAGE_SIZE
         return page.map { ContinueWatchingItem(channel = it, resumeEntry = null) }
     }
 
-    private fun updateEmptyState() {
-        val searching = searchQuery.isNotEmpty()
-        val empty = if (searching) {
-            gridAdapter.itemCount == 0
-        } else {
-            rows.isEmpty() && binding.continueWatchingRow.visibility != View.VISIBLE
+    /** Groups raw group titles into the built-in Movie/Series pills. */
+    private fun classifyCategory(title: String): String? {
+        val value = title.lowercase()
+        val seriesMarkers = listOf("dizi", "series", "sezon", "season", "episode", "bölüm")
+        val movieMarkers = listOf("film", "movie", "cinema", "sinema")
+        return when {
+            seriesMarkers.any(value::contains) -> GENRE_SERIES
+            movieMarkers.any(value::contains) -> GENRE_MOVIES
+            else -> null
         }
+    }
+
+    private fun updateEmptyState() {
+        val empty = gridAdapter.itemCount == 0 &&
+            binding.continueWatchingRow.visibility != View.VISIBLE
         binding.vodEmpty.visibility = if (empty) View.VISIBLE else View.GONE
     }
 
@@ -470,8 +471,6 @@ class VodHomeActivity : TvRemoteActivity() {
         private const val PAGE_THRESHOLD = 12
         private const val SEARCH_DEBOUNCE_MS = 300L
         private const val GRID_SPAN = 5
-        private const val MAX_CATEGORY_ROWS = 10
-        private const val ROW_ITEM_LIMIT = 20
         private const val GENRE_SCROLL_INTERVAL_MS = 3000L
         private const val GENRE_MOVIES = "__movies__"
         private const val GENRE_SERIES = "__series__"
