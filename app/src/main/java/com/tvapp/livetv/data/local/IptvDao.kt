@@ -89,24 +89,6 @@ interface IptvDao {
     @Query(
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
-            "WHERE (:sourceId = 0 OR sourceId = :sourceId) " +
-            "AND (:category IS NULL OR groupTitle = :category) " +
-            "AND contentType = 'VOD' " +
-            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
-            "WHERE iptv_channel_search MATCH :query)) " +
-            "ORDER BY displayName COLLATE NOCASE LIMIT :limit OFFSET :offset",
-    )
-    suspend fun getVodPage(
-        sourceId: Long,
-        category: String?,
-        query: String,
-        limit: Int,
-        offset: Int,
-    ): List<IptvChannelListProjection>
-
-    @Query(
-        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
-            "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
@@ -351,14 +333,6 @@ interface IptvDao {
             "AND groupTitle != '' ORDER BY groupTitle COLLATE NOCASE",
     )
     suspend fun getCategoriesForSource(sourceId: Long): List<String>
-
-    @Query(
-        "SELECT DISTINCT groupTitle FROM iptv_channels " +
-            "WHERE (:sourceId = 0 OR sourceId = :sourceId) AND contentType = 'VOD' " +
-            "AND groupTitle IS NOT NULL AND groupTitle != '' " +
-            "ORDER BY groupTitle COLLATE NOCASE LIMIT 64",
-    )
-    suspend fun getVodCategories(sourceId: Long): List<String>
 
     @Query("SELECT * FROM iptv_channels WHERE sourceKey = :sourceKey LIMIT 1")
     suspend fun getChannel(sourceKey: String): IptvChannelEntity?
