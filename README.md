@@ -53,7 +53,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Seçim yöneticisinde kategori, arama, yalnız seçilenler filtresi, 1-4 haneli doğrudan sıra erişimi ve ilk/son arasında dolaşım bulunur.
 - M3U içe aktarma 500 kayıtta bir veritabanına yazılır; Canlı/VOD türü içe aktarım sırasında sınıflandırılıp indekslenir.
 - Canlı yayınlarda canlı noktaya dönme; VOD içeriklerinde oynat/duraklat, ileri/geri sarma, kaldığın yerden devam ve “İzlemeye devam et” görünümü vardır.
-- VOD oynatması sırasında kanal listesi ve son kanallar açılmaz; `OK`/`MENU` oynatma kontrollerini, `Back` VOD ana sayfasını açar. VOD ana sayfasında `Back` TV moduna kanal listesi açık şekilde döner. VOD ana sayfası gradyan arka plan, odak hero paneli ve aksanlı kategori başlıklarıyla yenilendi.
+- VOD oynatması sırasında kanal listesi ve son kanallar açılmaz; `OK`/`MENU` oynatma kontrollerini, `Back` VOD ana sayfasını açar. VOD ana sayfası gradyan arka plan, odak hero paneli ve aksanlı kategori başlıklarıyla yenilendi.
 - M3U `catchup-source`/`catchup-days` ve Xtream arşiv bilgisi olan kanallarda geçmiş EPG programları saat simgesiyle gösterilir; `OK` arşivi oynatır, kırmızı eylem canlı yayına döner.
 - Mavi oynatıcı eylemi üzerinden kalite, ekrana sığdırma/doldurma/yakınlaştırma ve harici oynatıcı seçilebilir.
 - Geçici IPTV oynatma hataları 1, 2 ve 4 saniyelik aralıklarla otomatik yeniden denenir; aynı kanala ait alternatif akış bulunursa sıradaki URL denenir.

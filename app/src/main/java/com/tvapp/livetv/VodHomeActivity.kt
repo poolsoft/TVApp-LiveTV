@@ -341,8 +341,6 @@ class VodHomeActivity : TvRemoteActivity() {
             binding.vodSearch.setText("")
             return
         }
-        // Leaving the VOD home returns to TV mode with the channel list open;
-        // MainActivity opens it in onResume when it launched this screen.
         super.onBackPressed()
     }
 

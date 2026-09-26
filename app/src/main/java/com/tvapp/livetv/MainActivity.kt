@@ -295,9 +295,6 @@ class MainActivity : TvRemoteActivity() {
     private var vodSessionActive = false
     /** Channel that was playing before the VOD session; restored by Back. */
     private var vodReturnChannel: LiveChannel? = null
-    /** Set while VodHomeActivity is in front of this activity; Back from that
-     *  screen returns to TV mode with the channel list opened. */
-    private var openChannelListAfterVodHome = false
     private var catchUpReturnChannel: LiveChannel? = null
     private var iptvManualTimeshift = false
     private var iptvPlaybackFailed = false
@@ -2687,7 +2684,6 @@ class MainActivity : TvRemoteActivity() {
      *  teletext view when it is implemented. */
     private fun showTxtTracks() {
         if (iptvGridActive) return
-        openChannelListAfterVodHome = true
         startActivity(android.content.Intent(this, VodHomeActivity::class.java))
     }
 
@@ -6436,7 +6432,6 @@ class MainActivity : TvRemoteActivity() {
             iptvPlayback.pause()
         }
         if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
-        openChannelListAfterVodHome = true
         startActivity(android.content.Intent(this, VodHomeActivity::class.java))
     }
 
@@ -6475,25 +6470,9 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (openChannelListAfterVodHome) {
-            openChannelListAfterVodHome = false
-            when {
-                // Returning from the VOD home: back to TV mode with the list open.
-                !isVodMode() -> showChannelPanel(expanded = false)
-                // VOD kept playing with no channel to restore (cold start):
-                // fall back to channel selection instead of a hidden list.
-                else -> showRecentChannels()
-            }
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // Arriving through a VOD deep link, not through VOD home Back.
-        openChannelListAfterVodHome = false
         handleVodSourceDeepLink(intent)
         val requestedUri = intent.getStringExtra(TvChannelViewActivity.EXTRA_TIF_CHANNEL_URI)
         if (requestedUri != null) {
