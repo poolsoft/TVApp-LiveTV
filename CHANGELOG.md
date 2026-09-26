@@ -5,6 +5,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Veritabanı İndeks İyileştirmesi (DB v24)
+* **contentType + displayName ve contentType + groupTitle indeksleri:** Büyük kataloglarda (15.000+ kayıt) VOD kategori/tür ve sayfalı liste sorgularının tam tablo taraması yerine indeks araması yapması sağlandı; tarama sonrası page cache süpürmesi nedeniyle diğer sorguların yavaşlaması da azalır. Room migration 23→24 ile eklenir, kullanıcı verisi korunur.
 ### IPTV Kayıtlı Liste Düzeni, Zapping Kararlılığı ve Ekran Ortası Hata / Tanılama Gösterimi
 * **Kayıtlı IPTV Listelerinde Adres Taşması Düzeltmesi:** Kayıtlı listeler ekranında uzun URL'ye sahip kaynaklarda istatistiklerin ve güncelleme tarihlerinin ekrandan kaybolması önlendi. Liste öğesi 3 satırlı yapılandırılmış düzene (`item_iptv_source.xml`) geçirilerek adres tek satırda sınırlandırıldı (`singleLine`, `ellipsize="end"`), istatistik ve tarihler her zaman net şekilde görünür kılındı.
 * **Kanal Gezinirken (Zapping) Spinner Takılması ve Panel Kapanmasının Önlenmesi:** Hızlı kanal geçişlerinde eski kanalın "yükleniyor spinnerı"nın ekranda takılı kalması engellendi; kanal değişimi ve callback doğrulamalarında stale durumlar temizlendi. Yayın toparlandığında veya kontroller tetiklendiğinde açık olan kanal listesi panelinin istemsizce kapanması tamamen önlendi.

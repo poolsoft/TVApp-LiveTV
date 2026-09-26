@@ -22,6 +22,8 @@ import androidx.room.PrimaryKey
         Index(value = ["sourceId", "groupTitle", "originalIndex", "sourceKey"]),
         Index(value = ["sourceId", "contentType", "originalIndex"]),
         Index(value = ["sourceId", "contentType", "groupTitle", "originalIndex"]),
+        Index(value = ["contentType", "displayName"]),
+        Index(value = ["contentType", "groupTitle"]),
         Index(
             value = ["sourceId", "tvgId", "selected", "originalIndex"],
             orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC, Index.Order.ASC],

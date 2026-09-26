@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -60,6 +60,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_20_21,
                 MIGRATION_21_22,
                 MIGRATION_22_23,
+                MIGRATION_23_24,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
@@ -407,6 +408,24 @@ abstract class TVAppDatabase : RoomDatabase() {
                         "COALESCE(`groupTitle`, '') FROM `iptv_channels`",
                 )
                 createIptvSearchTriggers(db)
+            }
+        }
+
+        internal val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Covers the VOD home queries that filter by contentType and sort
+                // by displayName / groupTitle: turns full table scans into
+                // index searches on large (15k+) catalogs.
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_contentType_displayName` " +
+                        "ON `iptv_channels` (`contentType`, `displayName`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_iptv_channels_contentType_groupTitle` " +
+                        "ON `iptv_channels` (`contentType`, `groupTitle`)",
+                )
             }
         }
 
