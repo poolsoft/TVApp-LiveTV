@@ -7,7 +7,6 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.KeyEvent
-import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -20,8 +19,6 @@ import com.tvapp.livetv.data.XmlTvSourceSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
 
 class XmlTvSourcesActivity : TvRemoteActivity() {
     private val repository by lazy { XmlTvRepository(this) }
@@ -84,31 +81,12 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
     private fun loadSources() {
         lifecycleScope.launch {
             sources = withContext(Dispatchers.IO) { repository.sourceSummaries() }
-            sourceList.adapter = ArrayAdapter(
-                this@XmlTvSourcesActivity,
-                R.layout.item_iptv_source,
-                sources.map { summary ->
-                    getString(
-                        R.string.xmltv_source_row_status,
-                        summary.source.name,
-                        getString(
-                            if (summary.source.kind == XmlTvRepository.KIND_URL) {
-                                R.string.xmltv_source_url
-                            } else {
-                                R.string.xmltv_source_file
-                            },
-                        ),
-                        summary.channelCount,
-                        summary.programCount,
-                        getString(if (summary.source.enabled) R.string.source_enabled else R.string.source_disabled),
-                        summary.source.lastUpdatedAt.takeIf { it > 0L }?.let {
-                            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                                .format(Date(it))
-                        } ?: getString(R.string.never),
-                        summary.source.lastError?.let { getString(R.string.source_error_short, it) }.orEmpty(),
-                    )
-                },
-            )
+            val adapter = sourceList.adapter as? XmlTvSourceAdapter
+            if (adapter == null) {
+                sourceList.adapter = XmlTvSourceAdapter(this@XmlTvSourcesActivity, sources)
+            } else {
+                adapter.submit(sources)
+            }
         }
     }
 

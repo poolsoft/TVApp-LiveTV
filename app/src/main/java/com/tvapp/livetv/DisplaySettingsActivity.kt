@@ -317,6 +317,10 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 focusDelayIndex,
             ) { index -> update { copy(channelFocusTuneDelayMillis = focusDelays[index]) } }
         }
+        section(R.string.playback_settings)
+        toggle(R.string.black_screen_while_tuning, current.blackScreenWhileTuning) {
+            update { copy(blackScreenWhileTuning = it) }
+        }
     }
 
     private fun buildIptvEpgSettings() {
@@ -393,9 +397,6 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         }
         toggle(R.string.subtitles_default, current.subtitlesEnabled) {
             update { copy(subtitlesEnabled = it) }
-        }
-        toggle(R.string.black_screen_while_tuning, current.blackScreenWhileTuning) {
-            update { copy(blackScreenWhileTuning = it) }
         }
     }
 
