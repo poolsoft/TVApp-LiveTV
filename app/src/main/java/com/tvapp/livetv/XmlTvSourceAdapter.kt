@@ -31,13 +31,25 @@ class XmlTvSourceAdapter(
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val row = convertView ?: layoutInflater.inflate(R.layout.item_iptv_source, parent, false)
         val summary = summaries[position]
-        row.findViewById<TextView>(R.id.source_item_name).text = summary.source.name
-        row.findViewById<TextView>(R.id.source_item_location).text = locationLabel(summary)
+        val nameView = row.findViewById<TextView>(R.id.source_item_name)
+        nameView.text = "${summary.source.name} · ${kindLabel(summary)}"
+        nameView.setCompoundDrawablesRelativeWithIntrinsicBounds(kindIcon(summary), 0, 0, 0)
+        nameView.compoundDrawablePadding = (8 * context.resources.displayMetrics.density).toInt()
+        val locationView = row.findViewById<TextView>(R.id.source_item_location)
+        // Show the real address (URL or file path); fall back to the kind
+        // label only when the location is blank.
+        locationView.text = summary.source.location.ifBlank { kindLabel(summary) }
+        locationView.visibility = View.VISIBLE
         row.findViewById<TextView>(R.id.source_item_details).text = detailsLabel(summary)
         return row
     }
 
-    private fun locationLabel(summary: XmlTvSourceSummary): String =
+    private fun kindIcon(summary: XmlTvSourceSummary): Int = when (summary.source.kind) {
+        XmlTvRepository.KIND_URL -> R.drawable.ic_link
+        else -> R.drawable.ic_file
+    }
+
+    private fun kindLabel(summary: XmlTvSourceSummary): String =
         context.getString(
             if (summary.source.kind == XmlTvRepository.KIND_URL) {
                 R.string.xmltv_source_url
@@ -50,7 +62,7 @@ class XmlTvSourceAdapter(
         context.getString(
             R.string.xmltv_source_row_status,
             summary.source.name,
-            locationLabel(summary),
+            kindLabel(summary),
             summary.channelCount,
             summary.programCount,
             context.getString(

@@ -5,6 +5,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### XMLTV Kaynak Satırında Gerçek Adres Gösterimi
+* **XMLTV kaynak satırı artık URL/dosya yolunu gösteriyor:** Satırın ikinci satırında yalnızca "URL"/"Dosya" etiketi yerine kaynağın gerçek adresi (http(s) URL'si veya dosya yolu) yazıyor; tür etiketi başlığa taşındı ve tür ikonuyla desteklendi. IPTV kaynak ekranı zaten adresi gösterdiği için orada değişiklik gerekmedi.
 ### XMLTV Kaynak Ekranı Çökmesi Düzeltmesi
 * **XMLTV kaynakları açılışta kapanıyordu:** `item_iptv_source` düzeninin 3 satırlı yapıya geçirilmesinden sonra XMLTV kaynak ekranındaki liste `ArrayAdapter`'ın zorunlu kıldığı `@android:id/text1` kimliğini bulamayıp çöküyordu. Liste artık düzeni kimliklere göre bağlayan özel adapter ile çalışıyor; düzen güncellemeleri satır yeniden kullanımıyla yapılıyor.
 ### Kanal Değişiminde Siyah Ekran Ayarı
