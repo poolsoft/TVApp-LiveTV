@@ -209,6 +209,13 @@ class MainActivity : TvRemoteActivity() {
     private var lastTifCallbackLogSignature: String? = null
     private var lastIptvHealthLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
+
+    /** True from channel switch until the new channel's video really renders;
+     *  drives the optional black-screen-while-tuning overlay (Ayarlar >
+     *  Oynatma). Never lets a stale render callback from the previous channel
+     *  end the blackout for the wrong tune. */
+    private var blackScreenTuneGeneration = 0
+    private var blackScreenActive = false
     private var channels: List<LiveChannel> = emptyList()
     private var normalPanelChannels: List<LiveChannel> = emptyList()
     private val currentPrograms = mutableMapOf<String, ProgramSummary>()
@@ -507,6 +514,7 @@ class MainActivity : TvRemoteActivity() {
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF) {
                 if (available) recordTuneReady(channel)
+                if (available && blackScreenActive) endBlackout("TIF_VIDEO_AVAILABLE")
                 when {
                     channel.isRadioChannel() -> updateAudioOnlyPanel(channel, true)
                     available -> updateAudioOnlyPanel(channel, false)
@@ -542,6 +550,7 @@ class MainActivity : TvRemoteActivity() {
                 val recoveredFromFailure = iptvPlaybackFailed
                 iptvPlaybackFailed = false
                 setIptvBufferingVisible(false)
+                if (blackScreenActive) endBlackout("IPTV_PLAYBACK_READY")
                 if (recoveredFromFailure && binding.channelPanel.visibility != View.VISIBLE) {
                     hideIptvPlaybackControls()
                 }
@@ -1056,6 +1065,27 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+    /** Black-screen-while-tuning: optionally hides the previous channel's
+     *  frozen video under the OSD from channel switch until the new channel
+     *  really renders. The infobar stays visible on top so the user can still
+     *  read what they switched to. */
+    private fun startBlackout() {
+        if (!displayPreferences.blackScreenWhileTuning) return
+        if (blackScreenActive) return
+        val target = binding.blackoutView
+        target.visibility = View.VISIBLE
+        blackScreenActive = true
+        blackScreenTuneGeneration++
+        debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
+    }
+
+    private fun endBlackout(reason: String) {
+        if (!blackScreenActive) return
+        blackScreenActive = false
+        binding.blackoutView.visibility = View.GONE
+        debugLog.recordDebug("BLACKOUT_END | reason=$reason")
+    }
+
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
         if (channel.source == LiveChannel.Source.IPTV && !hasIptvAccess {
                 playSelectedChannel(channel, recordHistory)
@@ -1078,6 +1108,10 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
+        // Hide the old channel's video behind a black layer; the infobar above
+        // it stays readable. If this tune renders nothing, the failure/error
+        // paths end the blackout instead of leaving a permanent black screen.
+        startBlackout()
         focusedTuneJob?.cancel()
         activePassthroughInputId = null
         currentPlaybackUsesIptvLibrary = !recordHistory
@@ -1256,6 +1290,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvPlaybackFailure(error: Throwable? = null) {
+        endBlackout("IPTV_FAILURE")
         iptvPlaybackFailed = true
         osdCoordinator.hideStatus()
         showIptvPlaybackControls(R.string.iptv_stream_failed, autoHide = false)
@@ -1331,6 +1366,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
+        endBlackout("PLAYBACK_ERROR")
         if (binding.channelPanel.visibility == View.VISIBLE || osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
             showIptvNotice(R.string.iptv_stream_failed)
             return
@@ -2890,6 +2926,7 @@ class MainActivity : TvRemoteActivity() {
         osdCoordinator.hideStatus()
         binding.tvView.visibility = View.VISIBLE
         activePassthroughInputId = input.id
+        endBlackout("PHYSICAL_INPUT")
         runCatching { playback.playPassthrough(input.id) }
             .onFailure { error ->
                 debugLog.recordDebug(
@@ -3553,6 +3590,7 @@ class MainActivity : TvRemoteActivity() {
         }
         if (iptvGridActive) stopIptvGrid(resumePrevious = true)
         iptvOverlayActive = true
+        endBlackout("IPTV_OVERLAY")
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_OVERLAY)
         val width = (resources.displayMetrics.widthPixels * 0.32f).toInt()
         val height = (width * 9f / 16f).toInt()
@@ -3814,6 +3852,7 @@ class MainActivity : TvRemoteActivity() {
         gridFullscreenIndex = null
         iptvGridActive = true
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_GRID)
+        endBlackout("IPTV_GRID")
         playback.stop()
         iptvPlayback.stop()
         binding.iptvPlayerView.visibility = View.GONE
@@ -6316,6 +6355,7 @@ class MainActivity : TvRemoteActivity() {
 
     override fun onStart() {
         super.onStart()
+        endBlackout("ACTIVITY_START")
         if (!resumeTifPlayback) return
         resumeTifPlayback = false
         val passthroughInputId = activePassthroughInputId

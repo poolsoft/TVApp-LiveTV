@@ -50,6 +50,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - IPTV kaynak yönetimi, kategori filtresi, kanal önizleme ve Media3 oynatma desteği bulunur.
 - Büyük IPTV kaynakları ana kütüphanede 250, seçim yöneticisinde 200 öğelik Room sayfalarıyla yüklenir; binlerce kayıt aynı anda belleğe alınmaz.
 - Kanal panelinin başlığındaki arama simgesi, kumandanın `SEARCH` tuşu veya normal kanal listesindeki `Mavi`; kanal adı, numarası ve kategori içinde arama yapar. Tam IPTV kütüphanesinde arama Room FTS ve sayfalama ile çalışır.
+- "Kanal değişiminde siyah ekran göster" ayarı (Ayarlar > Oynatma) açıldığında kanal geçişinde eski kanalın donmuş görüntüsü gizlenir; infobar okunabilir kalır ve yeni kanal görüntüsü gelince yayın gösterilir.
 - Seçim yöneticisinde kategori, arama, yalnız seçilenler filtresi, 1-4 haneli doğrudan sıra erişimi ve ilk/son arasında dolaşım bulunur.
 - M3U içe aktarma 500 kayıtta bir veritabanına yazılır; Canlı/VOD türü içe aktarım sırasında sınıflandırılıp indekslenir.
 - Canlı yayınlarda canlı noktaya dönme; VOD içeriklerinde oynat/duraklat, ileri/geri sarma, kaldığın yerden devam ve “İzlemeye devam et” görünümü vardır.

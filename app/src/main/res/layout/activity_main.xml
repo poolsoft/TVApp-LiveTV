@@ -29,6 +29,15 @@
         app:surface_type="texture_view"
         app:use_controller="false" />
 
+    <!-- Black-screen-while-tuning (Ayarlar > Oynatma): sits above both player
+         surfaces but below every OSD element so the infobar stays readable. -->
+    <View
+        android:id="@+id/blackout_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/black"
+        android:visibility="gone" />
+
     <GridLayout
         android:id="@+id/iptv_grid"
         android:layout_width="match_parent"

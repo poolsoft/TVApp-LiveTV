@@ -5,6 +5,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Kanal Değişiminde Siyah Ekran Ayarı
+* **Ayarlar > Oynatma’da yeni seçenek:** "Kanal değişiminde siyah ekran göster" açıldığında kanal geçişinde eski kanalın donmuş görüntüsü gizlenir; ekran siyah kalır ve infobar okunabilir durumda kalır. Yeni kanalın görüntüsü geldiğinde (TIF `videoAvailable`, IPTV ilk kare hazır) siyah katman kalkar; yayın açılamazsa hata ekranı gösterilir. Varsayılan olarak kapalıdır; PiP ve Multi-View etkilenmez.
 ### IPTV Veritabanı İndeks İyileştirmesi (DB v24)
 * **contentType + displayName ve contentType + groupTitle indeksleri:** Büyük kataloglarda (15.000+ kayıt) VOD kategori/tür ve sayfalı liste sorgularının tam tablo taraması yerine indeks araması yapması sağlandı; tarama sonrası page cache süpürmesi nedeniyle diğer sorguların yavaşlaması da azalır. Room migration 23→24 ile eklenir, kullanıcı verisi korunur.
 ### IPTV Kayıtlı Liste Düzeni, Zapping Kararlılığı ve Ekran Ortası Hata / Tanılama Gösterimi

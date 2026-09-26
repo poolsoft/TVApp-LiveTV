@@ -25,6 +25,10 @@ data class DisplayPreferences(
     val preferredAudioLanguage: String? = null,
     val preferredSubtitleLanguage: String? = null,
     val showDiagnosticsOverlay: Boolean = false,
+    /** While tuning a new channel, keep the screen black and the infobar up
+     *  until the new channel really renders; hides the previous channel's
+     *  video freezing under the OSD. */
+    val blackScreenWhileTuning: Boolean = false,
 )
 
 class DisplayPreferencesStore(context: Context) {
@@ -68,6 +72,7 @@ class DisplayPreferencesStore(context: Context) {
         preferredAudioLanguage = preferences.getString(KEY_AUDIO_LANGUAGE, null),
         preferredSubtitleLanguage = preferences.getString(KEY_SUBTITLE_LANGUAGE, null),
         showDiagnosticsOverlay = preferences.getBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, false),
+        blackScreenWhileTuning = preferences.getBoolean(KEY_BLACK_SCREEN_WHILE_TUNING, false),
     )
 
     fun save(displayPreferences: DisplayPreferences) {
@@ -100,6 +105,7 @@ class DisplayPreferencesStore(context: Context) {
             .putString(KEY_AUDIO_LANGUAGE, displayPreferences.preferredAudioLanguage)
             .putString(KEY_SUBTITLE_LANGUAGE, displayPreferences.preferredSubtitleLanguage)
             .putBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, displayPreferences.showDiagnosticsOverlay)
+            .putBoolean(KEY_BLACK_SCREEN_WHILE_TUNING, displayPreferences.blackScreenWhileTuning)
             .apply()
     }
 
@@ -139,5 +145,6 @@ class DisplayPreferencesStore(context: Context) {
         const val KEY_AUDIO_LANGUAGE = "audio-language"
         const val KEY_SUBTITLE_LANGUAGE = "subtitle-language"
         const val KEY_SHOW_DIAGNOSTICS_OVERLAY = "show-diagnostics-overlay"
+        const val KEY_BLACK_SCREEN_WHILE_TUNING = "black-screen-while-tuning"
     }
 }
