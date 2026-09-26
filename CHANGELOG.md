@@ -5,6 +5,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Liste Performans Paketi (Keyset + Program Tick + Prefetch)
+* **Keyset sayfalama:** Tam IPTV kütüphanesi ve VOD katalog sayfalama sorguları `LIMIT/OFFSET` yerine `originalIndex >= :fromIndex` anahtar kümesi formuna geçti; yüksek sayfa konumlarında SQLite artık satır atlamak yerine indeks üzerinde yürüyerek okuyor (perf raporundaki 10 ms'lik yüksek-offset kalemi giderildi). Doğrudan numara atlama (`AT_INDEX`) da `originalIndex >= :targetIndex` tabanlı `AtOrAfter` sorgusuna bağlandı; seyrek indeks uyarısıyla davranış aynıdır.
+* **Kanal listesinde program ilerlemesi 60 saniyelik tick:** Program ilerleme çubukları artık yalnızca liste açıkken 60 saniyede bir, yalnızca program satırına bağlı görünen satırlar için yeniden bağlanıyor; tam adapter yenilemesi ve saniyelik iş yok — satır titremesi (blink) önleniyor.
+* **Yön duyarlı logo prefetch:** Kanal listesinde odak yönüne göre en yakın satırların logoları önce önden yüklenir; bir sonraki odaklenen satırın logosu neredeyse her zaman önbellekten gelir.
 ### XMLTV Kaynak Satırında Gerçek Adres Gösterimi
 * **XMLTV kaynak satırı artık URL/dosya yolunu gösteriyor:** Satırın ikinci satırında yalnızca "URL"/"Dosya" etiketi yerine kaynağın gerçek adresi (http(s) URL'si veya dosya yolu) yazıyor; tür etiketi başlığa taşındı ve tür ikonuyla desteklendi. IPTV kaynak ekranı zaten adresi gösterdiği için orada değişiklik gerekmedi.
 ### XMLTV Kaynak Ekranı Çökmesi Düzeltmesi

@@ -7,6 +7,11 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import com.tvapp.livetv.R
 import com.tvapp.livetv.data.ProgramSummary
 import com.tvapp.livetv.databinding.ItemChannelBinding
@@ -26,8 +31,14 @@ class ChannelAdapter(
     private var showIptvMembership = false
     private var selectedId: Long? = null
     private var lastFocusedPosition: Int = RecyclerView.NO_POSITION
+    /** Positions of rows bound with a program progress bar; advanced by the
+     *  1-minute program tick instead of full adapter refreshes. */
+    private val programBoundPositions = mutableSetOf<Int>()
+    private var programTickJob: Job? = null
+    private var programTickScope: CoroutineScope? = null
 
     fun submitList(items: List<LiveChannel>) {
+        programBoundPositions.clear()
         val previous = channels.toList()
         val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize() = previous.size
@@ -45,6 +56,7 @@ class ChannelAdapter(
     }
 
     fun appendItems(items: List<LiveChannel>) {
+        programBoundPositions.clear()
         if (items.isEmpty()) return
         val start = channels.size
         channels.addAll(items)
@@ -65,6 +77,34 @@ class ChannelAdapter(
         }
         val newIndex = channels.indexOfFirst { it.sourceKey == sourceKey }
         if (newIndex >= 0) notifyItemChanged(newIndex, PAYLOAD_SELECTION)
+    }
+
+    /** Starts a 60-second tick that re-binds only rows showing a program
+     *  progress bar, so elapsed-time progress stays current without full
+     *  adapter refreshes or per-second work. */
+    fun startProgramTicker(scope: CoroutineScope) {
+        if (programTickScope == scope) return
+        programTickScope = scope
+        programTickJob?.cancel()
+        programTickJob = scope.launch {
+            while (isActive) {
+                delay(PROGRAM_TICK_MILLIS)
+                refreshProgramProgress()
+            }
+        }
+    }
+
+    fun stopProgramTicker() {
+        programTickJob?.cancel()
+        programTickJob = null
+        programTickScope = null
+    }
+
+    private fun refreshProgramProgress() {
+        val positions = programBoundPositions.filter { it in channels.indices }.ifEmpty { return }
+        positions.forEach { position ->
+            notifyItemChanged(position, PAYLOAD_PROGRAM)
+        }
     }
 
     fun submitPrograms(items: Map<String, ProgramSummary>) {
@@ -226,6 +266,7 @@ class ChannelAdapter(
         }
 
         fun bindProgram(channel: LiveChannel, program: ProgramSummary?) = with(binding) {
+            (this@ChannelAdapter).programBoundPositions.add(bindingAdapterPosition)
             channelProgram.text = program?.title.orEmpty().ifBlank {
                 root.context.getString(R.string.no_program_information)
             }
@@ -245,21 +286,21 @@ class ChannelAdapter(
 
         private fun prefetchAround(view: View, position: Int, movingUp: Boolean) {
             if (position !in channels.indices) return
-            val candidates = if (movingUp) {
-                (position - 1 downTo 0).asSequence()
-                    .map { channels[it] }
-                    .map { candidate ->
-                        if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
-                        else TvContract.buildChannelLogoUri(candidate.id)
-                    }
+            // Direction-aware window: nearest rows first so the next focused row's
+            // logo is almost always in cache. TIF logos resolve from the system
+            // cache instantly; only IPTV URLs hit the network.
+            val nearestFirst: Sequence<LiveChannel> = if (movingUp) {
+                (position - 1 downTo 0).asSequence().map { channels[it] } +
+                    channels.asSequence().drop(position + 1)
             } else {
-                channels.asSequence()
-                    .drop(position + 1)
-                    .map { candidate ->
-                        if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
-                        else TvContract.buildChannelLogoUri(candidate.id)
-                    }
+                channels.asSequence().drop(position + 1) +
+                    (position - 1 downTo 0).asSequence().map { channels[it] }
             }
+            val candidates = nearestFirst
+                .map { candidate ->
+                    if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                    else TvContract.buildChannelLogoUri(candidate.id)
+                }
             ChannelLogoLoader.prefetch(view.context, candidates)
         }
     }
@@ -271,6 +312,7 @@ class ChannelAdapter(
         const val NUMBER_WIDTH_FRACTION = 0.042f
         const val PAYLOAD_PROGRAM = "program"
         const val PAYLOAD_SELECTION = "selection"
+        const val PROGRAM_TICK_MILLIS = 60_000L
     }
 }
 

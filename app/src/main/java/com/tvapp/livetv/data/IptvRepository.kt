@@ -204,17 +204,25 @@ class IptvRepository(context: Context) {
         }
     }
 
-    suspend fun libraryLiveChannelsPage(
+    /** Keyset-paged VOD/catalog window: `originalIndex >= fromIndex`. Prefer this
+     *  over OFFSET paging — SQLite scans the index instead of skipping rows. */
+    suspend fun libraryLiveChannelsPageFrom(
         sourceId: Long,
         category: String?,
         contentType: String,
         limit: Int,
-        offset: Int,
+        fromIndex: Int,
         query: String = "",
-    ): List<LiveChannel> = dao.getLibraryPage(
-        sourceId, category, contentType, IptvFtsQuery.from(query), limit, offset,
-    )
-        .map { it.toLiveChannel() }
+    ): IptvLibraryPage {
+        val entities = dao.getLibraryPageFrom(
+            sourceId, category, contentType, IptvFtsQuery.from(query), fromIndex, limit,
+        )
+        return IptvLibraryPage(
+            channels = entities.map { it.toLiveChannel() },
+            firstAnchor = entities.firstOrNull()?.pageAnchor(),
+            lastAnchor = entities.lastOrNull()?.pageAnchor(),
+        )
+    }
 
     suspend fun libraryLiveChannelsWindow(
         sourceId: Long,
@@ -228,8 +236,8 @@ class IptvRepository(context: Context) {
     ): IptvLibraryPage {
         val ftsQuery = IptvFtsQuery.from(query)
         val entities = when (direction) {
-            IptvPageDirection.FIRST -> dao.getLibraryPage(
-                sourceId, category, contentType, ftsQuery, limit, 0,
+            IptvPageDirection.FIRST -> dao.getLibraryPageFrom(
+                sourceId, category, contentType, ftsQuery, 0, limit,
             )
             IptvPageDirection.NEXT -> requireNotNull(anchor).let {
                 dao.getLibraryPageAfter(
@@ -246,10 +254,11 @@ class IptvRepository(context: Context) {
             IptvPageDirection.LAST -> dao.getLibraryLastPage(
                 sourceId, category, contentType, ftsQuery, limit,
             ).asReversed()
-            // Direct numeric jumps use a filtered ordinal. originalIndex is sparse after
-            // category/FTS filtering, so this one explicit jump must use OFFSET.
-            IptvPageDirection.AT_INDEX -> dao.getLibraryPage(
-                sourceId, category, contentType, ftsQuery, limit, targetIndex,
+            // Direct numeric jumps land at the first row at/after the requested
+            // ordinal; originalIndex is sparse after category/FTS filtering, so
+            // the jump is approximate by design (same as the previous OFFSET form).
+            IptvPageDirection.AT_INDEX -> dao.getLibraryPageAtOrAfter(
+                sourceId, category, contentType, ftsQuery, targetIndex, limit,
             )
         }
         return IptvLibraryPage(

@@ -94,15 +94,16 @@ interface IptvDao {
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
-            "ORDER BY originalIndex LIMIT :limit OFFSET :offset",
+            "AND originalIndex >= :fromIndex " +
+            "ORDER BY originalIndex LIMIT :limit",
     )
-    suspend fun getLibraryPage(
+    suspend fun getLibraryPageFrom(
         sourceId: Long,
         category: String?,
         contentType: String,
         query: String,
+        fromIndex: Int,
         limit: Int,
-        offset: Int,
     ): List<IptvChannelListProjection>
 
     @Query(

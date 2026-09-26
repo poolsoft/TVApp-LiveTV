@@ -8,6 +8,7 @@ import android.view.View
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.tvapp.livetv.data.IptvLibraryPage
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.image.ChannelLogoLoader
@@ -51,7 +52,8 @@ class VodHomeActivity : TvRemoteActivity() {
     // per-source offset. The full catalog is never held in memory.
     private var sourceIds: List<Long> = emptyList()
     private var nextSourceIndex = 0
-    private var nextSourceOffset = 0
+    /** Keyset cursor: the next originalIndex to fetch for [nextSourceIndex]. */
+    private var nextSourceFromIndex = 0
     private var exhausted = false
     private var loadingPage = false
 
@@ -143,7 +145,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun reloadGrid() {
         loadGeneration++
         nextSourceIndex = 0
-        nextSourceOffset = 0
+        nextSourceFromIndex = 0
         exhausted = false
         gridAdapter.submitList(emptyList())
         loadNextGridPage()
@@ -179,26 +181,26 @@ class VodHomeActivity : TvRemoteActivity() {
             val sourceId = sourceIds[nextSourceIndex]
             val remaining = PAGE_SIZE - collected.size
             val page = runCatching {
-                repository.libraryLiveChannelsPage(
+                repository.libraryLiveChannelsPageFrom(
                     sourceId = sourceId,
                     category = null,
                     contentType = CONTENT_TYPE_VOD,
                     limit = remaining,
-                    offset = nextSourceOffset,
+                    fromIndex = nextSourceFromIndex,
                     query = query,
                 )
-            }.getOrDefault(emptyList())
-            if (page.isEmpty()) {
+            }.getOrDefault(IptvLibraryPage(emptyList(), null, null))
+            if (page.channels.isEmpty()) {
                 nextSourceIndex++
-                nextSourceOffset = 0
+                nextSourceFromIndex = 0
                 continue
             }
-            collected.addAll(page)
-            if (page.size < remaining) {
+            collected.addAll(page.channels)
+            if (page.channels.size < remaining) {
                 nextSourceIndex++
-                nextSourceOffset = 0
+                nextSourceFromIndex = 0
             } else {
-                nextSourceOffset += page.size
+                nextSourceFromIndex = (page.lastAnchor?.originalIndex ?: 0) + 1
             }
         }
         return collected.map { ContinueWatchingItem(channel = it, resumeEntry = null) }

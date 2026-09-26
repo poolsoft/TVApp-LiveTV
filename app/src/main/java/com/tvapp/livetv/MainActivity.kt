@@ -5200,6 +5200,8 @@ class MainActivity : TvRemoteActivity() {
                 expanded = expanded,
                 iptvChrome = currentChannel?.source == LiveChannel.Source.IPTV,
             )
+            // Keep in-row program progress current while the list is open.
+            if (expanded) adapter.startProgramTicker(lifecycleScope)
             binding.sourceFilterRow.visibility = View.GONE
             binding.advancedFilterRow.visibility = if (
                 expanded && channelPanelContent == ChannelPanelContent.NORMAL
@@ -5235,6 +5237,7 @@ class MainActivity : TvRemoteActivity() {
     private fun hideChannelPanel() {
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
+        adapter.stopProgramTicker()
         focusedAutoTunePreviousChannel = null
         focusedAutoTuneTargetKey = null
         channelPanelExpanded = false
