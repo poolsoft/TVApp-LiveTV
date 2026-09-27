@@ -62,6 +62,7 @@ class RemoteEditServerController private constructor(
 
     @Synchronized
     fun start(): Boolean {
+        if (!com.tvapp.livetv.BuildConfig.REMOTE_EDIT_ENABLED) return false
         if (!preferencesStore.enabled()) return false
         if (serverRef.get() != null) return true
         val server = RemoteEditServer(
@@ -108,6 +109,14 @@ class RemoteEditServerController private constructor(
                 context.assets.open("webpanel/$path").use { stream -> stream.readBytes() }
             }.getOrNull()
         }
+        // REMOTEEDIT-006: remote playlist imports through the existing pipeline.
+        val importQueue = RemoteImportQueue(context)
+        server.importQueueHandler = { name, url ->
+            val id = importQueue.enqueue(name, url)
+            server.bumpDataVersion()
+            id
+        }
+        server.importQueueListHandler = { importQueue.all() }
         return try {
             server.startServer()
             serverRef.set(server)

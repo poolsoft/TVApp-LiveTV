@@ -12,6 +12,7 @@
     selected: {},
     version: 1,
     polling: false,
+    dragIndex: null,
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -90,9 +91,10 @@
   function renderRows() {
     var tbody = $("rows");
     tbody.innerHTML = "";
-    state.rows.forEach(function (row) {
+    state.rows.forEach(function (row, index) {
       var tr = document.createElement("tr");
       tr.dataset.key = row.sourceKey;
+      tr.draggable = true;
 
       var check = document.createElement("td");
       check.className = "col-check";
@@ -132,9 +134,136 @@
       tr.appendChild(src);
       tr.appendChild(flags);
       tr.addEventListener("dblclick", function () { editRow(row); });
+      attachDragHandlers(tr, index);
       tbody.appendChild(tr);
     });
     updateSelectionInfo();
+  }
+
+  /* Drag-to-reorder: on drop the moved row's new position is converted to a
+   * sortOrder patch (position between neighbors) and sent to the TV. */
+  function attachDragHandlers(tr, index) {
+    tr.addEventListener("dragstart", function (event) {
+      state.dragIndex = index;
+      tr.classList.add("dragging");
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    });
+    tr.addEventListener("dragend", function () {
+      tr.classList.remove("dragging");
+    });
+    tr.addEventListener("dragover", function (event) {
+      event.preventDefault();
+      tr.classList.add("drag-over");
+    });
+    tr.addEventListener("dragleave", function () {
+      tr.classList.remove("drag-over");
+    });
+    tr.addEventListener("drop", function (event) {
+      event.preventDefault();
+      tr.classList.remove("drag-over");
+      var from = state.dragIndex;
+      var to = index;
+      if (from == null || from === to) return;
+      reorder(from, to);
+    });
+  }
+
+  function reorder(fromIndex, toIndex) {
+    var moved = state.rows.splice(fromIndex, 1)[0];
+    state.rows.splice(toIndex, 0, moved);
+    renderRows();
+    var before = state.rows[toIndex - 1];
+    var after = state.rows[toIndex + 1];
+    var newOrder;
+    if (before && after) {
+      newOrder = Math.floor((rowSortKey(before) + rowSortKey(after)) / 2);
+    } else if (before) {
+      newOrder = rowSortKey(before) + 1;
+    } else if (after) {
+      newOrder = rowSortKey(after) - 1;
+    } else {
+      newOrder = 0;
+    }
+    api("/api/v1/channels/" + encodeURIComponent(moved.sourceKey), {
+      method: "PATCH",
+      bodyJson: { revision: moved.revision, sortOrder: newOrder },
+    }).then(refresh).catch(function (error) {
+      alert("Sıralama kaydedilemedi: " + error.message);
+      return refresh();
+    });
+  }
+
+  function rowSortKey(row) {
+    // The list endpoint orders rows as the TV shows them; derive an integer
+    // position from the loaded page. Pages are contiguous, so the index works.
+    return Math.max(0, state.rows.indexOf(row));
+  }
+
+  function addSource() {
+    var urlInput = document.createElement("input");
+    urlInput.placeholder = "http://… M3U adresi";
+    urlInput.style.width = "100%";
+    var nameInput = document.createElement("input");
+    nameInput.placeholder = "Liste adı (isteğe bağlı)";
+    nameInput.style.width = "100%";
+    var wrap = document.createElement("div");
+    wrap.className = "edit-grid";
+    var label1 = document.createElement("label");
+    label1.textContent = "Adres";
+    var label2 = document.createElement("label");
+    label2.textContent = "Ad";
+    wrap.appendChild(label1); wrap.appendChild(urlInput);
+    wrap.appendChild(label2); wrap.appendChild(nameInput);
+    var overlay = document.createElement("div");
+    overlay.className = "card";
+    overlay.innerHTML = "<h2>IPTV listesi ekle</h2>";
+    overlay.appendChild(wrap);
+    var actions = document.createElement("div");
+    actions.className = "edit-actions";
+    var save = document.createElement("button");
+    save.textContent = "Kuyruğa al";
+    var cancel = document.createElement("button");
+    cancel.textContent = "Vazgeç";
+    actions.appendChild(save); actions.appendChild(cancel);
+    overlay.appendChild(actions);
+    $("app").appendChild(overlay);
+    cancel.addEventListener("click", function () { overlay.remove(); });
+    save.addEventListener("click", function () {
+      var url = urlInput.value.trim();
+      if (!/^https?:\/\//.test(url)) { alert("http(s) adresi gerekli."); return; }
+      api("/api/v1/imports", { method: "POST", bodyJson: { url: url, name: nameInput.value.trim() } })
+        .then(function () {
+          overlay.remove();
+          $("importsCard").classList.remove("hidden");
+          pollImports();
+        })
+        .catch(function (error) { alert(error.message); });
+    });
+  }
+
+  function pollImports() {
+    api("/api/v1/imports").then(function (json) {
+      var items = json.imports || [];
+      if (!items.length) return;
+      $("importsCard").classList.remove("hidden");
+      var tbody = $("importRows");
+      tbody.innerHTML = "";
+      items.forEach(function (item) {
+        var tr = document.createElement("tr");
+        [item.id, item.name, item.status, item.importedChannels].forEach(function (value) {
+          var td = document.createElement("td");
+          td.textContent = value;
+          tr.appendChild(td);
+        });
+        if (item.error) {
+          var td = document.createElement("td");
+          td.textContent = item.error;
+          td.className = "error";
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+    }).catch(function () { /* ignore */ });
   }
 
   function updateSelectionInfo() {
@@ -274,6 +403,8 @@
     });
     $("refreshBtn").addEventListener("click", refresh);
     $("moreBtn").addEventListener("click", function () { loadPage(false); });
+    $("addSourceBtn").addEventListener("click", addSource);
+    setInterval(pollImports, 3000);
     $("batchFav").addEventListener("click", function () { batch({ favorite: true }); });
     $("batchHide").addEventListener("click", function () { batch({ hidden: true }); });
     var searchTimer = null;

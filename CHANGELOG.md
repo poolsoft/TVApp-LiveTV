@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### REMOTEEDIT Sprint R3b/R4/R5: Sürükle-Bırak Sıralama, Uzaktan Liste Ekleme ve Sertleştirme (REMOTEEDIT-006, 007)
+* **Web panosunda sürükle-bırak sıralama:** Kanal satırları tutulup taşınabilir; bırakıldığında yeni konum komşu satırların arasına düşen `sortOrder` yamasıyla TV'ye kaydedilir. Sıralama yalnız Room'a yazılır.
+* **Uzaktan IPTV listesi ekleme (REMOTEEDIT-006):** `POST /api/v1/imports` telefon/web'den gelen aktarım isteğini kuyruğa alır; TV uygulaması mevcut sayfalı aktarım hattıyla (15k+ katalog destekli) işler. `GET /api/v1/imports` ve `/imports/{id}` ile durum izlenir (pending/running/done/failed + işlenen kanal sayısı). Liste URL'si ve içindeki kimlik bilgileri hiçbir yanıtın içinde döndürülmez ve hiçbir günlüğe yazılmaz.
+* **Özellik bayrağı (REMOTEEDIT-007):** `BuildConfig.REMOTE_EDIT_ENABLED` üç flavor'da da tanımlı; Ayarlar bölümü ve sunucu başlatma bu bayrağa saygı duyar. Play politikası gerektirirse tek satırla kapatılabilir.
+* **Entegrasyon sözleşme testleri:** Import kuyruğu tel formatı (kırmızı URL, durum adları), 409 çakışma gövdesi, events sürüm sinyali, batch işlem durumları ve sıralama yaması sözleşmesi testlerle sabitlendi.
+* **Dokümantasyon:** README'ye "Telefonla yönetim" bölümü eklendi; CHANGELOG ve TASKS güncel.
 ### REMOTEEDIT Sprint R3: Web Panosu, Canlı Yenileme ve Zengin Telefon Düzenlemesi (REMOTEEDIT-008, 005)
 * **Migration düzeltmesi:** v25'teki `paired_devices` unique index'i entity tarafında da bildirildi; telefonda görülen "Migration didn't properly handle paired_devices" hatası giderildi.
 * **Web panosu (REMOTEEDIT-008):** TVApp sunucusu artık `http://<TV-IP>:8890/` adresinden tarayıcıya yönetim panosu servis ediyor (APK içine gömülü statik sayfa, ek bağımlılık yok). Panoda: 6 haneli kodla eşleştirme, sayfalı + aranabilir kanal tablosu, çift tıkla satır düzenleyici (özel ad/numara, grup, favori/gizli), çoklu seçim + toplu favori/gizle (batch), 25 sn uzun sorgulama ile canlı yenileme.

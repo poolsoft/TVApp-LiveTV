@@ -138,6 +138,15 @@ class RemoteEditServer(
             method == Method.POST && uri == API_CHANNELS_BATCH ->
                 handleBatch(session)
 
+            method == Method.POST && uri == API_IMPORTS ->
+                handleImportRequest(session)
+
+            method == Method.GET && uri == API_IMPORTS ->
+                handleImportList()
+
+            method == Method.GET && uri.startsWith(API_IMPORTS + "/") ->
+                handleImportStatus(uri.removePrefix(API_IMPORTS + "/"))
+
             else -> json(
                 StatusCode.NOT_FOUND,
                 error("not_found", "Bu sürümde bulunmayan uç nokta."),
@@ -297,6 +306,79 @@ class RemoteEditServer(
 
     fun bumpDataVersion(): Long = versionCounter.incrementAndGet()
 
+    /** REMOTEEDIT-006: queue a remote playlist import; executes via the TV
+     *  app's existing pipeline. URL/credentials are never echoed or logged. */
+    private fun handleImportRequest(session: IHTTPSession): Response {
+        val body = readBody(session)
+        val url = body.optString("url").trim()
+        val name = body.optString("name").trim()
+        if (url.isBlank()) {
+            throw BadRequestException("url gerekli.")
+        }
+        val importQueue = importQueueHandler ?: return json(
+            StatusCode.NOT_FOUND,
+            error("imports_unsupported", "Bu sunucu kaynak aktarımı kabul etmiyor."),
+        )
+        val id = try {
+            importQueue.invoke(name, url)
+        } catch (error: IllegalArgumentException) {
+            throw BadRequestException(error.message ?: "Geçersiz adres.")
+        }
+        return json(
+            StatusCode.OK,
+            JSONObject()
+                .put("id", id)
+                .put("status", "queued"),
+        )
+    }
+
+    private fun handleImportList(): Response {
+        val queue = importQueueListHandler
+            ?: return json(
+                StatusCode.NOT_FOUND,
+                error("imports_unsupported", "Bu sunucu kaynak aktarımı kabul etmiyor."),
+            )
+        val requests = JSONArray()
+        queue().forEach { request ->
+            requests.put(
+                JSONObject()
+                    .put("id", request.id)
+                    .put("name", request.name)
+                    .put("status", request.status.name.lowercase())
+                    .put("importedChannels", request.importedChannels)
+                    .put("error", request.error ?: JSONObject.NULL),
+            )
+        }
+        return json(StatusCode.OK, JSONObject().put("imports", requests))
+    }
+
+    private fun handleImportStatus(idText: String): Response {
+        val id = idText.toLongOrNull() ?: return json(
+            StatusCode.BAD_REQUEST,
+            error("bad_request", "Geçersiz istek kimliği."),
+        )
+        val queue = importQueueListHandler
+            ?: return json(
+                StatusCode.NOT_FOUND,
+                error("imports_unsupported", "Bu sunucu kaynak aktarımı kabul etmiyor."),
+            )
+        val request = queue().firstOrNull { it.id == id }
+            ?: return json(StatusCode.NOT_FOUND, error("not_found", "İstek bulunamadı."))
+        return json(
+            StatusCode.OK,
+            JSONObject()
+                .put("id", request.id)
+                .put("name", request.name)
+                .put("status", request.status.name.lowercase())
+                .put("importedChannels", request.importedChannels)
+                .put("error", request.error ?: JSONObject.NULL),
+        )
+    }
+
+    /** REMOTEEDIT-006: import queue hooks; absent = imports disabled. */
+    var importQueueHandler: ((name: String, url: String) -> Long)? = null
+    var importQueueListHandler: (() -> List<RemoteImportQueue.Request>)? = null
+
     /** REMOTEEDIT-005: long-poll until the data version moves or the wait
      *  elapses. NanoHTTPD worker threads tolerate the blocking sleep; clients
      *  treat any changed response as "refetch your list". */
@@ -403,6 +485,7 @@ class RemoteEditServer(
         private const val API_CHANNELS = "$API_ROOT/channels"
         private const val API_CHANNELS_BATCH = "$API_ROOT/channels/batch"
         private const val API_EVENTS = "$API_ROOT/events"
+        private const val API_IMPORTS = "$API_ROOT/imports"
         private const val API_GROUPS = "$API_ROOT/groups"
         private const val API_SOURCES = "$API_ROOT/sources"
         private const val WEB_ROOT = "/assets/webpanel"
@@ -425,6 +508,9 @@ class RemoteEditServer(
             EndpointProbe(Method.PATCH, "$API_CHANNELS/{sourceKey}"),
             EndpointProbe(Method.POST, API_CHANNELS_BATCH),
             EndpointProbe(Method.GET, API_EVENTS),
+            EndpointProbe(Method.POST, API_IMPORTS),
+            EndpointProbe(Method.GET, API_IMPORTS),
+            EndpointProbe(Method.GET, "$API_IMPORTS/{id}"),
             EndpointProbe(Method.GET, API_GROUPS),
             EndpointProbe(Method.GET, API_SOURCES),
         )

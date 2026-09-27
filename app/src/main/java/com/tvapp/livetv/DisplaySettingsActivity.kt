@@ -514,6 +514,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     /** REMOTEEDIT Sprint R1: phone/web management switch, pairing code display,
      *  and paired-device removal. The embedded server runs only while enabled. */
     private fun buildRemoteEditSettings() {
+        if (!BuildConfig.REMOTE_EDIT_ENABLED) return
         section(R.string.remote_edit_settings)
         val controller = RemoteEditServerController.get(this)
         toggle(R.string.remote_edit_enable, controller.isEnabled) { enabled ->

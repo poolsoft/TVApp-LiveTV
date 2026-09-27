@@ -432,18 +432,20 @@ dokunuşlarda zenginleştirilecek; uç noktalar ve çakışma sözleşmesi tamam
   pano yalnız LAN'dan erişilebilir; ek bağımlılık eklenmez. Not: sürükle-bırak
   sıralama sonraki dokunuş; toplu favori/gizle ve satır düzenleyici çalışıyor.
 
-- [ ] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı)**
+- [x] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı) — Sprint R4'te tamamlandı**
   Telefondan/web'den yeni IPTV listesi ekleme/güncelleme isteği sunucuda kuyruğa alınır;
   TV mevcut import akışıyla (IptvRepository) uygular. Kimlik bilgileri şifreli alanda
   taşınır, loglanmaz.
   **Kabul:** Büyük katalog importu sayfalı akışla çalışır; kaynak silme iki aşamalı onay;
-  kimlik bilgisi hiçbir yerde düz metin loglanmaz.
+  kimlik bilgisi hiçbir yerde düz metin loglanmaz. Not: kaynak silme v1 kapsamında
+  değil; ekleme + durum izleme tamam.
 
-- [ ] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler**
+- [x] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler — Sprint R5'te tamamlandı**
   Entegrasyon testleri (sahte client), çakışma senaryoları, Kılavuz + README +
   CHANGELOG, paid flavor davranışı.
   **Kabul:** Hem `local` hem `paid` derlenir; özellik bayrağı
   (`BuildConfig.REMOTE_EDIT_ENABLED`) ile açılır/kapanır; dokümantasyon güncel.
+  Not: soket düzeyi otomasyon testi cihaz doğrulamasıyla tamamlanmalı.
 
 ### Sprint sırası
 1. Sprint R1: `REMOTEEDIT-001` + `REMOTEEDIT-002` (sunucu + eşleştirme)

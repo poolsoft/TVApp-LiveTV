@@ -32,7 +32,9 @@
       <span id="selectionInfo"></span>
       <button id="batchFav" class="hidden">Seçilenleri ★</button>
       <button id="batchHide" class="hidden">Seçilenleri gizle</button>
+      <button id="addSourceBtn">+ Liste ekle</button>
     </div>
+    <p class="hint">Sıralama: satırı tutup yukarı/aşağı taşı; bırakınca TV'ye kaydedilir.</p>
     <div class="table-wrap card">
       <table id="channels">
         <thead>
@@ -45,6 +47,13 @@
           </tr>
         </thead>
         <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="importsCard" class="card hidden">
+      <h2>Liste aktarımları</h2>
+      <table id="imports">
+        <thead><tr><th>#</th><th>Ad</th><th>Durum</th><th>Kanal</th></tr></thead>
+        <tbody id="importRows"></tbody>
       </table>
     </div>
     <div class="toolbar">

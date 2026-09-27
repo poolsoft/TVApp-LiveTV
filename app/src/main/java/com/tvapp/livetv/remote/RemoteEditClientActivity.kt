@@ -11,6 +11,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.R
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -197,6 +199,9 @@ class RemoteEditClientActivity : AppCompatActivity() {
             getString(R.string.remote_edit_client_edit_group) to { _: Int ->
                 showEditGroupDialog(row)
             },
+            getString(R.string.remote_edit_client_add_source) to { _: Int ->
+                showAddSourceDialog()
+            },
         )
         val labels = actions.map { it.first }.toTypedArray()
         AlertDialog.Builder(this)
@@ -262,6 +267,66 @@ class RemoteEditClientActivity : AppCompatActivity() {
                 }
                 .setNegativeButton(R.string.cancel, null)
                 .show()
+        }
+    }
+
+    /** REMOTEEDIT-006: queue a playlist import on the TV; the TV executes it
+     *  with its existing paged import pipeline and the user can watch status
+     *  in the same dialog. */
+    private fun showAddSourceDialog() {
+        val urlInput = EditText(this).apply {
+            hint = getString(R.string.remote_edit_client_url_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine()
+        }
+        val nameInput = EditText(this).apply {
+            hint = getString(R.string.remote_edit_client_source_name_hint)
+            setSingleLine()
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = dp(16)
+            setPadding(pad, 0, pad, 0)
+            addView(urlInput)
+            addView(nameInput)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.remote_edit_client_add_source)
+            .setView(container)
+            .setPositiveButton(R.string.remote_edit_client_queue_import) { _, _ ->
+                val url = urlInput.text.toString().trim()
+                if (url.startsWith("http")) {
+                    queueImport(nameInput.text.toString().trim(), url)
+                } else {
+                    Toast.makeText(this, R.string.xmltv_url_invalid, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun queueImport(name: String, url: String) {
+        lifecycleScope.launch {
+            val queued = withContext(Dispatchers.IO) {
+                runCatching {
+                    val body = org.json.JSONObject().put("url", url).put("name", name)
+                    val request = okhttp3.Request.Builder()
+                        .url("http://${store.address().trim().trimEnd('/')}/api/v1/imports")
+                        .header("Authorization", "Bearer ${store.token()}")
+                        .post(
+                            body.toString()
+                                .toRequestBody("application/json; charset=utf-8".toMediaType()),
+                        )
+                        .build()
+                    clientHttp.newCall(request).execute().use { response -> response.isSuccessful }
+                }.getOrDefault(false)
+            }
+            val message = if (queued) {
+                R.string.remote_edit_client_import_queued
+            } else {
+                R.string.remote_edit_client_error
+            }
+            Toast.makeText(this@RemoteEditClientActivity, message, Toast.LENGTH_SHORT).show()
         }
     }
 

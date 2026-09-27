@@ -197,6 +197,11 @@
     <string name="remote_edit_client_replay_queue">Kuyruğu gönder</string>
     <string name="remote_edit_client_queue_empty">Kuyruk boş</string>
     <string name="remote_edit_client_queue_replayed">%1$d uygulandı, %2$d başarısız</string>
+    <string name="remote_edit_client_add_source">IPTV listesi ekle (kuyruğa al)</string>
+    <string name="remote_edit_client_url_hint">M3U adresi (http/https)</string>
+    <string name="remote_edit_client_source_name_hint">Liste adı (isteğe bağlı)</string>
+    <string name="remote_edit_client_queue_import">Kuyruğa al</string>
+    <string name="remote_edit_client_import_queued">TV\'de aktarım kuyruğa alındı</string>
     <string name="check_for_updates">Güncellemeleri denetle</string>
     <string name="current_version">Sürüm %1$s (%2$d)</string>
     <string name="version_label">Sürüm</string>

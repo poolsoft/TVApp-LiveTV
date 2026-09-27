@@ -108,3 +108,7 @@ tr.editing td { background: rgba(110, 168, 255, 0.12); }
   margin-top: 12px;
 }
 #pageInfo { color: var(--muted); font-size: 13px; padding: 0 18px; }
+.hint { color: var(--muted); font-size: 13px; margin: 8px 18px 0; }
+tr.dragging { opacity: 0.45; }
+tr.drag-over td { background: rgba(110, 168, 255, 0.18); }
+table#channels tbody tr { cursor: grab; }
