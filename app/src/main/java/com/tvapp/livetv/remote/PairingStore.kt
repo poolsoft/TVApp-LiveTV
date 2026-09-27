@@ -118,6 +118,10 @@ class PairingStore(context: Context) {
                 ),
             )
         }
+        // Cap the registry so a web panel and a phone can both stay paired:
+        // when the limit is exceeded the oldest pairing silently falls off and
+        // that client re-pairs with a fresh code.
+        runBlockingIo { deviceDao.deleteBeyondNewestLimit(MAX_DEVICES) }
         return Session(deviceId = id, deviceName = deviceName, tokenPlain = token)
     }
 
@@ -165,6 +169,8 @@ class PairingStore(context: Context) {
         internal const val CODE_TTL_MILLIS = 5 * 60_000L
         internal const val LOCKOUT_MILLIS = 5 * 60_000L
         internal const val MAX_ATTEMPTS = 3
+        /** Simultaneous pairings: one web panel + one phone. */
+        internal const val MAX_DEVICES = 2
         private const val TOKEN_BYTES = 32
         private const val KEY_CODE = "pairing_code"
         private const val KEY_CODE_EXPIRES_AT = "pairing_code_expires_at"

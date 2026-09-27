@@ -21,4 +21,16 @@ interface PairedDeviceDao {
 
     @Query("DELETE FROM paired_devices WHERE id = :deviceId")
     suspend fun delete(deviceId: Long): Int
+
+    /** Keeps the newest [limit] rows (highest ids) and deletes the rest; used
+     *  to enforce the paired-device cap so a web panel and a phone can both
+     *  stay paired. */
+    @Query(
+        "DELETE FROM paired_devices WHERE id NOT IN " +
+            "(SELECT id FROM paired_devices ORDER BY id DESC LIMIT :limit)",
+    )
+    suspend fun deleteBeyondNewestLimit(limit: Int): Int
+
+    @Query("SELECT COUNT(*) FROM paired_devices")
+    suspend fun count(): Int
 }

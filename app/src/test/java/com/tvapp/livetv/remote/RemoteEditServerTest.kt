@@ -85,4 +85,10 @@ class RemoteEditServerTest {
         // Either a wlan IPv4 or the loopback fallback — never a blank value.
         assertTrue(host == "127.0.0.1" || host.contains('.'))
     }
+
+    @Test
+    fun `paired device cap allows a web panel and a phone together`() {
+        // One web panel + one phone must fit under the cap.
+        assertTrue(PairingStore.MAX_DEVICES >= 2)
+    }
 }

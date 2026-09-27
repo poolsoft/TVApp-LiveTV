@@ -5,6 +5,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Web Panosu Düzeltmeleri (varsa kaynağa 404 ve eşleşme limiti)
+* **CSS/JS 404 düzeltmesi:** Panel HTML'i `webpanel/style.css` ve `webpanel/app.js` göreceli yollarıyla referans veriyordu; panel `/` adresinde servis edildiği için tarayıcı `/webpanel/...` istiyor ve sunucu yalnız `/assets/webpanel/...` kabul ettiğinden her iki dosya da 404 dönüyordu (pano stilsiz ve işlevsiz görünüyordu). Yollar mutlak `/assets/webpanel/*` yapıldı.
+* **Eşleşme limiti 2:** Aynı anda bir web panosu + bir telefon eşleşebilsin diye `paired_devices` kayıt sınırı 2'ye çıkarıldı; yeni eşleşme sınırı aşarsa en eski eşleşme sessizce düşer (o client yeni kodla yeniden eşleşir). Daha önce telefon eşleşmişken web panosu eşleşmesi eski kaydı düşürmediği için kullanıcı üçüncü eşleşmede sıkışıyordu.
 ### Uzaktan Yönetim Yeniden Tasarımı: Web Panosu Ana Yönetim Yeri, Telefon Yalnız Kaynak Yönetimi
 * **Telefondan kanal düzenleme kaldırıldı:** Mobil client ekranı (`RemoteEditClientActivity`) sade bir "TV yönetimi" sayfasına dönüştü; yalnız IPTV listesi / XMLTV EPG ekleme, URL kaynaklarını yenileme, adres değiştirme, kaynak silme ve kuyruktaki aktarımların durumunu gösterir. Kanal düzenleme (favori/gizle/ad/numara/grup/sıralama) tamamen web panosuna bırakıldı.
 * **Web panosunda Kaynaklar kartı:** Ana yönetim arayüzüne IPTV + XMLTV kaynak tablosu eklendi: tür etiketi, kanal/seçili sayısı, hata göstergesi; satır işlemleri "Kanal seç" (IPTV), "Yenile", "Adres" (URL kaynakları) ve "Sil". Yeni `+ IPTV listesi ekle` ve `+ XMLTV EPG ekle` butonları aktarım kuyruğuna doğru türle istek gönderir.
