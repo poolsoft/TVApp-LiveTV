@@ -202,6 +202,7 @@
     <string name="remote_edit_client_source_name_hint">Playlist name (optional)</string>
     <string name="remote_edit_client_queue_import">Queue import</string>
     <string name="remote_edit_client_import_queued">Import queued on the TV</string>
+    <string name="remote_edit_client_entry">Manage TV from phone</string>
     <string name="check_for_updates">Check for updates</string>
     <string name="current_version">Version %1$s (%2$d)</string>
     <string name="version_label">Version</string>

@@ -124,6 +124,15 @@
                     android:src="@drawable/ic_audio" />
 
                 <ImageView
+                    android:id="@+id/overlay_btn_remote_edit"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/remote_edit_client_entry"
+                    android:padding="6dp"
+                    android:src="@drawable/ic_remote_edit" />
+
+                <ImageView
                     android:id="@+id/overlay_btn_settings"
                     android:layout_width="36dp"
                     android:layout_height="36dp"

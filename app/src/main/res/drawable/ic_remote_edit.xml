@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <!-- Phone outline with a small channel-list: "manage TV from phone". -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M15.5,1h-8C6.12,1 5,2.12 5,3.5v17C5,21.88 6.12,23 7.5,23h8c1.38,0 2.5,-1.12 2.5,-2.5v-17C18,2.12 16.88,1 15.5,1zM11.5,22c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5 1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5zM16,19L7,19L7,4h9v15zM9,7.5h5v1.5L9,9L9,7.5zM9,10.5h5v1.5L9,12v-1.5zM9,13.5h3v1.5L9,15v-1.5z" />
+</vector>

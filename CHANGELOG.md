@@ -5,6 +5,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Mobil Uygulamaya "TV'yi Yönet" Giriş Noktası
+* **Telefon artık client olarak kullanılabilir:** Mobil sürümün oynatma katmanındaki araç çubuğuna yeni "TV'yi telefondan yönet" ikonu eklendi; dokununca `RemoteEditClientActivity` açılır (TV adresi + 6 haneli kodla eşleştirme, sayfalı kanal listesi, favori/gizle/özel ad/numara/grup düzenlemeleri, IPTV listesi ekleme, çevrimdışı kuyruk). Giriş noktası `REMOTE_EDIT_ENABLED` bayrağına saygı duyar; kapalıysa ikon gizlenir.
 ### REMOTEEDIT Sprint R3b/R4/R5: Sürükle-Bırak Sıralama, Uzaktan Liste Ekleme ve Sertleştirme (REMOTEEDIT-006, 007)
 * **Web panosunda sürükle-bırak sıralama:** Kanal satırları tutulup taşınabilir; bırakıldığında yeni konum komşu satırların arasına düşen `sortOrder` yamasıyla TV'ye kaydedilir. Sıralama yalnız Room'a yazılır.
 * **Uzaktan IPTV listesi ekleme (REMOTEEDIT-006):** `POST /api/v1/imports` telefon/web'den gelen aktarım isteğini kuyruğa alır; TV uygulaması mevcut sayfalı aktarım hattıyla (15k+ katalog destekli) işler. `GET /api/v1/imports` ve `/imports/{id}` ile durum izlenir (pending/running/done/failed + işlenen kanal sayısı). Liste URL'si ve içindeki kimlik bilgileri hiçbir yanıtın içinde döndürülmez ve hiçbir günlüğe yazılmaz.
