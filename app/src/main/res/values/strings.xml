@@ -232,6 +232,11 @@
     <string name="xmltv_clear">XMLTV verisini temizle</string>
     <string name="xmltv_not_configured">Alternatif EPG kaynağı ayarlanmadı.</string>
     <string name="xmltv_importing">XMLTV programları okunuyor…</string>
+    <string name="xmltv_import_progress">XMLTV güncelleniyor: %1$s (%2$d program)</string>
+    <string name="xmltv_phase_reading">bağlanılıyor</string>
+    <string name="xmltv_phase_parsing">işleniyor</string>
+    <string name="xmltv_phase_saving">kaydediliyor</string>
+    <string name="xmltv_phase_done">bitiriliyor</string>
     <string name="xmltv_import_complete">%1$d program içe aktarıldı.</string>
     <string name="xmltv_cleared">Alternatif EPG temizlendi.</string>
     <string name="xmltv_import_failed">XMLTV alınamadı: %1$s</string>

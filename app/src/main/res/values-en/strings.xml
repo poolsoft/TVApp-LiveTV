@@ -219,6 +219,11 @@
     <string name="xmltv_clear">Clear XMLTV data</string>
     <string name="xmltv_not_configured">No alternative EPG source configured.</string>
     <string name="xmltv_importing">Reading XMLTV programs...</string>
+    <string name="xmltv_import_progress">Updating XMLTV: %1$s (%2$d programs)</string>
+    <string name="xmltv_phase_reading">connecting</string>
+    <string name="xmltv_phase_parsing">parsing</string>
+    <string name="xmltv_phase_saving">saving</string>
+    <string name="xmltv_phase_done">finishing</string>
     <string name="xmltv_import_complete">%1$d programs imported.</string>
     <string name="xmltv_cleared">Alternative EPG cleared.</string>
     <string name="xmltv_import_failed">XMLTV import failed: %1$s</string>

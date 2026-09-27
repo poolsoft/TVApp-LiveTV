@@ -1035,7 +1035,9 @@ class MainActivity : TvRemoteActivity() {
     /** Black-screen-while-tuning: optionally hides the previous channel's
      *  frozen video under the OSD from channel switch until the new channel
      *  really renders. The infobar stays visible on top so the user can still
-     *  read what they switched to. */
+     *  read what they switched to. While the blackout is active the previous
+     *  channel's audio is muted too, and playback.unmutedByPlayback restores
+     *  the level when the new channel renders (or on a failure path). */
     private fun startBlackout() {
         if (!displayPreferences.blackScreenWhileTuning) return
         if (blackScreenActive) return
@@ -1043,6 +1045,7 @@ class MainActivity : TvRemoteActivity() {
         target.visibility = View.VISIBLE
         blackScreenActive = true
         blackScreenTuneGeneration++
+        playback.setMuted(true)
         debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
     }
 
@@ -1050,6 +1053,7 @@ class MainActivity : TvRemoteActivity() {
         if (!blackScreenActive) return
         blackScreenActive = false
         binding.blackoutView.visibility = View.GONE
+        playback.setMuted(false)
         debugLog.recordDebug("BLACKOUT_END | reason=$reason")
     }
 

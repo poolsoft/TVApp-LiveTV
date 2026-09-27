@@ -7,6 +7,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -14,6 +15,8 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
+import com.tvapp.livetv.data.XmlTvImportPhase
+import com.tvapp.livetv.data.XmlTvImportProgress
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.data.XmlTvSourceSummary
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +34,7 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
         runCatching {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        runOperation { repository.importDocument(uri) }
+        runOperation { onProgress -> repository.importDocument(uri, onProgress = onProgress) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,7 +118,7 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
                     input.requestFocus()
                 } else {
                     dialog.dismiss()
-                    runOperation { repository.importUrl(url) }
+                    runOperation { onProgress -> repository.importUrl(url, onProgress = onProgress) }
                 }
             }
             input.requestFocus()
@@ -184,7 +187,9 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
                         setResult(RESULT_OK)
                         loadSources()
                     }
-                    Action.REFRESH -> runOperation { repository.refreshSource(summary.source) }
+                    Action.REFRESH -> runOperation { onProgress ->
+                        repository.refreshSource(summary.source, onProgress = onProgress)
+                    }
                     Action.EDIT_URL -> showEditUrlDialog(summary)
                     Action.RENAME -> showRenameDialog(summary)
                     Action.MATCH -> startActivity(Intent(this, XmlTvEpgEditorActivity::class.java))
@@ -221,7 +226,7 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
                     input.requestFocus()
                 } else {
                     dialog.dismiss()
-                    runOperation { repository.updateUrl(summary.source, url) }
+                    runOperation { onProgress -> repository.updateUrl(summary.source, url, onProgress = onProgress) }
                 }
             }
             input.requestFocus()
@@ -275,23 +280,48 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
             .show()
     }
 
-    private fun runOperation(action: () -> Int) {
+    /** Aşamalı ilerleme gösterimi ile uzun XMLTV işlemi çalıştırır. İşlem sürerken ekran
+     *  koruyucu devreye girmez (FLAG_KEEP_SCREEN_ON) ve tamamlanınca kaldırılır. */
+    private fun runOperation(operation: (onProgress: (XmlTvImportProgress) -> Unit) -> Int) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         status.setText(R.string.xmltv_importing)
         lifecycleScope.launch {
-            runCatching { withContext(Dispatchers.IO) { action() } }
-                .onSuccess { count ->
-                    setResult(RESULT_OK)
-                    status.text = getString(R.string.xmltv_import_complete, count)
-                    loadSources()
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    operation { progress ->
+                        runOnUiThread { showProgress(progress) }
+                    }
                 }
-                .onFailure { error ->
-                    status.text = getString(
-                        R.string.xmltv_import_failed,
-                        error.message ?: error.javaClass.simpleName,
-                    )
-                }
+            }.onSuccess { count ->
+                setResult(RESULT_OK)
+                status.text = getString(R.string.xmltv_import_complete, count)
+                loadSources()
+            }.onFailure { error ->
+                status.text = getString(
+                    R.string.xmltv_import_failed,
+                    error.message ?: error.javaClass.simpleName,
+                )
+            }
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
+
+    private fun showProgress(progress: XmlTvImportProgress) {
+        status.text = getString(
+            R.string.xmltv_import_progress,
+            phaseLabel(progress.phase),
+            progress.programsImported,
+        )
+    }
+
+    private fun phaseLabel(phase: XmlTvImportPhase): String = getString(
+        when (phase) {
+            XmlTvImportPhase.READING -> R.string.xmltv_phase_reading
+            XmlTvImportPhase.PARSING -> R.string.xmltv_phase_parsing
+            XmlTvImportPhase.SAVING -> R.string.xmltv_phase_saving
+            XmlTvImportPhase.DONE -> R.string.xmltv_phase_done
+        },
+    )
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
