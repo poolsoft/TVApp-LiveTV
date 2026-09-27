@@ -284,3 +284,100 @@ ilerlemelidir:
 Her sprintte Hibrit TV için DVB/ATV kanal açma, kanal listesi, infobar, EPG, ses ve Back davranışı
 regresyon testinden geçirilmelidir. İkinci motor ve medya merkezi özellikleri bu çekirdek işler
 gerçek TV/TV stick üzerinde doğrulanmadan başlatılmamalıdır.
+
+## Epic REMOTEEDIT - TV Sunucu / Telefon Client Liste Yönetimi
+
+> Vizyon: TV sürümü **sunucu (server) modunda** çalışır; telefon sürümü **client modunda**
+> TVApp'in kanal/liste verisini sunucudan çeker, telefon arayüzünde düzenler ve değişiklikleri
+> sunucuya geri senkron eder. Sunucu veri sahibidir (source of truth), client yalnızca
+> açıkça gönderilen değişiklikleri uygular. Bu epic tamamen bir plan taslağıdır; her sprint
+> önce onaylanır, sonra uygulanır.
+
+### Mimari hedefler ve ilkeler
+- **Room yetkili kalır:** Tüm listeye/katalog verisi TV tarafındaki Room veritabanında yaşar.
+  Server modu Room'un üstünde bir salt-okunur anlık görüntü + değişiklik kuyruğu servis eder;
+  client asla doğrudan TV'nin veritabanına yazmaz.
+- **Yetki modeli:** Varsayılan olarak kanal düzenleme istekleri TVApp'in mevcut
+  `ChannelRepository`/`IptvRepository` API'lerinden geçer; başka yazma yolu açılmaz.
+- **Güvenlik:** İstemci-TV eşleşmesi yerel ağda tek seferlik eşleştirme kodu (pairing code)
+  ile yapılır. Jetonlar (token) cihazda saklanır, **asla loglanmaz**; trafik yalnız
+  yerel ağ (LAN) amaçlıdır ve varsayılan olarak Wi-Fi ağ arabirimine bağlıdır.
+- **Ölçek:** 15.000+ katalog senaryosu için listeleme/aktarım her zaman sayfalıdır
+  (mevcut keyset `originalIndex >= :fromIndex` sorguları yeniden kullanılır); tam katalog
+  belleğe tek seferde yüklenmez.
+- **Çakışma stratejisi:** Alan bazlı "son kazanan" (field-level last-write-wins) +
+  sürüm sayacı. Her kullanıcı düzenlemesi `user_channels` satırında monoton bir
+  `revision` alanı taşır; client eski `revision` üzerinden değişiklik gönderirse sunucu
+  çakışma yanıtı döner ve client mevcut satırı yeniden çeker. Kanal silme/ekleme
+  idempotent (yeniden gönderilebilir) tanımlanır.
+- **Tek/çoklu client:** v1'de tek eşleşmiş telefon; ileride eşleştirilmiş cihaz listesi
+  genişletilebilir. Sunucu aynı anda tek yazma oturumu kabul eder.
+
+### Sprint planı
+
+- [ ] **REMOTEEDIT-001 (P1): Sunucu modu temeli — yerel HTTP servis**
+  TV uygulaması içinde yalnız LAN'da çalışan gömülü HTTP sunucusu (örn. Ktor/NanoHTTPD;
+  mevcut bağımlılık setine en yakın olanı seçilir) ve Ayarlar > Sistem altında
+  "Telefonla yönetim" anahtarı. Endpoint taslağı:
+  `GET /api/v1/ping`, `GET /api/v1/channels?pageAfter=<index>&limit=<n>`,
+  `GET /api/v1/groups`, `GET /api/v1/sources`.
+  **Kabul:** TV uygulaması ön planda/arka planda iken sunucu davranışı belgelenir;
+  ekran kapalıyken davranış (Doze/battery) cihazda test edilir; şifresiz trafik yalnız
+  LAN'da çalışır; PIN/eşleştirme olmadan hiçbir veri dönmez.
+
+- [ ] **REMOTEEDIT-002 (P1): Eşleştirme ve yetkilendirme**
+  TV'de 6 haneli tek seferlik eşleştirme kodu gösterilir; telefon kodu girer, sunucu
+  cihaz kaydeder ve zaman sınırlı jeton üretir. Tüm istekler jetonla doğrulanır.
+  **Kabul:** Yanlış/eksik jeton 401 döner; jeton ve eşleştirme kodu hiçbir günlüğe
+  yazılmaz; eşleştirme TV'den geri alınabilir (cihaz listesi + iptal).
+
+- [ ] **REMOTEEDIT-003 (P1): Telefon client okuma yolu**
+  Mobil flavor'da "TV'ye bağlan" akışı: sunucu keşfi (el ile IP:port; mDNS/DNS-SD
+  sonradan), eşleştirme, sayfalı kanal/liste görüntüleme (mevcut keyset desenine uygun).
+  **Kabul:** 15.000+ kayıtlı katalog telefonda akıcı sayfalanır; cihaz çevrimdışıysa
+  net hata gösterilir; loglarda kanal kaynak kimlik bilgileri görünmez.
+
+- [ ] **REMOTEEDIT-004 (P1): Düzenleme + senkron yazma yolu**
+  Telefondan sık kullanı, gizle/skip, sıralama (sortOrder), ad ve grup düzenlemeleri.
+  İstek biçimi: alan bazlı yama (`PATCH /api/v1/channels/{sourceKey}`) + `revision`;
+  sunucu mevcut `ChannelRepository` DAO güncellemelerini kullanır. Toplu işlem için
+  sınırlı batch endpoint'i (maks. N satır/istek).
+  **Kabul:** Telefondaki düzenleme TV'de anlık/`revision` uyuşmazlığında temiz çakışma
+  mesajıyla yansır; ana liste sıralaması yalnız Room'a yazılır (TIF veritabanına
+  asla); çevrimdışı yapılan düzenlemeler kuyrukta tutulup bağlantı gelince uygulanır.
+
+- [ ] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme**
+  Sunucuda işlem sonrası `revision` artışı; client kısa periyotlu uzun sorgulama
+  (long-poll) ile değişikliği alır (v1'de push yok). TV tarafı listesi Room akışıyla
+  zaten canlı güncellenir.
+  **Kabul:** TV'de ve telefonda aynı satır `revision`'da buluşur; ağ kesilmesi
+  durumunda her iki taraf da tutarlı son duruma döner.
+
+- [ ] **REMOTEEDIT-006 (P2): IPTV kaynak/liter yönetimi (kısıtlı)**
+  Telefondan yeni IPTV listesi ekleme/güncelleme isteği sunucuda kuyruğa alınır ve
+  TV uygulaması mevcut import akışıyla (IptvRepository) uygular; kimlik bilgileri
+  telefonda girilir, sunucuya aktarımda şifreli alan kullanılır ve loglanmaz.
+  **Kabul:** Büyük katalog importu TV'de mevcut sayfalı akışla çalışır; telefondan
+  kaynak silme iki aşamalı onay ister; kimlik bilgisi hiçbir yerde düz metin loglanmaz.
+
+- [ ] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler**
+  Sahte sunucu/client ile entegrasyon testleri, çakışma senaryoları, Kılavuz ve
+  README güncellemeleri, paid flavor dahil davranışın belgelenmesi.
+  **Kabul:** Hem `local` hem `paid` paketinde derlenir; ödeme duvarı politikasına
+  göre özellik bayrağıyla açılır/kapanır; Kılavuz + README + CHANGELOG güncel.
+
+### Sprint sırası
+1. Sprint R1: `REMOTEEDIT-001` + `REMOTEEDIT-002` (sunucu + eşleştirme)
+2. Sprint R2: `REMOTEEDIT-003` (telefonda okuma)
+3. Sprint R3: `REMOTEEDIT-004` + `REMOTEEDIT-005` (yazma + canlı)
+4. Sprint R4: `REMOTEEDIT-006` (kaynak yönetimi)
+5. Sprint R5: `REMOTEEDIT-007` (sertleştirme + dokümantasyon)
+
+### Riskler ve açık kararlar
+- Arka planda sunucunun dayanıklılığı: foreground service + pil istisnası istenip
+  istenmeyeceği kullanıcı kararıyla netleşmeli (uygulama açıkken sınırlı kalmak da
+  yeterli olabilir).
+- Sunucu bileşeni için bağımlılık seçimi (Ktor vs NanoHTTPD): APK boyutu etkisi
+  ölçülmeli; mevcut OkHttp ailesiyle uyumlu minimal çözüm tercih edilir.
+- Uzaktan (LAN dışı) erişim v1'de kapsamda **değildir**; gerekirse ileride ayrı
+  güvenlik değerlendirmesiyle ele alınır.

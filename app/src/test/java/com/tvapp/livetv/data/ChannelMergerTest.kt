@@ -79,12 +79,12 @@ class ChannelMergerTest {
     fun merge_appliesChannelPlaybackEngineOverride() {
         val channel = channel("iptv", "1", "IPTV").copy(source = LiveChannel.Source.IPTV)
         val preference = preference(channel, sortOrder = 0).copy(
-            playbackEngineOverride = "IJK",
+            playbackEngineOverride = "MEDIA3",
         )
 
         val result = ChannelMerger.merge(listOf(channel), listOf(preference)).single()
 
-        assertEquals("IJK", result.playbackEngineOverride)
+        assertEquals("MEDIA3", result.playbackEngineOverride)
     }
 
     private fun channel(key: String, number: String, name: String) = LiveChannel(

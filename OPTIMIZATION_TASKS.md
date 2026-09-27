@@ -11,15 +11,15 @@
 
 | ID | Task | Area | Effort | Status | Branch | PR | Notes |
 |----|------|------|--------|--------|--------|-----|-------|
-| OPT-1.1 | HTTP timeout tuning (connect 10s, read 20s) | Network | 1h | ⬜ Todo | | | IptvRepository.kt connect/read timeouts |
-| OPT-1.2 | Standardize HTTP headers (User-Agent, Accept) | Network | 1h | ⬜ Todo | | | Centralized DefaultHttpDataSource.Factory |
-| OPT-1.3 | Failed logo request TTL (5 min, max 100 entries) | Image | 1h | ⬜ Todo | | | ChannelLogoLoader.kt failedRequests Set |
-| OPT-1.4 | Bandwidth fraction 0.75 → 0.82 | Playback | 30m | ⬜ Todo | | | IptvPlaybackController.kt ADAPTIVE_BANDWIDTH_FRACTION |
-| OPT-1.5 | Renderer mode ON → PREFER (Media3 1.6+) | Playback | 15m | ⬜ Todo | | | DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER |
-| OPT-1.6 | Remove dead IJK code | Cleanup | 2h | ⬜ Todo | | | enableIjkFallback, IJK enum, callbacks, classifyIjkPlaybackFailure |
+| OPT-1.1 | HTTP timeout tuning (connect 10s, read 20s) | Network | 1h | ✅ Done | | | IptvRepository + Stalker/Xtream istemcilerinde 10s/20s (a26fef9) |
+| OPT-1.2 | Standardize HTTP headers (User-Agent, Accept) | Network | 1h | ✅ Done | | | Playlist import header'ları (a26fef9) + oynatmada merkezi IptvDataSourceFactory (OkHttp UA/timeout) |
+| OPT-1.3 | Failed logo request TTL (5 min, max 100 entries) | Image | 1h | ✅ Done | | | FailedLogoTracker: TTL 5 dk, LRU 200 kayıt (a26fef9; hedefin 100'ünden cömert, sınırlı) |
+| OPT-1.4 | Bandwidth fraction 0.75 → 0.82 | Playback | 30m | ✅ Done | | | ADAPTIVE_BANDWIDTH_FRACTION = 0.82f (d6a7446) |
+| OPT-1.5 | Renderer mode ON → PREFER (Media3 1.6+) | Playback | 15m | 🟡 Review | | | EXTENSION_RENDERER_MODE_PREFER uygulandı; cihaz doğrulaması bekliyor |
+| OPT-1.6 | Remove dead IJK code | Cleanup | 2h | ✅ Done | | | enableIjkFallback, IptvPlaybackEngineMode/IptvPlaybackEngine, fallback callback'leri, classifyIjkPlaybackFailure, motor UI'sı ve override stratejisi kaldırıldı; Room playbackEngineOverride kolonu geriye dönük uyumluluk için bırakıldı |
 | OPT-1.7 | Selective EPG cache invalidation | Database | 1h | ⬜ Todo | | | EpgSnapshotCache.invalidate only changed channel |
-| OPT-1.8 | Channel list program progress via Flow (1s tick) | UI | 1h | ⬜ Todo | | | ChannelAdapter.kt bindProgram → coroutine flow |
-| OPT-1.9 | Channel list prefetch 3-5 items viewport-based | Image | 2h | ⬜ Todo | | | ChannelAdapter.kt prefetchAround → scroll direction aware |
+| OPT-1.8 | Channel list program progress via Flow (1s tick) | UI | 1h | ✅ Done | | | 60 sn program tick, yalnız program-bound satırlara payload (d528693; 1 sn yerine daha az sıklıkla, titremesiz) |
+| OPT-1.9 | Channel list prefetch 3-5 items viewport-based | Image | 2h | ✅ Done | | | Yön duyarlı logo prefetch (d528693) |
 | OPT-1.10 | Unit test coverage push to 60% (DAO, Merger, Navigator) | Test | 2h | ⬜ Todo | | | ChannelRepository, ChannelMerger, ChannelNavigator tests |
 
 ---
@@ -85,11 +85,11 @@
 
 | Phase | Total Tasks | Completed | In Progress | Blocked | % Done |
 |-------|-------------|-----------|-------------|---------|--------|
-| Phase 1 | 10 | 0 | 0 | 0 | 0% |
+| Phase 1 | 10 | 7 | 1 | 0 | %70 |
 | Phase 2 | 7 | 0 | 0 | 0 | 0% |
 | Phase 3 | 8 | 0 | 0 | 0 | 0% |
 | Phase 4 | 4 | 0 | 0 | 0 | 0% |
-| **Total** | **29** | **0** | **0** | **0** | **0%** |
+| **Total** | **29** | **7** | **1** | **0** | **%26** |
 
 ---
 

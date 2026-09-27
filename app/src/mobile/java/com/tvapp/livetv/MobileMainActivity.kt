@@ -123,7 +123,6 @@ class MobileMainActivity : AppCompatActivity() {
         iptvPlayback = IptvPlaybackController(
             context = this,
             playerView = binding.mobilePlayerView,
-            enableIjkFallback = true,
         )
 
         iptvPlayback.onPlaybackReady = {

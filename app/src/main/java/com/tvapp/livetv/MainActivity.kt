@@ -67,7 +67,6 @@ import com.tvapp.livetv.playback.gridProfileForCellCount
 import com.tvapp.livetv.playback.IptvBufferingState
 import com.tvapp.livetv.playback.IptvPlaybackProfile
 import com.tvapp.livetv.playback.IptvPlaybackHealthSnapshot
-import com.tvapp.livetv.playback.IptvPlaybackEngine
 import com.tvapp.livetv.playback.IptvRecoveryAction
 import com.tvapp.livetv.playback.IptvContentKind
 import com.tvapp.livetv.playback.IptvPlaybackPhase
@@ -94,7 +93,6 @@ import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.IptvPlaybackPreferences
-import com.tvapp.livetv.settings.IptvPlaybackEngineMode
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.ParentalControlStore
@@ -174,7 +172,7 @@ class MainActivity : TvRemoteActivity() {
     private enum class IptvLibraryContentType { ALL, LIVE, VOD, CONTINUE }
     private enum class MultiViewPickerFilter { ALL, TIF, IPTV, SELECTED }
     private enum class IptvControlRow { TIMELINE, BUTTONS }
-    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, ENGINE }
+    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE }
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -366,19 +364,6 @@ class MainActivity : TvRemoteActivity() {
         )
         applyDisplayPreferences()
         scheduleSleepTimer()
-        if (
-            currentChannel?.source == LiveChannel.Source.IPTV &&
-            currentChannel?.playbackEngineOverride == null
-        ) {
-            val selectedEngine = IptvPlaybackPreferencesStore(this).load().engineMode
-            if (selectedEngine != iptvPlayback.playbackEngineMode()) {
-                iptvPlayback.setPlaybackEngineMode(
-                    selectedEngine,
-                    persistAsDefault = false,
-                    channelOverride = null,
-                )
-            }
-        }
         val previousMode = experienceMode
         applyExperienceMode()
         if (experienceMode != previousMode) loadChannels(preserveCurrentPlayback = true)
@@ -436,13 +421,11 @@ class MainActivity : TvRemoteActivity() {
         iptvPlayback = IptvPlaybackController(
             this,
             binding.iptvPlayerView,
-            enableIjkFallback = true,
         )
         secondaryIptvPlayback = IptvPlaybackController(
             this,
             binding.secondaryIptvPlayerView,
             IptvPlaybackProfile.SECONDARY,
-            enableIjkFallback = true,
         )
         secondaryIptvPlayback.onPlaybackError = { error ->
             debugLog.recordDebug("IPTV_PIP_FAILURE | ${error.errorCodeName}")
@@ -531,19 +514,6 @@ class MainActivity : TvRemoteActivity() {
             } else {
                 handleIptvPlaybackError(error)
             }
-        }
-        iptvPlayback.onExternalFallbackRecommended = { error ->
-            debugLog.recordDebug(
-                "IPTV_EXTERNAL_FALLBACK_RECOMMENDED | code=${error.errorCodeName}, " +
-                    "channel=${currentChannel?.sourceKey}",
-            )
-        }
-        iptvPlayback.onEngineChanged = { engine, reason ->
-            debugLog.recordDebug(
-                "IPTV_ENGINE | engine=$engine, reason=${reason ?: "primary"}, " +
-                    "channel=${currentChannel?.sourceKey}",
-            )
-            updateIptvPlaybackControls()
         }
         iptvPlayback.onPlaybackReady = {
             if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey()) {
@@ -654,8 +624,6 @@ class MainActivity : TvRemoteActivity() {
                 health.firstFrameRendered,
                 health.retryAttempt,
                 health.lastErrorCode,
-                health.engine,
-                health.fallbackReason,
             ).joinToString("|")
             if (signature != lastIptvHealthLogSignature) {
                 lastIptvHealthLogSignature = signature
@@ -677,8 +645,7 @@ class MainActivity : TvRemoteActivity() {
                             "audioHz=${health.audioSampleRateHz ?: -1}, " +
                             "audioChannels=${health.audioChannelCount ?: -1}, " +
                             "retry=${health.retryAttempt}, failure=${health.lastFailureClass}, " +
-                            "error=${health.lastErrorCode ?: "none"}, engine=${health.engine}, " +
-                            "fallbackReason=${health.fallbackReason ?: "none"}",
+                            "error=${health.lastErrorCode ?: "none"}",
                     )
                 }
             }
@@ -1963,13 +1930,9 @@ class MainActivity : TvRemoteActivity() {
             activateSelectedIptvButton()
             showIptvPlaybackControls()
         }
+
         binding.iptvBtnMore.setOnClickListener {
             selectedIptvButton = IptvControlButton.MORE
-            activateSelectedIptvButton()
-            showIptvPlaybackControls()
-        }
-        binding.iptvBtnEngine.setOnClickListener {
-            selectedIptvButton = IptvControlButton.ENGINE
             activateSelectedIptvButton()
             showIptvPlaybackControls()
         }
@@ -2050,7 +2013,6 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBtnBuffer.background = controlBg
         binding.iptvBtnSpeed.background = controlBg
         binding.iptvBtnMore.background = controlBg
-        binding.iptvBtnEngine.background = controlBg
 
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
@@ -2121,27 +2083,6 @@ class MainActivity : TvRemoteActivity() {
             getString(R.string.iptv_speed_label),
             String.format(Locale.getDefault(), "%.2gx", iptvPlayback.vodPlaybackSpeed()),
         )
-        setIptvControlLabel(
-            binding.iptvBtnEngine,
-            getString(R.string.iptv_engine_label),
-            when (iptvPlayback.playbackEngineMode()) {
-                IptvPlaybackEngineMode.MEDIA3 -> "Media3"
-                IptvPlaybackEngineMode.IJK -> "IJK"
-                IptvPlaybackEngineMode.AUTO_FALLBACK -> {
-                    if (iptvPlayback.activePlaybackEngine() == IptvPlaybackEngine.IJK) {
-                        getString(R.string.iptv_engine_auto_active_ijk)
-                    } else {
-                        getString(R.string.iptv_engine_short_auto)
-                    }
-                }
-            },
-        )
-        binding.iptvBtnEngine.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            R.drawable.ic_engine_small,
-            0,
-            if (currentChannel?.playbackEngineOverride != null) R.drawable.ic_lock_tiny else 0,
-            0,
-        )
         binding.iptvBtnSpeed.visibility = View.VISIBLE
 
         updateIptvActionBarState()
@@ -2166,8 +2107,6 @@ class MainActivity : TvRemoteActivity() {
             add(IptvControlButton.BUFFER)
             add(IptvControlButton.SPEED)
             add(IptvControlButton.MORE)
-            // Note: Engine selection hidden while ijkplayer is suspended
-            // add(IptvControlButton.ENGINE)
         }
         val idx = visibleButtons.indexOf(selectedIptvButton).coerceAtLeast(0)
         selectedIptvButton = visibleButtons[(idx + direction + visibleButtons.size) % visibleButtons.size]
@@ -2184,13 +2123,11 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvBtnBuffer.clearFocus()
             binding.iptvBtnSpeed.clearFocus()
             binding.iptvBtnMore.clearFocus()
-            binding.iptvBtnEngine.clearFocus()
             binding.iptvSeekbarRow.background = defaultBg
             binding.iptvBtnPlayPause.background = defaultBg
             binding.iptvBtnBuffer.background = defaultBg
             binding.iptvBtnSpeed.background = defaultBg
             binding.iptvBtnMore.background = defaultBg
-            binding.iptvBtnEngine.background = defaultBg
             return
         }
 
@@ -2213,7 +2150,6 @@ class MainActivity : TvRemoteActivity() {
         updateButton(binding.iptvBtnBuffer, selectedIptvButton == IptvControlButton.BUFFER)
         updateButton(binding.iptvBtnSpeed, selectedIptvButton == IptvControlButton.SPEED)
         updateButton(binding.iptvBtnMore, selectedIptvButton == IptvControlButton.MORE)
-        updateButton(binding.iptvBtnEngine, selectedIptvButton == IptvControlButton.ENGINE)
     }
 
     private fun updateIptvActionBarState() {
@@ -2235,7 +2171,6 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBtnBuffer.isFocusable = focusable
         binding.iptvBtnSpeed.isFocusable = focusable
         binding.iptvBtnMore.isFocusable = focusable
-        binding.iptvBtnEngine.isFocusable = focusable
     }
 
     private fun activateSelectedIptvButton() {
@@ -2255,7 +2190,6 @@ class MainActivity : TvRemoteActivity() {
                 showIptvSpeedChoices()
             }
             IptvControlButton.MORE -> showIptvMoreChoices()
-            IptvControlButton.ENGINE -> showIptvEngineChoices()
         }
         updateIptvPlaybackControls()
     }
@@ -3550,12 +3484,7 @@ class MainActivity : TvRemoteActivity() {
             gridPlayerViews += playerView
             gridLabels += label
             renderedGridKeys += null
-            gridControllers += IptvPlaybackController(
-                this,
-                playerView,
-                gridProfileForCellCount(deviceResourcePolicy.maximumGridStreams),
-                enableIjkFallback = true,
-            ).apply {
+            gridControllers += IptvPlaybackController(context = this, playerView = playerView, profile = gridProfileForCellCount(deviceResourcePolicy.maximumGridStreams)).apply {
                 onPlaybackError = { error ->
                     debugLog.recordDebug(
                         "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}",
@@ -5630,73 +5559,6 @@ class MainActivity : TvRemoteActivity() {
                 scheduleChannelPanelClose()
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun showIptvEngineChoices() {
-        val channel = currentChannel?.takeIf { it.source == LiveChannel.Source.IPTV } ?: return
-        val modes = IptvPlaybackEngineMode.entries
-        val modeLabels = arrayOf(
-            getString(R.string.iptv_engine_media3),
-            getString(R.string.iptv_engine_auto_fallback),
-            getString(R.string.iptv_engine_ijk),
-        )
-        val defaultMode = IptvPlaybackPreferencesStore(this).load().engineMode
-        val labels = arrayOf(
-            getString(
-                R.string.iptv_engine_use_default,
-                modeLabels[modes.indexOf(defaultMode).coerceAtLeast(0)],
-            ),
-            *modeLabels,
-        )
-        val overrideMode = channel.playbackEngineOverride
-            ?.let { stored -> modes.firstOrNull { it.name == stored } }
-        val checked = overrideMode?.let { modes.indexOf(it) + 1 } ?: 0
-        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(R.string.iptv_playback_engine)
-            .setSingleChoiceItems(
-                labels,
-                checked,
-            ) { dialog, which ->
-                dialog.dismiss()
-                val selectedOverride = modes.getOrNull(which - 1)
-                val effectiveMode = selectedOverride ?: defaultMode
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        repository.setPlaybackEngineOverride(channel, selectedOverride?.name)
-                    }
-                    if (currentChannel?.sourceKey != channel.sourceKey) return@launch
-                    val updated = channel.copy(playbackEngineOverride = selectedOverride?.name)
-                    currentChannel = updated
-                    channels = channels.map { item ->
-                        if (item.sourceKey == updated.sourceKey) updated else item
-                    }
-                    iptvPlayback.setPlaybackEngineMode(
-                        effectiveMode,
-                        persistAsDefault = false,
-                        channelOverride = selectedOverride?.name,
-                    )
-                    debugLog.recordDebug(
-                        "IPTV_ENGINE_OVERRIDE | channel=${channel.sourceKey}, " +
-                            "override=${selectedOverride?.name ?: "DEFAULT"}, " +
-                            "effective=${effectiveMode.name}",
-                    )
-                    Toast.makeText(
-                        this@MainActivity,
-                        if (selectedOverride == null) {
-                            getString(R.string.iptv_engine_channel_default)
-                        } else {
-                            getString(
-                                R.string.iptv_engine_channel_saved,
-                                modeLabels[modes.indexOf(selectedOverride)],
-                            )
-                        },
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    updateIptvPlaybackControls()
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 

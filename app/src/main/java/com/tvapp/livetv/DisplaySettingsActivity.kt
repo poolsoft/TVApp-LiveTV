@@ -32,7 +32,6 @@ import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.IptvPlaybackPreferences
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
-import com.tvapp.livetv.settings.IptvPlaybackEngineMode
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.LogoCachePreferences
 import com.tvapp.livetv.settings.LogoCachePreferencesStore
@@ -345,22 +344,6 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
         section(R.string.playback_settings)
         val iptvPlaybackPreferences = iptvPlaybackStore.load()
-        // Note: Engine selection hidden while ijkplayer is suspended. Media3 is the active engine.
-        /*
-        val engineModes = IptvPlaybackEngineMode.entries
-        choice(
-            R.string.iptv_playback_engine,
-            listOf(
-                getString(R.string.iptv_engine_media3),
-                getString(R.string.iptv_engine_auto_fallback),
-                getString(R.string.iptv_engine_ijk),
-            ),
-            engineModes.indexOf(iptvPlaybackPreferences.engineMode).coerceAtLeast(0),
-        ) { index ->
-            iptvPlaybackStore.saveEngineMode(engineModes[index])
-            markChanged()
-        }
-        */
         val bufferOptions = IptvPlaybackPreferences.BUFFER_OPTIONS
         choice(
             R.string.iptv_default_buffer,

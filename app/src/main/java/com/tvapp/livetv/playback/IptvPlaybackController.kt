@@ -26,9 +26,7 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
-import com.tvapp.livetv.settings.IptvPlaybackEngineMode
 import com.tvapp.livetv.ui.isRadioChannel
-import com.tvapp.livetv.settings.resolveIptvPlaybackEngineMode
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -36,7 +34,6 @@ class IptvPlaybackController(
     context: Context,
     private val playerView: PlayerView,
     private val profile: IptvPlaybackProfile = IptvPlaybackProfile.PRIMARY,
-    private val enableIjkFallback: Boolean = false,
 ) {
     private val appContext = context.applicationContext
     private val retryHandler = Handler(Looper.getMainLooper())
@@ -65,10 +62,7 @@ class IptvPlaybackController(
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
     private var vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
-    private var playbackEngineMode = playbackPreferences.engineMode
     private var muted = false
-    private var fallbackReason: String? = null
-    private var lastFallbackPositionMillis = 0L
 
     /** Incremented on every play()/stop()/release(). Everything queued on
      *  retryHandler and every player callback carries the generation it was
@@ -109,8 +103,6 @@ class IptvPlaybackController(
     var onTracksChanged: (() -> Unit)? = null
     var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
     var onRecovery: ((IptvRecoveryEvent) -> Unit)? = null
-    var onExternalFallbackRecommended: ((PlaybackException) -> Unit)? = null
-    var onEngineChanged: ((IptvPlaybackEngine, String?) -> Unit)? = null
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
@@ -118,8 +110,6 @@ class IptvPlaybackController(
         tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
-        fallbackReason = null
-        lastFallbackPositionMillis = 0L
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
@@ -127,10 +117,6 @@ class IptvPlaybackController(
         playbackPreferences = playbackPreferencesStore.load()
         targetBufferSeconds = playbackPreferences.targetBufferSeconds
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
-        playbackEngineMode = resolveIptvPlaybackEngineMode(
-            channel.playbackEngineOverride,
-            playbackPreferences.engineMode,
-        )
         if (player != null && previousBufferSeconds != targetBufferSeconds) {
             playerView.player = null
             player?.release()
@@ -149,15 +135,15 @@ class IptvPlaybackController(
         bufferingStartedAt = null
         resetProgressObservation()
         healthPhase = IptvPlaybackPhase.PREPARING
-        onEngineChanged?.invoke(IptvPlaybackEngine.MEDIA3, null)
         val renderersFactory = DefaultRenderersFactory(appContext).apply {
             setEnableDecoderFallback(true)
-            // EXTENSION_RENDERER_MODE_ON orders software extension renderers after
-            // the built-in hardware renderers, so they are only consulted when a
-            // hardware decoder cannot be selected for the track. (Media3 1.8.0 has
-            // no ON_FAIL mode; ON is the closest available discipline.) Grid cells
-            // additionally cap resolution/bitrate via IptvPlaybackProfile.
-            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+            // EXTENSION_RENDERER_MODE_PREFER puts software extension renderers
+            // ahead of the built-in renderers, so streams the hardware decoder
+            // rejects (or the device decoder fails on) fall through to the
+            // bundled software decoders without a restart. Grid cells still cap
+            // resolution/bitrate via IptvPlaybackProfile so 4-cell layouts do
+            // not overwhelm low-end SoCs.
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         }
         val maximumBufferMs = if (profile == IptvPlaybackProfile.PRIMARY) {
             (targetBufferSeconds * 1_000).coerceAtLeast(MIN_BUFFER_MS)
@@ -263,9 +249,6 @@ class IptvPlaybackController(
                         retryHandler.removeCallbacks(retryRunnable)
                         retryHandler.postDelayed(retryRunnable, delay)
                     } else {
-                        if (shouldRecommendExternalFallback(lastFailureClass)) {
-                            onExternalFallbackRecommended?.invoke(error)
-                        }
                         onPlaybackError?.invoke(error)
                     }
                 }
@@ -343,7 +326,6 @@ class IptvPlaybackController(
         player?.stop()
         player?.clearMediaItems()
         currentChannel = null
-        lastFallbackPositionMillis = 0L
         bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.IDLE)
     }
@@ -474,36 +456,7 @@ class IptvPlaybackController(
 
     fun vodPlaybackSpeed(): Float = vodPlaybackSpeed
 
-    fun playbackEngineMode(): IptvPlaybackEngineMode = playbackEngineMode
 
-    fun activePlaybackEngine(): IptvPlaybackEngine = IptvPlaybackEngine.MEDIA3
-
-    fun setPlaybackEngineMode(
-        mode: IptvPlaybackEngineMode,
-        persistAsDefault: Boolean = true,
-        channelOverride: String? = if (persistAsDefault) null else mode.name,
-    ): IptvPlaybackEngineMode {
-        if (profile != IptvPlaybackProfile.PRIMARY) return playbackEngineMode
-        if (persistAsDefault) playbackPreferencesStore.saveEngineMode(mode)
-        if (mode == playbackEngineMode) {
-            currentChannel = currentChannel?.copy(playbackEngineOverride = channelOverride)
-            return mode
-        }
-        val channel = currentChannel
-        val resumePosition = playbackSnapshot().positionMillis.takeIf {
-            channel?.iptvContentType.equals("VOD", ignoreCase = true)
-        } ?: 0L
-        playbackEngineMode = mode
-        if (channel != null) {
-            play(
-                channel.copy(
-                    playbackEngineOverride = channelOverride,
-                ),
-                resumePosition,
-            )
-        }
-        return mode
-    }
 
     fun setVodPlaybackSpeed(speed: Float): Float {
         if (profile != IptvPlaybackProfile.PRIMARY) return vodPlaybackSpeed
@@ -534,16 +487,6 @@ class IptvPlaybackController(
 
     fun playbackSnapshot(): IptvPlaybackSnapshot {
         val current = player
-        if (current == null && lastFallbackPositionMillis > 0L) {
-            return IptvPlaybackSnapshot(
-                positionMillis = lastFallbackPositionMillis,
-                durationMillis = 0L,
-                bufferedPositionMillis = lastFallbackPositionMillis,
-                isPlaying = false,
-                isSeekable = contentKind() == IptvContentKind.VOD,
-                kind = contentKind(),
-            )
-        }
         return IptvPlaybackSnapshot(
             positionMillis = current?.currentPosition ?: 0L,
             durationMillis = current?.duration?.takeUnless { it == C.TIME_UNSET } ?: 0L,
@@ -594,8 +537,6 @@ class IptvPlaybackController(
             retryAttempt = retryCount,
             lastErrorCode = lastErrorCode,
             lastFailureClass = lastFailureClass,
-            engine = IptvPlaybackEngine.MEDIA3,
-            fallbackReason = fallbackReason,
         )
     }
 
@@ -721,7 +662,6 @@ class IptvPlaybackController(
         trackSelector = null
         mediaSourceFactory = null
         currentChannel = null
-        lastFallbackPositionMillis = 0L
         bufferingStartedAt = null
         updateHealthPhase(IptvPlaybackPhase.RELEASED)
     }
@@ -881,8 +821,6 @@ class IptvPlaybackController(
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000
         const val ADAPTIVE_BANDWIDTH_FRACTION = 0.82f
-        const val DIRECT_IJK_REASON = "DIRECT_MODE"
-        const val IJK_SOFTWARE_VIDEO_REASON = "NO_FIRST_FRAME_SOFTWARE_DECODER"
         const val DEFAULT_LIVE_TARGET_OFFSET_MS = 6_000L
         const val MIN_LIVE_TARGET_OFFSET_MS = 3_000L
         const val MAX_LIVE_TARGET_OFFSET_MS = 10_000L
@@ -898,8 +836,6 @@ class IptvPlaybackController(
 }
 
 enum class IptvContentKind { LIVE, VOD, UNKNOWN }
-
-enum class IptvPlaybackEngine { MEDIA3, IJK }
 
 enum class IptvBufferingState { NONE, LOADING, BUFFERING }
 

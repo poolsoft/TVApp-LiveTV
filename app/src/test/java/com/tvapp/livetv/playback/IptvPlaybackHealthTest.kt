@@ -1,8 +1,6 @@
 package com.tvapp.livetv.playback
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IptvPlaybackHealthTest {
@@ -30,23 +28,6 @@ class IptvPlaybackHealthTest {
         )
     }
 
-    @Test
-    fun recommendsFallbackOnlyForDecoderAndSourceFailures() {
-        assertTrue(shouldRecommendExternalFallback(IptvPlaybackFailureClass.DECODER))
-        assertTrue(shouldRecommendExternalFallback(IptvPlaybackFailureClass.SOURCE))
-        assertFalse(shouldRecommendExternalFallback(IptvPlaybackFailureClass.NETWORK))
-        assertFalse(shouldRecommendExternalFallback(IptvPlaybackFailureClass.HTTP))
-    }
-
-    @Test
-    fun startsIjkOnlyOnceForEligiblePrimaryFailures() {
-        assertTrue(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.DECODER))
-        assertTrue(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.SOURCE))
-        assertFalse(shouldUseIjkFallback(false, false, IptvPlaybackFailureClass.DECODER))
-        assertFalse(shouldUseIjkFallback(true, true, IptvPlaybackFailureClass.DECODER))
-        assertFalse(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.NETWORK))
-        assertFalse(shouldUseIjkFallback(true, false, IptvPlaybackFailureClass.HTTP))
-    }
 
     @Test
     fun watchdogSeparatesStartupBufferAndStall() {
