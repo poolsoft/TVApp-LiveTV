@@ -202,7 +202,7 @@ class XmlTvRepository(context: Context) {
             dao.deleteSource(sourceId)
         }
         updateSourceSummary()
-        EpgSnapshotCache.clear()
+        EpgSnapshotCache.invalidateAll()
         if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
     }
 
@@ -227,7 +227,7 @@ class XmlTvRepository(context: Context) {
 
     fun setSourceEnabled(sourceId: Long, enabled: Boolean) {
         dao.setSourceEnabled(sourceId, enabled)
-        EpgSnapshotCache.clear()
+        EpgSnapshotCache.invalidateAll()
         updateSourceSummary()
     }
 
@@ -246,7 +246,7 @@ class XmlTvRepository(context: Context) {
             sourceIds.forEach(dao::deleteSource)
         }
         legacyCacheFile.delete()
-        EpgSnapshotCache.clear()
+        EpgSnapshotCache.invalidateAll()
         cancelPeriodicRefresh()
     }
 
@@ -308,7 +308,7 @@ class XmlTvRepository(context: Context) {
             val xmlTvDeleted = dao.deleteExpiredPrograms(cutoffMillis)
             val xtreamDeleted = xtreamEpgDao.deleteExpiredPrograms(cutoffMillis)
             if (xmlTvDeleted > 0 || xtreamDeleted > 0) {
-                EpgSnapshotCache.clear()
+                EpgSnapshotCache.invalidateAll()
             }
         }
     }
@@ -486,7 +486,7 @@ class XmlTvRepository(context: Context) {
             xtreamEpgDao.clearPrograms()
             distinctPrograms.chunked(INSERT_BATCH_SIZE).forEach(xtreamEpgDao::insertPrograms)
         }
-        EpgSnapshotCache.clear()
+        EpgSnapshotCache.invalidateAll()
         purgeExpiredPrograms()
         if (queriedChannels > 0 && successfulQueries == queriedChannels) {
             preferences.edit().putLong(KEY_XTREAM_UPDATED, now).apply()
@@ -657,7 +657,7 @@ class XmlTvRepository(context: Context) {
             }
         }
 
-        EpgSnapshotCache.clear()
+        EpgSnapshotCache.invalidateAll()
         reportProgress(XmlTvImportPhase.SAVING)
         purgeExpiredPrograms()
         updateSourceSummary()

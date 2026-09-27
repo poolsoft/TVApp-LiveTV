@@ -17,7 +17,7 @@
 | OPT-1.4 | Bandwidth fraction 0.75 → 0.82 | Playback | 30m | ✅ Done | | | ADAPTIVE_BANDWIDTH_FRACTION = 0.82f (d6a7446) |
 | OPT-1.5 | Renderer mode ON → PREFER (Media3 1.6+) | Playback | 15m | 🟡 Review | | | EXTENSION_RENDERER_MODE_PREFER uygulandı; cihaz doğrulaması bekliyor |
 | OPT-1.6 | Remove dead IJK code | Cleanup | 2h | ✅ Done | | | enableIjkFallback, IptvPlaybackEngineMode/IptvPlaybackEngine, fallback callback'leri, classifyIjkPlaybackFailure, motor UI'sı ve override stratejisi kaldırıldı; Room playbackEngineOverride kolonu geriye dönük uyumluluk için bırakıldı |
-| OPT-1.7 | Selective EPG cache invalidation | Database | 1h | ⬜ Todo | | | EpgSnapshotCache.invalidate only changed channel |
+| OPT-1.7 | Selective EPG cache invalidation | Database | 1h | ✅ Done | | | invalidateAll() sürüm tabanlı toplu geçersizleme + kanal başına invalidate(selector); XmlTvRepository'deki 6 toplu temizleme noktası geçersizlemeye bağlandı |
 | OPT-1.8 | Channel list program progress via Flow (1s tick) | UI | 1h | ✅ Done | | | 60 sn program tick, yalnız program-bound satırlara payload (d528693; 1 sn yerine daha az sıklıkla, titremesiz) |
 | OPT-1.9 | Channel list prefetch 3-5 items viewport-based | Image | 2h | ✅ Done | | | Yön duyarlı logo prefetch (d528693) |
 | OPT-1.10 | Unit test coverage push to 60% (DAO, Merger, Navigator) | Test | 2h | ⬜ Todo | | | ChannelRepository, ChannelMerger, ChannelNavigator tests |
@@ -85,7 +85,7 @@
 
 | Phase | Total Tasks | Completed | In Progress | Blocked | % Done |
 |-------|-------------|-----------|-------------|---------|--------|
-| Phase 1 | 10 | 7 | 1 | 0 | %70 |
+| Phase 1 | 10 | 8 | 1 | 0 | %80 |
 | Phase 2 | 7 | 0 | 0 | 0 | 0% |
 | Phase 3 | 8 | 0 | 0 | 0 | 0% |
 | Phase 4 | 4 | 0 | 0 | 0 | 0% |

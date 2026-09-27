@@ -5,6 +5,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Seçici EPG Önbellek Geçersizleştirme (OPT-1.7)
+* **Toplu geçersizleme artık sürüm tabanlı ve hafif:** XMLTV/Xtream EPG verisi değiştiğinde `EpgSnapshotCache` tümünü boşaltan 6 nokta yeni `invalidateAll()` çağrısına bağlandı; önbellek sürüm sayacıyla eski anlık görüntüleri tek seferde geçersiz kılar (iki harita temizliği + sayaç artışı). Kanal başına `invalidate(sourceKey)` davranışı korundu: tek kanalın EPG eşlemesi değiştiğinde yalnız o kanalın önbelleği düşer.
+* **Fayda:** EPG kaynağı güncellemeleri artık tüm kanalların şu anki/sonraki program önbelleğini boşaltır; bir sonraki okumada yalnızca gerçekten değişen veriler yeniden hesaplanır. Kanal listesi gezinirken gereksiz veritabanı sorguları azalır.
 ### XMLTV Güncellemesinde Aşamalı İlerleme, Ekran Koruyucu Engeli ve Ayrıştırma Hızı
 * **Aşamalı ilerleme gösterimi:** XMLTV kaynak güncellemesi artık ekranda aşama aşama izleniyor: "bağlanılıyor → işleniyor → kaydediliyor → bitiriliyor" ve o ana kadar işlenen program sayısı (örn. "XMLTV güncelleniyor: işleniyor (24.500 program)"). Güncellemenin gerçekten çalıştığı, tıkandığı mı yoksa bittiği mi artık net görülüyor; liste satırındaki program sayısı da işlem bitince güncel toplamı gösterir.
 * **Güncelleme sırasında ekran koruyucu devreye girmez:** İşlem sürerken ekranda `FLAG_KEEP_SCREEN_ON` tutulur; işlem tamamlanınca veya hata verince bayrak kaldırılır. Böylece uzun (15.000+ program) güncellemeler ortasında ekran koruyucu devreye girip akışı bölmez.
