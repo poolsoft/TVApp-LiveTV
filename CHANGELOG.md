@@ -5,6 +5,8 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Planlama: REMOTEEDIT Detaylı Tasarım Onaylandı
+* **TV sunucu / telefon client + web panosu tasarımı netleşti:** TASKS.md'deki REMOTEEDIT epic'i uygulama detayına indirildi. Onaylanan kararlar: gömülü sunucu hem telefona (mobil flavor) hem tarayıcıya (APK içinden servis edilen statik web panosu, ek bağımlılık yok) aynı REST API'yi servis eder; çakışma stratejisi `revision` sayacı + son yazan kazanır (DB v25 migration'ı ile satır sürümü); tüm düzenleme alanları (sık kullanı, gizle, özel ad/numara, grup, sıralama) ilk sürümde açılır. Eşleştirme akışı (TV'de 6 haneli kod, tek seferlik jeton, SHA-256 hash saklama), API tablosu (keyset sayfalı `/api/v1/channels`, alan bazlı `PATCH`, batch, long-poll events), çevrimdışı kuyruk ve 5 sprintlik sıra (R1 sunucu+eşleştirme → R2 telefon okuma/yazma → R3 web panosu+canlı → R4 kaynak yönetimi → R5 test/dokümantasyon) dokümana işlendi. Kod uygulaması Sprint R1 ile başlayacak.
 ### Seçici EPG Önbellek Geçersizleştirme (OPT-1.7)
 * **Toplu geçersizleme artık sürüm tabanlı ve hafif:** XMLTV/Xtream EPG verisi değiştiğinde `EpgSnapshotCache` tümünü boşaltan 6 nokta yeni `invalidateAll()` çağrısına bağlandı; önbellek sürüm sayacıyla eski anlık görüntüleri tek seferde geçersiz kılar (iki harita temizliği + sayaç artışı). Kanal başına `invalidate(sourceKey)` davranışı korundu: tek kanalın EPG eşlemesi değiştiğinde yalnız o kanalın önbelleği düşer.
 * **Fayda:** EPG kaynağı güncellemeleri artık tüm kanalların şu anki/sonraki program önbelleğini boşaltır; bir sonraki okumada yalnızca gerçekten değişen veriler yeniden hesaplanır. Kanal listesi gezinirken gereksiz veritabanı sorguları azalır.
