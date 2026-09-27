@@ -5,6 +5,14 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Uzaktan Yönetim Yeniden Tasarımı: Web Panosu Ana Yönetim Yeri, Telefon Yalnız Kaynak Yönetimi
+* **Telefondan kanal düzenleme kaldırıldı:** Mobil client ekranı (`RemoteEditClientActivity`) sade bir "TV yönetimi" sayfasına dönüştü; yalnız IPTV listesi / XMLTV EPG ekleme, URL kaynaklarını yenileme, adres değiştirme, kaynak silme ve kuyruktaki aktarımların durumunu gösterir. Kanal düzenleme (favori/gizle/ad/numara/grup/sıralama) tamamen web panosuna bırakıldı.
+* **Web panosunda Kaynaklar kartı:** Ana yönetim arayüzüne IPTV + XMLTV kaynak tablosu eklendi: tür etiketi, kanal/seçili sayısı, hata göstergesi; satır işlemleri "Kanal seç" (IPTV), "Yenile", "Adres" (URL kaynakları) ve "Sil". Yeni `+ IPTV listesi ekle` ve `+ XMLTV EPG ekle` butonları aktarım kuyruğuna doğru türle istek gönderir.
+* **Kanal seçme uzaktan:** `POST /api/v1/sources/selection/{id}` gövdesi `{add:[], remove[]}` (delta) veya `{selected[]}` (tümü) kabul eder; web panosu seçim diyaloğu tek kaynağın kataloğunu `sourceId` filtresiyle sayfalı listeler (`GET /api/v1/channels?sourceId=`, DAO'da sınırlı sorgu, 15k+ katalog güvenli) ve her işaretlemeyi anında delta olarak yazar.
+* **Yeni kaynak uç noktaları:** `POST /api/v1/sources/delete` ve `POST /api/v1/sources/refresh` (gövde `{kind, id}`), `GET /api/v1/xmltv/catalog` (EPG kanal kataloğu). `POST /api/v1/imports` artık `kind` alanı (`iptv`/`xmltv`) alır; XMLTV aktarımı TV'deki mevcut `XmlTvRepository.importUrl` hattıyla işler. Import yanıtları `kind` alanı taşır. Kaynak URL'leri hâlâ hiçbir yanıt/günlükte yer almaz.
+* **Adres girişi kolaylaştı (NSD):** TV, yönetim sunucusunu `_tvapp._tcp.` olarak NSD/mDNS ile duyurur; telefon eşleştirme penceresi ağıdaki TV'yi kendisi bulur ve adres kutusunu doldurur (elle girişe geri çekilme korunur).
+* **Dikeyde görünür giriş noktası:** Mobil sürümde "TV yönetimi" butonu yatay oynatma overlay'inden dikey toolbar'a da eklendi; her yönde erişilebilir.
+* **Test:** Mevcut sunucu/yazma/import sözleşme testleri güncel tel formatıyla geçer; üç flavor derlemesi ve birim testleri yerel olarak doğrulandı. Cihaz üzerinde web panosu akışı, NSD keşfi ve eşleştirme doğrulaması kullanıcıda yapılmalı.
 ### Mobil Uygulamaya "TV'yi Yönet" Giriş Noktası
 * **Telefon artık client olarak kullanılabilir:** Mobil sürümün oynatma katmanındaki araç çubuğuna yeni "TV'yi telefondan yönet" ikonu eklendi; dokununca `RemoteEditClientActivity` açılır (TV adresi + 6 haneli kodla eşleştirme, sayfalı kanal listesi, favori/gizle/özel ad/numara/grup düzenlemeleri, IPTV listesi ekleme, çevrimdışı kuyruk). Giriş noktası `REMOTE_EDIT_ENABLED` bayrağına saygı duyar; kapalıysa ikon gizlenir.
 ### REMOTEEDIT Sprint R3b/R4/R5: Sürükle-Bırak Sıralama, Uzaktan Liste Ekleme ve Sertleştirme (REMOTEEDIT-006, 007)

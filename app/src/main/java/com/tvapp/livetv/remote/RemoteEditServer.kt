@@ -33,8 +33,9 @@ class RemoteEditServer(
     interface DataProvider {
         fun serverPing(): JSONObject
 
-        /** Keyset-paged channel list (cursor = last sourceKey); JSON array. */
-        fun channels(afterSourceKey: String?, limit: Int, query: String?): JSONArray
+        /** Keyset-paged channel list (cursor = last sourceKey); JSON array.
+         *  sourceId filters IPTV catalog rows to one source (channel picker). */
+        fun channels(afterSourceKey: String?, limit: Int, query: String?, sourceId: Long?): JSONArray
 
         /** Single channel with full editable fields, or null. */
         fun channel(sourceKey: String): JSONObject?
@@ -42,6 +43,13 @@ class RemoteEditServer(
         fun groups(): JSONArray
 
         fun sources(): JSONArray
+
+        /** XMLTV EPG channel catalog (sourceId, channelId, channelName). */
+        fun xmltvCatalog(): JSONArray
+
+        /** Applies a full/delta selection change for an IPTV source.
+         *  false = source unknown or payload empty. */
+        fun applySelection(sourceId: Long, body: JSONObject): Boolean
     }
 
     @Throws(IOException::class)
@@ -146,6 +154,18 @@ class RemoteEditServer(
 
             method == Method.GET && uri.startsWith(API_IMPORTS + "/") ->
                 handleImportStatus(uri.removePrefix(API_IMPORTS + "/"))
+
+            method == Method.GET && uri == API_XMLTV_CATALOG ->
+                json(StatusCode.OK, JSONObject().put("catalog", dataProvider.xmltvCatalog()))
+
+            method == Method.POST && uri.startsWith(API_SOURCES + "/selection/") ->
+                handleSelection(session, uri.removePrefix(API_SOURCES + "/selection/"))
+
+            method == Method.POST && uri == API_SOURCES + "/delete" ->
+                handleSourceMutation(session, OP_DELETE)
+
+            method == Method.POST && uri == API_SOURCES + "/refresh" ->
+                handleSourceMutation(session, OP_REFRESH)
 
             else -> json(
                 StatusCode.NOT_FOUND,
@@ -306,12 +326,17 @@ class RemoteEditServer(
 
     fun bumpDataVersion(): Long = versionCounter.incrementAndGet()
 
-    /** REMOTEEDIT-006: queue a remote playlist import; executes via the TV
-     *  app's existing pipeline. URL/credentials are never echoed or logged. */
+    /** REMOTEEDIT-006: queue a remote source import (IPTV playlist or XMLTV
+     *  EPG); executes via the TV app's existing pipelines. URL/credentials are
+     *  never echoed or logged. */
     private fun handleImportRequest(session: IHTTPSession): Response {
         val body = readBody(session)
         val url = body.optString("url").trim()
         val name = body.optString("name").trim()
+        val kind = when (body.optString("kind").trim().lowercase(java.util.Locale.ROOT)) {
+            "xmltv", "epg" -> RemoteImportQueue.Request.Kind.XMLTV
+            else -> RemoteImportQueue.Request.Kind.IPTV
+        }
         if (url.isBlank()) {
             throw BadRequestException("url gerekli.")
         }
@@ -320,7 +345,7 @@ class RemoteEditServer(
             error("imports_unsupported", "Bu sunucu kaynak aktarımı kabul etmiyor."),
         )
         val id = try {
-            importQueue.invoke(name, url)
+            importQueue.invoke(name, url, kind)
         } catch (error: IllegalArgumentException) {
             throw BadRequestException(error.message ?: "Geçersiz adres.")
         }
@@ -340,14 +365,7 @@ class RemoteEditServer(
             )
         val requests = JSONArray()
         queue().forEach { request ->
-            requests.put(
-                JSONObject()
-                    .put("id", request.id)
-                    .put("name", request.name)
-                    .put("status", request.status.name.lowercase())
-                    .put("importedChannels", request.importedChannels)
-                    .put("error", request.error ?: JSONObject.NULL),
-            )
+            requests.put(importJson(request))
         }
         return json(StatusCode.OK, JSONObject().put("imports", requests))
     }
@@ -364,20 +382,73 @@ class RemoteEditServer(
             )
         val request = queue().firstOrNull { it.id == id }
             ?: return json(StatusCode.NOT_FOUND, error("not_found", "İstek bulunamadı."))
-        return json(
-            StatusCode.OK,
-            JSONObject()
-                .put("id", request.id)
-                .put("name", request.name)
-                .put("status", request.status.name.lowercase())
-                .put("importedChannels", request.importedChannels)
-                .put("error", request.error ?: JSONObject.NULL),
+        return json(StatusCode.OK, importJson(request))
+    }
+
+    private fun importJson(request: RemoteImportQueue.Request): JSONObject = JSONObject()
+        .put("id", request.id)
+        .put("name", request.name)
+        .put("kind", request.kind.name.lowercase(java.util.Locale.ROOT))
+        .put("status", request.status.name.lowercase())
+        .put("importedChannels", request.importedChannels)
+        .put("error", request.error ?: JSONObject.NULL)
+
+    /** Source delete/refresh; body {kind, id}. A missing handler or unknown
+     *  source answers 404; the outcome never echoes URLs. */
+    private fun handleSourceMutation(session: IHTTPSession, operation: String): Response {
+        val body = readBody(session)
+        val kind = body.optString("kind").trim()
+        val id = body.optLong("id", -1L)
+        if (kind.isBlank() || id <= 0) {
+            throw BadRequestException("kind ve id gerekli.")
+        }
+        val handler = sourceMutationHandler
+            ?: return json(
+                StatusCode.NOT_FOUND,
+                error("sources_unsupported", "Bu sunucu kaynak yönetimini desteklemiyor."),
+            )
+        val updated = try {
+            handler(kind, id, operation)
+        } catch (error: IllegalArgumentException) {
+            throw BadRequestException(error.message ?: "Geçersiz kaynak isteği.")
+        }
+        return if (updated) {
+            versionCounter.incrementAndGet()
+            json(StatusCode.OK, JSONObject().put("status", "ok"))
+        } else {
+            json(StatusCode.NOT_FOUND, error("not_found", "Kaynak bulunamadı veya işlem uygulanamaz."))
+        }
+    }
+
+    /** IPTV selection change; path /sources/selection/{id}, body {add[], remove[]}
+     *  or {selected[]}. Responds ok or 404 when the source is unknown. */
+    private fun handleSelection(session: IHTTPSession, idText: String): Response {
+        val id = idText.toLongOrNull() ?: return json(
+            StatusCode.BAD_REQUEST,
+            error("bad_request", "Geçersiz kaynak kimliği."),
         )
+        val body = readBody(session)
+        val applied = try {
+            dataProvider.applySelection(id, body)
+        } catch (error: JSONException) {
+            throw BadRequestException("JSON gövdesi hatalı.")
+        } catch (error: IllegalArgumentException) {
+            throw BadRequestException(error.message ?: "Geçersiz seçim isteği.")
+        }
+        return if (applied) {
+            versionCounter.incrementAndGet()
+            json(StatusCode.OK, JSONObject().put("status", "ok"))
+        } else {
+            json(StatusCode.NOT_FOUND, error("not_found", "Kaynak bulunamadı veya seçim boş."))
+        }
     }
 
     /** REMOTEEDIT-006: import queue hooks; absent = imports disabled. */
-    var importQueueHandler: ((name: String, url: String) -> Long)? = null
+    var importQueueHandler: ((name: String, url: String, kind: RemoteImportQueue.Request.Kind) -> Long)? = null
     var importQueueListHandler: (() -> List<RemoteImportQueue.Request>)? = null
+
+    /** Source delete/refresh hook: (kind, id, operation) -> Boolean. */
+    var sourceMutationHandler: ((kind: String, id: Long, operation: String) -> Boolean)? = null
 
     /** REMOTEEDIT-005: long-poll until the data version moves or the wait
      *  elapses. NanoHTTPD worker threads tolerate the blocking sleep; clients
@@ -411,12 +482,13 @@ class RemoteEditServer(
             ?.takeIf(String::isNotEmpty)
         val query = parameters["q"]?.firstOrNull()?.trim()?.take(QUERY_MAX_LENGTH)
             ?.takeIf(String::isNotEmpty)
+        val sourceId = parameters["sourceId"]?.firstOrNull()?.toLongOrNull()
         val limit = (parameters["limit"]?.firstOrNull()?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT)
             .coerceIn(1, MAX_PAGE_LIMIT)
         return json(
             StatusCode.OK,
             JSONObject()
-                .put("channels", dataProvider.channels(after, limit, query))
+                .put("channels", dataProvider.channels(after, limit, query, sourceId))
                 .put("limit", limit)
                 .put("after", after ?: JSONObject.NULL),
         )
@@ -488,6 +560,7 @@ class RemoteEditServer(
         private const val API_IMPORTS = "$API_ROOT/imports"
         private const val API_GROUPS = "$API_ROOT/groups"
         private const val API_SOURCES = "$API_ROOT/sources"
+        private const val API_XMLTV_CATALOG = "$API_ROOT/xmltv/catalog"
         private const val WEB_ROOT = "/assets/webpanel"
         private const val EVENTS_MAX_WAIT_MILLIS = 25_000L
         private const val EVENTS_POLL_STEP_MILLIS = 500L
@@ -497,6 +570,8 @@ class RemoteEditServer(
         private const val QUERY_MAX_LENGTH = 64
         private const val CURSOR_MAX_LENGTH = 128
         private const val DEVICE_NAME_MAX_LENGTH = 64
+        internal const val OP_DELETE = "delete"
+        internal const val OP_REFRESH = "refresh"
 
         /** Routes exposed for tests without starting a socket. */
         internal val ROUTES = listOf(
@@ -513,6 +588,10 @@ class RemoteEditServer(
             EndpointProbe(Method.GET, "$API_IMPORTS/{id}"),
             EndpointProbe(Method.GET, API_GROUPS),
             EndpointProbe(Method.GET, API_SOURCES),
+            EndpointProbe(Method.POST, "$API_SOURCES/delete"),
+            EndpointProbe(Method.POST, "$API_SOURCES/refresh"),
+            EndpointProbe(Method.POST, "$API_SOURCES/selection/{id}"),
+            EndpointProbe(Method.GET, API_XMLTV_CATALOG),
         )
 
         internal fun error(code: String, message: String): JSONObject =

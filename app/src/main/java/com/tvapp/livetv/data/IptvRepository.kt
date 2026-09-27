@@ -293,6 +293,27 @@ class IptvRepository(context: Context) {
         if (sourceKeys.isNotEmpty()) xmlTvRepository.requestXtreamRefresh(force = true)
     }
 
+    /** Remote source management: applies a delta membership change without
+     *  touching the rest of the source's selection. Used by the web panel's
+     *  channel picker; keeps the existing paged/chunked write discipline. */
+    suspend fun updateSelectedChannels(
+        sourceId: Long,
+        addKeys: Set<String>,
+        removeKeys: Set<String>,
+    ) {
+        if (addKeys.isEmpty() && removeKeys.isEmpty()) return
+        database.withTransaction {
+            removeKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
+                if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, false)
+            }
+            addKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
+                if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, true)
+            }
+        }
+        notifySharedChannelsChanged()
+        if (addKeys.isNotEmpty()) xmlTvRepository.requestXtreamRefresh(force = true)
+    }
+
     suspend fun channels(): List<LiveChannel> {
         val channels = dao.getEnabledChannels()
         val effective = if (BuildConfig.MOBILE_UI_ENABLED && channels.isEmpty()) {

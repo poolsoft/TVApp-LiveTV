@@ -243,6 +243,18 @@ class MobileMainActivity : AppCompatActivity() {
             iptvSourcesLauncher.launch(Intent(this, IptvSourcesActivity::class.java))
         }
 
+        // Source-management sprint: the phone's TV management entry is placed
+        // in the portrait toolbar (always visible), not only in the playback
+        // overlay, which was invisible in portrait.
+        if (BuildConfig.REMOTE_EDIT_ENABLED) {
+            binding.mobileBtnRemoteEdit.visibility = View.VISIBLE
+            binding.mobileBtnRemoteEdit.setOnClickListener {
+                startActivity(Intent(this, RemoteEditClientActivity::class.java))
+            }
+        } else {
+            binding.mobileBtnRemoteEdit.visibility = View.GONE
+        }
+
         binding.mobileBtnChannelSelect.setOnClickListener {
             iptvSelectionLauncher.launch(Intent(this, IptvChannelSelectionActivity::class.java))
         }

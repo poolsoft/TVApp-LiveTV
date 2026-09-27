@@ -2,6 +2,8 @@
 <!--
   TVApp REMOTEEDIT-008: embedded management panel. Served by the TV app's
   LAN-only server from APK assets; vanilla JS + fetch, no dependencies.
+  Source management sprint: the Sources card is the primary workflow
+  (add/update/delete/refresh IPTV + XMLTV, per-source channel picker).
 -->
 <html lang="tr">
 <head>
@@ -26,15 +28,44 @@
   </section>
 
   <section id="mainView" class="hidden">
+    <div id="sourcesCard" class="card">
+      <h2>Kaynaklar</h2>
+      <div class="table-wrap">
+        <table id="sources">
+          <thead>
+            <tr>
+              <th class="col-src">Tür</th>
+              <th>Ad</th>
+              <th class="col-num">Kanal</th>
+              <th class="col-flags">Durum</th>
+              <th class="col-actions">İşlemler</th>
+            </tr>
+          </thead>
+          <tbody id="sourceRows"></tbody>
+        </table>
+      </div>
+      <div class="toolbar">
+        <button id="addSourceBtn">+ IPTV listesi ekle</button>
+        <button id="addXmltvBtn">+ XMLTV EPG ekle</button>
+      </div>
+    </div>
+
+    <div id="importsCard" class="card hidden">
+      <h2>Liste aktarımları</h2>
+      <table id="imports">
+        <thead><tr><th>#</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Kanal</th></tr></thead>
+        <tbody id="importRows"></tbody>
+      </table>
+    </div>
+
     <div class="toolbar">
       <input id="search" placeholder="Kanal ara…" autocomplete="off">
       <button id="refreshBtn">Yenile</button>
       <span id="selectionInfo"></span>
       <button id="batchFav" class="hidden">Seçilenleri ★</button>
       <button id="batchHide" class="hidden">Seçilenleri gizle</button>
-      <button id="addSourceBtn">+ Liste ekle</button>
     </div>
-    <p class="hint">Sıralama: satırı tutup yukarı/aşağı taşı; bırakınca TV'ye kaydedilir.</p>
+    <p class="hint">Sıralama: satırı tutup yukarı/aşağı taşı; bırakınca TV'ye kaydedilir. Satıra çift tıkla: düzenle.</p>
     <div class="table-wrap card">
       <table id="channels">
         <thead>
@@ -47,13 +78,6 @@
           </tr>
         </thead>
         <tbody id="rows"></tbody>
-      </table>
-    </div>
-    <div id="importsCard" class="card hidden">
-      <h2>Liste aktarımları</h2>
-      <table id="imports">
-        <thead><tr><th>#</th><th>Ad</th><th>Durum</th><th>Kanal</th></tr></thead>
-        <tbody id="importRows"></tbody>
       </table>
     </div>
     <div class="toolbar">

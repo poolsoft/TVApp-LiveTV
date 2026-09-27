@@ -31,6 +31,7 @@ class RemoteEditServerController private constructor(
     private val preferencesStore = RemoteEditPreferencesStore(context)
     private val pairingStore = PairingStore(context)
     private val serverRef = AtomicReference<RemoteEditServer?>(null)
+    private var nsdAnnouncer: RemoteNsdAnnouncer? = null
 
     val isEnabled: Boolean get() = preferencesStore.enabled()
 
@@ -109,17 +110,34 @@ class RemoteEditServerController private constructor(
                 context.assets.open("webpanel/$path").use { stream -> stream.readBytes() }
             }.getOrNull()
         }
-        // REMOTEEDIT-006: remote playlist imports through the existing pipeline.
+        // REMOTEEDIT-006: remote source imports (IPTV playlist / XMLTV EPG)
+        // through the existing pipelines.
         val importQueue = RemoteImportQueue(context)
-        server.importQueueHandler = { name, url ->
-            val id = importQueue.enqueue(name, url)
+        server.importQueueHandler = { name, url, kind ->
+            val id = importQueue.enqueue(name, url, kind)
             server.bumpDataVersion()
             id
         }
         server.importQueueListHandler = { importQueue.all() }
+        // Source management: delete / refresh / selection via RemoteSourceService.
+        val sourceService = RemoteSourceService(context)
+        server.sourceMutationHandler = { kind, id, operation ->
+            val updated = when (operation) {
+                RemoteEditServer.OP_DELETE -> sourceService.deleteSource(kind, id)
+                RemoteEditServer.OP_REFRESH -> sourceService.refreshSource(kind, id)
+                else -> false
+            }
+            if (updated) server.bumpDataVersion()
+            updated
+        }
         return try {
             server.startServer()
             serverRef.set(server)
+            // Advertise over NSD so phones can discover the address.
+            RemoteNsdAnnouncer(context, preferencesStore.port()).also { announcer ->
+                nsdAnnouncer = announcer
+                announcer.register()
+            }
             true
         } catch (error: IOException) {
             false
@@ -128,6 +146,8 @@ class RemoteEditServerController private constructor(
 
     @Synchronized
     fun stop() {
+        nsdAnnouncer?.unregister()
+        nsdAnnouncer = null
         serverRef.getAndSet(null)?.stop()
     }
 
@@ -136,6 +156,8 @@ class RemoteEditServerController private constructor(
         private val iptvRepository = IptvRepository(context)
         private val xmlTvRepository = XmlTvRepository(context)
         private val channelDao = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(context).channelDao()
+        private val iptvDao = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(context).iptvDao()
+        private val sourceService = RemoteSourceService(context)
 
         override fun serverPing(): JSONObject = JSONObject()
             .put("app", "TVApp")
@@ -148,7 +170,52 @@ class RemoteEditServerController private constructor(
          *  position; we resume after that row. LiveChannel has no sortOrder
          *  field itself, so ordering follows the merged list order that the
          *  main list already uses, and the cursor is the last sourceKey. */
-        override fun channels(afterSourceKey: String?, limit: Int, query: String?): JSONArray {
+        override fun channels(
+            afterSourceKey: String?,
+            limit: Int,
+            query: String?,
+            sourceId: Long?,
+        ): JSONArray {
+            // Picker mode: page one IPTV source's full catalog from the DAO
+            // (bounded query, no full in-memory load).
+            if (sourceId != null) {
+                return JSONArray().apply {
+                    var anchorIndex: Int = -1
+                    var anchorKey: String? = null
+                    if (afterSourceKey != null) {
+                        val anchor = runBlocking(Dispatchers.IO) {
+                            iptvDao.getChannel(afterSourceKey)
+                        }
+                        if (anchor != null && anchor.sourceId == sourceId) {
+                            anchorIndex = anchor.originalIndex
+                            anchorKey = anchor.sourceKey
+                        }
+                    }
+                    val page: List<com.tvapp.livetv.data.local.IptvChannelListProjection> = runBlocking(Dispatchers.IO) {
+                        val ftsQuery = ftsQueryFrom(query)
+                        if (anchorKey != null) {
+                            iptvDao.getCatalogPageAfter(sourceId, anchorIndex, anchorKey, ftsQuery, limit)
+                        } else {
+                            iptvDao.getCatalogPageFirst(sourceId, ftsQuery, limit)
+                        }
+                    }
+                    page.forEach { entity ->
+                        put(
+                            JSONObject()
+                                .put("sourceKey", entity.sourceKey)
+                                .put("displayName", entity.displayName)
+                                .put("displayNumber", (entity.originalIndex + 1).toString())
+                                .put("source", "IPTV")
+                                .put("favorite", false)
+                                .put("hidden", false)
+                                .put("inMainList", entity.selected)
+                                .put("revision", JSONObject.NULL)
+                                .put("groupId", JSONObject.NULL)
+                                .put("iptvContentType", entity.contentType ?: JSONObject.NULL),
+                        )
+                    }
+                }
+            }
             val rows: List<LiveChannel> = runBlocking(Dispatchers.IO) {
                 channelRepository.channels(includeTif = true).getOrDefault(emptyList())
             }
@@ -222,24 +289,24 @@ class RemoteEditServerController private constructor(
             }
         }
 
-        override fun sources(): JSONArray = JSONArray().apply {
-            val iptvSources = runBlocking(Dispatchers.IO) { iptvRepository.sources() }
-            iptvSources.forEach { summary ->
-                put(
-                    JSONObject()
-                        .put("kind", "iptv")
-                        .put("id", summary.source.id)
-                        .put("name", summary.source.name),
-                )
-            }
-            xmlTvRepository.sources().forEach { source ->
-                put(
-                    JSONObject()
-                        .put("kind", "xmltv")
-                        .put("id", source.id)
-                        .put("name", source.name),
-                )
-            }
+        override fun sources(): JSONArray = sourceService.sources()
+
+        override fun xmltvCatalog(): JSONArray = sourceService.xmltvCatalog()
+
+        override fun applySelection(sourceId: Long, body: JSONObject): Boolean =
+            sourceService.applySelection(sourceId, body) ==
+                RemoteSourceService.SelectionOutcome.Applied
+
+        /** Same tokenization contract as IptvFtsQuery (internal to the data
+         *  package); duplicated here because the remote package cannot see it. */
+        private fun ftsQueryFrom(rawQuery: String?): String {
+            if (rawQuery.isNullOrBlank()) return ""
+            val terms = Regex("[\\p{L}\\p{N}]+").findAll(rawQuery)
+                .map(MatchResult::value)
+                .distinct()
+                .toList()
+            if (terms.isEmpty()) return "tvappnomatchtoken*"
+            return terms.joinToString(" ") { term -> "$term*" }
         }
 
         private companion object {

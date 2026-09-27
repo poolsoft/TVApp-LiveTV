@@ -112,3 +112,18 @@ tr.editing td { background: rgba(110, 168, 255, 0.12); }
 tr.dragging { opacity: 0.45; }
 tr.drag-over td { background: rgba(110, 168, 255, 0.18); }
 table#channels tbody tr { cursor: grab; }
+.col-actions { width: 240px; white-space: normal; }
+.row-action {
+  font-size: 12px;
+  padding: 4px 9px;
+  margin: 2px 4px 2px 0;
+}
+.src-epg { color: var(--ok); }
+td.muted { color: var(--muted); }
+.picker-card { max-height: 85vh; display: flex; flex-direction: column; }
+.picker-card .table-wrap { flex: 1; min-height: 300px; max-height: none; }
+.picker-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+.picker-toolbar input { flex: 1; }
+.picker-table td { white-space: normal; }
+.pick-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.pick-row input { width: 18px; height: 18px; }

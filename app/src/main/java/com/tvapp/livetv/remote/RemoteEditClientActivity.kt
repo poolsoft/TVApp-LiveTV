@@ -1,92 +1,121 @@
 package com.tvapp.livetv.remote
 
+import android.content.Context
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.R
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * REMOTEEDIT-003: phone-side "connect to TV" screen. Pairs with the 6-digit
- * code, lists channels with keyset paging, and lets the user toggle favorites
- * / hidden state. Edits made while offline are queued locally and replayed
- * on demand (REMOTEEDIT-004 behavior on the phone side). Touch-first: this
- * screen is only reached from the mobile flavor.
+ * REMOTEEDIT-003 (redesigned): phone-side "TV management" screen. The phone
+ * no longer edits channels; this page only manages sources — add IPTV
+ * playlist / XMLTV EPG by URL, update or refresh an existing URL source,
+ * delete a source — and shows queued import status. Detailed channel work
+ * (renames, favorites, reordering, channel selection) lives in the embedded
+ * web panel served by the TV at http://<tv-ip>:8890/.
+ *
+ * Address entry is eased with NSD: the TV advertises `_tvapp._tcp.` on the
+ * Wi-Fi network, so the phone discovers `http://<ip>:<port>` without typing.
+ * Touch-first: this screen is only reached from the mobile flavor.
  */
 class RemoteEditClientActivity : AppCompatActivity() {
 
     private lateinit var store: RemoteEditClientStore
     private lateinit var client: RemoteEditClient
-    private lateinit var clientHttp: okhttp3.OkHttpClient
     private lateinit var status: TextView
     private lateinit var listContainer: LinearLayout
-    private var rows: List<RemoteEditClient.ChannelRow> = emptyList()
-    private var nextCursor: String? = null
-    private var query: String? = null
+    private var sources: List<RemoteEditClient.SourceRow> = emptyList()
+    private var imports: List<RemoteEditClient.ImportRow> = emptyList()
+    private var importPollJob: Job? = null
+
+    private var nsdManager: NsdManager? = null
+    private var nsdDiscoveryListener: NsdManager.DiscoveryListener? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = RemoteEditClientStore(this)
         client = RemoteEditClient(store)
-        clientHttp = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
+        setContentView(buildContentView())
+        title = getString(R.string.remote_edit_client_title)
+
+        if (store.token().isBlank()) {
+            showConnectPrompt()
+        } else {
+            refreshAll()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopNsdDiscovery()
+        importPollJob?.cancel()
+    }
+
+    /* ---------- View construction ---------- */
+
+    private fun buildContentView(): View {
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
         status = TextView(this).apply {
-            textSize = 15f
+            textSize = 14f
             setPadding(0, dp(8), 0, dp(8))
         }
         content.addView(status)
-        val search = EditText(this).apply {
-            hint = getString(R.string.remote_edit_client_search_hint)
-            inputType = InputType.TYPE_CLASS_TEXT
-            setSingleLine()
-        }
-        search.addTextChangedListener(
-            object : android.text.TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
-                override fun afterTextChanged(s: android.text.Editable?) {
-                    query = s?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-                    rows = emptyList()
-                    nextPage()
-                }
-            },
-        )
-        content.addView(search)
-        val replayButton = TextView(this).apply {
-            text = getString(R.string.remote_edit_client_replay_queue)
-            setPadding(0, dp(8), 0, dp(8))
-            isClickable = true
-            setOnClickListener { replayQueue() }
-        }
-        content.addView(replayButton)
-        listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(listContainer)
-        setContentView(content)
 
-        if (store.token().isBlank()) {
-            showConnectPrompt()
-        } else {
-            nextPage()
+        val addIptv = TextView(this).apply {
+            text = getString(R.string.remote_edit_client_add_iptv)
+            textSize = 16f
+            setPadding(0, dp(12), 0, dp(12))
+            isClickable = true
+            setOnClickListener { showAddSourceDialog(RemoteImportQueue.Request.Kind.IPTV) }
         }
+        val addXmltv = TextView(this).apply {
+            text = getString(R.string.remote_edit_client_add_xmltv)
+            textSize = 16f
+            setPadding(0, dp(4), 0, dp(4))
+            isClickable = true
+            setOnClickListener { showAddSourceDialog(RemoteImportQueue.Request.Kind.XMLTV) }
+        }
+        content.addView(addIptv)
+        content.addView(addXmltv)
+
+        content.addView(TextView(this).apply {
+            text = getString(R.string.remote_edit_client_sources_header)
+            textSize = 15f
+            setPadding(0, dp(12), 0, dp(4))
+        })
+
+        val scroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { weight = 1f }
+        }
+        listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        scroll.addView(listContainer)
+        content.addView(scroll)
+        return content
     }
+
+    /* ---------- Pairing / discovery ---------- */
 
     private fun showConnectPrompt() {
         val addressInput = EditText(this).apply {
@@ -94,6 +123,15 @@ class RemoteEditClientActivity : AppCompatActivity() {
             setText(store.address())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setSingleLine()
+        }
+        val discovered = TextView(this).apply {
+            text = getString(R.string.remote_edit_client_discovering)
+            textSize = 13f
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+        }
+        discovered.setOnClickListener {
+            val address = discovered.tag as? String ?: return@setOnClickListener
+            addressInput.setText(address)
         }
         val codeInput = EditText(this).apply {
             hint = getString(R.string.remote_edit_client_code_hint)
@@ -109,10 +147,11 @@ class RemoteEditClientActivity : AppCompatActivity() {
             val pad = dp(16)
             setPadding(pad, 0, pad, 0)
             addView(addressInput)
+            addView(discovered)
             addView(codeInput)
             addView(nameInput)
         }
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.remote_edit_client_connect_title)
             .setView(container)
             .setPositiveButton(R.string.remote_edit_client_connect) { _, _ ->
@@ -123,7 +162,56 @@ class RemoteEditClientActivity : AppCompatActivity() {
                 }
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog.show()
+        startNsdDiscovery { serviceAddress ->
+            runOnUiThread {
+                discovered.text = getString(R.string.remote_edit_client_found_tv, serviceAddress)
+                discovered.tag = serviceAddress
+                if (addressInput.text.isNullOrBlank()) addressInput.setText(serviceAddress)
+            }
+        }
+    }
+
+    /** NSD discovery of `_tvapp._tcp.`; the first found TV prefills the
+     *  address so the user does not type IP:port by hand. */
+    private fun startNsdDiscovery(onFound: (String) -> Unit) {
+        val manager = nsdManager ?: (getSystemService(Context.NSD_SERVICE) as? NsdManager) ?: return
+        nsdManager = manager
+        val listener = object : NsdManager.DiscoveryListener {
+            override fun onDiscoveryStarted(serviceType: String) = Unit
+            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
+            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
+            override fun onDiscoveryStopped(serviceType: String) = Unit
+
+            override fun onServiceFound(serviceInfo: NsdServiceInfo) {
+                if (serviceInfo.serviceName?.contains(SERVICE_NAME_HINT, ignoreCase = true) != true) return
+                runCatching {
+                    manager.resolveService(
+                        serviceInfo,
+                        object : NsdManager.ResolveListener {
+                            override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = Unit
+                            override fun onServiceResolved(info: NsdServiceInfo) {
+                                val host = info.host?.hostAddress ?: return
+                                val port = info.port
+                                if (host.isNotBlank() && port > 0) onFound("$host:$port")
+                            }
+                        },
+                    )
+                }
+            }
+
+            override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
+        }
+        nsdDiscoveryListener = listener
+        runCatching { manager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener) }
+    }
+
+    private fun stopNsdDiscovery() {
+        val manager = nsdManager ?: return
+        val listener = nsdDiscoveryListener ?: return
+        runCatching { manager.stopServiceDiscovery(listener) }
+        nsdDiscoveryListener = null
     }
 
     private fun pairAndLoad(code: String, deviceName: String) {
@@ -136,7 +224,7 @@ class RemoteEditClientActivity : AppCompatActivity() {
                 is RemoteEditClient.PairResult.Paired -> {
                     store.setToken(result.token)
                     status.text = getString(R.string.remote_edit_client_connected)
-                    nextPage()
+                    refreshAll()
                 }
 
                 is RemoteEditClient.PairResult.Refused -> {
@@ -147,133 +235,165 @@ class RemoteEditClientActivity : AppCompatActivity() {
         }
     }
 
-    private fun nextPage() {
+    /* ---------- Source management ---------- */
+
+    private fun refreshAll() {
         lifecycleScope.launch {
-            val loaded = withContext(Dispatchers.IO) {
-                client.channels(after = nextCursor, query = query)
-            }
-            loaded.onSuccess { page ->
-                rows = rows + page
-                nextCursor = page.lastOrNull()?.sourceKey
+            val loaded = withContext(Dispatchers.IO) { client.sources() }
+            loaded.onSuccess { rows ->
+                sources = rows
                 renderRows()
-                status.text = getString(R.string.remote_edit_client_row_count, rows.size)
+                status.text = getString(R.string.remote_edit_client_source_count, rows.size)
             }.onFailure { error ->
                 status.text = error.message ?: getString(R.string.remote_edit_client_error)
             }
         }
+        pollImports()
     }
 
     private fun renderRows() {
         listContainer.removeAllViews()
-        rows.forEach { row ->
-            val rowView = TextView(this).apply {
-                textSize = 16f
-                setPadding(dp(8), dp(12), dp(8), dp(12))
-                text = buildString {
-                    append(row.displayNumber)
-                    append("  ")
-                    append(row.displayName)
-                    if (row.favorite) append("  ★")
-                    if (row.hidden) append("  ⃰")
-                }
-                setOnClickListener { showRowActions(row) }
+        sources.forEach { row -> listContainer.addView(sourceRowView(row)) }
+        if (imports.isNotEmpty()) {
+            listContainer.addView(TextView(this).apply {
+                text = getString(R.string.remote_edit_client_imports_header)
+                textSize = 15f
+                setPadding(0, dp(16), 0, dp(4))
+            })
+            imports.forEach { import ->
+                listContainer.addView(TextView(this).apply {
+                    textSize = 14f
+                    setPadding(dp(8), dp(6), dp(8), dp(6))
+                    text = formatImport(import)
+                })
             }
-            listContainer.addView(rowView)
         }
     }
 
-    private fun showRowActions(row: RemoteEditClient.ChannelRow) {
-        val actions = listOf(
-            getString(R.string.remote_edit_client_toggle_favorite) to { _: Int ->
-                patchChannel(row, JSONObject().put("favorite", !row.favorite))
-            },
-            getString(R.string.remote_edit_client_toggle_hidden) to { _: Int ->
-                patchChannel(row, JSONObject().put("hidden", !row.hidden))
-            },
-            getString(R.string.remote_edit_client_edit_name) to { _: Int ->
-                showEditNameDialog(row)
-            },
-            getString(R.string.remote_edit_client_edit_number) to { _: Int ->
-                showEditNumberDialog(row)
-            },
-            getString(R.string.remote_edit_client_edit_group) to { _: Int ->
-                showEditGroupDialog(row)
-            },
-            getString(R.string.remote_edit_client_add_source) to { _: Int ->
-                showAddSourceDialog()
-            },
-        )
+    private fun formatImport(import: RemoteEditClient.ImportRow): String = buildString {
+        append(if (import.kind == "xmltv" || import.kind == "epg") "XMLTV" else "IPTV")
+        append(" · ")
+        append(import.name)
+        append(" · ")
+        append(import.status)
+        if (import.importedChannels > 0) {
+            append(" · ")
+            append(getString(R.string.remote_edit_client_import_channels, import.importedChannels))
+        }
+        import.error?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
+    }
+
+    private fun sourceRowView(row: RemoteEditClient.SourceRow): View {
+        val kindLabel = if (row.kind == "xmltv") {
+            getString(R.string.remote_edit_client_kind_xmltv)
+        } else {
+            getString(R.string.remote_edit_client_kind_iptv)
+        }
+        val summary = if (row.kind == "xmltv") {
+            getString(R.string.remote_edit_client_channel_count, row.channelCount)
+        } else {
+            getString(
+                R.string.remote_edit_client_selection_count,
+                row.channelCount,
+                row.selectedCount ?: 0,
+            )
+        }
+        return TextView(this).apply {
+            textSize = 16f
+            setPadding(dp(8), dp(12), dp(8), dp(12))
+            text = buildString {
+                append(kindLabel).append(" · ").append(row.name)
+                append('\n')
+                append(summary)
+                if (!row.error.isNullOrBlank()) {
+                    append('\n')
+                    append(getString(R.string.remote_edit_client_source_error, row.error))
+                }
+            }
+            setOnClickListener { showSourceActions(row) }
+        }
+    }
+
+    private fun showSourceActions(row: RemoteEditClient.SourceRow) {
+        val actions = mutableListOf<Pair<String, () -> Unit>>()
+        if (row.urlKind) {
+            actions += getString(R.string.remote_edit_client_refresh) to { doRefresh(row) }
+            actions += getString(R.string.remote_edit_client_change_url) to { showChangeUrlDialog(row) }
+        }
+        actions += getString(R.string.remote_edit_client_delete) to { confirmDelete(row) }
         val labels = actions.map { it.first }.toTypedArray()
         AlertDialog.Builder(this)
-            .setTitle(row.displayName)
-            .setItems(labels) { _, which -> actions[which].second(which) }
+            .setTitle(row.name)
+            .setItems(labels) { _, which -> actions[which].second() }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
-    private fun showEditNameDialog(row: RemoteEditClient.ChannelRow) {
+    private fun doRefresh(row: RemoteEditClient.SourceRow) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { client.refreshSource(row.kind, row.id) }
+            when (result) {
+                is RemoteEditClient.MutationResult.Applied -> {
+                    toast(R.string.remote_edit_client_refresh_started)
+                    refreshAll()
+                }
+
+                is RemoteEditClient.MutationResult.Failed ->
+                    toast(R.string.remote_edit_client_error)
+            }
+        }
+    }
+
+    private fun showChangeUrlDialog(row: RemoteEditClient.SourceRow) {
         val input = EditText(this).apply {
-            hint = getString(R.string.remote_edit_client_name_hint)
+            hint = getString(R.string.remote_edit_client_url_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setSingleLine()
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.remote_edit_client_edit_name)
+            .setTitle(R.string.remote_edit_client_change_url)
             .setView(input)
-            .setPositiveButton(R.string.remote_edit_client_save) { _, _ ->
-                val value = input.text.toString().trim()
-                val patch = JSONObject()
-                if (value.isEmpty()) patch.put("clearCustomName", true) else patch.put("customName", value)
-                patchChannel(row, patch)
+            .setPositiveButton(R.string.remote_edit_client_queue_import) { _, _ ->
+                val url = input.text.toString().trim()
+                if (!url.startsWith("http")) {
+                    toast(R.string.xmltv_url_invalid)
+                    return@setPositiveButton
+                }
+                lifecycleScope.launch {
+                    // Address change = refresh with the new URL (the TV
+                    // re-imports in place through the same pipeline).
+                    val result = withContext(Dispatchers.IO) {
+                        client.queueImport(row.name, url, row.kind)
+                    }
+                    result.onSuccess {
+                        toast(R.string.remote_edit_client_import_queued)
+                        refreshAll()
+                    }.onFailure { toast(R.string.remote_edit_client_error) }
+                }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
-    private fun showEditNumberDialog(row: RemoteEditClient.ChannelRow) {
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            hint = getString(R.string.remote_edit_client_number_hint)
-        }
+    private fun confirmDelete(row: RemoteEditClient.SourceRow) {
         AlertDialog.Builder(this)
-            .setTitle(R.string.remote_edit_client_edit_number)
-            .setView(input)
-            .setPositiveButton(R.string.remote_edit_client_save) { _, _ ->
-                val value = input.text.toString().trim()
-                val patch = JSONObject()
-                if (value.isEmpty()) {
-                    patch.put("clearCustomNumber", true)
-                } else {
-                    value.toIntOrNull()?.let { patch.put("customNumber", it) }
+            .setTitle(R.string.remote_edit_client_delete)
+            .setMessage(getString(R.string.remote_edit_client_delete_confirm, row.name))
+            .setPositiveButton(R.string.remote_edit_client_delete) { _, _ ->
+                lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) { client.deleteSource(row.kind, row.id) }
+                    when (result) {
+                        is RemoteEditClient.MutationResult.Applied -> refreshAll()
+                        is RemoteEditClient.MutationResult.Failed ->
+                            toast(R.string.remote_edit_client_error)
+                    }
                 }
-                patchChannel(row, patch)
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
-    private fun showEditGroupDialog(row: RemoteEditClient.ChannelRow) {
-        lifecycleScope.launch {
-            val groups = withContext(Dispatchers.IO) { fetchGroups() }
-            val labels = buildList {
-                add(getString(R.string.remote_edit_client_group_none))
-                addAll(groups.map { it.second })
-            }.toTypedArray()
-            AlertDialog.Builder(this@RemoteEditClientActivity)
-                .setTitle(R.string.remote_edit_client_edit_group)
-                .setItems(labels) { _, which ->
-                    val patch = JSONObject()
-                    if (which == 0) patch.put("clearGroupId", true) else patch.put("groupId", groups[which - 1].first)
-                    patchChannel(row, patch)
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
-        }
-    }
-
-    /** REMOTEEDIT-006: queue a playlist import on the TV; the TV executes it
-     *  with its existing paged import pipeline and the user can watch status
-     *  in the same dialog. */
-    private fun showAddSourceDialog() {
+    private fun showAddSourceDialog(kind: RemoteImportQueue.Request.Kind) {
         val urlInput = EditText(this).apply {
             hint = getString(R.string.remote_edit_client_url_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
@@ -291,12 +411,22 @@ class RemoteEditClientActivity : AppCompatActivity() {
             addView(nameInput)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.remote_edit_client_add_source)
+            .setTitle(
+                if (kind == RemoteImportQueue.Request.Kind.XMLTV) {
+                    R.string.remote_edit_client_add_xmltv
+                } else {
+                    R.string.remote_edit_client_add_iptv
+                },
+            )
             .setView(container)
             .setPositiveButton(R.string.remote_edit_client_queue_import) { _, _ ->
                 val url = urlInput.text.toString().trim()
                 if (url.startsWith("http")) {
-                    queueImport(nameInput.text.toString().trim(), url)
+                    queueImport(
+                        nameInput.text.toString().trim(),
+                        url,
+                        if (kind == RemoteImportQueue.Request.Kind.XMLTV) "xmltv" else "iptv",
+                    )
                 } else {
                     Toast.makeText(this, R.string.xmltv_url_invalid, Toast.LENGTH_SHORT).show()
                 }
@@ -305,127 +435,38 @@ class RemoteEditClientActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun queueImport(name: String, url: String) {
+    private fun queueImport(name: String, url: String, kind: String) {
         lifecycleScope.launch {
-            val queued = withContext(Dispatchers.IO) {
-                runCatching {
-                    val body = org.json.JSONObject().put("url", url).put("name", name)
-                    val request = okhttp3.Request.Builder()
-                        .url("http://${store.address().trim().trimEnd('/')}/api/v1/imports")
-                        .header("Authorization", "Bearer ${store.token()}")
-                        .post(
-                            body.toString()
-                                .toRequestBody("application/json; charset=utf-8".toMediaType()),
-                        )
-                        .build()
-                    clientHttp.newCall(request).execute().use { response -> response.isSuccessful }
-                }.getOrDefault(false)
-            }
-            val message = if (queued) {
-                R.string.remote_edit_client_import_queued
-            } else {
-                R.string.remote_edit_client_error
-            }
-            Toast.makeText(this@RemoteEditClientActivity, message, Toast.LENGTH_SHORT).show()
+            val queued = withContext(Dispatchers.IO) { client.queueImport(name, url, kind) }
+            queued.onSuccess {
+                toast(R.string.remote_edit_client_import_queued)
+                refreshAll()
+            }.onFailure { toast(R.string.remote_edit_client_error) }
         }
     }
 
-    private fun fetchGroups(): List<Pair<Long, String>> {
-        val request = okhttp3.Request.Builder()
-            .url("http://${store.address().trim().trimEnd('/')}/api/v1/groups")
-            .header("Authorization", "Bearer ${store.token()}")
-            .build()
-        clientHttp.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "HTTP ${response.code}" }
-            val json = org.json.JSONObject(response.body?.string().orEmpty())
-            val array = json.optJSONArray("groups") ?: org.json.JSONArray()
-            return (0 until array.length()).mapNotNull { index ->
-                val item = array.optJSONObject(index) ?: return@mapNotNull null
-                Pair(item.optLong("id"), item.optString("name"))
-            }
-        }
-    }
-
-    private fun replayQueue() {
-        val pending = store.pendingOps()
-        if (pending.isEmpty()) {
-            Toast.makeText(this, R.string.remote_edit_client_queue_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        lifecycleScope.launch {
-            val failed = mutableListOf<RemoteEditClientStore.PendingOp>()
-            withContext(Dispatchers.IO) {
-                pending.forEach { op ->
-                    when (client.patch(op.sourceKey, op.revision, op.patch)) {
-                        is RemoteEditClient.PatchResult.Applied -> Unit
-                        is RemoteEditClient.PatchResult.Conflict,
-                        is RemoteEditClient.PatchResult.Failed,
-                        -> failed += op
-                    }
-                }
-            }
-            store.retainFailed(failed)
-            val applied = pending.size - failed.size
-            Toast.makeText(
-                this@RemoteEditClientActivity,
-                getString(R.string.remote_edit_client_queue_replayed, applied, failed.size),
-                Toast.LENGTH_SHORT,
-            ).show()
-            refreshList()
-        }
-    }
-
-    private fun patchChannel(row: RemoteEditClient.ChannelRow, patch: JSONObject) {
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                client.patch(row.sourceKey, revisionFor(row), patch)
-            }
-            when (result) {
-                is RemoteEditClient.PatchResult.Applied -> {
-                    rows = rows.map { current ->
-                        if (current.sourceKey != row.sourceKey) {
-                            current
-                        } else {
-                            current.copy(
-                                favorite = patch.optBoolean("favorite", current.favorite),
-                                hidden = patch.optBoolean("hidden", current.hidden),
-                            )
-                        }
-                    }
+    private fun pollImports() {
+        importPollJob?.cancel()
+        importPollJob = lifecycleScope.launch {
+            while (isActive) {
+                val loaded = withContext(Dispatchers.IO) { client.imports() }
+                loaded.onSuccess { rows ->
+                    imports = rows
                     renderRows()
                 }
-
-                is RemoteEditClient.PatchResult.Conflict -> {
-                    Toast.makeText(
-                        this@RemoteEditClientActivity,
-                        R.string.remote_edit_client_conflict,
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-
-                is RemoteEditClient.PatchResult.Failed -> {
-                    // Offline or unreachable: queue for later replay.
-                    store.enqueue(RemoteEditClientStore.PendingOp(row.sourceKey, revisionFor(row), patch))
-                    Toast.makeText(
-                        this@RemoteEditClientActivity,
-                        R.string.remote_edit_client_queued,
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
+                delay(3_000)
             }
         }
     }
 
-    private fun refreshList() {
-        rows = emptyList()
-        nextCursor = null
-        nextPage()
+    private fun toast(resId: Int) {
+        Toast.makeText(this, resId, Toast.LENGTH_SHORT).show()
     }
 
-    /** The phone does not track revisions per row yet; row-level revisions land
-     *  with the live-refresh sprint. Until then optimistic edits use 0 and any
-     *  conflict is surfaced to the user instead of being force-written. */
-    private fun revisionFor(row: RemoteEditClient.ChannelRow): Long = 0L
-
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        const val SERVICE_TYPE = "_tvapp._tcp."
+        const val SERVICE_NAME_HINT = "TVApp"
+    }
 }

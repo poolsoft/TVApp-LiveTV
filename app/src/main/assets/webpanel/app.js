@@ -1,6 +1,9 @@
 /* TVApp REMOTEEDIT-008: web panel logic. Vanilla JS + fetch; talks to the
  * same /api/v1 endpoints as the phone client. Token is kept in memory by
- * default; persisted in localStorage after pairing (single-user LAN panel). */
+ * default; persisted in localStorage after pairing (single-user LAN panel).
+ * Source management sprint: the Sources card is the primary workflow
+ * (add/update/delete/refresh IPTV + XMLTV), plus the per-source channel
+ * picker ("kanal seçme") that drives the selection endpoints. */
 (function () {
   "use strict";
 
@@ -13,6 +16,8 @@
     version: 1,
     polling: false,
     dragIndex: null,
+    sources: [],
+    imports: [],
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -199,62 +204,296 @@
     return Math.max(0, state.rows.indexOf(row));
   }
 
-  function addSource() {
+  /* ---------- Source management (primary workflow) ---------- */
+
+  function loadSources() {
+    return api("/api/v1/sources").then(function (json) {
+      state.sources = json.sources || [];
+      renderSources();
+    }).catch(function () { /* panel keeps working without sources */ });
+  }
+
+  function renderSources() {
+    var tbody = $("sourceRows");
+    tbody.innerHTML = "";
+    if (!state.sources.length) {
+      var empty = document.createElement("tr");
+      var td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "muted";
+      td.textContent = "Henüz kaynak yok. Aşağıdan IPTV listesi veya XMLTV EPG ekleyin.";
+      empty.appendChild(td);
+      tbody.appendChild(empty);
+      return;
+    }
+    state.sources.forEach(function (source) {
+      var tr = document.createElement("tr");
+
+      var kind = document.createElement("td");
+      kind.className = "col-src";
+      var tag = document.createElement("span");
+      tag.className = "src " + (source.kind === "xmltv" ? "src-epg" : "");
+      tag.textContent = source.kind === "xmltv" ? "XMLTV" : "IPTV";
+      kind.appendChild(tag);
+
+      var name = document.createElement("td");
+      name.className = "name";
+      name.textContent = source.name;
+
+      var counts = document.createElement("td");
+      counts.className = "col-num";
+      counts.textContent = source.kind === "xmltv"
+        ? (source.channelCount + " kanal")
+        : (source.channelCount + " / " + (source.selectedCount || 0) + " seçili");
+
+      var state2 = document.createElement("td");
+      state2.className = "col-flags";
+      if (source.error) {
+        var err = document.createElement("span");
+        err.className = "hid";
+        err.textContent = "hata";
+        err.title = source.error;
+        state2.appendChild(err);
+      } else {
+        state2.textContent = "—";
+      }
+
+      var actions = document.createElement("td");
+      actions.className = "col-actions";
+
+      if (source.kind === "iptv") {
+        var pick = actionButton("Kanal seç", function () { openSelectionPicker(source); });
+        actions.appendChild(pick);
+      }
+      if (source.urlKind) {
+        actions.appendChild(actionButton("Yenile", function () { mutateSource("refresh", source); }));
+        actions.appendChild(actionButton("Adres", function () { changeSourceUrl(source); }));
+      }
+      actions.appendChild(actionButton("Sil", function () { deleteSource(source); }));
+
+      tr.appendChild(kind);
+      tr.appendChild(name);
+      tr.appendChild(counts);
+      tr.appendChild(state2);
+      tr.appendChild(actions);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function actionButton(label, handler) {
+    var button = document.createElement("button");
+    button.className = "row-action";
+    button.textContent = label;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function mutateSource(operation, source) {
+    api("/api/v1/sources/" + operation, {
+      method: "POST",
+      bodyJson: { kind: source.kind, id: source.id },
+    }).then(function () {
+      pollImports();
+      return loadSources();
+    }).catch(function (error) { alert(error.message); });
+  }
+
+  function deleteSource(source) {
+    var label = source.kind === "xmltv" ? "XMLTV kaynağı" : "IPTV listesi";
+    if (!confirm('"' + source.name + '" ' + label + ' silinsin mi? Kanalları/programlarıyla birlikte silinir.')) return;
+    api("/api/v1/sources/delete", {
+      method: "POST",
+      bodyJson: { kind: source.kind, id: source.id },
+    }).then(function () {
+      return loadSources();
+    }).then(refresh).catch(function (error) { alert(error.message); });
+  }
+
+  function changeSourceUrl(source) {
     var urlInput = document.createElement("input");
-    urlInput.placeholder = "http://… M3U adresi";
+    urlInput.placeholder = "http://… yeni adres";
+    urlInput.style.width = "100%";
+    var overlay = simpleDialog(
+      source.kind === "xmltv" ? "XMLTV adresini güncelle" : "IPTV adresini güncelle",
+      [["Adres", urlInput]],
+      function () {
+        var url = urlInput.value.trim();
+        if (!/^https?:\/\//.test(url)) { alert("http(s) adresi gerekli."); return false; }
+        api("/api/v1/sources/refresh", {
+          method: "POST",
+          bodyJson: { kind: source.kind, id: source.id, url: url },
+        }).then(function () {
+          pollImports();
+          return loadSources();
+        }).catch(function (error) { alert(error.message); });
+        return true;
+      }
+    );
+    $("app").appendChild(overlay);
+  }
+
+  function addSource(kind) {
+    var urlInput = document.createElement("input");
+    urlInput.placeholder = kind === "xmltv" ? "http://… XMLTV adresi" : "http://… M3U adresi";
     urlInput.style.width = "100%";
     var nameInput = document.createElement("input");
-    nameInput.placeholder = "Liste adı (isteğe bağlı)";
+    nameInput.placeholder = "Ad (isteğe bağlı)";
     nameInput.style.width = "100%";
-    var wrap = document.createElement("div");
-    wrap.className = "edit-grid";
-    var label1 = document.createElement("label");
-    label1.textContent = "Adres";
-    var label2 = document.createElement("label");
-    label2.textContent = "Ad";
-    wrap.appendChild(label1); wrap.appendChild(urlInput);
-    wrap.appendChild(label2); wrap.appendChild(nameInput);
+    var overlay = simpleDialog(
+      kind === "xmltv" ? "XMLTV EPG kaynağı ekle" : "IPTV listesi ekle",
+      [["Adres", urlInput], ["Ad", nameInput]],
+      function () {
+        var url = urlInput.value.trim();
+        if (!/^https?:\/\//.test(url)) { alert("http(s) adresi gerekli."); return false; }
+        api("/api/v1/imports", {
+          method: "POST",
+          bodyJson: { url: url, name: nameInput.value.trim(), kind: kind === "xmltv" ? "xmltv" : "iptv" },
+        }).then(function () {
+          $("importsCard").classList.remove("hidden");
+          pollImports();
+        }).catch(function (error) { alert(error.message); });
+        return true;
+      }
+    );
+    $("app").appendChild(overlay);
+  }
+
+  function simpleDialog(title, fields, onSave) {
     var overlay = document.createElement("div");
     overlay.className = "card";
-    overlay.innerHTML = "<h2>IPTV listesi ekle</h2>";
+    overlay.innerHTML = "<h2>" + escapeHtml(title) + "</h2>";
+    var wrap = document.createElement("div");
+    wrap.className = "edit-grid";
+    fields.forEach(function (field) {
+      var label = document.createElement("label");
+      label.textContent = field[0];
+      wrap.appendChild(label);
+      wrap.appendChild(field[1]);
+    });
     overlay.appendChild(wrap);
     var actions = document.createElement("div");
     actions.className = "edit-actions";
     var save = document.createElement("button");
-    save.textContent = "Kuyruğa al";
+    save.textContent = "Kaydet";
     var cancel = document.createElement("button");
     cancel.textContent = "Vazgeç";
     actions.appendChild(save); actions.appendChild(cancel);
     overlay.appendChild(actions);
-    $("app").appendChild(overlay);
     cancel.addEventListener("click", function () { overlay.remove(); });
     save.addEventListener("click", function () {
-      var url = urlInput.value.trim();
-      if (!/^https?:\/\//.test(url)) { alert("http(s) adresi gerekli."); return; }
-      api("/api/v1/imports", { method: "POST", bodyJson: { url: url, name: nameInput.value.trim() } })
-        .then(function () {
-          overlay.remove();
-          $("importsCard").classList.remove("hidden");
-          pollImports();
-        })
-        .catch(function (error) { alert(error.message); });
+      if (onSave() !== false) overlay.remove();
     });
+    return overlay;
+  }
+
+  /* Channel picker ("kanal seçme"): paged catalog for one IPTV source with
+   * checkboxes; every change is sent as a small delta to the selection API so
+   * huge catalogs never travel as one payload. */
+  function openSelectionPicker(source) {
+    var overlay = document.createElement("div");
+    overlay.className = "card picker-card";
+    overlay.innerHTML =
+      "<h2>Kanal seç: " + escapeHtml(source.name) + "</h2>" +
+      '<div class="picker-toolbar">' +
+      '<input id="pickSearch" placeholder="Kanal ara…" autocomplete="off">' +
+      '<button id="pickDone">Bitti</button>' +
+      "</div>" +
+      '<div class="table-wrap"><table class="picker-table"><tbody id="pickRows"></tbody></table></div>' +
+      '<p class="hint" id="pickInfo">Yükleniyor…</p>';
+    $("app").appendChild(overlay);
+
+    var anchor = null;
+    var currentQuery = "";
+    var loadedCount = 0;
+    var selectedTotal = source.selectedCount || 0;
+
+    function pickerApi(params) {
+      var query = "/api/v1/channels?limit=200&sourceId=" + encodeURIComponent(source.id) + params;
+      return api(query);
+    }
+
+    function loadPickerPage(reset) {
+      if (reset) { anchor = null; loadedCount = 0; }
+      var suffix = "";
+      if (!reset && anchor) suffix = "&after=" + encodeURIComponent(anchor);
+      if (currentQuery) suffix += "&q=" + encodeURIComponent(currentQuery);
+      pickerApi(suffix).then(function (json) {
+        var page = json.channels || [];
+        if (reset) $("pickRows").innerHTML = "";
+        if (page.length) anchor = page[page.length - 1].sourceKey;
+        loadedCount += page.length;
+        page.forEach(function (row) { appendPickerRow(row); });
+        $("pickInfo").textContent = loadedCount + " kanal gösteriliyor · " +
+          selectedTotal + " seçili · aşağı kaydırınca devam yüklenir";
+        if (!page.length && !currentQuery) $("pickInfo").textContent = "Bu kaynakta kanal yok.";
+      }).catch(function (error) {
+        $("pickInfo").textContent = "Hata: " + error.message;
+      });
+    }
+
+    function appendPickerRow(row) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      var label = document.createElement("label");
+      label.className = "pick-row";
+      var box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = row.inMainList === true;
+      box.addEventListener("change", function () {
+        var body = {};
+        if (box.checked) { body.add = [row.sourceKey]; selectedTotal++; }
+        else { body.remove = [row.sourceKey]; selectedTotal--; }
+        api("/api/v1/sources/selection/" + source.id, { method: "POST", bodyJson: body })
+          .then(function () {
+            $("pickInfo").textContent = loadedCount + " kanal gösteriliyor · " +
+              selectedTotal + " seçili · aşağı kaydırınca devam yüklenir";
+          })
+          .catch(function (error) {
+            box.checked = !box.checked;
+            alert(error.message);
+          });
+      });
+      var text = document.createElement("span");
+      text.textContent = (row.displayNumber ? row.displayNumber + "  " : "") + row.displayName;
+      label.appendChild(box);
+      label.appendChild(text);
+      td.appendChild(label);
+      tr.appendChild(td);
+      $("pickRows").appendChild(tr);
+    }
+
+    overlay.querySelector("#pickSearch").addEventListener("input", function (event) {
+      clearTimeout(openSelectionPicker.timer);
+      openSelectionPicker.timer = setTimeout(function () {
+        currentQuery = event.target.value.trim();
+        loadPickerPage(true);
+      }, 300);
+    });
+    overlay.querySelector("#pickDone").addEventListener("click", function () {
+      overlay.remove();
+      loadSources();
+      refresh();
+    });
+
+    loadPickerPage(true);
   }
 
   function pollImports() {
     api("/api/v1/imports").then(function (json) {
       var items = json.imports || [];
+      state.imports = items;
       if (!items.length) return;
       $("importsCard").classList.remove("hidden");
       var tbody = $("importRows");
       tbody.innerHTML = "";
       items.forEach(function (item) {
         var tr = document.createElement("tr");
-        [item.id, item.name, item.status, item.importedChannels].forEach(function (value) {
-          var td = document.createElement("td");
-          td.textContent = value;
-          tr.appendChild(td);
-        });
+        [item.id, item.name, item.kind === "xmltv" ? "XMLTV" : "IPTV", item.status, item.importedChannels]
+          .forEach(function (value) {
+            var td = document.createElement("td");
+            td.textContent = value;
+            tr.appendChild(td);
+          });
         if (item.error) {
           var td = document.createElement("td");
           td.textContent = item.error;
@@ -263,6 +502,7 @@
         }
         tbody.appendChild(tr);
       });
+      loadSources();
     }).catch(function () { /* ignore */ });
   }
 
@@ -392,6 +632,7 @@
     $("mainView").classList.remove("hidden");
     setBadge("Bağlı", "ok");
     refresh();
+    loadSources();
     setInterval(pollEvents, 1500);
   }
 
@@ -401,9 +642,10 @@
     $("pairCode").addEventListener("keydown", function (event) {
       if (event.key === "Enter") pair();
     });
-    $("refreshBtn").addEventListener("click", refresh);
+    $("refreshBtn").addEventListener("click", function () { refresh(); loadSources(); });
     $("moreBtn").addEventListener("click", function () { loadPage(false); });
-    $("addSourceBtn").addEventListener("click", addSource);
+    $("addSourceBtn").addEventListener("click", function () { addSource("iptv"); });
+    $("addXmltvBtn").addEventListener("click", function () { addSource("xmltv"); });
     setInterval(pollImports, 3000);
     $("batchFav").addEventListener("click", function () { batch({ favorite: true }); });
     $("batchHide").addEventListener("click", function () { batch({ hidden: true }); });

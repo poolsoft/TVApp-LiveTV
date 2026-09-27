@@ -17,13 +17,25 @@ class RemoteEditClient(
     private val store: RemoteEditClientStore,
     private val http: OkHttpClient = defaultHttp(),
 ) {
-    data class ChannelRow(
-        val sourceKey: String,
-        val displayName: String,
-        val displayNumber: String,
-        val source: String,
-        val favorite: Boolean,
-        val hidden: Boolean,
+    /** One IPTV/XMLTV source as shown on the phone's management screen. */
+    data class SourceRow(
+        val kind: String,
+        val id: Long,
+        val name: String,
+        val channelCount: Int,
+        val selectedCount: Int?,
+        val urlKind: Boolean,
+        val error: String?,
+    )
+
+    /** One queued import with its observable status. */
+    data class ImportRow(
+        val id: Long,
+        val name: String,
+        val kind: String,
+        val status: String,
+        val importedChannels: Int,
+        val error: String?,
     )
 
     sealed class PairResult {
@@ -31,10 +43,9 @@ class RemoteEditClient(
         data class Refused(val message: String) : PairResult()
     }
 
-    sealed class PatchResult {
-        data class Applied(val newRevision: Long) : PatchResult()
-        data class Conflict(val currentRevision: Long) : PatchResult()
-        data class Failed(val message: String) : PatchResult()
+    sealed class MutationResult {
+        data object Applied : MutationResult()
+        data class Failed(val message: String) : MutationResult()
     }
 
     fun ping(address: String): JSONObject? = runCatching {
@@ -69,56 +80,86 @@ class RemoteEditClient(
         }
     }.getOrElse { error -> PairResult.Refused(error.message ?: "Bağlantı hatası.") }
 
-    fun channels(after: String?, limit: Int = 100, query: String? = null): Result<List<ChannelRow>> =
-        runCatching {
-            val url = buildString {
-                append(normalizeAddress(store.address()))
-                append("/api/v1/channels?limit=")
-                append(limit)
-                if (!after.isNullOrBlank()) append("&after=").append(urlEncode(after))
-                if (!query.isNullOrBlank()) append("&q=").append(urlEncode(query))
-            }
-            val request = authorizedRequest(url)
-            http.newCall(request).execute().use { response ->
-                check(response.isSuccessful) { "HTTP ${response.code}" }
-                val payload = JSONObject(response.body?.string().orEmpty())
-                val array = payload.optJSONArray("channels") ?: JSONArray()
-                (0 until array.length()).mapNotNull { index ->
-                    val item = array.optJSONObject(index) ?: return@mapNotNull null
-                    ChannelRow(
-                        sourceKey = item.getString("sourceKey"),
-                        displayName = item.optString("displayName"),
-                        displayNumber = item.optString("displayNumber"),
-                        source = item.optString("source"),
-                        favorite = item.optBoolean("favorite", false),
-                        hidden = item.optBoolean("hidden", false),
-                    )
-                }
+    fun sources(): Result<List<SourceRow>> = runCatching {
+        val request = authorizedRequest(normalizeAddress(store.address()) + "/api/v1/sources")
+        http.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "HTTP ${response.code}" }
+            val payload = JSONObject(response.body?.string().orEmpty())
+            val array = payload.optJSONArray("sources") ?: JSONArray()
+            (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                SourceRow(
+                    kind = item.optString("kind"),
+                    id = item.optLong("id"),
+                    name = item.optString("name"),
+                    channelCount = item.optInt("channelCount"),
+                    selectedCount = if (item.isNull("selectedCount")) null else item.optInt("selectedCount"),
+                    urlKind = item.optBoolean("urlKind", false),
+                    error = if (item.isNull("error")) null else item.optString("error"),
+                )
             }
         }
+    }
 
-    /** Applies one patch; when offline the caller enqueues it instead. */
-    fun patch(sourceKey: String, revision: Long, patch: JSONObject): PatchResult = runCatching {
-        val payload = JSONObject(patch.toString()).put("revision", revision)
-        val request = authorizedRequest(
-            normalizeAddress(store.address()) + "/api/v1/channels/" + urlEncode(sourceKey),
-        ).newBuilder()
-            .patch(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+    fun imports(): Result<List<ImportRow>> = runCatching {
+        val request = authorizedRequest(normalizeAddress(store.address()) + "/api/v1/imports")
+        http.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "HTTP ${response.code}" }
+            val payload = JSONObject(response.body?.string().orEmpty())
+            val array = payload.optJSONArray("imports") ?: JSONArray()
+            (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                ImportRow(
+                    id = item.optLong("id"),
+                    name = item.optString("name"),
+                    kind = item.optString("kind", "iptv"),
+                    status = item.optString("status"),
+                    importedChannels = item.optInt("importedChannels"),
+                    error = if (item.isNull("error")) null else item.optString("error"),
+                )
+            }
+        }
+    }
+
+    /** Queues an IPTV playlist or XMLTV EPG import on the TV. */
+    fun queueImport(name: String, url: String, kind: String): Result<Long> = runCatching {
+        val payload = JSONObject()
+            .put("url", url)
+            .put("name", name)
+            .put("kind", kind)
+        val request = Request.Builder()
+            .url(normalizeAddress(store.address()) + "/api/v1/imports")
+            .header("Authorization", "Bearer ${store.token()}")
+            .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         http.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-            when {
-                response.code == 409 ->
-                    PatchResult.Conflict(json.optLong("currentRevision", -1L))
-
-                response.isSuccessful && json.has("revision") ->
-                    PatchResult.Applied(json.getLong("revision"))
-
-                else -> PatchResult.Failed(json.optString("message", "HTTP ${response.code}"))
-            }
+            check(response.isSuccessful) { "HTTP ${response.code}" }
+            JSONObject(response.body?.string().orEmpty()).optLong("id")
         }
-    }.getOrElse { error -> PatchResult.Failed(error.message ?: "Bağlantı hatası.") }
+    }
+
+    /** Deletes one source together with its channels/programs. */
+    fun deleteSource(kind: String, id: Long): MutationResult =
+        postSourceMutation("delete", kind, id)
+
+    /** Re-downloads an existing URL-kind source in place. */
+    fun refreshSource(kind: String, id: Long): MutationResult =
+        postSourceMutation("refresh", kind, id)
+
+    private fun postSourceMutation(operation: String, kind: String, id: Long): MutationResult = runCatching {
+        val payload = JSONObject().put("kind", kind).put("id", id)
+        val request = Request.Builder()
+            .url(normalizeAddress(store.address()) + "/api/v1/sources/$operation")
+            .header("Authorization", "Bearer ${store.token()}")
+            .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+        http.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "HTTP ${response.code}" }
+        }
+    }.fold(
+        onSuccess = { MutationResult.Applied },
+        onFailure = { error -> MutationResult.Failed(error.message ?: "Bağlantı hatası.") },
+    )
 
     private fun authorizedRequest(url: String): Request = Request.Builder()
         .url(url)

@@ -432,13 +432,22 @@ dokunuşlarda zenginleştirilecek; uç noktalar ve çakışma sözleşmesi tamam
   pano yalnız LAN'dan erişilebilir; ek bağımlılık eklenmez. Not: sürükle-bırak
   sıralama sonraki dokunuş; toplu favori/gizle ve satır düzenleyici çalışıyor.
 
-- [x] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı) — Sprint R4'te tamamlandı**
-  Telefondan/web'den yeni IPTV listesi ekleme/güncelleme isteği sunucuda kuyruğa alınır;
-  TV mevcut import akışıyla (IptvRepository) uygular. Kimlik bilgileri şifreli alanda
-  taşınır, loglanmaz.
+- [x] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı) — Sprint R4'te tamamlandı; R6'da genişletildi**
+  Telefondan/web'den yeni IPTV listesi / XMLTV EPG ekleme/güncelleme isteği sunucuda
+  kuyruğa alınır; TV mevcut import akışlarıyla (IptvRepository / XmlTvRepository) uygular.
+  Kaynak silme (`POST /api/v1/sources/delete`), yenileme (`/sources/refresh`), kaynak
+  başına kanal seçimi (`/sources/selection/{id}`, delta veya tümü) ve XMLTV kanal
+  kataloğu (`GET /api/v1/xmltv/catalog`) R6'da eklendi; web panosunda Kaynaklar kartı.
+  Kimlik bilgileri şifreli alanda taşınır, loglanmaz.
   **Kabul:** Büyük katalog importu sayfalı akışla çalışır; kaynak silme iki aşamalı onay;
-  kimlik bilgisi hiçbir yerde düz metin loglanmaz. Not: kaynak silme v1 kapsamında
-  değil; ekleme + durum izleme tamam.
+  kimlik bilgisi hiçbir yerde düz metin loglanmaz.
+
+- [x] **REMOTEEDIT-009 (P1, Sprint R6): Mobil client sadeleştirme + NSD keşfi — tamamlandı**
+  Kullanıcı geri bildirimiyle telefondan kanal düzenleme kaldırıldı; telefon yalnız
+  kaynak yönetimi yapar (IPTV/XMLTV ekle, yenile, adres değiştir, sil, aktarım durumu).
+  TV sunucusu `_tvapp._tcp.` NSD duyurusu yapar; telefon adresi elle yazmadan bulur.
+  Mobil ana ekranda dikey toolbar'a "TV yönetimi" ikonu eklendi (dikeyde görünmez
+  overlay ikonu sorunu çözüldü). Ana yönetim yeri web panosudur.
 
 - [x] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler — Sprint R5'te tamamlandı**
   Entegrasyon testleri (sahte client), çakışma senaryoları, Kılavuz + README +

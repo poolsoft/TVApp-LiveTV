@@ -435,6 +435,17 @@
                 android:src="@drawable/ic_iptv_library" />
 
             <ImageView
+                android:id="@+id/mobile_btn_remote_edit"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/remote_edit_client_entry"
+                android:padding="8dp"
+                android:src="@drawable/ic_remote_edit"
+                android:visibility="gone" />
+
+            <ImageView
                 android:id="@+id/mobile_btn_channel_select"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
