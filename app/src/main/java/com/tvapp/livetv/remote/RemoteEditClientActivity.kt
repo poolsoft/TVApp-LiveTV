@@ -27,6 +27,7 @@ class RemoteEditClientActivity : AppCompatActivity() {
 
     private lateinit var store: RemoteEditClientStore
     private lateinit var client: RemoteEditClient
+    private lateinit var clientHttp: okhttp3.OkHttpClient
     private lateinit var status: TextView
     private lateinit var listContainer: LinearLayout
     private var rows: List<RemoteEditClient.ChannelRow> = emptyList()
@@ -37,6 +38,10 @@ class RemoteEditClientActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         store = RemoteEditClientStore(this)
         client = RemoteEditClient(store)
+        clientHttp = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(16), dp(16), dp(16))
@@ -63,6 +68,13 @@ class RemoteEditClientActivity : AppCompatActivity() {
             },
         )
         content.addView(search)
+        val replayButton = TextView(this).apply {
+            text = getString(R.string.remote_edit_client_replay_queue)
+            setPadding(0, dp(8), 0, dp(8))
+            isClickable = true
+            setOnClickListener { replayQueue() }
+        }
+        content.addView(replayButton)
         listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         content.addView(listContainer)
         setContentView(content)
@@ -170,19 +182,132 @@ class RemoteEditClientActivity : AppCompatActivity() {
 
     private fun showRowActions(row: RemoteEditClient.ChannelRow) {
         val actions = listOf(
-            getString(R.string.remote_edit_client_toggle_favorite) to {
+            getString(R.string.remote_edit_client_toggle_favorite) to { _: Int ->
                 patchChannel(row, JSONObject().put("favorite", !row.favorite))
             },
-            getString(R.string.remote_edit_client_toggle_hidden) to {
+            getString(R.string.remote_edit_client_toggle_hidden) to { _: Int ->
                 patchChannel(row, JSONObject().put("hidden", !row.hidden))
+            },
+            getString(R.string.remote_edit_client_edit_name) to { _: Int ->
+                showEditNameDialog(row)
+            },
+            getString(R.string.remote_edit_client_edit_number) to { _: Int ->
+                showEditNumberDialog(row)
+            },
+            getString(R.string.remote_edit_client_edit_group) to { _: Int ->
+                showEditGroupDialog(row)
             },
         )
         val labels = actions.map { it.first }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle(row.displayName)
-            .setItems(labels) { _, which -> actions[which].second() }
+            .setItems(labels) { _, which -> actions[which].second(which) }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showEditNameDialog(row: RemoteEditClient.ChannelRow) {
+        val input = EditText(this).apply {
+            hint = getString(R.string.remote_edit_client_name_hint)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.remote_edit_client_edit_name)
+            .setView(input)
+            .setPositiveButton(R.string.remote_edit_client_save) { _, _ ->
+                val value = input.text.toString().trim()
+                val patch = JSONObject()
+                if (value.isEmpty()) patch.put("clearCustomName", true) else patch.put("customName", value)
+                patchChannel(row, patch)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showEditNumberDialog(row: RemoteEditClient.ChannelRow) {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.remote_edit_client_number_hint)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.remote_edit_client_edit_number)
+            .setView(input)
+            .setPositiveButton(R.string.remote_edit_client_save) { _, _ ->
+                val value = input.text.toString().trim()
+                val patch = JSONObject()
+                if (value.isEmpty()) {
+                    patch.put("clearCustomNumber", true)
+                } else {
+                    value.toIntOrNull()?.let { patch.put("customNumber", it) }
+                }
+                patchChannel(row, patch)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showEditGroupDialog(row: RemoteEditClient.ChannelRow) {
+        lifecycleScope.launch {
+            val groups = withContext(Dispatchers.IO) { fetchGroups() }
+            val labels = buildList {
+                add(getString(R.string.remote_edit_client_group_none))
+                addAll(groups.map { it.second })
+            }.toTypedArray()
+            AlertDialog.Builder(this@RemoteEditClientActivity)
+                .setTitle(R.string.remote_edit_client_edit_group)
+                .setItems(labels) { _, which ->
+                    val patch = JSONObject()
+                    if (which == 0) patch.put("clearGroupId", true) else patch.put("groupId", groups[which - 1].first)
+                    patchChannel(row, patch)
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun fetchGroups(): List<Pair<Long, String>> {
+        val request = okhttp3.Request.Builder()
+            .url("http://${store.address().trim().trimEnd('/')}/api/v1/groups")
+            .header("Authorization", "Bearer ${store.token()}")
+            .build()
+        clientHttp.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "HTTP ${response.code}" }
+            val json = org.json.JSONObject(response.body?.string().orEmpty())
+            val array = json.optJSONArray("groups") ?: org.json.JSONArray()
+            return (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                Pair(item.optLong("id"), item.optString("name"))
+            }
+        }
+    }
+
+    private fun replayQueue() {
+        val pending = store.pendingOps()
+        if (pending.isEmpty()) {
+            Toast.makeText(this, R.string.remote_edit_client_queue_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            val failed = mutableListOf<RemoteEditClientStore.PendingOp>()
+            withContext(Dispatchers.IO) {
+                pending.forEach { op ->
+                    when (client.patch(op.sourceKey, op.revision, op.patch)) {
+                        is RemoteEditClient.PatchResult.Applied -> Unit
+                        is RemoteEditClient.PatchResult.Conflict,
+                        is RemoteEditClient.PatchResult.Failed,
+                        -> failed += op
+                    }
+                }
+            }
+            store.retainFailed(failed)
+            val applied = pending.size - failed.size
+            Toast.makeText(
+                this@RemoteEditClientActivity,
+                getString(R.string.remote_edit_client_queue_replayed, applied, failed.size),
+                Toast.LENGTH_SHORT,
+            ).show()
+            refreshList()
+        }
     }
 
     private fun patchChannel(row: RemoteEditClient.ChannelRow, patch: JSONObject) {
@@ -224,6 +349,12 @@ class RemoteEditClientActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun refreshList() {
+        rows = emptyList()
+        nextCursor = null
+        nextPage()
     }
 
     /** The phone does not track revisions per row yet; row-level revisions land

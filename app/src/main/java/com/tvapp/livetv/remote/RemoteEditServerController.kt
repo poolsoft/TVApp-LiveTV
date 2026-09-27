@@ -102,6 +102,12 @@ class RemoteEditServerController private constructor(
                     RemoteEditServer.WriteOutcome.NotFound
             }
         }
+        // REMOTEEDIT-008: serve the embedded web panel from APK assets.
+        server.webPanelLoader = { path ->
+            runCatching {
+                context.assets.open("webpanel/$path").use { stream -> stream.readBytes() }
+            }.getOrNull()
+        }
         return try {
             server.startServer()
             serverRef.set(server)
@@ -169,6 +175,27 @@ class RemoteEditServerController private constructor(
                         )
                     }
             }
+        }
+
+        /** REMOTEEDIT-008/R3: single channel with full editable fields. */
+        override fun channel(sourceKey: String): JSONObject? {
+            val rows: List<LiveChannel> = runBlocking(Dispatchers.IO) {
+                channelRepository.channels(includeTif = true).getOrDefault(emptyList())
+            }
+            val channel = rows.firstOrNull { it.sourceKey == sourceKey } ?: return null
+            val revision = runBlocking(Dispatchers.IO) {
+                channelDao.revisionOf(channel.sourceKey)
+            } ?: 0L
+            return JSONObject()
+                .put("sourceKey", channel.sourceKey)
+                .put("displayName", channel.displayName)
+                .put("displayNumber", channel.displayNumber)
+                .put("source", channel.source.name)
+                .put("favorite", channel.favorite)
+                .put("hidden", channel.hidden)
+                .put("revision", revision)
+                .put("groupId", channel.groupId ?: JSONObject.NULL)
+                .put("iptvContentType", channel.iptvContentType ?: JSONObject.NULL)
         }
 
         override fun groups(): JSONArray {

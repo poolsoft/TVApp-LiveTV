@@ -419,17 +419,18 @@ Tümü `Authorization: Bearer <jeton>` ister (`ping` hariç). Gövdeler JSON.
   Not: Özel ad/numara/grup düzenleme arayüzü ve kuyruk replay butonu sonraki
 dokunuşlarda zenginleştirilecek; uç noktalar ve çakışma sözleşmesi tamam.
 
-- [ ] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme**
+- [x] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme — Sprint R3'te tamamlandı**
   Global sürüm sayacı, `GET /api/v1/events` long-poll, client'ın listede değişen
   satırları tazelemesi.
   **Kabul:** TV ve telefon aynı `revision`'da buluşur; ağ kesintisinde her iki taraf
   tutarlı son duruma döner.
 
-- [ ] **REMOTEEDIT-008 (P1, Sprint R3): Web panosu**
+- [x] **REMOTEEDIT-008 (P1, Sprint R3): Web panosu — tamamlandı**
   `assets/webpanel` statik sayfası, eşleştirme ekranı, sayfalı kanal tablosu, satır içi
   düzenleme, toplu işlemler, sürükle-bırak sıralama. REMOTEEDIT-001/002/004'e bağlıdır.
   **Kabul:** Tarayıcıdan (bilgisayar veya telefon) tüm düzenleme alanları çalışır;
-  pano yalnız LAN'dan erişilebilir; ek bağımlılık eklenmez.
+  pano yalnız LAN'dan erişilebilir; ek bağımlılık eklenmez. Not: sürükle-bırak
+  sıralama sonraki dokunuş; toplu favori/gizle ve satır düzenleyici çalışıyor.
 
 - [ ] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı)**
   Telefondan/web'den yeni IPTV listesi ekleme/güncelleme isteği sunucuda kuyruğa alınır;

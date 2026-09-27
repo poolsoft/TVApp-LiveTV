@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### REMOTEEDIT Sprint R3: Web Panosu, Canlı Yenileme ve Zengin Telefon Düzenlemesi (REMOTEEDIT-008, 005)
+* **Migration düzeltmesi:** v25'teki `paired_devices` unique index'i entity tarafında da bildirildi; telefonda görülen "Migration didn't properly handle paired_devices" hatası giderildi.
+* **Web panosu (REMOTEEDIT-008):** TVApp sunucusu artık `http://<TV-IP>:8890/` adresinden tarayıcıya yönetim panosu servis ediyor (APK içine gömülü statik sayfa, ek bağımlılık yok). Panoda: 6 haneli kodla eşleştirme, sayfalı + aranabilir kanal tablosu, çift tıkla satır düzenleyici (özel ad/numara, grup, favori/gizli), çoklu seçim + toplu favori/gizle (batch), 25 sn uzun sorgulama ile canlı yenileme.
+* **Canlı yenileme (REMOTEEDIT-005):** `GET /api/v1/events?since=` long-poll uç noktası ve her başarılı yazmada artan global sürüm sayacı eklendi; web panosu ve telefon client'ı değişiklikleri otomatik görür.
+* **Tek kanal okuma:** `GET /api/v1/channels/{sourceKey}` tüm düzenlenebilir alanları döndürür (web panosu düzenleyicisi bunu kullanır).
+* **Telefon client zenginleştirme:** Özel ad ve özel numara düzenleme diyalogları (boş = kilit kaldır), grup seçim diyaloğu (grup listesi sunucudan çekilir), "Kuyruğu gönder" butonu — çevrimdışı biriken düzenlemeleri tek dokunuşla oynatır (uygulanan/başarısız sayısı bildirilir, başarısızlar kuyrukta kalır).
 ### REMOTEEDIT Sprint R2: Telefondan Okuma ve Çakışma Farkında Düzenleme (REMOTEEDIT-003, REMOTEEDIT-004)
 * **DB v25 (yıkıcı olmayan):** `user_channels` tablosuna `revision` kolonu (her kullanıcı düzenlemesinde monoton artar) ve yeni `paired_devices` tablosu (jeton yalnız SHA-256 hash olarak saklanır) eklendi; Room migration 24→25 mevcut kullanıcı verisini korur.
 * **Sunucu yazma uç noktaları:** `PATCH /api/v1/channels/{sourceKey}` alan bazlı yama (favorite/hidden/customName/customNumber/groupId/sortOrder + alan temizleme bayrakları) ve `POST /api/v1/channels/batch` (en fazla 100 işlem/istek, işlem başına uygulanır/çakışma/bulunamadı yanıtı). Client'ın gönderdiği `revision` satırdaki sürümle uyuşmazsa `409 + currentRevision` döner — TV'de değişmiş alanlar sessizce ezilmez; sıralama yalnız Room'a yazılır.

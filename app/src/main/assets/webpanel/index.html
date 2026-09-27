@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  TVApp REMOTEEDIT-008: embedded management panel. Served by the TV app's
+  LAN-only server from APK assets; vanilla JS + fetch, no dependencies.
+-->
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVApp Yönetim Panosu</title>
+<link rel="stylesheet" href="webpanel/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>TVApp Yönetim Panosu</h1>
+    <span id="connState" class="badge">Bağlanıyor…</span>
+  </header>
+
+  <section id="pairView" class="card hidden">
+    <h2>Eşleştirme</h2>
+    <p>TV ekranında gösterilen 6 haneli kodu girin.</p>
+    <input id="pairCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="off">
+    <button id="pairBtn">Bağlan</button>
+    <p id="pairError" class="error"></p>
+  </section>
+
+  <section id="mainView" class="hidden">
+    <div class="toolbar">
+      <input id="search" placeholder="Kanal ara…" autocomplete="off">
+      <button id="refreshBtn">Yenile</button>
+      <span id="selectionInfo"></span>
+      <button id="batchFav" class="hidden">Seçilenleri ★</button>
+      <button id="batchHide" class="hidden">Seçilenleri gizle</button>
+    </div>
+    <div class="table-wrap card">
+      <table id="channels">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" id="checkAll"></th>
+            <th class="col-num">No</th>
+            <th>Ad</th>
+            <th class="col-src">Kaynak</th>
+            <th class="col-flags">★ / gizli</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <button id="moreBtn" class="hidden">Daha fazla yükle</button>
+      <span id="pageInfo"></span>
+    </div>
+  </section>
+</div>
+<script src="webpanel/app.js"></script>
+</body>
+</html>

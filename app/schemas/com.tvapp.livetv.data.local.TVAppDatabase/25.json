@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 25,
-    "identityHash": "f2ed105f8b602aaacf7cec5c13c743eb",
+    "identityHash": "cb537b612720c46b94493070e5f7c292",
     "entities": [
       {
         "tableName": "user_channels",
@@ -1013,12 +1013,23 @@
           "columnNames": [
             "id"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_paired_devices_tokenHash",
+            "unique": true,
+            "columnNames": [
+              "tokenHash"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_paired_devices_tokenHash` ON `${TABLE_NAME}` (`tokenHash`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f2ed105f8b602aaacf7cec5c13c743eb')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cb537b612720c46b94493070e5f7c292')"
     ]
   }
 }

@@ -5,7 +5,6 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
-
 /**
  * REMOTEEDIT-001: the embedded, LAN-only management server. Serves the v1
  * REST API over plain HTTP on the Wi-Fi interface. Every endpoint except
@@ -37,6 +36,9 @@ class RemoteEditServer(
         /** Keyset-paged channel list (cursor = last sourceKey); JSON array. */
         fun channels(afterSourceKey: String?, limit: Int, query: String?): JSONArray
 
+        /** Single channel with full editable fields, or null. */
+        fun channel(sourceKey: String): JSONObject?
+
         fun groups(): JSONArray
 
         fun sources(): JSONArray
@@ -52,7 +54,11 @@ class RemoteEditServer(
         val method = session.method
         return try {
             when {
-                method == Method.GET && (uri.isEmpty() || uri == "/" || uri == API_PING) ->
+                // REMOTEEDIT-008: static web panel served from APK assets.
+                method == Method.GET && (uri.isEmpty() || uri == "/" || uri.startsWith(WEB_ROOT)) ->
+                    serveWebAsset(uri)
+
+                method == Method.GET && uri == API_PING ->
                     json(StatusCode.OK, dataProvider.serverPing())
 
                 method == Method.POST && uri == API_PAIR ->
@@ -74,6 +80,33 @@ class RemoteEditServer(
         }
     }
 
+    /** REMOTEEDIT-008: serves assets/webpanel files; / → index.html. */
+    private fun serveWebAsset(uri: String): Response {
+        val relative = when {
+            uri.isEmpty() || uri == "/" -> "index.html"
+            uri.startsWith(WEB_ROOT) -> uri.removePrefix(WEB_ROOT).trimStart('/')
+            else -> return json(StatusCode.NOT_FOUND, error("not_found", "Bilinmeyen yol."))
+        }
+        val safe = relative.takeWhile { it != '?' }
+        if (safe.contains("..") || safe.isBlank()) {
+            return json(StatusCode.NOT_FOUND, error("not_found", "Bilinmeyen yol."))
+        }
+        val mime = when (safe.substringAfterLast('.', "")) {
+            "html" -> "text/html"
+            "js" -> "application/javascript"
+            "css" -> "text/css"
+            "svg" -> "image/svg+xml"
+            "png" -> "image/png"
+            else -> "application/octet-stream"
+        }
+        val bytes = webPanelLoader?.invoke(safe) ?: return json(
+            StatusCode.NOT_FOUND,
+            error("not_found", "Panosu dosyası yok: $safe"),
+        )
+        return newFixedLengthResponse(Response.Status.OK, mime, bytes.inputStream(), bytes.size.toLong())
+            .apply { addHeader("Cache-Control", "no-cache") }
+    }
+
     private fun handleAuthorized(
         session: IHTTPSession,
         uri: String,
@@ -86,6 +119,13 @@ class RemoteEditServer(
         }
         return when {
             method == Method.GET && uri == API_CHANNELS -> handleChannels(session)
+            method == Method.GET && uri.startsWith(API_CHANNELS + "/") ->
+                dataProvider.channel(uri.removePrefix(API_CHANNELS + "/"))?.let {
+                    json(StatusCode.OK, it)
+                } ?: json(StatusCode.NOT_FOUND, error("not_found", "Kanal bulunamadı."))
+
+            method == Method.GET && uri == API_EVENTS -> handleEvents(session)
+
             method == Method.GET && uri == API_GROUPS ->
                 json(StatusCode.OK, dataProvider.groups())
 
@@ -122,12 +162,15 @@ class RemoteEditServer(
                 error("writes_unsupported", "Bu sunucu yazma kabul etmiyor."),
             )
         return when (result) {
-            is WriteOutcome.Applied -> json(
-                StatusCode.OK,
-                JSONObject()
-                    .put("sourceKey", sourceKey)
-                    .put("revision", result.newRevision),
-            )
+            is WriteOutcome.Applied -> {
+                versionCounter.incrementAndGet()
+                json(
+                    StatusCode.OK,
+                    JSONObject()
+                        .put("sourceKey", sourceKey)
+                        .put("revision", result.newRevision),
+                )
+            }
 
             is WriteOutcome.Rejected -> json(
                 StatusCode.CONFLICT,
@@ -249,6 +292,37 @@ class RemoteEditServer(
         (sourceKey: String, expectedRevision: Long, patch: ChannelPatch) -> WriteOutcome?
     )? = null
 
+    /** REMOTEEDIT-005: monotonic data version; every applied write bumps it. */
+    private val versionCounter = java.util.concurrent.atomic.AtomicLong(1L)
+
+    fun bumpDataVersion(): Long = versionCounter.incrementAndGet()
+
+    /** REMOTEEDIT-005: long-poll until the data version moves or the wait
+     *  elapses. NanoHTTPD worker threads tolerate the blocking sleep; clients
+     *  treat any changed response as "refetch your list". */
+    private fun handleEvents(session: IHTTPSession): Response {
+        val since = session.parameters["since"]?.firstOrNull()?.toLongOrNull()
+            ?: return json(
+                StatusCode.BAD_REQUEST,
+                error("bad_request", "since parametresi gerekli."),
+            )
+        val deadline = System.currentTimeMillis() + EVENTS_MAX_WAIT_MILLIS
+        var current = versionCounter.get()
+        while (current <= since && System.currentTimeMillis() < deadline) {
+            Thread.sleep(EVENTS_POLL_STEP_MILLIS)
+            current = versionCounter.get()
+        }
+        return json(
+            StatusCode.OK,
+            JSONObject()
+                .put("version", current)
+                .put("changed", current > since),
+        )
+    }
+
+    /** REMOTEEDIT-008: asset loader for the web panel; wired to APK assets. */
+    var webPanelLoader: ((path: String) -> ByteArray?)? = null
+
     private fun handleChannels(session: IHTTPSession): Response {
         val parameters = session.parameters
         val after = parameters["after"]?.firstOrNull()?.trim()?.take(CURSOR_MAX_LENGTH)
@@ -328,8 +402,12 @@ class RemoteEditServer(
         private const val API_PAIR = "$API_ROOT/pair"
         private const val API_CHANNELS = "$API_ROOT/channels"
         private const val API_CHANNELS_BATCH = "$API_ROOT/channels/batch"
+        private const val API_EVENTS = "$API_ROOT/events"
         private const val API_GROUPS = "$API_ROOT/groups"
         private const val API_SOURCES = "$API_ROOT/sources"
+        private const val WEB_ROOT = "/assets/webpanel"
+        private const val EVENTS_MAX_WAIT_MILLIS = 25_000L
+        private const val EVENTS_POLL_STEP_MILLIS = 500L
         private const val MAX_BATCH_OPS = 100
         private const val DEFAULT_PAGE_LIMIT = 100
         private const val MAX_PAGE_LIMIT = 500
@@ -339,11 +417,14 @@ class RemoteEditServer(
 
         /** Routes exposed for tests without starting a socket. */
         internal val ROUTES = listOf(
+            EndpointProbe(Method.GET, "/"),
             EndpointProbe(Method.GET, API_PING),
             EndpointProbe(Method.POST, API_PAIR),
             EndpointProbe(Method.GET, API_CHANNELS),
+            EndpointProbe(Method.GET, "$API_CHANNELS/{sourceKey}"),
             EndpointProbe(Method.PATCH, "$API_CHANNELS/{sourceKey}"),
             EndpointProbe(Method.POST, API_CHANNELS_BATCH),
+            EndpointProbe(Method.GET, API_EVENTS),
             EndpointProbe(Method.GET, API_GROUPS),
             EndpointProbe(Method.GET, API_SOURCES),
         )
