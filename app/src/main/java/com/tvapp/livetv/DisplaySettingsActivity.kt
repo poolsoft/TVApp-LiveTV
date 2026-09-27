@@ -49,6 +49,10 @@ import com.tvapp.livetv.settings.MultiViewPreferencesStore
 import com.tvapp.livetv.update.AppUpdateManager
 import com.tvapp.livetv.tifinput.IptvInputChannelSyncRepository
 import com.tvapp.livetv.tifinput.IptvInputResolver
+import com.tvapp.livetv.remote.PairingStore
+import com.tvapp.livetv.remote.RemoteEditPreferencesStore
+import com.tvapp.livetv.remote.RemoteEditServer
+import com.tvapp.livetv.remote.RemoteEditServerController
 import com.tvapp.livetv.ui.TvUiComponents
 import com.tvapp.livetv.ui.TvUiMetrics
 import kotlinx.coroutines.launch
@@ -450,6 +454,8 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             }
         }
 
+        buildRemoteEditSettings()
+
         section(R.string.application_settings)
         if (BuildConfig.DIAGNOSTICS_ENABLED || BuildConfig.DEBUG) {
             section(R.string.debug_tools)
@@ -503,6 +509,67 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         } else {
             info(R.string.version_label, currentVersion)
         }
+    }
+
+    /** REMOTEEDIT Sprint R1: phone/web management switch, pairing code display,
+     *  and paired-device removal. The embedded server runs only while enabled. */
+    private fun buildRemoteEditSettings() {
+        section(R.string.remote_edit_settings)
+        val controller = RemoteEditServerController.get(this)
+        toggle(R.string.remote_edit_enable, controller.isEnabled) { enabled ->
+            controller.setEnabled(enabled)
+            markChanged()
+            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+            content.post { firstContentFocusable?.requestFocus() }
+        }
+        if (!controller.isEnabled) return
+        val code = controller.newPairingCode()
+        info(
+            R.string.remote_edit_address,
+            remoteEditAddressLabel(code),
+        )
+        val devices: List<RemoteEditServerController.PairedDeviceInfo> = controller.pairedDevices()
+        if (devices.isEmpty()) {
+            info(R.string.remote_edit_devices, getString(R.string.remote_edit_no_devices))
+        } else {
+            devices.forEach { device ->
+                action(device.deviceName, remoteEditDeviceLabel(device)) {
+                    AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+                        .setTitle(device.deviceName)
+                        .setMessage(getString(R.string.remote_edit_remove_confirm, device.deviceName))
+                        .setPositiveButton(R.string.delete) { _, _ ->
+                            controller.removeDevice(device.id)
+                            markChanged()
+                            showPage(SettingsPage.SYSTEM, moveFocusToTab = false)
+                        }
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun remoteEditAddressLabel(code: String?): String {
+        val address = RemoteEditServer.wifiIpv4HostAddress() ?: getString(R.string.remote_edit_no_wifi)
+        val port = RemoteEditPreferencesStore(this).port()
+        val addressPart = if (getString(R.string.remote_edit_no_wifi) == address) {
+            address
+        } else {
+            "$address:$port"
+        }
+        return if (code == null) {
+            addressPart
+        } else {
+            "$addressPart  ·  ${getString(R.string.remote_edit_code_value, code)}"
+        }
+    }
+
+    private fun remoteEditDeviceLabel(device: RemoteEditServerController.PairedDeviceInfo): String {
+        val formatter = android.text.format.DateFormat.getDateFormat(this)
+        return getString(
+            R.string.remote_edit_device_summary,
+            formatter.format(java.util.Date(device.pairedAt)),
+        )
     }
 
     private fun section(titleRes: Int) {
@@ -635,7 +702,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         },
     )
 
-    private fun settingRow(titleRes: Int): SettingRow {
+    private fun settingRow(titleRes: Int): SettingRow = settingRow(getString(titleRes))
+
+    private fun settingRow(title: String): SettingRow {
         val row = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -648,9 +717,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             isClickable = true
             setPadding(dp(18), 0, dp(16), 0)
         }
-        val title = TextView(this).apply {
+        val titleView = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            text = getString(titleRes)
+            text = title
             setTextColor(getColorStateList(R.color.settings_title_text))
             textSize = 17f
             maxLines = 2
@@ -666,7 +735,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             textSize = 15f
             isDuplicateParentStateEnabled = true
         }
-        row.addView(title)
+        row.addView(titleView)
         row.addView(value)
         content.addView(row)
         if (firstContentFocusable == null) firstContentFocusable = row
@@ -675,6 +744,13 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     private fun action(titleRes: Int, initialValue: String, clicked: (SettingRow) -> Unit) {
         val row = settingRow(titleRes)
+        row.value.text = initialValue
+        row.root.setOnClickListener { clicked(row) }
+    }
+
+    /** Action row with a literal (non-resource) title, e.g. paired device names. */
+    private fun action(title: String, initialValue: String, clicked: (SettingRow) -> Unit) {
+        val row = settingRow(title)
         row.value.text = initialValue
         row.root.setOnClickListener { clicked(row) }
     }
