@@ -405,17 +405,19 @@ Tümü `Authorization: Bearer <jeton>` ister (`ping` hariç). Gövdeler JSON.
   **Kabul:** Yanlış/eksik jeton 401; jeton ve kod hiçbir günlüğe yazılmaz; eşleştirme
   TV'den geri alınabilir.
 
-- [ ] **REMOTEEDIT-003 (P1): Telefon client okuma yolu**
+- [x] **REMOTEEDIT-003 (P1): Telefon client okuma yolu — Sprint R2'de tamamlandı**
   "TV'ye bağlan" akışı, jeton saklama, keyset sayfalı kanal listesi, `q` araması.
   **Kabul:** 15.000+ katalog telefonda akıcı sayfalanır; cihaz çevrimdışıysa net hata;
   loglarda kimlik bilgisi görünmez.
 
-- [ ] **REMOTEEDIT-004 (P1): Düzenleme + senkron yazma yolu**
+- [x] **REMOTEEDIT-004 (P1): Düzenleme + senkron yazma yolu — Sprint R2'de tamamlandı**
   DB v25 (`revision` kolonu, migration 24→25), `PATCH` + `batch` endpoint'leri,
   409 çakışma yanıtı, telefonda çevrimdışı kuyruk ve senkron butonu; TV tarafında
   Room akışı üzerinden canlı yansıma.
   **Kabul:** Tüm düzenleme alanları telefondan çalışır; sıralama yalnız Room'a yazılır
   (TIF veritabanına asla); çakışmada veri kaybı olmadan temiz mesaj.
+  Not: Özel ad/numara/grup düzenleme arayüzü ve kuyruk replay butonu sonraki
+dokunuşlarda zenginleştirilecek; uç noktalar ve çakışma sözleşmesi tamam.
 
 - [ ] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme**
   Global sürüm sayacı, `GET /api/v1/events` long-poll, client'ın listede değişen

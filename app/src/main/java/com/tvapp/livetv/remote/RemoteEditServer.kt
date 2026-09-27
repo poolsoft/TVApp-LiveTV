@@ -92,11 +92,129 @@ class RemoteEditServer(
             method == Method.GET && uri == API_SOURCES ->
                 json(StatusCode.OK, dataProvider.sources())
 
+            method == Method.PATCH && uri.startsWith(API_CHANNELS + "/") ->
+                handlePatch(session, uri.removePrefix(API_CHANNELS + "/"))
+
+            method == Method.POST && uri == API_CHANNELS_BATCH ->
+                handleBatch(session)
+
             else -> json(
                 StatusCode.NOT_FOUND,
                 error("not_found", "Bu sürümde bulunmayan uç nokta."),
             )
         }
+    }
+
+    /** REMOTEEDIT-004: revision-guarded field patch on one channel. */
+    private fun handlePatch(session: IHTTPSession, sourceKey: String): Response {
+        if (sourceKey.isBlank()) {
+            throw BadRequestException("Kanal anahtarı gerekli.")
+        }
+        val body = readBody(session)
+        val expectedRevision = body.optLong("revision", Long.MIN_VALUE)
+        if (expectedRevision == Long.MIN_VALUE) {
+            throw BadRequestException("revision alanı gerekli.")
+        }
+        val patch = parsePatch(body)
+        val result = writeHandler?.invoke(sourceKey, expectedRevision, patch)
+            ?: return json(
+                StatusCode.NOT_FOUND,
+                error("writes_unsupported", "Bu sunucu yazma kabul etmiyor."),
+            )
+        return when (result) {
+            is WriteOutcome.Applied -> json(
+                StatusCode.OK,
+                JSONObject()
+                    .put("sourceKey", sourceKey)
+                    .put("revision", result.newRevision),
+            )
+
+            is WriteOutcome.Rejected -> json(
+                StatusCode.CONFLICT,
+                JSONObject()
+                    .put("error", "revision_conflict")
+                    .put("message", "Kanal TV tarafında değişmiş.")
+                    .put("currentRevision", result.currentRevision),
+            )
+
+            WriteOutcome.NotFound -> json(
+                StatusCode.NOT_FOUND,
+                error("not_found", "Kanal bulunamadı."),
+            )
+        }
+    }
+
+    /** REMOTEEDIT-004: bounded batch of the same revision-guarded patches. */
+    private fun handleBatch(session: IHTTPSession): Response {
+        val body = readBody(session)
+        val ops = body.optJSONArray("ops")
+            ?: throw BadRequestException("ops dizisi gerekli.")
+        if (ops.length() > MAX_BATCH_OPS) {
+            return json(
+                StatusCode.PAYLOAD_TOO_LARGE,
+                error("batch_too_large", "En fazla $MAX_BATCH_OPS işlem/istek."),
+            )
+        }
+        val results = JSONArray()
+        for (index in 0 until ops.length()) {
+            val op = ops.optJSONObject(index) ?: throw BadRequestException("ops[$index] nesne olmalı.")
+            val sourceKey = op.optString("sourceKey")
+            val expectedRevision = op.optLong("revision", Long.MIN_VALUE)
+            if (sourceKey.isBlank() || expectedRevision == Long.MIN_VALUE) {
+                throw BadRequestException("ops[$index]: sourceKey ve revision gerekli.")
+            }
+            val patch = parsePatch(op)
+            val outcome = writeHandler?.invoke(sourceKey, expectedRevision, patch)
+            results.put(
+                when (outcome) {
+                    is WriteOutcome.Applied -> JSONObject()
+                        .put("sourceKey", sourceKey)
+                        .put("status", "applied")
+                        .put("revision", outcome.newRevision)
+
+                    is WriteOutcome.Rejected -> JSONObject()
+                        .put("sourceKey", sourceKey)
+                        .put("status", "conflict")
+                        .put("currentRevision", outcome.currentRevision)
+
+                    WriteOutcome.NotFound, null -> JSONObject()
+                        .put("sourceKey", sourceKey)
+                        .put("status", "not_found")
+                },
+            )
+        }
+        return json(StatusCode.OK, JSONObject().put("results", results))
+    }
+
+    private fun parsePatch(body: JSONObject): ChannelPatch = ChannelPatch(
+        favorite = body.optBooleanOrNull("favorite"),
+        hidden = body.optBooleanOrNull("hidden"),
+        customName = body.optStringOrNull("customName"),
+        clearCustomName = body.optBoolean("clearCustomName", false),
+        customNumber = body.optIntOrNull("customNumber"),
+        clearCustomNumber = body.optBoolean("clearCustomNumber", false),
+        groupId = body.optLongOrNull("groupId"),
+        clearGroupId = body.optBoolean("clearGroupId", false),
+        sortOrder = body.optIntOrNull("sortOrder"),
+    )
+
+    /** One channel's editable fields; null means "leave unchanged". */
+    data class ChannelPatch(
+        val favorite: Boolean?,
+        val hidden: Boolean?,
+        val customName: String?,
+        val clearCustomName: Boolean,
+        val customNumber: Int?,
+        val clearCustomNumber: Boolean,
+        val groupId: Long?,
+        val clearGroupId: Boolean,
+        val sortOrder: Int?,
+    )
+
+    sealed class WriteOutcome {
+        data class Applied(val newRevision: Long) : WriteOutcome()
+        data class Rejected(val currentRevision: Long) : WriteOutcome()
+        data object NotFound : WriteOutcome()
     }
 
     private fun handlePair(session: IHTTPSession): Response {
@@ -126,6 +244,11 @@ class RemoteEditServer(
      *  endpoint refuses with 401 — the code was wrong/expired/locked out. */
     var pairingHandler: ((code: String, deviceName: String) -> Triple<Long, String, String>?)? = null
 
+    /** REMOTEEDIT-004: revision-guarded write path; absent = writes disabled. */
+    var writeHandler: (
+        (sourceKey: String, expectedRevision: Long, patch: ChannelPatch) -> WriteOutcome?
+    )? = null
+
     private fun handleChannels(session: IHTTPSession): Response {
         val parameters = session.parameters
         val after = parameters["after"]?.firstOrNull()?.trim()?.take(CURSOR_MAX_LENGTH)
@@ -142,6 +265,18 @@ class RemoteEditServer(
                 .put("after", after ?: JSONObject.NULL),
         )
     }
+
+    private fun JSONObject.optBooleanOrNull(name: String): Boolean? =
+        if (has(name) && !isNull(name)) optBoolean(name) else null
+
+    private fun JSONObject.optStringOrNull(name: String): String? =
+        if (has(name) && !isNull(name)) optString(name) else null
+
+    private fun JSONObject.optIntOrNull(name: String): Int? =
+        if (has(name) && !isNull(name)) optInt(name) else null
+
+    private fun JSONObject.optLongOrNull(name: String): Long? =
+        if (has(name) && !isNull(name)) optLong(name) else null
 
     private fun bearerToken(session: IHTTPSession): String? {
         val header = session.headers["authorization"] ?: return null
@@ -177,6 +312,7 @@ class RemoteEditServer(
         BAD_REQUEST(Response.Status.BAD_REQUEST),
         UNAUTHORIZED(Response.Status.UNAUTHORIZED),
         NOT_FOUND(Response.Status.NOT_FOUND),
+        CONFLICT(Response.Status.CONFLICT),
         PAYLOAD_TOO_LARGE(Response.Status.PAYLOAD_TOO_LARGE),
         INTERNAL_ERROR(Response.Status.INTERNAL_ERROR),
     }
@@ -191,8 +327,10 @@ class RemoteEditServer(
         private const val API_PING = "$API_ROOT/ping"
         private const val API_PAIR = "$API_ROOT/pair"
         private const val API_CHANNELS = "$API_ROOT/channels"
+        private const val API_CHANNELS_BATCH = "$API_ROOT/channels/batch"
         private const val API_GROUPS = "$API_ROOT/groups"
         private const val API_SOURCES = "$API_ROOT/sources"
+        private const val MAX_BATCH_OPS = 100
         private const val DEFAULT_PAGE_LIMIT = 100
         private const val MAX_PAGE_LIMIT = 500
         private const val QUERY_MAX_LENGTH = 64
@@ -204,6 +342,8 @@ class RemoteEditServer(
             EndpointProbe(Method.GET, API_PING),
             EndpointProbe(Method.POST, API_PAIR),
             EndpointProbe(Method.GET, API_CHANNELS),
+            EndpointProbe(Method.PATCH, "$API_CHANNELS/{sourceKey}"),
+            EndpointProbe(Method.POST, API_CHANNELS_BATCH),
             EndpointProbe(Method.GET, API_GROUPS),
             EndpointProbe(Method.GET, API_SOURCES),
         )

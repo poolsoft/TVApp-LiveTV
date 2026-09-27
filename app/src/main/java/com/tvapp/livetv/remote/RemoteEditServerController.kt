@@ -13,6 +13,12 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicReference
 
+private typealias PatchHandler = (
+    sourceKey: String,
+    expectedRevision: Long,
+    patch: RemoteEditServer.ChannelPatch,
+) -> RemoteEditServer.WriteOutcome?
+
 /**
  * Owns the singleton [RemoteEditServer] lifecycle on the TV side. The server
  * runs only while the user has enabled it in Settings; start/stop are safe to
@@ -68,6 +74,34 @@ class RemoteEditServerController private constructor(
                 Triple(session.deviceId, session.deviceName, session.tokenPlain)
             }
         }
+        val writeRepository = ChannelRepository(context)
+        server.writeHandler = { sourceKey, expectedRevision, patch ->
+            val outcome = runBlocking(Dispatchers.IO) {
+                writeRepository.remotePatchChannel(
+                    sourceKey = sourceKey,
+                    expectedRevision = expectedRevision,
+                    favorite = patch.favorite,
+                    hidden = patch.hidden,
+                    customName = patch.customName,
+                    clearCustomName = patch.clearCustomName,
+                    customNumber = patch.customNumber,
+                    clearCustomNumber = patch.clearCustomNumber,
+                    groupId = patch.groupId,
+                    clearGroupId = patch.clearGroupId,
+                    sortOrder = patch.sortOrder,
+                )
+            }
+            when (outcome) {
+                is ChannelRepository.RemoteEditResult.Success ->
+                    RemoteEditServer.WriteOutcome.Applied(outcome.newRevision)
+
+                is ChannelRepository.RemoteEditResult.Conflict ->
+                    RemoteEditServer.WriteOutcome.Rejected(outcome.currentRevision)
+
+                ChannelRepository.RemoteEditResult.NotFound ->
+                    RemoteEditServer.WriteOutcome.NotFound
+            }
+        }
         return try {
             server.startServer()
             serverRef.set(server)
@@ -115,6 +149,9 @@ class RemoteEditServerController private constructor(
                     .filter { query == null || it.displayName.contains(query, ignoreCase = true) }
                     .take(limit)
                     .forEach { channel ->
+                        val revision = runBlocking(Dispatchers.IO) {
+                            channelDao.revisionOf(channel.sourceKey)
+                        } ?: 0L
                         put(
                             JSONObject()
                                 .put("sourceKey", channel.sourceKey)
@@ -123,6 +160,7 @@ class RemoteEditServerController private constructor(
                                 .put("source", channel.source.name)
                                 .put("favorite", channel.favorite)
                                 .put("hidden", channel.hidden)
+                                .put("revision", revision)
                                 .put("groupId", channel.groupId ?: JSONObject.NULL)
                                 .put(
                                     "iptvContentType",

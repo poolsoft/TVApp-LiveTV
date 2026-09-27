@@ -18,8 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvProgramEntity::class,
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
+        PairedDeviceEntity::class,
     ],
-    version = 24,
+    version = 25,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class TVAppDatabase : RoomDatabase() {
     abstract fun iptvDao(): IptvDao
     abstract fun xmlTvDao(): XmlTvDao
     abstract fun xtreamEpgDao(): XtreamEpgDao
+    abstract fun pairedDeviceDao(): PairedDeviceDao
 
     companion object {
         @Volatile
@@ -61,6 +63,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_21_22,
                 MIGRATION_22_23,
                 MIGRATION_23_24,
+                MIGRATION_24_25,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
@@ -408,6 +411,32 @@ abstract class TVAppDatabase : RoomDatabase() {
                         "COALESCE(`groupTitle`, '') FROM `iptv_channels`",
                 )
                 createIptvSearchTriggers(db)
+            }
+        }
+
+        internal val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // REMOTEEDIT Sprint R2: per-row edit revision for conflict-aware
+                // remote edits and the paired-device registry. Non-destructive:
+                // existing user data is preserved; new columns default to 0/empty.
+                db.execSQL(
+                    "ALTER TABLE `user_channels` " +
+                        "ADD COLUMN `revision` INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `paired_devices` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`deviceName` TEXT NOT NULL, " +
+                        "`pairedAt` INTEGER NOT NULL, " +
+                        "`lastSeenAt` INTEGER NOT NULL, " +
+                        "`tokenHash` TEXT NOT NULL" +
+                        ")",
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                        "`index_paired_devices_tokenHash` ON `paired_devices` (`tokenHash`)" +
+                        "",
+                )
             }
         }
 

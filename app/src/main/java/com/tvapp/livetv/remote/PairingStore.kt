@@ -42,6 +42,10 @@ class PairingStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
+    /** REMOTEEDIT-002: device registry moved to Room (paired_devices, DB v25). */
+    private val deviceDao =
+        com.tvapp.livetv.data.local.TVAppDatabase.getInstance(context).pairedDeviceDao()
+
     private val random = SecureRandom()
     private val failedAttempts = AtomicInteger(0)
 
@@ -104,49 +108,45 @@ class PairingStore(context: Context) {
     @Synchronized
     fun registerDevice(deviceName: String, now: Long = System.currentTimeMillis()): Session {
         val token = generateToken()
-        val id = preferences.getLong(KEY_NEXT_ID, 1L)
-        preferences.edit()
-            .putLong(KEY_NEXT_ID, id + 1)
-            .putString(tokenHashKey(token), "$id|$deviceName|$now|$now")
-            .apply()
+        val id = runBlockingIo {
+            deviceDao.insert(
+                com.tvapp.livetv.data.local.PairedDeviceEntity(
+                    deviceName = deviceName,
+                    pairedAt = now,
+                    lastSeenAt = now,
+                    tokenHash = sha256Hex(token),
+                ),
+            )
+        }
         return Session(deviceId = id, deviceName = deviceName, tokenPlain = token)
     }
 
     @Synchronized
-    fun devices(now: Long = System.currentTimeMillis()): List<DeviceInfo> = preferences.all.entries
-        .filter { it.key.startsWith(HASH_PREFIX) }
-        .mapNotNull { entry ->
-            val parts = (entry.value as? String)?.split('|') ?: return@mapNotNull null
-            if (parts.size < 4) return@mapNotNull null
+    fun devices(now: Long = System.currentTimeMillis()): List<DeviceInfo> = runBlockingIo {
+        deviceDao.devices().map { row ->
             DeviceInfo(
-                id = parts[0].toLongOrNull() ?: return@mapNotNull null,
-                deviceName = parts[1],
-                pairedAt = parts[2].toLongOrNull() ?: return@mapNotNull null,
-                lastSeenAt = parts[3].toLongOrNull() ?: return@mapNotNull null,
+                id = row.id,
+                deviceName = row.deviceName,
+                pairedAt = row.pairedAt,
+                lastSeenAt = row.lastSeenAt,
             )
         }
-        .sortedBy(DeviceInfo::id)
+    }
 
     @Synchronized
-    fun removeDevice(deviceId: Long): Boolean {
-        val key = preferences.all.entries.firstOrNull { entry ->
-            entry.key.startsWith(HASH_PREFIX) &&
-                (entry.value as? String)?.startsWith("$deviceId|") == true
-        }?.key ?: return false
-        preferences.edit().remove(key).apply()
-        return true
+    fun removeDevice(deviceId: Long): Boolean = runBlockingIo {
+        deviceDao.delete(deviceId) > 0
     }
 
     /** Returns true and refreshes lastSeenAt when the bearer token is valid. */
     @Synchronized
     fun authorize(token: String, now: Long = System.currentTimeMillis()): Boolean {
         if (token.isBlank()) return false
-        val hash = tokenHashKey(token)
-        val stored = preferences.getString(hash, null) ?: return false
-        val parts = stored.split('|')
-        if (parts.size < 4) return false
-        preferences.edit().putString(hash, "${parts[0]}|${parts[1]}|${parts[2]}|$now").apply()
-        return true
+        return runBlockingIo {
+            val row = deviceDao.byTokenHash(sha256Hex(token)) ?: return@runBlockingIo false
+            deviceDao.touch(row.tokenHash, now)
+            true
+        }
     }
 
     private fun generateToken(): String {
@@ -154,9 +154,6 @@ class PairingStore(context: Context) {
         random.nextBytes(bytes)
         return bytes.joinToString(separator = "") { String.format(Locale.US, "%02x", it) }
     }
-
-    private fun tokenHashKey(token: String): String =
-        HASH_PREFIX + sha256Hex(token)
 
     private fun constantTimeEquals(expected: String, submitted: String): Boolean =
         MessageDigest.isEqual(
@@ -172,11 +169,14 @@ class PairingStore(context: Context) {
         private const val KEY_CODE = "pairing_code"
         private const val KEY_CODE_EXPIRES_AT = "pairing_code_expires_at"
         private const val KEY_LOCKED_UNTIL = "pairing_locked_until"
-        private const val KEY_NEXT_ID = "next_device_id"
-        private const val HASH_PREFIX = "token_hash_"
 
         internal fun sha256Hex(value: String): String =
             MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
                 .joinToString(separator = "") { String.format(Locale.US, "%02x", it) }
     }
 }
+
+/** Blocking bridge for DAO calls from the synchronized pairing paths; the
+ *  server already runs on NanoHTTPD worker threads, never the main thread. */
+private inline fun <T> runBlockingIo(crossinline block: suspend () -> T): T =
+    kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { block() }
