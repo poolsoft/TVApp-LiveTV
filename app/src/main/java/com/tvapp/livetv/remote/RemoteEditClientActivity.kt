@@ -304,6 +304,7 @@ class RemoteEditClientActivity : AppCompatActivity() {
             text = buildString {
                 append(kindLabel).append(" · ").append(row.name)
                 append('\n')
+                if (row.location.isNotBlank()) append(row.location).append('\n')
                 append(summary)
                 if (!row.error.isNullOrBlank()) {
                     append('\n')
@@ -349,6 +350,7 @@ class RemoteEditClientActivity : AppCompatActivity() {
             hint = getString(R.string.remote_edit_client_url_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setSingleLine()
+            setText(row.location)
         }
         AlertDialog.Builder(this)
             .setTitle(R.string.remote_edit_client_change_url)
@@ -360,15 +362,20 @@ class RemoteEditClientActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 lifecycleScope.launch {
-                    // Address change = refresh with the new URL (the TV
-                    // re-imports in place through the same pipeline).
+                    // Address change applies the new URL to the existing
+                    // source and re-imports it in place (no duplicate source).
                     val result = withContext(Dispatchers.IO) {
-                        client.queueImport(row.name, url, row.kind)
+                        client.updateSourceUrl(row.kind, row.id, url)
                     }
-                    result.onSuccess {
-                        toast(R.string.remote_edit_client_import_queued)
-                        refreshAll()
-                    }.onFailure { toast(R.string.remote_edit_client_error) }
+                    when (result) {
+                        is RemoteEditClient.MutationResult.Applied -> {
+                            toast(R.string.remote_edit_client_import_queued)
+                            refreshAll()
+                        }
+
+                        is RemoteEditClient.MutationResult.Failed ->
+                            toast(R.string.remote_edit_client_error)
+                    }
                 }
             }
             .setNegativeButton(R.string.cancel, null)

@@ -5,6 +5,12 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Web Panosu Kaynak Yönetimi Yeniden Düzenlendi (IPTV ≠ XMLTV)
+* **IPTV listeleri ve XMLTV EPG kaynakları ayrı kartlara ayrıldı:** İki farklı şey tek listede kanal gibi listeleniyordu. Artık "IPTV Listeleri" ve "XMLTV EPG Kaynakları" ayrı tablolar: IPTV'de kanal/seçili sayısı + kanal seçimi, XMLTV'de kanal sayısı; her kartın kendi ekleme butonu var.
+* **Adresler artık görünüyor:** Kaynak satırlarında adres sütunu var (URL kaynaklarında tam adres, taşma durumunda başlıkta gösterilir); `GET /api/v1/sources` yanıtı da `location` alanı taşıyor (IPTV kullanıcı adı/şifresi asla dahil edilmez).
+* **"Adres" güncellemesi gerçekten çalışıyor (bug fix):** Web/telefon "Adres" diyaloğu yeni adresi `sources/refresh` gövdesine koyuyordu ama sunucu `url` alanını yok sayıp eski adresi yeniden indiriyordu — adres değişmiyor, üstelik telefonda yeni import açtığı için mükerrer kaynak oluşuyordu. Yeni `POST /api/v1/sources/update` ucu gerçek adres değişikliğini uygular ve kaynağı yerinde yeniden aktarır (TV OSD ilerlemesiyle). Web paneli, telefondaki "Adres değiştir" akışı ve client kitaplığı bu uca bağlandı.
+* **Diyaloglar ortalanmış modal:** Ekleme/adres güncelleme, kanal seçimi ve kanal düzenleyici artık sayfanın altına değil, koyu zeminli ortalanmış modal pencere olarak açılır (zemin tıklaması kapatır).
+* **Test:** testLocal/testPaid + üç flavor derlemesi geçti; cihazda web akışı ve adres güncellemesi doğrulaması kullanıcıya ait.
 ### Web Panosu Veri Akışı Düzeltmesi + TV'de Canlı Aktarım OSD'si
 * **Kaynaklar/Gruplar webde hiç gelmiyordu (kök neden):** `/api/v1/sources` ve `/api/v1/groups` uçları çıplak JSON array döndürüyordu; web panosu ve telefon client ise `{sources:[...]}` / `{groups:[...]}` sarmalayıcısı bekliyordu — iki taraf da parse edemediği için liste boş görünüyordu. Sarmalayıcı şekli sunucuya eklendi; telefondaki kaynak listesi de aynı sebeple düzeldi.
 * **TV'de canlı aktarım kartı:** Web panosundan/telefondan eklenen IPTV/XMLTV aktarımı TV'de oynatma ekranının sağ üstünde küçük bir OSD kartıyla canlı görünür (ad + tür, aşama/kanal sayısı); koşan aktarım kart üzerinden İptal edilebilir, bitişte kart birkaç saniye sonra kendiliğinden kapanır. Kart `Application.ActivityLifecycleCallbacks` ile en üstteki activity'ye eklenir; oynatma ve diğer OSD'lere odak çalmaz.

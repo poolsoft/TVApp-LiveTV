@@ -22,6 +22,7 @@ class RemoteEditClient(
         val kind: String,
         val id: Long,
         val name: String,
+        val location: String,
         val channelCount: Int,
         val selectedCount: Int?,
         val urlKind: Boolean,
@@ -92,6 +93,7 @@ class RemoteEditClient(
                     kind = item.optString("kind"),
                     id = item.optLong("id"),
                     name = item.optString("name"),
+                    location = item.optString("location"),
                     channelCount = item.optInt("channelCount"),
                     selectedCount = if (item.isNull("selectedCount")) null else item.optInt("selectedCount"),
                     urlKind = item.optBoolean("urlKind", false),
@@ -140,14 +142,25 @@ class RemoteEditClient(
 
     /** Deletes one source together with its channels/programs. */
     fun deleteSource(kind: String, id: Long): MutationResult =
-        postSourceMutation("delete", kind, id)
+        postSourceMutation("delete", kind, id, null)
 
     /** Re-downloads an existing URL-kind source in place. */
     fun refreshSource(kind: String, id: Long): MutationResult =
-        postSourceMutation("refresh", kind, id)
+        postSourceMutation("refresh", kind, id, null)
 
-    private fun postSourceMutation(operation: String, kind: String, id: Long): MutationResult = runCatching {
+    /** Applies a new playlist/EPG address to an existing source and re-imports
+     *  it in place on the TV (the web panel's "Adres" flow). */
+    fun updateSourceUrl(kind: String, id: Long, url: String): MutationResult =
+        postSourceMutation("update", kind, id, url)
+
+    private fun postSourceMutation(
+        operation: String,
+        kind: String,
+        id: Long,
+        url: String?,
+    ): MutationResult = runCatching {
         val payload = JSONObject().put("kind", kind).put("id", id)
+        if (!url.isNullOrBlank()) payload.put("url", url)
         val request = Request.Builder()
             .url(normalizeAddress(store.address()) + "/api/v1/sources/$operation")
             .header("Authorization", "Bearer ${store.token()}")

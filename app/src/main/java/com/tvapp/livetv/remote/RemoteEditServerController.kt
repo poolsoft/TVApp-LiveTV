@@ -124,12 +124,15 @@ class RemoteEditServerController private constructor(
         server.importQueueCancelHandler = { id -> importQueue.cancel(id) }
         // REMOTEEDIT OSD: the TV surfaces live import progress from the queue.
         RemoteImportOverlayController.bind(context, importQueue)
-        // Source management: delete / refresh / selection via RemoteSourceService.
+        // Source management: delete / refresh / update / selection via
+        // RemoteSourceService. Update applies the new address and re-imports
+        // through the queue so the TV OSD shows live progress.
         val sourceService = RemoteSourceService(context)
-        server.sourceMutationHandler = { kind, id, operation ->
+        server.sourceMutationHandler = { kind, id, operation, url ->
             val updated = when (operation) {
                 RemoteEditServer.OP_DELETE -> sourceService.deleteSource(kind, id)
                 RemoteEditServer.OP_REFRESH -> sourceService.refreshSource(kind, id)
+                RemoteEditServer.OP_UPDATE -> sourceService.updateSource(kind, id, url)
                 else -> false
             }
             if (updated) server.bumpDataVersion()

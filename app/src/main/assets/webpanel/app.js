@@ -205,6 +205,9 @@
   }
 
   /* ---------- Source management (primary workflow) ---------- */
+  /* IPTV lists and XMLTV EPG sources are different things and render as
+   * separate cards; each row shows its address, and every mutation opens as
+   * a centered modal dialog. */
 
   function loadSources() {
     return api("/api/v1/sources").then(function (json) {
@@ -214,37 +217,59 @@
   }
 
   function renderSources() {
-    var tbody = $("sourceRows");
+    renderSourceTable("iptvRows", "iptv", 6);
+    renderSourceTable("xmltvRows", "xmltv", 5);
+  }
+
+  function renderSourceTable(tbodyId, kind, emptyColSpan) {
+    var tbody = $(tbodyId);
     tbody.innerHTML = "";
-    if (!state.sources.length) {
+    var rows = state.sources.filter(function (source) { return source.kind === kind; });
+    if (!rows.length) {
       var empty = document.createElement("tr");
       var td = document.createElement("td");
-      td.colSpan = 6;
+      td.colSpan = emptyColSpan;
       td.className = "muted";
-      td.textContent = "Henüz kaynak yok. Aşağıdan IPTV listesi veya XMLTV EPG ekleyin.";
+      td.textContent = kind === "xmltv"
+        ? "XMLTV EPG kaynağı yok. Aşağıdaki butondan ekleyin."
+        : "IPTV listesi yok. Aşağıdaki butondan ekleyin.";
       empty.appendChild(td);
       tbody.appendChild(empty);
       return;
     }
-    state.sources.forEach(function (source) {
+    rows.forEach(function (source) {
       var tr = document.createElement("tr");
-
-      var kind = document.createElement("td");
-      kind.className = "col-src";
-      var tag = document.createElement("span");
-      tag.className = "src " + (source.kind === "xmltv" ? "src-epg" : "");
-      tag.textContent = source.kind === "xmltv" ? "XMLTV" : "IPTV";
-      kind.appendChild(tag);
 
       var name = document.createElement("td");
       name.className = "name";
       name.textContent = source.name;
 
+      var address = document.createElement("td");
+      address.className = "col-address";
+      if (source.urlKind && source.location) {
+        var link = document.createElement("span");
+        link.className = "addr";
+        link.textContent = source.location;
+        link.title = source.location;
+        address.appendChild(link);
+      } else {
+        address.textContent = source.location || "—";
+      }
+
+      tr.appendChild(name);
+      tr.appendChild(address);
+
       var counts = document.createElement("td");
       counts.className = "col-num";
-      counts.textContent = source.kind === "xmltv"
-        ? (source.channelCount + " kanal")
-        : (source.channelCount + " / " + (source.selectedCount || 0) + " seçili");
+      counts.textContent = String(source.channelCount);
+      tr.appendChild(counts);
+
+      if (kind === "iptv") {
+        var selected = document.createElement("td");
+        selected.className = "col-num";
+        selected.textContent = String(source.selectedCount || 0);
+        tr.appendChild(selected);
+      }
 
       var state2 = document.createElement("td");
       state2.className = "col-flags";
@@ -257,24 +282,19 @@
       } else {
         state2.textContent = "—";
       }
+      tr.appendChild(state2);
 
       var actions = document.createElement("td");
       actions.className = "col-actions";
 
-      if (source.kind === "iptv") {
-        var pick = actionButton("Kanal seç", function () { openSelectionPicker(source); });
-        actions.appendChild(pick);
+      if (kind === "iptv") {
+        actions.appendChild(actionButton("Kanal seç", function () { openSelectionPicker(source); }));
       }
       if (source.urlKind) {
         actions.appendChild(actionButton("Yenile", function () { mutateSource("refresh", source); }));
         actions.appendChild(actionButton("Adres", function () { changeSourceUrl(source); }));
       }
       actions.appendChild(actionButton("Sil", function () { deleteSource(source); }));
-
-      tr.appendChild(kind);
-      tr.appendChild(name);
-      tr.appendChild(counts);
-      tr.appendChild(state2);
       tr.appendChild(actions);
       tbody.appendChild(tr);
     });
@@ -309,9 +329,12 @@
     }).then(refresh).catch(function (error) { alert(error.message); });
   }
 
+  /* Real address update: POST /sources/update applies the new URL and
+   * re-imports through the queue (TV shows the live OSD progress). */
   function changeSourceUrl(source) {
     var urlInput = document.createElement("input");
     urlInput.placeholder = "http://… yeni adres";
+    urlInput.value = source.location || "";
     urlInput.style.width = "100%";
     var overlay = simpleDialog(
       source.kind === "xmltv" ? "XMLTV adresini güncelle" : "IPTV adresini güncelle",
@@ -319,7 +342,8 @@
       function () {
         var url = urlInput.value.trim();
         if (!/^https?:\/\//.test(url)) { alert("http(s) adresi gerekli."); return false; }
-        api("/api/v1/sources/refresh", {
+        if (url === source.location) { return true; }
+        api("/api/v1/sources/update", {
           method: "POST",
           bodyJson: { kind: source.kind, id: source.id, url: url },
         }).then(function () {
@@ -329,7 +353,7 @@
         return true;
       }
     );
-    $("app").appendChild(overlay);
+    openModal(overlay);
   }
 
   function addSource(kind) {
@@ -355,12 +379,23 @@
         return true;
       }
     );
-    $("app").appendChild(overlay);
+    openModal(overlay);
+  }
+
+  /* Centered modal: dark backdrop, dialog on top, backdrop click cancels. */
+  function openModal(dialogCard) {
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.appendChild(dialogCard);
+    backdrop.addEventListener("click", function (event) {
+      if (event.target === backdrop) backdrop.remove();
+    });
+    document.body.appendChild(backdrop);
   }
 
   function simpleDialog(title, fields, onSave) {
     var overlay = document.createElement("div");
-    overlay.className = "card";
+    overlay.className = "card modal-card";
     overlay.innerHTML = "<h2>" + escapeHtml(title) + "</h2>";
     var wrap = document.createElement("div");
     wrap.className = "edit-grid";
@@ -379,9 +414,14 @@
     cancel.textContent = "Vazgeç";
     actions.appendChild(save); actions.appendChild(cancel);
     overlay.appendChild(actions);
-    cancel.addEventListener("click", function () { overlay.remove(); });
+    cancel.addEventListener("click", function () {
+      overlay.closest(".modal-backdrop").remove();
+    });
     save.addEventListener("click", function () {
-      if (onSave() !== false) overlay.remove();
+      if (onSave() !== false) {
+        var backdrop = overlay.closest(".modal-backdrop");
+        if (backdrop) backdrop.remove();
+      }
     });
     return overlay;
   }
@@ -406,7 +446,7 @@
       "</div>" +
       '<div class="table-wrap"><table class="picker-table"><tbody id="pickRows"></tbody></table></div>' +
       '<p class="hint" id="pickInfo">Yükleniyor…</p>';
-    $("app").appendChild(overlay);
+    openModal(overlay);
 
     var anchor = null;
     var currentQuery = "";
@@ -524,7 +564,8 @@
     overlay.querySelector("#pickAddPage").addEventListener("click", function () { batchPage(false); });
     overlay.querySelector("#pickRemovePage").addEventListener("click", function () { batchPage(true); });
     overlay.querySelector("#pickDone").addEventListener("click", function () {
-      overlay.remove();
+      var backdrop = overlay.closest(".modal-backdrop");
+      if (backdrop) backdrop.remove(); else overlay.remove();
       loadSources();
       refresh();
     });
@@ -608,7 +649,7 @@
       '<button id="eClearName">Adı sıfırla</button>' +
       '<button id="eCancel">Vazgeç</button>' +
       "</div>";
-    $("app").appendChild(overlay);
+    openModal(overlay);
 
     api("/api/v1/groups").then(function (json) {
       var select = overlay.querySelector("#eGroup");
@@ -625,7 +666,10 @@
       });
     }).catch(function () { /* groups optional */ });
 
-    overlay.querySelector("#eCancel").addEventListener("click", function () { overlay.remove(); });
+    overlay.querySelector("#eCancel").addEventListener("click", function () {
+      var backdrop = overlay.closest(".modal-backdrop");
+      if (backdrop) backdrop.remove(); else overlay.remove();
+    });
     overlay.querySelector("#eSave").addEventListener("click", function () {
       var patch = { revision: full.revision };
       var name = overlay.querySelector("#eName").value.trim();
@@ -639,14 +683,22 @@
       api("/api/v1/channels/" + encodeURIComponent(full.sourceKey), {
         method: "PATCH",
         bodyJson: patch,
-      }).then(function () { overlay.remove(); return refresh(); })
+      }).then(function () {
+        var backdrop = overlay.closest(".modal-backdrop");
+        if (backdrop) backdrop.remove(); else overlay.remove();
+        return refresh();
+      })
         .catch(function (error) { alert(error.message); });
     });
     overlay.querySelector("#eClearName").addEventListener("click", function () {
       api("/api/v1/channels/" + encodeURIComponent(full.sourceKey), {
         method: "PATCH",
         bodyJson: { revision: full.revision, clearCustomName: true },
-      }).then(function () { overlay.remove(); return refresh(); })
+      }).then(function () {
+        var backdrop = overlay.closest(".modal-backdrop");
+        if (backdrop) backdrop.remove(); else overlay.remove();
+        return refresh();
+      })
         .catch(function (error) { alert(error.message); });
     });
   }

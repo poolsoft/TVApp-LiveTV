@@ -126,6 +126,20 @@ td.muted { color: var(--muted); }
 .picker-toolbar input { flex: 1; min-width: 160px; }
 .picker-toolbar select { flex: 0 1 220px; }
 .picker-batch { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* Centered modal dialogs: dark backdrop, card pinned above the page flow. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-card { min-width: 340px; max-width: min(560px, 92vw); max-height: 85vh; overflow: auto; }
+.col-address { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-address .addr { cursor: default; color: #7fb2ff; }
 .picker-table td { white-space: normal; }
 .pick-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .pick-row input { width: 18px; height: 18px; }

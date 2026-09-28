@@ -186,6 +186,9 @@ class RemoteEditServer(
             method == Method.POST && uri == API_SOURCES + "/refresh" ->
                 handleSourceMutation(session, OP_REFRESH)
 
+            method == Method.POST && uri == API_SOURCES + "/update" ->
+                handleSourceMutation(session, OP_UPDATE)
+
             else -> json(
                 StatusCode.NOT_FOUND,
                 error("not_found", "Bu sürümde bulunmayan uç nokta."),
@@ -434,14 +437,19 @@ class RemoteEditServer(
         .put("importedChannels", request.importedChannels)
         .put("error", request.error ?: JSONObject.NULL)
 
-    /** Source delete/refresh; body {kind, id}. A missing handler or unknown
-     *  source answers 404; the outcome never echoes URLs. */
+    /** Source delete/refresh/update; body {kind, id} plus {url} for update.
+     *  A missing handler or unknown source answers 404; the outcome never
+     *  echoes URLs. */
     private fun handleSourceMutation(session: IHTTPSession, operation: String): Response {
         val body = readBody(session)
         val kind = body.optString("kind").trim()
         val id = body.optLong("id", -1L)
+        val url = body.optString("url").trim()
         if (kind.isBlank() || id <= 0) {
             throw BadRequestException("kind ve id gerekli.")
+        }
+        if (operation == OP_UPDATE && !url.startsWith("http://") && !url.startsWith("https://")) {
+            throw BadRequestException("Güncelleme için http(s) adresi gerekli.")
         }
         val handler = sourceMutationHandler
             ?: return json(
@@ -449,7 +457,7 @@ class RemoteEditServer(
                 error("sources_unsupported", "Bu sunucu kaynak yönetimini desteklemiyor."),
             )
         val updated = try {
-            handler(kind, id, operation)
+            handler(kind, id, operation, url)
         } catch (error: IllegalArgumentException) {
             throw BadRequestException(error.message ?: "Geçersiz kaynak isteği.")
         }
@@ -489,8 +497,9 @@ class RemoteEditServer(
     var importQueueListHandler: (() -> List<RemoteImportQueue.Request>)? = null
     var importQueueCancelHandler: ((id: Long) -> Boolean)? = null
 
-    /** Source delete/refresh hook: (kind, id, operation) -> Boolean. */
-    var sourceMutationHandler: ((kind: String, id: Long, operation: String) -> Boolean)? = null
+    /** Source delete/refresh/update hook: (kind, id, operation, url) -> Boolean.
+     *  url is only meaningful for update (the new playlist/EPG address). */
+    var sourceMutationHandler: ((kind: String, id: Long, operation: String, url: String) -> Boolean)? = null
 
     /** REMOTEEDIT-005: long-poll until the data version moves or the wait
      *  elapses. NanoHTTPD worker threads tolerate the blocking sleep; clients
@@ -618,6 +627,7 @@ class RemoteEditServer(
         private const val DEVICE_NAME_MAX_LENGTH = 64
         internal const val OP_DELETE = "delete"
         internal const val OP_REFRESH = "refresh"
+        internal const val OP_UPDATE = "update"
 
         /** Routes exposed for tests without starting a socket. */
         internal val ROUTES = listOf(
@@ -638,6 +648,7 @@ class RemoteEditServer(
             EndpointProbe(Method.GET, API_SOURCES),
             EndpointProbe(Method.POST, "$API_SOURCES/delete"),
             EndpointProbe(Method.POST, "$API_SOURCES/refresh"),
+            EndpointProbe(Method.POST, "$API_SOURCES/update"),
             EndpointProbe(Method.POST, "$API_SOURCES/selection/{id}"),
             EndpointProbe(Method.GET, API_XMLTV_CATALOG),
         )

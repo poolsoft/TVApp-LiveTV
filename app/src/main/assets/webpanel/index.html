@@ -2,8 +2,9 @@
 <!--
   TVApp REMOTEEDIT-008: embedded management panel. Served by the TV app's
   LAN-only server from APK assets; vanilla JS + fetch, no dependencies.
-  Source management sprint: the Sources card is the primary workflow
-  (add/update/delete/refresh IPTV + XMLTV, per-source channel picker).
+  Source management sprint: IPTV lists and XMLTV EPG sources are separate
+  cards (they are different things), each row shows its address, and every
+  mutation opens as a centered modal dialog.
 -->
 <html lang="tr">
 <head>
@@ -28,24 +29,45 @@
   </section>
 
   <section id="mainView" class="hidden">
-    <div id="sourcesCard" class="card">
-      <h2>Kaynaklar</h2>
+    <div id="iptvCard" class="card">
+      <h2>IPTV Listeleri</h2>
       <div class="table-wrap">
-        <table id="sources">
+        <table id="iptvSources">
           <thead>
             <tr>
-              <th class="col-src">Tür</th>
               <th>Ad</th>
+              <th>Adres</th>
+              <th class="col-num">Kanal</th>
+              <th class="col-num">Seçili</th>
+              <th class="col-flags">Durum</th>
+              <th class="col-actions">İşlemler</th>
+            </tr>
+          </thead>
+          <tbody id="iptvRows"></tbody>
+        </table>
+      </div>
+      <div class="toolbar">
+        <button id="addSourceBtn">+ IPTV listesi ekle</button>
+      </div>
+    </div>
+
+    <div id="xmltvCard" class="card">
+      <h2>XMLTV EPG Kaynakları</h2>
+      <div class="table-wrap">
+        <table id="xmltvSources">
+          <thead>
+            <tr>
+              <th>Ad</th>
+              <th>Adres</th>
               <th class="col-num">Kanal</th>
               <th class="col-flags">Durum</th>
               <th class="col-actions">İşlemler</th>
             </tr>
           </thead>
-          <tbody id="sourceRows"></tbody>
+          <tbody id="xmltvRows"></tbody>
         </table>
       </div>
       <div class="toolbar">
-        <button id="addSourceBtn">+ IPTV listesi ekle</button>
         <button id="addXmltvBtn">+ XMLTV EPG ekle</button>
       </div>
     </div>

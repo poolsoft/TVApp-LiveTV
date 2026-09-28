@@ -24,7 +24,9 @@ class RemoteSourceService(context: Context) {
     private val xmlTvRepository = XmlTvRepository(appContext)
     private val iptvDao = TVAppDatabase.getInstance(appContext).iptvDao()
 
-    /** All IPTV + XMLTV sources as the wire shape clients render. */
+    /** All IPTV + XMLTV sources as the wire shape clients render. The
+     *  location is the playlist/EPG address (or file path); IPTV credentials
+     *  live in separate columns and are never included. */
     fun sources(): JSONArray = JSONArray().apply {
         runBlocking(Dispatchers.IO) {
             iptvRepository.sources().forEach { summary ->
@@ -33,6 +35,7 @@ class RemoteSourceService(context: Context) {
                         .put("kind", "iptv")
                         .put("id", summary.source.id)
                         .put("name", summary.source.name)
+                        .put("location", summary.source.location)
                         .put("urlKind", summary.source.kind == IptvRepository.KIND_URL || summary.source.kind == IptvRepository.KIND_XTREAM)
                         .put("channelCount", summary.channelCount)
                         .put("selectedCount", summary.selectedChannelCount)
@@ -45,6 +48,7 @@ class RemoteSourceService(context: Context) {
                         .put("kind", "xmltv")
                         .put("id", summary.source.id)
                         .put("name", summary.source.name)
+                        .put("location", summary.source.location)
                         .put("urlKind", summary.source.kind == XmlTvRepository.KIND_URL)
                         .put("channelCount", summary.channelCount)
                         .put("selectedCount", JSONObject.NULL)
