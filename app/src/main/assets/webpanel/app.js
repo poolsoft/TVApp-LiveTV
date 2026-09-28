@@ -388,15 +388,21 @@
 
   /* Channel picker ("kanal seçme"): paged catalog for one IPTV source with
    * checkboxes; every change is sent as a small delta to the selection API so
-   * huge catalogs never travel as one payload. */
+   * huge catalogs never travel as one payload. Category filter + page-batch
+   * add/remove make whole groups manageable. */
   function openSelectionPicker(source) {
     var overlay = document.createElement("div");
     overlay.className = "card picker-card";
     overlay.innerHTML =
       "<h2>Kanal seç: " + escapeHtml(source.name) + "</h2>" +
       '<div class="picker-toolbar">' +
+      '<select id="pickCategory"><option value="">Tüm kategoriler</option></select>' +
       '<input id="pickSearch" placeholder="Kanal ara…" autocomplete="off">' +
       '<button id="pickDone">Bitti</button>' +
+      "</div>" +
+      '<div class="picker-batch">' +
+      '<button id="pickAddPage">Bu sayfayı ekle</button>' +
+      '<button id="pickRemovePage">Bu sayfayı çıkar</button>' +
       "</div>" +
       '<div class="table-wrap"><table class="picker-table"><tbody id="pickRows"></tbody></table></div>' +
       '<p class="hint" id="pickInfo">Yükleniyor…</p>';
@@ -404,8 +410,10 @@
 
     var anchor = null;
     var currentQuery = "";
+    var currentCategory = "";
     var loadedCount = 0;
     var selectedTotal = source.selectedCount || 0;
+    var pageKeys = [];
 
     function pickerApi(params) {
       var query = "/api/v1/channels?limit=200&sourceId=" + encodeURIComponent(source.id) + params;
@@ -413,22 +421,32 @@
     }
 
     function loadPickerPage(reset) {
-      if (reset) { anchor = null; loadedCount = 0; }
+      if (reset) { anchor = null; loadedCount = 0; pageKeys = []; }
       var suffix = "";
       if (!reset && anchor) suffix = "&after=" + encodeURIComponent(anchor);
       if (currentQuery) suffix += "&q=" + encodeURIComponent(currentQuery);
+      if (currentCategory) suffix += "&category=" + encodeURIComponent(currentCategory);
       pickerApi(suffix).then(function (json) {
         var page = json.channels || [];
         if (reset) $("pickRows").innerHTML = "";
         if (page.length) anchor = page[page.length - 1].sourceKey;
         loadedCount += page.length;
-        page.forEach(function (row) { appendPickerRow(row); });
+        page.forEach(function (row) {
+          pageKeys.push(row.sourceKey);
+          appendPickerRow(row);
+        });
         $("pickInfo").textContent = loadedCount + " kanal gösteriliyor · " +
           selectedTotal + " seçili · aşağı kaydırınca devam yüklenir";
-        if (!page.length && !currentQuery) $("pickInfo").textContent = "Bu kaynakta kanal yok.";
+        if (!page.length && !currentQuery && !currentCategory) {
+          $("pickInfo").textContent = "Bu kaynakta kanal yok.";
+        }
       }).catch(function (error) {
         $("pickInfo").textContent = "Hata: " + error.message;
       });
+    }
+
+    function sendSelectionDelta(body) {
+      return api("/api/v1/sources/selection/" + source.id, { method: "POST", bodyJson: body });
     }
 
     function appendPickerRow(row) {
@@ -443,11 +461,8 @@
         var body = {};
         if (box.checked) { body.add = [row.sourceKey]; selectedTotal++; }
         else { body.remove = [row.sourceKey]; selectedTotal--; }
-        api("/api/v1/sources/selection/" + source.id, { method: "POST", bodyJson: body })
-          .then(function () {
-            $("pickInfo").textContent = loadedCount + " kanal gösteriliyor · " +
-              selectedTotal + " seçili · aşağı kaydırınca devam yüklenir";
-          })
+        sendSelectionDelta(body)
+          .then(updatePickInfo)
           .catch(function (error) {
             box.checked = !box.checked;
             alert(error.message);
@@ -462,6 +477,43 @@
       $("pickRows").appendChild(tr);
     }
 
+    function updatePickInfo() {
+      $("pickInfo").textContent = loadedCount + " kanal gösteriliyor · " +
+        selectedTotal + " seçili · aşağı kaydırınca devam yüklenir";
+    }
+
+    /* Page-batch: one delta request for every key loaded so far. */
+    function batchPage(remove) {
+      if (!pageKeys.length) return;
+      var body = remove ? { remove: pageKeys } : { add: pageKeys };
+      selectedTotal += remove ? -pageKeys.length : pageKeys.length;
+      sendSelectionDelta(body).then(function () {
+        var boxes = $("pickRows").querySelectorAll("input[type=checkbox]");
+        for (var index = 0; index < boxes.length; index++) boxes[index].checked = !remove;
+        updatePickInfo();
+      }).catch(function (error) {
+        selectedTotal += remove ? pageKeys.length : -pageKeys.length;
+        alert(error.message);
+      });
+    }
+
+    function loadCategories() {
+      api("/api/v1/sources/categories?sourceId=" + encodeURIComponent(source.id))
+        .then(function (json) {
+          var select = overlay.querySelector("#pickCategory");
+          (json.categories || []).forEach(function (category) {
+            var option = document.createElement("option");
+            option.value = category;
+            option.textContent = category;
+            select.appendChild(option);
+          });
+        }).catch(function () { /* categories optional */ });
+    }
+
+    overlay.querySelector("#pickCategory").addEventListener("change", function (event) {
+      currentCategory = event.target.value;
+      loadPickerPage(true);
+    });
     overlay.querySelector("#pickSearch").addEventListener("input", function (event) {
       clearTimeout(openSelectionPicker.timer);
       openSelectionPicker.timer = setTimeout(function () {
@@ -469,12 +521,15 @@
         loadPickerPage(true);
       }, 300);
     });
+    overlay.querySelector("#pickAddPage").addEventListener("click", function () { batchPage(false); });
+    overlay.querySelector("#pickRemovePage").addEventListener("click", function () { batchPage(true); });
     overlay.querySelector("#pickDone").addEventListener("click", function () {
       overlay.remove();
       loadSources();
       refresh();
     });
 
+    loadCategories();
     loadPickerPage(true);
   }
 
@@ -494,6 +549,16 @@
             td.textContent = value;
             tr.appendChild(td);
           });
+        var actions = document.createElement("td");
+        var active = item.status === "pending" || item.status === "running";
+        if (active) {
+          actions.appendChild(actionButton("İptal", function () {
+            api("/api/v1/imports/" + item.id + "/cancel", { method: "POST" })
+              .then(pollImports)
+              .catch(function (error) { alert(error.message); });
+          }));
+        }
+        tr.appendChild(actions);
         if (item.error) {
           var td = document.createElement("td");
           td.textContent = item.error;

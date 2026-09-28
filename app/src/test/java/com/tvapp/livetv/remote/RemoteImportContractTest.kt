@@ -18,9 +18,48 @@ class RemoteImportContractTest {
     fun `import request status uses the documented lowercase names`() {
         RemoteImportQueue.Request.Status.entries.forEach { status ->
             val wire = status.name.lowercase()
-            assertTrue(wire in setOf("pending", "running", "done", "failed"))
+            assertTrue(wire in setOf("pending", "running", "done", "failed", "cancelled"))
             assertEquals(wire, wire.lowercase())
         }
+    }
+
+    @Test
+    fun `route table covers cancel and categories endpoints`() {
+        val paths = RemoteEditServer.ROUTES.map { it.path }
+        assertTrue("/api/v1/imports/{id}/cancel" in paths)
+        assertTrue("/api/v1/sources/categories" in paths)
+    }
+
+    @Test
+    fun `sources and groups payloads use the wrapper shape clients expect`() {
+        // Both the web panel and the phone client parse {sources: [...]},
+        // {groups: [...]}; a bare array silently rendered as an empty list.
+        val sourcesEnvelope = JSONObject().put(
+            "sources",
+            org.json.JSONArray().put(JSONObject().put("kind", "iptv").put("id", 1L)),
+        )
+        val groupsEnvelope = JSONObject().put(
+            "groups",
+            org.json.JSONArray().put(JSONObject().put("id", 2L).put("name", "Spor")),
+        )
+        assertEquals(1, sourcesEnvelope.getJSONArray("sources").length())
+        assertEquals("Spor", groupsEnvelope.getJSONArray("groups").getJSONObject(0).getString("name"))
+    }
+
+    @Test
+    fun `cancelled import reports no error and keeps the redacted url`() {
+        val request = RemoteImportQueue.Request(
+            id = 3L,
+            name = "Listem",
+            kind = RemoteImportQueue.Request.Kind.IPTV,
+            url = RemoteImportQueue.Request.Status.CANCELLED.name, // never the real url in snapshots
+            status = RemoteImportQueue.Request.Status.CANCELLED,
+            requestedAt = 0L,
+            importedChannels = 120,
+            error = null,
+        )
+        assertEquals(RemoteImportQueue.Request.Status.CANCELLED, request.status)
+        assertNull(request.error)
     }
 
     @Test

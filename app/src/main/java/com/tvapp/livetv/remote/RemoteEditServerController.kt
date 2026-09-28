@@ -66,11 +66,13 @@ class RemoteEditServerController private constructor(
         if (!com.tvapp.livetv.BuildConfig.REMOTE_EDIT_ENABLED) return false
         if (!preferencesStore.enabled()) return false
         if (serverRef.get() != null) return true
+        val dataProvider = ServerDataProvider(context)
         val server = RemoteEditServer(
             preferencesStore,
             RemoteEditServer.PairingAuthorizer { token -> pairingStore.authorize(token) },
-            ServerDataProvider(context),
+            dataProvider,
         )
+        dataProvider.versionSource = { server.currentDataVersion() }
         server.pairingHandler = { code, deviceName ->
             pairingStore.attemptPair(code, deviceName)?.let { session ->
                 Triple(session.deviceId, session.deviceName, session.tokenPlain)
@@ -119,6 +121,9 @@ class RemoteEditServerController private constructor(
             id
         }
         server.importQueueListHandler = { importQueue.all() }
+        server.importQueueCancelHandler = { id -> importQueue.cancel(id) }
+        // REMOTEEDIT OSD: the TV surfaces live import progress from the queue.
+        RemoteImportOverlayController.bind(context, importQueue)
         // Source management: delete / refresh / selection via RemoteSourceService.
         val sourceService = RemoteSourceService(context)
         server.sourceMutationHandler = { kind, id, operation ->
@@ -149,6 +154,7 @@ class RemoteEditServerController private constructor(
         nsdAnnouncer?.unregister()
         nsdAnnouncer = null
         serverRef.getAndSet(null)?.stop()
+        RemoteImportOverlayController.unbind()
     }
 
     private class ServerDataProvider(context: Context) : RemoteEditServer.DataProvider {
@@ -159,6 +165,45 @@ class RemoteEditServerController private constructor(
         private val iptvDao = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(context).iptvDao()
         private val sourceService = RemoteSourceService(context)
 
+        /** Version-keyed snapshot cache for the channel list endpoint. Each
+         *  page request used to reload every channel and run one revision
+         *  query per row (N+1). The snapshot is rebuilt lazily after any
+         *  data-version bump (write, import, source mutation) and reused for
+         *  subsequent pages, so paging stays bounded.
+         *  Guarded by [snapshotLock]; rebuilds run on Dispatchers.IO. */
+        private val snapshotLock = Any()
+        private var snapshotVersion = -1L
+        private var snapshotRows: List<LiveChannel> = emptyList()
+        private var snapshotRevisions: Map<String, Long> = emptyMap()
+
+        /** Wired to the server's data version once the server exists. */
+        var versionSource: (() -> Long)? = null
+
+        private fun snapshot(version: Long): Pair<List<LiveChannel>, Map<String, Long>> {
+            synchronized(snapshotLock) {
+                if (snapshotVersion == version) {
+                    return snapshotRows to snapshotRevisions
+                }
+            }
+            val rows: List<LiveChannel> = runBlocking(Dispatchers.IO) {
+                channelRepository.channels(includeTif = true).getOrDefault(emptyList())
+            }
+            val keys = rows.map(LiveChannel::sourceKey)
+            val revisions: Map<String, Long> = runBlocking(Dispatchers.IO) {
+                channelDao.revisionsOf(keys).associate { it.sourceKey to it.revision }
+            }
+            synchronized(snapshotLock) {
+                // A newer caller may have rebuilt while we worked; keep the
+                // freshest build and only publish ours when we are current.
+                if (snapshotVersion < version) {
+                    snapshotVersion = version
+                    snapshotRows = rows
+                    snapshotRevisions = revisions
+                }
+                return snapshotRows to snapshotRevisions
+            }
+        }
+
         override fun serverPing(): JSONObject = JSONObject()
             .put("app", "TVApp")
             .put("versionName", BuildConfig.VERSION_NAME)
@@ -166,18 +211,18 @@ class RemoteEditServerController private constructor(
             .put("api", API_VERSION)
 
         /** Keyset paging on (sortOrder, sourceKey): client sends the last seen
-         *  row's sourceKey as `after` together with its sortOrder-derived
-         *  position; we resume after that row. LiveChannel has no sortOrder
-         *  field itself, so ordering follows the merged list order that the
-         *  main list already uses, and the cursor is the last sourceKey. */
+         *  row's sourceKey as `after`; we resume after that row. LiveChannel
+         *  has no sortOrder field itself, so ordering follows the merged list
+         *  order that the main list already uses, and the cursor is the last
+         *  sourceKey. Picker mode (sourceId) pages one source's catalog
+         *  straight from the DAO with optional category + FTS filters. */
         override fun channels(
             afterSourceKey: String?,
             limit: Int,
             query: String?,
             sourceId: Long?,
+            category: String?,
         ): JSONArray {
-            // Picker mode: page one IPTV source's full catalog from the DAO
-            // (bounded query, no full in-memory load).
             if (sourceId != null) {
                 return JSONArray().apply {
                     var anchorIndex: Int = -1
@@ -191,12 +236,13 @@ class RemoteEditServerController private constructor(
                             anchorKey = anchor.sourceKey
                         }
                     }
+                    val normalizedCategory = category?.trim()?.takeIf(String::isNotEmpty)
                     val page: List<com.tvapp.livetv.data.local.IptvChannelListProjection> = runBlocking(Dispatchers.IO) {
                         val ftsQuery = ftsQueryFrom(query)
                         if (anchorKey != null) {
-                            iptvDao.getCatalogPageAfter(sourceId, anchorIndex, anchorKey, ftsQuery, limit)
+                            iptvDao.getCatalogPageAfter(sourceId, normalizedCategory, anchorIndex, anchorKey, ftsQuery, limit)
                         } else {
-                            iptvDao.getCatalogPageFirst(sourceId, ftsQuery, limit)
+                            iptvDao.getCatalogPageFirst(sourceId, normalizedCategory, ftsQuery, limit)
                         }
                     }
                     page.forEach { entity ->
@@ -210,15 +256,13 @@ class RemoteEditServerController private constructor(
                                 .put("hidden", false)
                                 .put("inMainList", entity.selected)
                                 .put("revision", JSONObject.NULL)
-                                .put("groupId", JSONObject.NULL)
+                                .put("groupId", entity.groupTitle ?: JSONObject.NULL)
                                 .put("iptvContentType", entity.contentType ?: JSONObject.NULL),
                         )
                     }
                 }
             }
-            val rows: List<LiveChannel> = runBlocking(Dispatchers.IO) {
-                channelRepository.channels(includeTif = true).getOrDefault(emptyList())
-            }
+            val (rows, revisions) = snapshot(versionSource?.invoke() ?: 0L)
             val startIndex = if (afterSourceKey == null) {
                 0
             } else {
@@ -231,9 +275,7 @@ class RemoteEditServerController private constructor(
                     .filter { query == null || it.displayName.contains(query, ignoreCase = true) }
                     .take(limit)
                     .forEach { channel ->
-                        val revision = runBlocking(Dispatchers.IO) {
-                            channelDao.revisionOf(channel.sourceKey)
-                        } ?: 0L
+                        val revision = revisions[channel.sourceKey] ?: 0L
                         put(
                             JSONObject()
                                 .put("sourceKey", channel.sourceKey)
@@ -255,13 +297,9 @@ class RemoteEditServerController private constructor(
 
         /** REMOTEEDIT-008/R3: single channel with full editable fields. */
         override fun channel(sourceKey: String): JSONObject? {
-            val rows: List<LiveChannel> = runBlocking(Dispatchers.IO) {
-                channelRepository.channels(includeTif = true).getOrDefault(emptyList())
-            }
+            val (rows, revisions) = snapshot(versionSource?.invoke() ?: 0L)
             val channel = rows.firstOrNull { it.sourceKey == sourceKey } ?: return null
-            val revision = runBlocking(Dispatchers.IO) {
-                channelDao.revisionOf(channel.sourceKey)
-            } ?: 0L
+            val revision = revisions[channel.sourceKey] ?: 0L
             return JSONObject()
                 .put("sourceKey", channel.sourceKey)
                 .put("displayName", channel.displayName)
@@ -290,6 +328,8 @@ class RemoteEditServerController private constructor(
         }
 
         override fun sources(): JSONArray = sourceService.sources()
+
+        override fun sourceCategories(sourceId: Long): JSONArray = sourceService.sourceCategories(sourceId)
 
         override fun xmltvCatalog(): JSONArray = sourceService.xmltvCatalog()
 

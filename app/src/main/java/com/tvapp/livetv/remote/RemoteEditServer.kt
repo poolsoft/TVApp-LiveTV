@@ -34,8 +34,15 @@ class RemoteEditServer(
         fun serverPing(): JSONObject
 
         /** Keyset-paged channel list (cursor = last sourceKey); JSON array.
-         *  sourceId filters IPTV catalog rows to one source (channel picker). */
-        fun channels(afterSourceKey: String?, limit: Int, query: String?, sourceId: Long?): JSONArray
+         *  sourceId filters IPTV catalog rows to one source (channel picker);
+         *  category narrows groupTitle within that source. */
+        fun channels(
+            afterSourceKey: String?,
+            limit: Int,
+            query: String?,
+            sourceId: Long?,
+            category: String?,
+        ): JSONArray
 
         /** Single channel with full editable fields, or null. */
         fun channel(sourceKey: String): JSONObject?
@@ -43,6 +50,9 @@ class RemoteEditServer(
         fun groups(): JSONArray
 
         fun sources(): JSONArray
+
+        /** Distinct IPTV group categories of one source (picker filter). */
+        fun sourceCategories(sourceId: Long): JSONArray
 
         /** XMLTV EPG channel catalog (sourceId, channelId, channelName). */
         fun xmltvCatalog(): JSONArray
@@ -135,10 +145,10 @@ class RemoteEditServer(
             method == Method.GET && uri == API_EVENTS -> handleEvents(session)
 
             method == Method.GET && uri == API_GROUPS ->
-                json(StatusCode.OK, dataProvider.groups())
+                json(StatusCode.OK, JSONObject().put("groups", dataProvider.groups()))
 
             method == Method.GET && uri == API_SOURCES ->
-                json(StatusCode.OK, dataProvider.sources())
+                json(StatusCode.OK, JSONObject().put("sources", dataProvider.sources()))
 
             method == Method.PATCH && uri.startsWith(API_CHANNELS + "/") ->
                 handlePatch(session, uri.removePrefix(API_CHANNELS + "/"))
@@ -155,8 +165,17 @@ class RemoteEditServer(
             method == Method.GET && uri.startsWith(API_IMPORTS + "/") ->
                 handleImportStatus(uri.removePrefix(API_IMPORTS + "/"))
 
+            method == Method.POST && uri.startsWith(API_IMPORTS + "/") && uri.endsWith(API_IMPORTS_CANCEL_SUFFIX) ->
+                handleImportCancel(uri.removePrefix(API_IMPORTS + "/").removeSuffix(API_IMPORTS_CANCEL_SUFFIX))
+
             method == Method.GET && uri == API_XMLTV_CATALOG ->
                 json(StatusCode.OK, JSONObject().put("catalog", dataProvider.xmltvCatalog()))
+
+            method == Method.GET && uri == API_SOURCES_CATEGORIES -> {
+                val sourceId = session.parameters["sourceId"]?.firstOrNull()?.toLongOrNull()
+                    ?: throw BadRequestException("sourceId gerekli.")
+                json(StatusCode.OK, JSONObject().put("categories", dataProvider.sourceCategories(sourceId)))
+            }
 
             method == Method.POST && uri.startsWith(API_SOURCES + "/selection/") ->
                 handleSelection(session, uri.removePrefix(API_SOURCES + "/selection/"))
@@ -326,6 +345,9 @@ class RemoteEditServer(
 
     fun bumpDataVersion(): Long = versionCounter.incrementAndGet()
 
+    /** Current data version for snapshot caches keyed on it. */
+    fun currentDataVersion(): Long = versionCounter.get()
+
     /** REMOTEEDIT-006: queue a remote source import (IPTV playlist or XMLTV
      *  EPG); executes via the TV app's existing pipelines. URL/credentials are
      *  never echoed or logged. */
@@ -368,6 +390,25 @@ class RemoteEditServer(
             requests.put(importJson(request))
         }
         return json(StatusCode.OK, JSONObject().put("imports", requests))
+    }
+
+    /** Import cancel: POST /imports/{id}/cancel. Unknown or finished id → 404. */
+    private fun handleImportCancel(idText: String): Response {
+        val id = idText.toLongOrNull() ?: return json(
+            StatusCode.BAD_REQUEST,
+            error("bad_request", "Geçersiz istek kimliği."),
+        )
+        val queue = importQueueCancelHandler
+            ?: return json(
+                StatusCode.NOT_FOUND,
+                error("imports_unsupported", "Bu sunucu kaynak aktarımı kabul etmiyor."),
+            )
+        return if (queue(id)) {
+            versionCounter.incrementAndGet()
+            json(StatusCode.OK, JSONObject().put("status", "cancelling"))
+        } else {
+            json(StatusCode.NOT_FOUND, error("not_found", "İstek bulunamadı veya zaten bitmiş."))
+        }
     }
 
     private fun handleImportStatus(idText: String): Response {
@@ -446,6 +487,7 @@ class RemoteEditServer(
     /** REMOTEEDIT-006: import queue hooks; absent = imports disabled. */
     var importQueueHandler: ((name: String, url: String, kind: RemoteImportQueue.Request.Kind) -> Long)? = null
     var importQueueListHandler: (() -> List<RemoteImportQueue.Request>)? = null
+    var importQueueCancelHandler: ((id: Long) -> Boolean)? = null
 
     /** Source delete/refresh hook: (kind, id, operation) -> Boolean. */
     var sourceMutationHandler: ((kind: String, id: Long, operation: String) -> Boolean)? = null
@@ -483,12 +525,14 @@ class RemoteEditServer(
         val query = parameters["q"]?.firstOrNull()?.trim()?.take(QUERY_MAX_LENGTH)
             ?.takeIf(String::isNotEmpty)
         val sourceId = parameters["sourceId"]?.firstOrNull()?.toLongOrNull()
+        val category = parameters["category"]?.firstOrNull()?.trim()?.take(QUERY_MAX_LENGTH)
+            ?.takeIf(String::isNotEmpty)
         val limit = (parameters["limit"]?.firstOrNull()?.toIntOrNull() ?: DEFAULT_PAGE_LIMIT)
             .coerceIn(1, MAX_PAGE_LIMIT)
         return json(
             StatusCode.OK,
             JSONObject()
-                .put("channels", dataProvider.channels(after, limit, query, sourceId))
+                .put("channels", dataProvider.channels(after, limit, query, sourceId, category))
                 .put("limit", limit)
                 .put("after", after ?: JSONObject.NULL),
         )
@@ -558,8 +602,10 @@ class RemoteEditServer(
         private const val API_CHANNELS_BATCH = "$API_ROOT/channels/batch"
         private const val API_EVENTS = "$API_ROOT/events"
         private const val API_IMPORTS = "$API_ROOT/imports"
+        private const val API_IMPORTS_CANCEL_SUFFIX = "/cancel"
         private const val API_GROUPS = "$API_ROOT/groups"
         private const val API_SOURCES = "$API_ROOT/sources"
+        private const val API_SOURCES_CATEGORIES = "$API_ROOT/sources/categories"
         private const val API_XMLTV_CATALOG = "$API_ROOT/xmltv/catalog"
         private const val WEB_ROOT = "/assets/webpanel"
         private const val EVENTS_MAX_WAIT_MILLIS = 25_000L
@@ -586,6 +632,8 @@ class RemoteEditServer(
             EndpointProbe(Method.POST, API_IMPORTS),
             EndpointProbe(Method.GET, API_IMPORTS),
             EndpointProbe(Method.GET, "$API_IMPORTS/{id}"),
+            EndpointProbe(Method.POST, "$API_IMPORTS/{id}/cancel"),
+            EndpointProbe(Method.GET, API_SOURCES_CATEGORIES),
             EndpointProbe(Method.GET, API_GROUPS),
             EndpointProbe(Method.GET, API_SOURCES),
             EndpointProbe(Method.POST, "$API_SOURCES/delete"),

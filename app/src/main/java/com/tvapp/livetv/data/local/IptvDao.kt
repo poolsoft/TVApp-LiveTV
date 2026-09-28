@@ -218,18 +218,20 @@ interface IptvDao {
     ): List<IptvChannelListProjection>
 
     /** Remote web-panel channel picker: bounded pages over one source's full
-     *  catalog with optional FTS query; keyset pagination on (originalIndex,
-     *  sourceKey). Reuses the selection projection shape. */
+     *  catalog with optional FTS query and category filter; keyset pagination
+     *  on (originalIndex, sourceKey). Reuses the selection projection shape. */
     @Query(
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "ORDER BY originalIndex, sourceKey LIMIT :limit",
     )
     suspend fun getCatalogPageFirst(
         sourceId: Long,
+        category: String?,
         query: String,
         limit: Int,
     ): List<IptvChannelListProjection>
@@ -238,6 +240,7 @@ interface IptvDao {
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
             "originalIndex, contentType, selected FROM iptv_channels " +
             "WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (originalIndex > :anchorIndex " +
@@ -246,6 +249,7 @@ interface IptvDao {
     )
     suspend fun getCatalogPageAfter(
         sourceId: Long,
+        category: String?,
         anchorIndex: Int,
         anchorKey: String,
         query: String,

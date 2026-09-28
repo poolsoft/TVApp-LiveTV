@@ -141,6 +141,14 @@ class RemoteSourceService(context: Context) {
         }
     }
 
+    /** Distinct group categories of one IPTV source (web picker filter). */
+    fun sourceCategories(sourceId: Long): JSONArray = JSONArray().apply {
+        val categories = runBlocking(Dispatchers.IO) {
+            runCatching { iptvRepository.sourceCategories(sourceId) }.getOrDefault(emptyList())
+        }
+        categories.forEach { put(it) }
+    }
+
     /**
      * Applies a full or delta selection change for one IPTV source. The
      * "full" shape replaces the whole selection (like the on-TV picker);

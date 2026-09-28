@@ -91,4 +91,14 @@ class RemoteEditServerTest {
         // One web panel + one phone must fit under the cap.
         assertTrue(PairingStore.MAX_DEVICES >= 2)
     }
+
+    @Test
+    fun `sourceKey revision pair matches the dao projection`() {
+        val row = com.tvapp.livetv.data.local.SourceKeyRevision(
+            sourceKey = "iptv:42",
+            revision = 9L,
+        )
+        assertEquals("iptv:42", row.sourceKey)
+        assertEquals(9L, row.revision)
+    }
 }

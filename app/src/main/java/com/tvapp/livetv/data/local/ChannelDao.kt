@@ -25,6 +25,11 @@ interface ChannelDao {
     @Query("SELECT revision FROM user_channels WHERE sourceKey = :sourceKey")
     suspend fun revisionOf(sourceKey: String): Long?
 
+    /** REMOTEEDIT: batch revision lookup for remote paging — one IN query
+     *  instead of one query per channel row (pages hold hundreds of keys). */
+    @Query("SELECT sourceKey, revision FROM user_channels WHERE sourceKey IN (:keys)")
+    suspend fun revisionsOf(keys: Collection<String>): List<SourceKeyRevision>
+
     /** REMOTEEDIT: revision-aware favorites toggle used by PATCH. */
     @Query(
         "UPDATE user_channels SET favorite = :favorite, revision = revision + 1 " +

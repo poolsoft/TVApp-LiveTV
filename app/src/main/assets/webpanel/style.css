@@ -122,8 +122,10 @@ table#channels tbody tr { cursor: grab; }
 td.muted { color: var(--muted); }
 .picker-card { max-height: 85vh; display: flex; flex-direction: column; }
 .picker-card .table-wrap { flex: 1; min-height: 300px; max-height: none; }
-.picker-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
-.picker-toolbar input { flex: 1; }
+.picker-toolbar { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.picker-toolbar input { flex: 1; min-width: 160px; }
+.picker-toolbar select { flex: 0 1 220px; }
+.picker-batch { display: flex; gap: 8px; margin-bottom: 8px; }
 .picker-table td { white-space: normal; }
 .pick-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 .pick-row input { width: 18px; height: 18px; }

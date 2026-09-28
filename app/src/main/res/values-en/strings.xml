@@ -206,6 +206,14 @@
     <string name="remote_edit_client_queue_import">Queue import</string>
     <string name="remote_edit_client_import_queued">Import queued on the TV</string>
     <string name="remote_edit_client_entry">Manage TV from phone</string>
+
+    <!-- Remote import OSD card (TV side, REMOTEEDIT) -->
+    <string name="remote_import_cancel">Cancel</string>
+    <string name="remote_import_status_pending">Queued…</string>
+    <string name="remote_import_status_running">Importing… %1$d channels</string>
+    <string name="remote_import_status_done">Done · %1$d channels</string>
+    <string name="remote_import_status_cancelled">Cancelled</string>
+    <string name="remote_import_status_failed">Failed</string>
     <string name="check_for_updates">Check for updates</string>
     <string name="current_version">Version %1$s (%2$d)</string>
     <string name="version_label">Version</string>
