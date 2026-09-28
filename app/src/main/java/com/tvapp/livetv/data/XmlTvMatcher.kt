@@ -53,15 +53,21 @@ object XmlTvMatcher {
 
 internal fun String.literalEpgKey(): String = lowercase(Locale.ROOT).trim()
 
+// Normalize adımları aynı kalıpları sürekli yeniden derlemesin; büyük XMLTV
+// içe aktarmalarında normalizeEpgKey yüz binlerce kez çağrılır.
+private val COUNTRY_SUFFIX = Regex("[._-][a-z]{2}$")
+private val QUALITY_SUFFIX = Regex("(?:[\\s._-]+)?(?:uhd|fhd|hd|sd|4k)$")
+private val NON_KEY_CHARS = Regex("[^a-z0-9çğıöşü]+")
+
 fun String.normalizeEpgKey(): String = lowercase(Locale.ROOT)
     .trim()
-    .replace(Regex("[._-][a-z]{2}$"), "")
-    .replace(Regex("(?:[\\s._-]+)?(?:uhd|fhd|hd|sd|4k)$"), "")
-    .replace(Regex("[^a-z0-9çğıöşü]+"), "")
+    .replace(COUNTRY_SUFFIX, "")
+    .replace(QUALITY_SUFFIX, "")
+    .replace(NON_KEY_CHARS, "")
 
 internal fun String.normalizeExactEpgKey(): String = lowercase(Locale.ROOT)
     .trim()
-    .replace(Regex("[._-][a-z]{2}$"), "")
-    .replace(Regex("[^a-z0-9çğıöşü]+"), "")
+    .replace(COUNTRY_SUFFIX, "")
+    .replace(NON_KEY_CHARS, "")
 
 internal fun String.normalizeRelaxedEpgKey(): String = normalizeEpgKey()

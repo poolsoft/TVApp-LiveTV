@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.tvapp.livetv.diagnostics.CrashReportStore
+import com.tvapp.livetv.diagnostics.MainThreadGuard
 import com.tvapp.livetv.settings.AppLanguage
 import com.tvapp.livetv.settings.AppLanguageStore
 import com.tvapp.livetv.tifinput.IptvInputSyncScheduler
@@ -20,6 +21,7 @@ class TvAppApplication : Application() {
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         val reportStore = CrashReportStore(this)
         reportStore.recordDebug("APPLICATION_START | process=${android.os.Process.myPid()}")
+        MainThreadGuard.install(reportStore)
         IptvInputSyncScheduler.schedulePeriodic(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             if (thread.name == "FinalizerWatchdogDaemon" && error is java.util.concurrent.TimeoutException) {

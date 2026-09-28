@@ -56,6 +56,13 @@ interface IptvDao {
     @Query("SELECT COUNT(*) FROM iptv_channels WHERE sourceId = :sourceId AND selected = 1")
     suspend fun selectedChannelCount(sourceId: Long): Int
 
+    @Query(
+        "SELECT displayName, tvgId, tvgName FROM iptv_channels c " +
+            "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
+            "WHERE s.enabled = 1 AND c.selected = 1",
+    )
+    suspend fun getEpgKeyColumnsForEnabledChannels(): List<IptvEpgKeyColumns>
+
     @Query("SELECT * FROM iptv_channels WHERE sourceId = :sourceId AND selected = 1")
     suspend fun getSelectedChannelsForSource(sourceId: Long): List<IptvChannelEntity>
 

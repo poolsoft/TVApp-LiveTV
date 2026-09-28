@@ -739,8 +739,13 @@ class IptvRepository(context: Context) {
         IptvInputSyncScheduler.scheduleImmediate(appContext)
     }
 
+    /** Yalnızca IMPORT_MUTEX altında, tek seferde çağrılır; MessageDigest instance'ı
+     *  thread-safe olmadığı için paylaşılan alan burada güvenlidir. Yeniden kurulum,
+     *  15k+ kanallı içe aktarmada kanal başına ek maliyet olurdu. */
+    private val importDigest = MessageDigest.getInstance("SHA-256")
+
     private fun sha256Prefix(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        val digest = importDigest.digest(value.toByteArray(Charsets.UTF_8))
         return buildString(24) {
             repeat(12) { index ->
                 val byte = digest[index].toInt() and 0xff
@@ -774,7 +779,7 @@ class IptvRepository(context: Context) {
         private const val READ_TIMEOUT_MS = 20_000
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"
         private const val SELECTION_UPDATE_CHUNK_SIZE = 500
-        private const val IMPORT_BATCH_SIZE = 500
+        private const val IMPORT_BATCH_SIZE = 1_000
         private const val STAGING_MAX_AGE_MS = 24L * 60L * 60L * 1_000L
         private const val MAX_REDIRECTS = 5
         private const val DAY_MILLIS = 24L * 60L * 60L * 1_000L

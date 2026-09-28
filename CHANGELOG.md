@@ -5,6 +5,14 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV/XMLTV İçe Aktarma Performansı ve Ana İş Parçacığı Denetimi
+* **XMLTV zaman çözümleme hızlandırıldı:** Programme `start/stop` ayrıştırma her program satırında üç `SimpleDateFormat` kuruyordu; artık önceden derlenmiş, thread-safe `java.time` biçimlendiricilerle (`XmlTvTime`) yapılıyor. Ofsetsiz zaman damgaları artık cihaz yereline değil UTC'ye düşer (XMLTV belirtimiyle uyumlu, cihazdan bağımsız kararlı sonuç).
+* **EPG anahtar normalizasyonu:** `normalizeEpgKey` içindeki üç regex her çağrıda yeniden derleniyordu; 100.000+ programlı içe aktarmada yüz binlerce `Pattern` derlemesi kesildi (kalıplar önceden derlenir, eşleştirme kuralları birebir korunur).
+* **Progress seli kısıtlıldı:** XMLTV sayacı artık zaman bazlı kıstırıcıyla (`XmlTvProgressThrottle`) en fazla ~8 güncelleme/sn iletir; IPTV tarafında okuma aşaması UI güncellemeleri aynı aralıkta kıstırılır. Aşama değişimleri gecikmeden iletilir.
+* **EPG hedef anahtarları projection ile okunur:** `activeChannelKeys` tam `user_channels`/`iptv_channels` varlıkları yerine yalnız EPG anahtar aday kolonlarını okur; 15.000+ kanallı kütüphanede içe aktarma öncesi tarama belirgin hafifler.
+* **IPTV staging yazımı:** SHA-256 özeti import mutex'i altında paylaşılan `MessageDigest` ile hesaplanır ve batch boyutu 500'den 1000'e çıkarıldı; 15k+ liste için daha az veritabanı turu.
+* **Ana iş parçacığı ihlalleri artık kanıtlanabilir:** Yalnızca debug derlemelerinde `StrictMode` ana iş parçacığı disk/ağ ihlallerini `MAIN_THREAD_VIOLATION` kaydıyla `Download/TVApp/TVApp-debug-*.log` dosyasına yazar; release davranışı değişmez. Dosyadan liste adı okuma (IPTV içe aktarma) ana thread'den IO'ya taşındı. Cihazdaki "yavaşlık" şikâyeti bu kayıtlarla somut olarak doğrulanabilir.
+* **Zamanlama ölçümü:** XMLTV içe aktarma süresi `XMLTV_IMPORT_TIMING` kaydıyla debug loga yazılır (IPTV'deki `IPTV_IMPORT_TIMING` karşılığı); darboğaz cihazda ölçülebilir.
 ### REMOTEEDIT Denemesi Tamamen Kaldırıldı (DB v25 → v24 geri dönüşü dahil)
 * **Neden:** Telefon/web üzerinden uzaktan kanal düzenleme denemesi sistemde yavaşlığa ve kararsız davranışa yol açtı; deneme iptal edildi. Gömülü HTTP sunucusu, eşleştirme, web panosu, telefon client, NSD duyurusu ve uzaktan import kuyruğu dahil REMOTEEDIT'in tamamı kod tabanından çıkarıldı. OPT-1.7 EPG önbellek iyileştirmesi korundu.
 * **Veritabanı geri dönüşü:** Sürüm 25'ten 24'e inildi; `paired_devices` tablosu ve `user_channels.revision` sütunu kaldırıldı. Yeni `MIGRATION_25_24` yıkıcı değildir: deneme sürümlerini kurmuş cihazlarda tüm kullanıcı verileri (özel sıra/numara/ad, favori, gizli, gruplar, IPTV kaynakları) korunarak düşürülür.

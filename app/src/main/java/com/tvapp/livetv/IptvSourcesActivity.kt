@@ -4,6 +4,7 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.view.KeyEvent
 import android.view.View
@@ -203,10 +204,15 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun importDocument(uri: Uri) {
-        val defaultName = documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
-        promptSourceName(defaultName) { name ->
-            runImport("IPTV_FILE_IMPORT", name, openSelectionAfter = true) {
-                repository.importDocument(uri, name)
+        lifecycleScope.launch {
+            // ContentResolver meta veri sorgusu disk G/Ç yapabilir; ana thread'i meşgul etmesin.
+            val defaultName = withContext(Dispatchers.IO) {
+                documentName(uri).substringBeforeLast('.').ifBlank { "IPTV" }
+            }
+            promptSourceName(defaultName) { name ->
+                runImport("IPTV_FILE_IMPORT", name, openSelectionAfter = true) {
+                    repository.importDocument(uri, name)
+                }
             }
         }
     }
@@ -557,17 +563,28 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.importStatus.text = error.message ?: error.javaClass.simpleName
     }
 
+    /** Okuma aşaması on binlerce batch ilerlemesi üretebilir; ana thread'e saniyede
+     *  ~8 güncellemeden fazlası arayüzü gereksiz şişirir. Diğer aşamalar her zaman iletilir. */
+    private var lastProgressUiUpdateAt = 0L
+
     private fun showImportProgress(progress: IptvImportProgress) {
+        val now = SystemClock.elapsedRealtime()
+        if (progress.stage == IptvImportStage.READING &&
+            now - lastProgressUiUpdateAt < PROGRESS_UPDATE_MIN_INTERVAL_MS
+        ) {
+            return
+        }
+        lastProgressUiUpdateAt = now
+        val stage = when (progress.stage) {
+            IptvImportStage.CONNECTING -> getString(R.string.iptv_import_connecting)
+            IptvImportStage.READING -> getString(
+                R.string.iptv_import_reading,
+                progress.processedChannels,
+            )
+            IptvImportStage.SAVING -> getString(R.string.iptv_import_saving)
+            IptvImportStage.FINISHING -> getString(R.string.iptv_import_finishing)
+        }
         binding.root.post {
-            val stage = when (progress.stage) {
-                IptvImportStage.CONNECTING -> getString(R.string.iptv_import_connecting)
-                IptvImportStage.READING -> getString(
-                    R.string.iptv_import_reading,
-                    progress.processedChannels,
-                )
-                IptvImportStage.SAVING -> getString(R.string.iptv_import_saving)
-                IptvImportStage.FINISHING -> getString(R.string.iptv_import_finishing)
-            }
             binding.importStatus.text = activeOperationSourceName?.let { sourceName ->
                 getString(R.string.iptv_source_progress, sourceName, stage)
             } ?: stage
@@ -693,5 +710,6 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private companion object {
         const val URL_SUCCESS_MESSAGE_MILLIS = 900L
+        const val PROGRESS_UPDATE_MIN_INTERVAL_MS = 120L
     }
 }

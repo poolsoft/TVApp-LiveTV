@@ -6,9 +6,11 @@ import android.app.job.JobScheduler
 import android.content.ComponentName
 import android.net.Uri
 import android.os.PersistableBundle
+import android.os.SystemClock
 import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.data.local.XmlTvSourceEntity
 import com.tvapp.livetv.data.local.XmlTvChannelCatalogRow
@@ -17,8 +19,6 @@ import org.json.JSONArray
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
@@ -37,6 +37,7 @@ class XmlTvRepository(context: Context) {
     private val dao = database.xmlTvDao()
     private val xtreamEpgDao = database.xtreamEpgDao()
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
+    private val debugLog = CrashReportStore(appContext)
 
     fun sources(): List<XmlTvSourceEntity> = dao.sources()
 
@@ -75,18 +76,16 @@ class XmlTvRepository(context: Context) {
 
     fun activeChannelKeys(): Set<String> = runCatching {
         runBlocking(Dispatchers.IO) {
-            val userChannels = database.channelDao().getAllChannels()
-            val iptvChannels = database.iptvDao().getEnabledChannels()
             buildSet {
-                userChannels.forEach { channel ->
-                    channel.lastKnownName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
-                    channel.customName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
-                    channel.epgIdOverride?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                database.channelDao().getEpgKeyColumns().forEach { columns ->
+                    columns.lastKnownName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    columns.customName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    columns.epgIdOverride?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
                 }
-                iptvChannels.forEach { channel ->
-                    channel.displayName.normalize().takeIf(String::isNotBlank)?.let(::add)
-                    channel.tvgName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
-                    channel.tvgId?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                database.iptvDao().getEpgKeyColumnsForEnabledChannels().forEach { columns ->
+                    columns.displayName.normalize().takeIf(String::isNotBlank)?.let(::add)
+                    columns.tvgName?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
+                    columns.tvgId?.normalize()?.takeIf(String::isNotBlank)?.let(::add)
                 }
             }
         }
@@ -519,6 +518,7 @@ class XmlTvRepository(context: Context) {
         val filterEnabled = !targetChannelKeys.isNullOrEmpty()
 
         val now = System.currentTimeMillis()
+        val importStartedAt = SystemClock.elapsedRealtime()
         val existing = replacementSource ?: dao.sourceByLocation(location)
         val sourceId = existing?.id ?: dao.insertSource(
             XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
@@ -526,19 +526,12 @@ class XmlTvRepository(context: Context) {
 
         val batch = ArrayList<XmlTvProgramEntity>(INSERT_BATCH_SIZE)
         var totalImported = 0
-        var lastReportedCount = -1
-        var lastReportedPhase: XmlTvImportPhase? = null
+        val progress = XmlTvProgressThrottle(onProgress)
 
-        /** Çok sayfalı büyük güncellemelerde UI bildirimlerini sınırlar; parse hızını düşürmez. */
-        fun reportProgress(phase: XmlTvImportPhase) {
-            if (onProgress == null) return
-            val countChanged = totalImported != lastReportedCount
-            val phaseChanged = phase != lastReportedPhase
-            if (!countChanged && !phaseChanged) return
-            lastReportedCount = totalImported
-            lastReportedPhase = phase
-            onProgress.invoke(XmlTvImportProgress(phase, totalImported))
-        }
+        /** Çok sayfalı büyük güncellemelerde UI bildirimlerini sınırlar; ayrıntı
+         *  için XmlTvProgressThrottle belgesine bakın. */
+        fun reportProgress(phase: XmlTvImportPhase, force: Boolean = false) =
+            progress.report(phase, force)
 
         // Program başına iki kez çalışan normalizeEpgKey üç regex derler; aynı kanal
         // kimliği/adı binlerce programda tekrarlandığından sonuç tek sefer hesaplanır.
@@ -587,8 +580,8 @@ class XmlTvRepository(context: Context) {
                             }
                         }
 
-                        val start = parseTime(parser.getAttributeValue(null, "start"))
-                        val stop = parseTime(parser.getAttributeValue(null, "stop"))
+                        val start = XmlTvTime.parse(parser.getAttributeValue(null, "start"))
+                        val stop = XmlTvTime.parse(parser.getAttributeValue(null, "stop"))
                         var title = ""
                         var description = ""
                         while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "programme")) {
@@ -614,6 +607,7 @@ class XmlTvRepository(context: Context) {
                                 sourceId = sourceId,
                             )
                             totalImported++
+                            progress.bump()
                             if (batch.size >= INSERT_BATCH_SIZE) {
                                 reportProgress(XmlTvImportPhase.SAVING)
                                 if (totalImported == batch.size) {
@@ -658,12 +652,16 @@ class XmlTvRepository(context: Context) {
         }
 
         EpgSnapshotCache.invalidateAll()
-        reportProgress(XmlTvImportPhase.SAVING)
+        reportProgress(XmlTvImportPhase.SAVING, force = true)
         purgeExpiredPrograms()
         updateSourceSummary()
         preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
         legacyCacheFile.delete()
-        reportProgress(XmlTvImportPhase.DONE)
+        reportProgress(XmlTvImportPhase.DONE, force = true)
+        debugLog.recordDebug(
+            "XMLTV_IMPORT_TIMING | source=$sourceId, programs=$totalImported, " +
+                "total=${SystemClock.elapsedRealtime() - importStartedAt}ms",
+        )
         return totalImported
     }
 
@@ -698,14 +696,6 @@ class XmlTvRepository(context: Context) {
             }
         }
         legacyCacheFile.delete()
-    }
-
-    private fun parseTime(value: String?): Long {
-        val text = value.orEmpty().trim()
-        val formats = listOf("yyyyMMddHHmmss Z", "yyyyMMddHHmmssZ", "yyyyMMddHHmmss")
-        return formats.firstNotNullOfOrNull { pattern ->
-            runCatching { SimpleDateFormat(pattern, Locale.US).parse(text)?.time }.getOrNull()
-        } ?: 0L
     }
 
     private fun sourceName(url: String): String = runCatching {

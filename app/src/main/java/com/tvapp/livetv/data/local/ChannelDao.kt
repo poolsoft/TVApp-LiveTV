@@ -18,6 +18,9 @@ interface ChannelDao {
     @Query("SELECT * FROM user_channels WHERE sourceKey = :sourceKey LIMIT 1")
     suspend fun getChannel(sourceKey: String): UserChannelEntity?
 
+    @Query("SELECT lastKnownName, customName, epgIdOverride FROM user_channels")
+    suspend fun getEpgKeyColumns(): List<EpgKeyColumns>
+
     @Query("SELECT MAX(sortOrder) FROM user_channels")
     suspend fun maxSortOrder(): Int?
 
