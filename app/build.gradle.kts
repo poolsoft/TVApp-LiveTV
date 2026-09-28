@@ -51,7 +51,6 @@ android {
         create("local") {
             dimension = "distribution"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
-            buildConfigField("boolean", "REMOTE_EDIT_ENABLED", "true")
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
@@ -62,7 +61,6 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".play"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "false")
-            buildConfigField("boolean", "REMOTE_EDIT_ENABLED", "true")
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "true")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
@@ -74,7 +72,6 @@ android {
             applicationId = "com.tvapp.mobile"
             versionNameSuffix = "-mobile"
             buildConfigField("boolean", "SELF_UPDATE_ENABLED", "true")
-            buildConfigField("boolean", "REMOTE_EDIT_ENABLED", "true")
             buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json\"")
             buildConfigField("boolean", "STORE_BILLING_ENABLED", "false")
             buildConfigField("boolean", "IPTV_PRO_REQUIRED", "false")
@@ -140,8 +137,6 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("io.coil-kt:coil:2.7.0")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     val media3Version = "1.8.0"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")

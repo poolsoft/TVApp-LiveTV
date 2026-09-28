@@ -285,7 +285,13 @@ Her sprintte Hibrit TV için DVB/ATV kanal açma, kanal listesi, infobar, EPG, s
 regresyon testinden geçirilmelidir. İkinci motor ve medya merkezi özellikleri bu çekirdek işler
 gerçek TV/TV stick üzerinde doğrulanmadan başlatılmamalıdır.
 
-## Epic REMOTEEDIT - TV Sunucu / Telefon Client Liste Yönetimi
+## Epic REMOTEEDIT - TV Sunucu / Telefon Client Liste Yönetimi (İPTAL EDİLDİ)
+
+> **DURUM: İptal edildi.** Epic uygulandı (sprint R1–R5 + web panosu + NSD), ancak
+> sistemde yavaşlık ve kararsız davranışa yol açtığı için kullanıcı denemesini iptal etti;
+> tüm kod geri alındı ve DB v25 → v24 geri dönüş migration'ı eklendi (veri kaybı yok).
+> Aşağıdaki plan yalnızca geçmiş/ referans amaçlı korunmaktadır; yeniden ele alınacaksa
+> performans ve stabilite çıkarımlarıyla baştan tasarlanmalıdır.
 
 > Vizyon: TV sürümü **sunucu (server) modunda** çalışır; telefon sürümü **client modunda**
 > TVApp'in kanal/liste verisini sunucudan çeker, telefon arayüzünde düzenler ve değişiklikleri
@@ -293,187 +299,91 @@ gerçek TV/TV stick üzerinde doğrulanmadan başlatılmamalıdır.
 > açıkça gönderilen değişiklikleri uygular. Bu epic tamamen bir plan taslağıdır; her sprint
 > önce onaylanır, sonra uygulanır.
 
-### Onaylanmış tasarım kararları (2026-09-27)
-- **Web panosu ilk sürümde var:** TVApp'in gömülü sunucusu hem telefona hem bilgisayar
-  tarayıcısına aynı REST API'yi servis eder. Web arayüzü APK içine gömülü statik sayfadır
-  (ek sunucu/bağımlılık gerektirmez).
-- **Çakışma stratejisi:** `revision` sayacı + son yazan kazanır. Client eski `revision`
-  ile yama gönderirse sunucu 409 + mevcut satırı döner; client yeniden çeker.
-- **Düzenleme kapsamı:** Tüm kullanıcı düzenleme alanları ilk sürümde açılır:
-  sık kullanı, gizle/skip, özel ad, özel numara, grup, sıralama.
-
-### Mimari genel bakış
-
-```
-[Telefon client (mobil flavor)]     [Web panosu (tarayıcı, LAN)]
-            \                           /
-             \-- HTTP, yalnız LAN ----/
-                       |
-         TVApp (TV sürümü) = sunucu modu
-         - Gömülü HTTP sunucusu (yalnız Wi-Fi arabirimi)
-         - Eşleştirme + jeton doğrulama
-         - REST API v1 (/api/v1/...)
-         - Yazmalar ChannelRepository üzerinden Room'a
-                       |
-                Room = yetkili veri
-```
-
-- TVApp tek doğruluk kaynağıdır; sunucu modu Room'un üstünde ince bir API katmanıdır.
-  Client doğrudan veritabanına asla yazmaz; her yazma isteği mevcut repository
-  metotlarına (`setFavorite`, `setHidden`, `setCustomName`, `setCustomNumber`,
-  `setGroup`, `setSortOrder`) bağlanır — başka yazma yolu açılmaz.
-- Telefon native client ve web panosu aynı API'yi kullanır; davranış birebir aynıdır,
-  bakım yükü tektir. Web panosu `assets/webpanel/` altından servis edilir.
-
-### Veri modeli değişiklikleri (DB v25)
-- `user_channels` tablosuna `revision INTEGER NOT NULL DEFAULT 0` kolonu; Room migration
-  24→25 (yıkıcı değil, kullanıcı verisi korunur). Her kullanıcı düzenleme yazımında
-  satırın `revision` değeri monoton artar.
-- Yeni tablo `paired_devices(id, deviceName, pairedAt, lastSeenAt, tokenHash)`:
-  jeton düz metin saklanmaz, yalnız SHA-256 özeti tutulur; hiçbir günlüğe yazılmaz.
-- Sunucunun global sürüm sayacı (preferences'ta monoton sayaç) her yazmada artar;
-  canlı yenileme (long-poll) bu sayacı izler.
-
-### Sunucu API tasarımı (v1)
-Tümü `Authorization: Bearer <jeton>` ister (`ping` hariç). Gövdeler JSON.
-
-| Metot ve yol | Amaç |
-|---|---|
-| `GET /api/v1/ping` | Sunucu adı, TVApp sürümü, eşleştirme gerekli mi |
-| `POST /api/v1/pair` `{code, deviceName}` | 6 haneli kodu doğrular, jeton döner |
-| `GET /api/v1/channels?after=<sortOrder>&limit=<n>&q=<ara>` | Keyset sayfalı liste + satır `revision`; `q` LIKE araması |
-| `GET /api/v1/channels/{sourceKey}` | Tek kanal + tüm düzenlenebilir alanlar |
-| `PATCH /api/v1/channels/{sourceKey}` `{revision, favorite?, hidden?, customName?, customNumber?, sortOrder?, groupId?}` | Alan bazlı yama; `revision` uyuşmazsa 409 |
-| `POST /api/v1/channels/batch` `{ops: [...]}` | Toplu sıralama/toggle; en fazla 100 işlem/istek |
-| `GET /api/v1/groups` / `POST /api/v1/groups` | Grup listesi / grup oluşturma |
-| `GET /api/v1/sources` | IPTV/XMLTV kaynak özetleri (v1 salt-okunur) |
-| `GET /api/v1/events?since=<globalRevision>` | Uzun sorgulama; global sürüm değişince döner |
-| `GET /` | Web panosu (APK assets'inden statik sayfa) |
-
-- Hata sözleşmesi: `401` jeton yok/geçersiz, `404` kanal yok, `409` revision çakışması
-  (gövde mevcut satırı döner), `413` batch limiti aşıldı, `400` doğrulama hatası.
-- 15.000+ katalog: listeleme daima keyset sayfalı; mevcut `originalIndex >= :fromIndex`
-  sorgu deseni yeniden kullanılır. Tam katalog hiçbir yerde belleğe tek seferde yüklenmez.
-
-### Eşleştirme akışı (adım adım)
-1. **TV:** Ayarlar > Sistem > "Telefonla yönetim" → Aç. Sunucu yalnız Wi-Fi arabirimine
-   bağlanır; ekranda `IP:port` ve 6 haneli tek seferlik kod gösterilir (kod 5 dk geçerli,
-   3 yanlış denemede 5 dk kilit).
-2. **Telefon / tarayıcı:** `IP:port` açılır; `ping` ile sürüm uyumu kontrol edilir.
-3. Kod girilir → `POST /api/v1/pair` → cihaz `paired_devices`'a yazılır, 256-bit rastgele
-   jeton üretilir ve **yalnız bir kez** gösterilir. Telefon jetonu
-   EncryptedSharedPreferences'ta saklar; web panosunda saklama kullanıcı tercihine
-   bırakılır (oturumluk / kalıcı).
-4. Sonraki tüm istekler jetonla doğrulanır (sabit zamanlı hash karşılaştırması).
-   TV'den "cihazı kaldır" jetonu geçersiz kılar; cihaz listesi TV'de yönetilir.
-
-### Telefondan düzenleme UX (mobil flavor)
-- "TV'ye bağlan" giriş ekranı: adres (son adres otomatik doldurulur), eşleştirme kodu
-  girişi, bağlantı durumu rozeti.
-- Bağlıyken: arama kutusu + sayfalı kanal listesi; satıra dokunun → düzenleme sayfası
-  (favori ★, gizle, özel ad, özel numara, grup, sıralama).
-- Sıralama sürükle-bırak; toplu seçim ile favori/gizle grup işlemleri batch endpoint'e
-  gider.
-- **Çevrimdışı kuyruk:** Bağlantı yokken yapılan düzenlemeler telefonda yerel kuyrukta
-  (JSON dosyası) tutulur; bağlantı gelince sırayla `PATCH` atılır. `409` alan işlemler
-  kullanıcıya "TV'de değişmiş" mesajıyla gösterilir, otomatik ezilmez.
-
-### Web panosu (APK içinden servis)
-- `assets/webpanel/{index.html, app.js, style.css}` — çerçevesiz vanilla JS + `fetch`,
-  tahmini 50-80 KB; ek bağımlılık yok.
-- Giriş: eşleştirme kodu → jeton; kanal tablosu (sanallaştırılmış render, API sayfalı),
-  satır içi düzenleme, çoklu seçim + toplu favori/gizle, sürükle-bırak sıralama
-  (batch işlemlerine dönüşür).
-- Yalnız LAN'da çalışır; kimlik bilgisi veya kanal kaynağı sırrı panoda asla görünmez.
+### Mimari hedefler ve ilkeler
+- **Room yetkili kalır:** Tüm listeye/katalog verisi TV tarafındaki Room veritabanında yaşar.
+  Server modu Room'un üstünde bir salt-okunur anlık görüntü + değişiklik kuyruğu servis eder;
+  client asla doğrudan TV'nin veritabanına yazmaz.
+- **Yetki modeli:** Varsayılan olarak kanal düzenleme istekleri TVApp'in mevcut
+  `ChannelRepository`/`IptvRepository` API'lerinden geçer; başka yazma yolu açılmaz.
+- **Güvenlik:** İstemci-TV eşleşmesi yerel ağda tek seferlik eşleştirme kodu (pairing code)
+  ile yapılır. Jetonlar (token) cihazda saklanır, **asla loglanmaz**; trafik yalnız
+  yerel ağ (LAN) amaçlıdır ve varsayılan olarak Wi-Fi ağ arabirimine bağlıdır.
+- **Ölçek:** 15.000+ katalog senaryosu için listeleme/aktarım her zaman sayfalıdır
+  (mevcut keyset `originalIndex >= :fromIndex` sorguları yeniden kullanılır); tam katalog
+  belleğe tek seferde yüklenmez.
+- **Çakışma stratejisi:** Alan bazlı "son kazanan" (field-level last-write-wins) +
+  sürüm sayacı. Her kullanıcı düzenlemesi `user_channels` satırında monoton bir
+  `revision` alanı taşır; client eski `revision` üzerinden değişiklik gönderirse sunucu
+  çakışma yanıtı döner ve client mevcut satırı yeniden çeker. Kanal silme/ekleme
+  idempotent (yeniden gönderilebilir) tanımlanır.
+- **Tek/çoklu client:** v1'de tek eşleşmiş telefon; ileride eşleştirilmiş cihaz listesi
+  genişletilebilir. Sunucu aynı anda tek yazma oturumu kabul eder.
 
 ### Sprint planı
 
 - [ ] **REMOTEEDIT-001 (P1): Sunucu modu temeli — yerel HTTP servis**
-  Gömülü sunucu kütüphanesi: **NanoHTTPD önerilir** (minimal, tek küçük bağımlılık);
-  Ktor CIO yalnız NanoHTTPD yetersiz kalırsa değerlendirilir. Wi-Fi arabirimine bağlama,
-  varsayılan port 8890, Ayarlar > Sistem altında "Telefonla yönetim" anahtarı ve durum
-  satırı (açık/kapalı, adres). Endpoint iskeleti: `ping`, `channels` (sayfalı okuma),
-  `groups`, `sources`. Hata sözleşmesi ve loglama kuralları bu sprintte netleşir.
-  **Kabul:** Uygulama açıkken sunucu LAN'dan erişilebilir; jeton olmadan hiçbir veri
-  dönmez; ekran kapalıyken/Doze'da davranış cihazda test edilip belgelenir; APK boyutu
-  etkisi ölçülüp not edilir.
+  TV uygulaması içinde yalnız LAN'da çalışan gömülü HTTP sunucusu (örn. Ktor/NanoHTTPD;
+  mevcut bağımlılık setine en yakın olanı seçilir) ve Ayarlar > Sistem altında
+  "Telefonla yönetim" anahtarı. Endpoint taslağı:
+  `GET /api/v1/ping`, `GET /api/v1/channels?pageAfter=<index>&limit=<n>`,
+  `GET /api/v1/groups`, `GET /api/v1/sources`.
+  **Kabul:** TV uygulaması ön planda/arka planda iken sunucu davranışı belgelenir;
+  ekran kapalıyken davranış (Doze/battery) cihazda test edilir; şifresiz trafik yalnız
+  LAN'da çalışır; PIN/eşleştirme olmadan hiçbir veri dönmez.
 
 - [ ] **REMOTEEDIT-002 (P1): Eşleştirme ve yetkilendirme**
-  `paired_devices` tablosu, 6 haneli kod üretimi/doğrulaması (5 dk, 3 deneme, kilit),
-  jeton üretimi + SHA-256 hash saklama, TV'de cihaz listesi ve kaldırma ekranı,
-  hız sınırı (brute-force koruması).
-  **Kabul:** Yanlış/eksik jeton 401; jeton ve kod hiçbir günlüğe yazılmaz; eşleştirme
-  TV'den geri alınabilir.
+  TV'de 6 haneli tek seferlik eşleştirme kodu gösterilir; telefon kodu girer, sunucu
+  cihaz kaydeder ve zaman sınırlı jeton üretir. Tüm istekler jetonla doğrulanır.
+  **Kabul:** Yanlış/eksik jeton 401 döner; jeton ve eşleştirme kodu hiçbir günlüğe
+  yazılmaz; eşleştirme TV'den geri alınabilir (cihaz listesi + iptal).
 
-- [x] **REMOTEEDIT-003 (P1): Telefon client okuma yolu — Sprint R2'de tamamlandı**
-  "TV'ye bağlan" akışı, jeton saklama, keyset sayfalı kanal listesi, `q` araması.
-  **Kabul:** 15.000+ katalog telefonda akıcı sayfalanır; cihaz çevrimdışıysa net hata;
-  loglarda kimlik bilgisi görünmez.
+- [ ] **REMOTEEDIT-003 (P1): Telefon client okuma yolu**
+  Mobil flavor'da "TV'ye bağlan" akışı: sunucu keşfi (el ile IP:port; mDNS/DNS-SD
+  sonradan), eşleştirme, sayfalı kanal/liste görüntüleme (mevcut keyset desenine uygun).
+  **Kabul:** 15.000+ kayıtlı katalog telefonda akıcı sayfalanır; cihaz çevrimdışıysa
+  net hata gösterilir; loglarda kanal kaynak kimlik bilgileri görünmez.
 
-- [x] **REMOTEEDIT-004 (P1): Düzenleme + senkron yazma yolu — Sprint R2'de tamamlandı**
-  DB v25 (`revision` kolonu, migration 24→25), `PATCH` + `batch` endpoint'leri,
-  409 çakışma yanıtı, telefonda çevrimdışı kuyruk ve senkron butonu; TV tarafında
-  Room akışı üzerinden canlı yansıma.
-  **Kabul:** Tüm düzenleme alanları telefondan çalışır; sıralama yalnız Room'a yazılır
-  (TIF veritabanına asla); çakışmada veri kaybı olmadan temiz mesaj.
-  Not: Özel ad/numara/grup düzenleme arayüzü ve kuyruk replay butonu sonraki
-dokunuşlarda zenginleştirilecek; uç noktalar ve çakışma sözleşmesi tamam.
+- [ ] **REMOTEEDIT-004 (P1): Düzenleme + senkron yazma yolu**
+  Telefondan sık kullanı, gizle/skip, sıralama (sortOrder), ad ve grup düzenlemeleri.
+  İstek biçimi: alan bazlı yama (`PATCH /api/v1/channels/{sourceKey}`) + `revision`;
+  sunucu mevcut `ChannelRepository` DAO güncellemelerini kullanır. Toplu işlem için
+  sınırlı batch endpoint'i (maks. N satır/istek).
+  **Kabul:** Telefondaki düzenleme TV'de anlık/`revision` uyuşmazlığında temiz çakışma
+  mesajıyla yansır; ana liste sıralaması yalnız Room'a yazılır (TIF veritabanına
+  asla); çevrimdışı yapılan düzenlemeler kuyrukta tutulup bağlantı gelince uygulanır.
 
-- [x] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme — Sprint R3'te tamamlandı**
-  Global sürüm sayacı, `GET /api/v1/events` long-poll, client'ın listede değişen
-  satırları tazelemesi.
-  **Kabul:** TV ve telefon aynı `revision`'da buluşur; ağ kesintisinde her iki taraf
-  tutarlı son duruma döner.
+- [ ] **REMOTEEDIT-005 (P2): Değişiklik bildirimi ve canlı yenileme**
+  Sunucuda işlem sonrası `revision` artışı; client kısa periyotlu uzun sorgulama
+  (long-poll) ile değişikliği alır (v1'de push yok). TV tarafı listesi Room akışıyla
+  zaten canlı güncellenir.
+  **Kabul:** TV'de ve telefonda aynı satır `revision`'da buluşur; ağ kesilmesi
+  durumunda her iki taraf da tutarlı son duruma döner.
 
-- [x] **REMOTEEDIT-008 (P1, Sprint R3): Web panosu — tamamlandı**
-  `assets/webpanel` statik sayfası, eşleştirme ekranı, sayfalı kanal tablosu, satır içi
-  düzenleme, toplu işlemler, sürükle-bırak sıralama. REMOTEEDIT-001/002/004'e bağlıdır.
-  **Kabul:** Tarayıcıdan (bilgisayar veya telefon) tüm düzenleme alanları çalışır;
-  pano yalnız LAN'dan erişilebilir; ek bağımlılık eklenmez. Not: sürükle-bırak
-  sıralama sonraki dokunuş; toplu favori/gizle ve satır düzenleyici çalışıyor.
+- [ ] **REMOTEEDIT-006 (P2): IPTV kaynak/liter yönetimi (kısıtlı)**
+  Telefondan yeni IPTV listesi ekleme/güncelleme isteği sunucuda kuyruğa alınır ve
+  TV uygulaması mevcut import akışıyla (IptvRepository) uygular; kimlik bilgileri
+  telefonda girilir, sunucuya aktarımda şifreli alan kullanılır ve loglanmaz.
+  **Kabul:** Büyük katalog importu TV'de mevcut sayfalı akışla çalışır; telefondan
+  kaynak silme iki aşamalı onay ister; kimlik bilgisi hiçbir yerde düz metin loglanmaz.
 
-- [x] **REMOTEEDIT-006 (P2): IPTV kaynak/liste yönetimi (kısıtlı) — Sprint R4'te tamamlandı; R6'da genişletildi**
-  Telefondan/web'den yeni IPTV listesi / XMLTV EPG ekleme/güncelleme isteği sunucuda
-  kuyruğa alınır; TV mevcut import akışlarıyla (IptvRepository / XmlTvRepository) uygular.
-  Kaynak silme (`POST /api/v1/sources/delete`), yenileme (`/sources/refresh`), kaynak
-  başına kanal seçimi (`/sources/selection/{id}`, delta veya tümü) ve XMLTV kanal
-  kataloğu (`GET /api/v1/xmltv/catalog`) R6'da eklendi; web panosunda Kaynaklar kartı.
-  Kimlik bilgileri şifreli alanda taşınır, loglanmaz.
-  **Kabul:** Büyük katalog importu sayfalı akışla çalışır; kaynak silme iki aşamalı onay;
-  kimlik bilgisi hiçbir yerde düz metin loglanmaz.
-
-- [x] **REMOTEEDIT-009 (P1, Sprint R6): Mobil client sadeleştirme + NSD keşfi — tamamlandı**
-  Kullanıcı geri bildirimiyle telefondan kanal düzenleme kaldırıldı; telefon yalnız
-  kaynak yönetimi yapar (IPTV/XMLTV ekle, yenile, adres değiştir, sil, aktarım durumu).
-  TV sunucusu `_tvapp._tcp.` NSD duyurusu yapar; telefon adresi elle yazmadan bulur.
-  Mobil ana ekranda dikey toolbar'a "TV yönetimi" ikonu eklendi (dikeyde görünmez
-  overlay ikonu sorunu çözüldü). Ana yönetim yeri web panosudur.
-
-- [x] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler — Sprint R5'te tamamlandı**
-  Entegrasyon testleri (sahte client), çakışma senaryoları, Kılavuz + README +
-  CHANGELOG, paid flavor davranışı.
-  **Kabul:** Hem `local` hem `paid` derlenir; özellik bayrağı
-  (`BuildConfig.REMOTE_EDIT_ENABLED`) ile açılır/kapanır; dokümantasyon güncel.
-  Not: soket düzeyi otomasyon testi cihaz doğrulamasıyla tamamlanmalı.
+- [ ] **REMOTEEDIT-007 (P3): Testler, güvenlik sertleştirme ve belgeler**
+  Sahte sunucu/client ile entegrasyon testleri, çakışma senaryoları, Kılavuz ve
+  README güncellemeleri, paid flavor dahil davranışın belgelenmesi.
+  **Kabul:** Hem `local` hem `paid` paketinde derlenir; ödeme duvarı politikasına
+  göre özellik bayrağıyla açılır/kapanır; Kılavuz + README + CHANGELOG güncel.
 
 ### Sprint sırası
 1. Sprint R1: `REMOTEEDIT-001` + `REMOTEEDIT-002` (sunucu + eşleştirme)
-2. Sprint R2: `REMOTEEDIT-003` + `REMOTEEDIT-004` (telefon okuma + yazma, DB v25)
-3. Sprint R3: `REMOTEEDIT-008` (web panosu) + `REMOTEEDIT-005` (canlı yenileme)
+2. Sprint R2: `REMOTEEDIT-003` (telefonda okuma)
+3. Sprint R3: `REMOTEEDIT-004` + `REMOTEEDIT-005` (yazma + canlı)
 4. Sprint R4: `REMOTEEDIT-006` (kaynak yönetimi)
 5. Sprint R5: `REMOTEEDIT-007` (sertleştirme + dokümantasyon)
 
-### Güvenlik ilkeleri
-- Jeton ve eşleştirme kodu **asla loglanmaz**; günlüklerde yalnız olay + cihaz adı.
-- Trafik yalnız LAN; sunucu yalnız Wi-Fi arabirimine bağlanır, LAN dışı istek reddedilir.
-- Sunucu yalnızca kullanıcı açtığında çalışır; kalıcı çalışma açıkça seçilirse
-  foreground service + pil davranışı belgelenir.
-- `local` ve `paid` flavor'larında aynı davranış; ileride Play politikası gerektirirse
-  özellik bayrağıyla kapatılabilir.
-
 ### Riskler ve açık kararlar
-- **Çözülenler (2026-09-27):** web panosu ilk sürümde var; `revision` + son yazan
-  kazanır; tüm düzenleme alanları ilk sürümde.
-- **Kalan:** Arka plan dayanıklılığı (uygulama açıkken sınırlı mı, foreground service
-  mi — kullanıcı kararı); NanoHTTPD'nin APK boyutu etkisinin ölçülmesi; LAN dışı erişim
-  v1'de kapsam dışı; web panosunda jeton kalıcılığı kullanıcı tercihine bırakıldı.
+- Arka planda sunucunun dayanıklılığı: foreground service + pil istisnası istenip
+  istenmeyeceği kullanıcı kararıyla netleşmeli (uygulama açıkken sınırlı kalmak da
+  yeterli olabilir).
+- Sunucu bileşeni için bağımlılık seçimi (Ktor vs NanoHTTPD): APK boyutu etkisi
+  ölçülmeli; mevcut OkHttp ailesiyle uyumlu minimal çözüm tercih edilir.
+- Uzaktan (LAN dışı) erişim v1'de kapsamda **değildir**; gerekirse ileride ayrı
+  güvenlik değerlendirmesiyle ele alınır.

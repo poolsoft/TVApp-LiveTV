@@ -154,57 +154,6 @@ class ChannelRepository(context: Context) {
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int) =
         channelDao.setSortOrder(sourceKey, sortOrder)
 
-    /** REMOTEEDIT-004 result for a revision-guarded edit. */
-    sealed class RemoteEditResult {
-        data class Success(val newRevision: Long) : RemoteEditResult()
-        data class Conflict(val currentRevision: Long) : RemoteEditResult()
-        data object NotFound : RemoteEditResult()
-    }
-
-    /** REMOTEEDIT-004: revision-guarded field patch applied through the same
-     *  DAO writes the TV UI uses. A row that appears later (created from a
-     *  LiveChannel on demand) starts at revision 0, so a client that saw the
-     *  empty list can still patch it with revision 0. */
-    suspend fun remotePatchChannel(
-        sourceKey: String,
-        expectedRevision: Long,
-        favorite: Boolean? = null,
-        hidden: Boolean? = null,
-        customName: String? = null,
-        clearCustomName: Boolean = false,
-        customNumber: Int? = null,
-        clearCustomNumber: Boolean = false,
-        groupId: Long? = null,
-        clearGroupId: Boolean = false,
-        sortOrder: Int? = null,
-    ): RemoteEditResult = database.withTransaction {
-        val existing = channelDao.getChannel(sourceKey)
-        if (existing == null) {
-            if (expectedRevision != 0L) return@withTransaction RemoteEditResult.Conflict(0L)
-            // Row does not exist yet: nothing editable to patch.
-            return@withTransaction RemoteEditResult.NotFound
-        }
-        if (existing.revision != expectedRevision) {
-            return@withTransaction RemoteEditResult.Conflict(existing.revision)
-        }
-        if (clearCustomName) channelDao.setCustomNameBumpingRevision(sourceKey, null)
-        if (clearCustomNumber) channelDao.setCustomNumberBumpingRevision(sourceKey, null)
-        if (clearGroupId) channelDao.setGroupBumpingRevision(sourceKey, null)
-        if (favorite != null) channelDao.setFavoriteBumpingRevision(sourceKey, favorite)
-        if (hidden != null) channelDao.setHiddenBumpingRevision(sourceKey, hidden)
-        if (!clearCustomName && customName != null) {
-            channelDao.setCustomNameBumpingRevision(sourceKey, customName)
-        }
-        if (!clearCustomNumber && customNumber != null) {
-            channelDao.setCustomNumberBumpingRevision(sourceKey, customNumber)
-        }
-        if (!clearGroupId && groupId != null) {
-            channelDao.setGroupBumpingRevision(sourceKey, groupId)
-        }
-        if (sortOrder != null) channelDao.setSortOrderBumpingRevision(sourceKey, sortOrder)
-        RemoteEditResult.Success(channelDao.revisionOf(sourceKey) ?: existing.revision)
-    }
-
     suspend fun moveChannel(sourceKey: String, offset: Int) = database.withTransaction {
         val ordered = channelDao.getOrderedChannels()
         val currentIndex = ordered.indexOfFirst { it.sourceKey == sourceKey }

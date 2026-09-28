@@ -150,11 +150,6 @@
             android:screenOrientation="landscape" />
 
         <activity
-            android:name=".remote.RemoteEditClientActivity"
-            android:exported="false"
-            android:theme="@style/Theme.TVApp.SettingsOverlay" />
-
-        <activity
             android:name=".ProgramGuideActivity"
             android:exported="false"
             android:theme="@style/Theme.TVApp.GuideOverlay"

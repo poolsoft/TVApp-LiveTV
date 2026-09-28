@@ -32,7 +32,4 @@ data class UserChannelEntity(
     val epgSourceIdOverride: Long? = null,
     val playbackEngineOverride: String? = null,
     val lastSeenAt: Long,
-    /** REMOTEEDIT: monotonic per-row edit version; bumped on every user edit.
-     *  Remote clients send the revision they saw; a mismatch is a 409. */
-    val revision: Long = 0,
 )

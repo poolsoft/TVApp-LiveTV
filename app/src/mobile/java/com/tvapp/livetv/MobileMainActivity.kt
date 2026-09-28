@@ -35,12 +35,10 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
-import com.tvapp.livetv.BuildConfig
 import com.tvapp.livetv.databinding.ActivityMobileMainBinding
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackPhase
-import com.tvapp.livetv.remote.RemoteEditClientActivity
 import com.tvapp.livetv.ui.MobileCategoryAdapter
 import com.tvapp.livetv.ui.MobileChannelAdapter
 import kotlinx.coroutines.Dispatchers
@@ -243,18 +241,6 @@ class MobileMainActivity : AppCompatActivity() {
             iptvSourcesLauncher.launch(Intent(this, IptvSourcesActivity::class.java))
         }
 
-        // Source-management sprint: the phone's TV management entry is placed
-        // in the portrait toolbar (always visible), not only in the playback
-        // overlay, which was invisible in portrait.
-        if (BuildConfig.REMOTE_EDIT_ENABLED) {
-            binding.mobileBtnRemoteEdit.visibility = View.VISIBLE
-            binding.mobileBtnRemoteEdit.setOnClickListener {
-                startActivity(Intent(this, RemoteEditClientActivity::class.java))
-            }
-        } else {
-            binding.mobileBtnRemoteEdit.visibility = View.GONE
-        }
-
         binding.mobileBtnChannelSelect.setOnClickListener {
             iptvSelectionLauncher.launch(Intent(this, IptvChannelSelectionActivity::class.java))
         }
@@ -325,16 +311,6 @@ class MobileMainActivity : AppCompatActivity() {
 
         binding.overlayBtnSettings.setOnClickListener {
             startActivity(Intent(this, DisplaySettingsActivity::class.java))
-        }
-
-        // REMOTEEDIT-003: phone-side client entry. The mobile flavor doubles as
-        // the remote-edit client; opening the editor here manages the TV.
-        if (BuildConfig.REMOTE_EDIT_ENABLED) {
-            binding.overlayBtnRemoteEdit.setOnClickListener {
-                startActivity(Intent(this, RemoteEditClientActivity::class.java))
-            }
-        } else {
-            binding.overlayBtnRemoteEdit.visibility = View.GONE
         }
 
         binding.overlayBtnBack.setOnClickListener {

@@ -21,57 +21,6 @@ interface ChannelDao {
     @Query("SELECT MAX(sortOrder) FROM user_channels")
     suspend fun maxSortOrder(): Int?
 
-    /** REMOTEEDIT: revision-aware read for conflict checks. */
-    @Query("SELECT revision FROM user_channels WHERE sourceKey = :sourceKey")
-    suspend fun revisionOf(sourceKey: String): Long?
-
-    /** REMOTEEDIT: batch revision lookup for remote paging — one IN query
-     *  instead of one query per channel row (pages hold hundreds of keys). */
-    @Query("SELECT sourceKey, revision FROM user_channels WHERE sourceKey IN (:keys)")
-    suspend fun revisionsOf(keys: Collection<String>): List<SourceKeyRevision>
-
-    /** REMOTEEDIT: revision-aware favorites toggle used by PATCH. */
-    @Query(
-        "UPDATE user_channels SET favorite = :favorite, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setFavoriteBumpingRevision(sourceKey: String, favorite: Boolean)
-
-    /** REMOTEEDIT: revision-aware hidden toggle used by PATCH. */
-    @Query(
-        "UPDATE user_channels SET hidden = :hidden, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setHiddenBumpingRevision(sourceKey: String, hidden: Boolean)
-
-    /** REMOTEEDIT: revision-aware name edit used by PATCH. */
-    @Query(
-        "UPDATE user_channels SET customName = :name, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setCustomNameBumpingRevision(sourceKey: String, name: String?)
-
-    /** REMOTEEDIT: revision-aware number edit used by PATCH. */
-    @Query(
-        "UPDATE user_channels SET customNumber = :number, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setCustomNumberBumpingRevision(sourceKey: String, number: Int?)
-
-    /** REMOTEEDIT: revision-aware group assignment used by PATCH. */
-    @Query(
-        "UPDATE user_channels SET groupId = :groupId, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setGroupBumpingRevision(sourceKey: String, groupId: Long?)
-
-    /** REMOTEEDIT: revision-aware reorder used by PATCH and batch moves. */
-    @Query(
-        "UPDATE user_channels SET sortOrder = :sortOrder, revision = revision + 1 " +
-            "WHERE sourceKey = :sourceKey",
-    )
-    suspend fun setSortOrderBumpingRevision(sourceKey: String, sortOrder: Int)
-
     @Upsert
     suspend fun upsertChannels(channels: List<UserChannelEntity>)
 

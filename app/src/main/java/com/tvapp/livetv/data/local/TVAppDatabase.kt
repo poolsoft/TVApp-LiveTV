@@ -18,9 +18,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvProgramEntity::class,
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
-        PairedDeviceEntity::class,
     ],
-    version = 25,
+    version = 24,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -28,7 +27,6 @@ abstract class TVAppDatabase : RoomDatabase() {
     abstract fun iptvDao(): IptvDao
     abstract fun xmlTvDao(): XmlTvDao
     abstract fun xtreamEpgDao(): XtreamEpgDao
-    abstract fun pairedDeviceDao(): PairedDeviceDao
 
     companion object {
         @Volatile
@@ -63,7 +61,7 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_21_22,
                 MIGRATION_22_23,
                 MIGRATION_23_24,
-                MIGRATION_24_25,
+                MIGRATION_25_24,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
@@ -414,32 +412,6 @@ abstract class TVAppDatabase : RoomDatabase() {
             }
         }
 
-        internal val MIGRATION_24_25 = object : Migration(24, 25) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // REMOTEEDIT Sprint R2: per-row edit revision for conflict-aware
-                // remote edits and the paired-device registry. Non-destructive:
-                // existing user data is preserved; new columns default to 0/empty.
-                db.execSQL(
-                    "ALTER TABLE `user_channels` " +
-                        "ADD COLUMN `revision` INTEGER NOT NULL DEFAULT 0",
-                )
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `paired_devices` (" +
-                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                        "`deviceName` TEXT NOT NULL, " +
-                        "`pairedAt` INTEGER NOT NULL, " +
-                        "`lastSeenAt` INTEGER NOT NULL, " +
-                        "`tokenHash` TEXT NOT NULL" +
-                        ")",
-                )
-                db.execSQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS " +
-                        "`index_paired_devices_tokenHash` ON `paired_devices` (`tokenHash`)" +
-                        "",
-                )
-            }
-        }
-
         internal val MIGRATION_23_24 = object : Migration(23, 24) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Covers the VOD home queries that filter by contentType and sort
@@ -454,6 +426,59 @@ abstract class TVAppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS " +
                         "`index_iptv_channels_contentType_groupTitle` " +
                         "ON `iptv_channels` (`contentType`, `groupTitle`)",
+                )
+            }
+        }
+
+        /** Rollback of the REMOTEEDIT experiment (DB v25 → v24): drops the
+         *  paired_devices registry and the user_channels.revision column.
+         *  Non-destructive: all user data (custom order/number/name, favorite,
+         *  hidden, groups, IPTV sources) survives the downgrade via the
+         *  table-rebuild dance SQLite requires for DROP COLUMN. */
+        internal val MIGRATION_25_24 = object : Migration(25, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP INDEX IF EXISTS `index_paired_devices_tokenHash`")
+                db.execSQL("DROP TABLE IF EXISTS `paired_devices`")
+                db.execSQL(
+                    "CREATE TABLE `_new_user_channels` (" +
+                        "`sourceKey` TEXT NOT NULL, " +
+                        "`sourceType` TEXT NOT NULL, " +
+                        "`originalDisplayNumber` TEXT NOT NULL, " +
+                        "`lastKnownName` TEXT NOT NULL, " +
+                        "`customNumber` INTEGER, " +
+                        "`customName` TEXT, " +
+                        "`sortOrder` INTEGER NOT NULL, " +
+                        "`favorite` INTEGER NOT NULL, " +
+                        "`hidden` INTEGER NOT NULL, " +
+                        "`groupId` INTEGER, " +
+                        "`epgIdOverride` TEXT, " +
+                        "`epgSourceIdOverride` INTEGER, " +
+                        "`playbackEngineOverride` TEXT, " +
+                        "`lastSeenAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`sourceKey`), " +
+                        "FOREIGN KEY(`groupId`) REFERENCES `channel_groups`(`id`) " +
+                        "ON UPDATE NO ACTION ON DELETE SET NULL )",
+                )
+                db.execSQL(
+                    "INSERT INTO `_new_user_channels` (" +
+                        "`sourceKey`, `sourceType`, `originalDisplayNumber`, `lastKnownName`, " +
+                        "`customNumber`, `customName`, `sortOrder`, `favorite`, `hidden`, " +
+                        "`groupId`, `epgIdOverride`, `epgSourceIdOverride`, " +
+                        "`playbackEngineOverride`, `lastSeenAt`) " +
+                        "SELECT `sourceKey`, `sourceType`, `originalDisplayNumber`, `lastKnownName`, " +
+                        "`customNumber`, `customName`, `sortOrder`, `favorite`, `hidden`, " +
+                        "`groupId`, `epgIdOverride`, `epgSourceIdOverride`, " +
+                        "`playbackEngineOverride`, `lastSeenAt` FROM `user_channels`",
+                )
+                db.execSQL("DROP TABLE `user_channels`")
+                db.execSQL("ALTER TABLE `_new_user_channels` RENAME TO `user_channels`")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_channels_groupId` " +
+                        "ON `user_channels` (`groupId`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_user_channels_sortOrder` " +
+                        "ON `user_channels` (`sortOrder`)",
                 )
             }
         }
