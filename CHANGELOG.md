@@ -5,6 +5,10 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### XMLTV Gece Yenilemesi Ayarları (Ayarlar > Kanallar)
+* **Aç/kapa + saat seçimi:** Kanallar sayfasına "XMLTV gece yenileme" bölümü eklendi: "Gece yenileme (EPG taze tut)" düğmesi ve 00:00–23:00 arası yenileme saati seçimi. Her iki ayar da TV ve mobil paketlerinde aynı şekilde çalışır; saat seçimi mevcut kumanda uyumlu choice satırıdır (sol/sağ ile değiştirilir).
+* **Anında uygulama:** Düğme kapatıldığında JobScheduler job'u hemen iptal edilir; açıkken veya saat değiştiğinde job yeni pencereye yeniden planlanır. Kayıtlı URL kaynağı yoksa job planlanmaz. Ayar `nightly-refresh` preference dosyasında saklanır; uygulama yeniden başlatmalarında korunur.
+* **Ayar değişikliklerinde hata kaydı:** Job planlaması beklenmedik şekilde başarısız olursa `NIGHTLY_REFRESH_SETTING_FAILURE` debug loga yazılır.
 ### XMLTV Gece Yenileme Politikası (JobScheduler)
 * **EPG hep taze, kullanıcı etkileşimi bozulmaz:** Kayıtlı XMLTV URL kaynakları artık her gece yerel saat ~04:00 penceresinde cihaz boşken sessizce yenilenir. Job minimum 6 saatlik flex penceresiyle planlanır; cihaz o sırada uyanıksa pencere içinde, değilse sabah ilk açılışta koşar; `setPersisted(true)` ile yeniden başlatmalarda kaybolmaz. Pil düşükse bekler (`setRequiresBatteryNotLow`).
 * **Kapsam:** Gece işi tüm etkin URL kaynaklarını yeniler, ardından Xtream kısa EPG'yi tazeler ve süresi geçmiş programları temizler; tek kaynağın hatası diğerlerini engellemez. Başarı (`NIGHTLY_REFRESH_SUCCESS`) ve hata (`NIGHTLY_REFRESH_FAILURE`) mevcut debug log tesisine yazılır.

@@ -32,6 +32,8 @@ import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
 import com.tvapp.livetv.settings.IptvPlaybackPreferences
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
+import com.tvapp.livetv.settings.NightlyRefreshPreferences
+import com.tvapp.livetv.settings.NightlyRefreshPreferencesStore
 import com.tvapp.livetv.settings.SleepTimerStore
 import com.tvapp.livetv.settings.LogoCachePreferences
 import com.tvapp.livetv.settings.LogoCachePreferencesStore
@@ -63,6 +65,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var languageStore: AppLanguageStore
     private lateinit var xmlTvRepository: XmlTvRepository
+    private lateinit var nightlyRefreshStore: NightlyRefreshPreferencesStore
     private lateinit var logoCacheStore: LogoCachePreferencesStore
     private lateinit var externalPlayerStore: ExternalPlayerPreferencesStore
     private lateinit var iptvPlaybackStore: IptvPlaybackPreferencesStore
@@ -100,6 +103,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         sleepTimerStore = SleepTimerStore(this)
         languageStore = AppLanguageStore(this)
         xmlTvRepository = XmlTvRepository(this)
+        nightlyRefreshStore = NightlyRefreshPreferencesStore(this)
         logoCacheStore = LogoCachePreferencesStore(this)
         externalPlayerStore = ExternalPlayerPreferencesStore(this)
         iptvPlaybackStore = IptvPlaybackPreferencesStore(this)
@@ -320,7 +324,51 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         toggle(R.string.black_screen_while_tuning, current.blackScreenWhileTuning) {
             update { copy(blackScreenWhileTuning = it) }
         }
+        buildNightlyRefreshSettings()
     }
+
+    /** XMLTV gece yenileme: hem TV hem mobil paketlerinde aynı ayar satırları.
+     *  Saat seçimi kaydırma çarkı değil, mevcut choice satırıdır; kumandadan
+     *  sol/sağ ile değiştirilir. Kapatma job'u anında iptal eder. */
+    private fun buildNightlyRefreshSettings() {
+        section(R.string.nightly_refresh_section)
+        val preferences = nightlyRefreshStore.load()
+        var enabled = preferences.enabled
+        var startHour = preferences.startHour
+        toggle(R.string.nightly_refresh_enabled, enabled) { value ->
+            enabled = value
+            nightlyRefreshStore.save(
+                NightlyRefreshPreferences(enabled = enabled, startHour = startHour),
+            )
+            applyNightlyRefreshJob()
+            markChanged()
+        }
+        choice(
+            R.string.nightly_refresh_start_hour,
+            (0 until 24).map(::nightlyHourLabel),
+            startHour,
+        ) { index ->
+            startHour = index
+            nightlyRefreshStore.save(
+                NightlyRefreshPreferences(enabled = enabled, startHour = startHour),
+            )
+            applyNightlyRefreshJob()
+            markChanged()
+        }
+    }
+
+    private fun applyNightlyRefreshJob() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { xmlTvRepository.ensureNightlyRefresh() }
+                .onFailure { error ->
+                    XmlTvRepository.recordNightlyRefreshDebug(
+                        "NIGHTLY_REFRESH_SETTING_FAILURE | ${error.javaClass.name}: ${error.message}",
+                    )
+                }
+        }
+    }
+
+    private fun nightlyHourLabel(hour: Int): String = "%02d:00".format(hour)
 
     private fun buildIptvEpgSettings() {
         section(R.string.source_management)

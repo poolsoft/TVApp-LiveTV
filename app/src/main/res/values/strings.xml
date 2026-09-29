@@ -319,6 +319,9 @@
     <string name="subtitles_default">Kanal değişiminde altyazıyı açık tut</string>
     <string name="black_screen_while_tuning">Kanal değişiminde siyah ekran göster</string>
     <string name="black_screen_while_tuning_desc">Yeni kanal görüntüsü gelene kadar ekran siyah kalır; önceki kanalın donmuş görüntüsü gizlenir.</string>
+    <string name="nightly_refresh_section">XMLTV gece yenileme</string>
+    <string name="nightly_refresh_enabled">Gece yenileme (EPG taze tut)</string>
+    <string name="nightly_refresh_start_hour">Yenileme saati</string>
     <string name="startup_settings">Başlangıç</string>
     <string name="launch_tvapp_on_boot">Televizyon açıldığında TVApp’i başlat</string>
     <string name="top">Üstte</string>

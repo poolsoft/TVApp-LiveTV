@@ -11,6 +11,7 @@ import android.util.Xml
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.XtreamEpgProgramEntity
 import com.tvapp.livetv.diagnostics.CrashReportStore
+import com.tvapp.livetv.settings.NightlyRefreshPreferencesStore
 import com.tvapp.livetv.data.local.XmlTvProgramEntity
 import com.tvapp.livetv.data.local.XmlTvSourceEntity
 import com.tvapp.livetv.data.local.XmlTvChannelCatalogRow
@@ -273,16 +274,23 @@ class XmlTvRepository(context: Context) {
         )
     }
 
-    /** Gece yenileme politikası: kayıtlı XMLTV URL kaynaklarını her gece ~04:00
-     *  penceresinde sessizce taze tutar. TV'ler boşta (idle) moduna nadiren geçtiği
-     *  için zorunlu idle kullanılmaz; cihaz o saatte uyku modundaysa iş, sistem
-     *  uyandığında (bakım penceresi veya sabah açılışı) gecikmeden koşar. Pil
-     *  kısıtı TV'de pratikte her zaman sağlanır; kısıt yine de açık kalır. Süre sonu
-     *  pencereyi sabaha kadar sınırlar; böylece günde en az bir kez tazelenir ve
-     *  kullanıcı etkileşimi sırasında planlanmış ağ işi kuyruğa binmez. */
+    /** Gece yenileme politikası: kayıtlı XMLTV URL kaynaklarını her gece kullanıcı
+     *  seçimli yerel saatte (varsayılan ~04:00) sessizce taze tutar. TV'ler boşta
+     *  (idle) moduna nadiren geçtiği için zorunlu idle kullanılmaz; cihaz o saatte
+     *  uyku modundaysa iş, sistem uyandığında (bakım penceresi veya sabah açılışı)
+     *  gecikmeden koşar. Pil kısıtı TV'de pratikte her zaman sağlanır; kısıt yine
+     *  de açık kalır. Süre sonu pencereyi sabaha kadar sınırlar; böylece günde en
+     *  az bir kez tazelenir ve kullanıcı etkileşimi sırasında planlanmış ağ işi
+     *  kuyruğa binmez. Ayar > Kanallar'daki açma/kapama düğmesiyle yönetilir:
+     *  kapalıysa job planlanmaz/iptal edilir. */
     fun ensureNightlyRefresh() {
+        val preferences = NightlyRefreshPreferencesStore(appContext).load()
+        if (!preferences.enabled || !hasNightlyRefreshWork()) {
+            cancelNightlyRefresh()
+            return
+        }
         val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        val latency = nextNightlyWindowDelayMillis()
+        val latency = nextNightlyWindowDelayMillis(preferences.startHour)
         scheduler.schedule(
             JobInfo.Builder(
                 NIGHTLY_REFRESH_JOB_ID,
@@ -302,13 +310,12 @@ class XmlTvRepository(context: Context) {
         scheduler.cancel(NIGHTLY_REFRESH_JOB_ID)
     }
 
-    /** Sıradaki ~04:00 yerel gece penceresine kalan süre; hesap test edilebilir
-     *  NightlyRefreshWindows'a devredilir. */
-    private fun nextNightlyWindowDelayMillis(now: Long = System.currentTimeMillis()): Long =
-        NightlyRefreshWindows.nextWindowDelayMillis(
-            now,
-            NIGHTLY_REFRESH_WINDOW_START_HOUR,
-        )
+    /** Sıradaki kullanıcı seçimli yerel gece penceresine kalan süre; hesap test
+     *  edilebilir NightlyRefreshWindows'a devredilir. */
+    private fun nextNightlyWindowDelayMillis(
+        startHour: Int,
+        now: Long = System.currentTimeMillis(),
+    ): Long = NightlyRefreshWindows.nextWindowDelayMillis(now, startHour)
 
     /** Kayıtlı URL kaynağı kalmadıysa gece job'u iptal edilir; boşta iş yapmaz. */
     fun hasNightlyRefreshWork(): Boolean =
@@ -818,7 +825,6 @@ class XmlTvRepository(context: Context) {
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         const val NIGHTLY_REFRESH_JOB_ID = 0x545652
-        const val NIGHTLY_REFRESH_WINDOW_START_HOUR = 4
         const val NIGHTLY_REFRESH_FLEX_WINDOW_MS = 6 * 60 * 60 * 1_000L
         const val AUTO_REFRESH_THRESHOLD_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
