@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### Yayın Donmalarına Karşı Otomatik Kurtarma
+* **Donma sonrası sessiz ölüm engellendi:** IPTV yayın donduğunda izleyici (watchdog) zaten birkaç kez yeniden hazırlıyor ve tüm alternatif akışları deniyordu; hepsi tükenirse kanal ölü karede kalıyordu. Artık bu noktada aynı kanal için sınırlı sayıda (2) tam otomatik yeniden ayarlama (re-tune) yapılır; bunlar da yetmezse hata mesajı + Tekrar Dene düğümü kalıcı kurtarma yolu olarak kalır. Uygulama hiçbir koşulda kendi kendini kapatmaz.
+* **Crash güvenliği:** Alternatif akışa geçiş ve alternatif akış listesi veritabanı okuması artık yakalanan hataya dönüşür; beklenmedik bir oynatıcı hatası çökme yerine `IPTV_ALTERNATIVE_PLAY_FAILURE` / `IPTV_ALTERNATIVES_FAILURE` kaydı + ekranda hata iletisi olarak görünür. Süreç boyunca `IPTV_EXHAUSTED_RETUNE` kayıtları yazılır; başarılı oynatma sayaçları sıfırlar.
+### Kanal Değişiminde Siyah Ekranda Yayın Mesajı
+* **“TV yayını birazdan sunulacak” bildirimi:** “Kanal değişiminde siyah ekran göster” açıkken siyah ekranın ortasında artık bilgi mesajı gösterilir; yeni kanalın görüntüsü gelince mesaj da siyah ekranla birlikte kalkar. Kullanıcı ekranın bozuk değil, kanalın bağlanmakta olduğunu net anlar. Mesaj İngilizce arayüzde “TV broadcast starting soon” olarak görünür.
 ### XMLTV Gece Yenilemesi Ayarları (Ayarlar > Kanallar)
 * **Aç/kapa + saat seçimi:** Kanallar sayfasına "XMLTV gece yenileme" bölümü eklendi: "Gece yenileme (EPG taze tut)" düğmesi ve 00:00–23:00 arası yenileme saati seçimi. Her iki ayar da TV ve mobil paketlerinde aynı şekilde çalışır; saat seçimi mevcut kumanda uyumlu choice satırıdır (sol/sağ ile değiştirilir).
 * **Anında uygulama:** Düğme kapatıldığında JobScheduler job'u hemen iptal edilir; açıkken veya saat değiştiğinde job yeni pencereye yeniden planlanır. Kayıtlı URL kaynağı yoksa job planlanmaz. Ayar `nightly-refresh` preference dosyasında saklanır; uygulama yeniden başlatmalarında korunur.

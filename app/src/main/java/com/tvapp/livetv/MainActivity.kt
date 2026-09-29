@@ -158,6 +158,11 @@ class MainActivity : TvRemoteActivity() {
         private const val EPG_FOCUS_DEBOUNCE_MS = 300L
         private const val EPG_LIST_WINDOW_RADIUS = 5
         private const val IPTV_MAX_LIVE_OFFSET_MS = 60_000L
+        /** Max automatic full re-tunes after watchdog recovery is exhausted
+         *  before the failure OSD becomes the only recovery path. The
+         *  watchdog itself already re-prepares MAX_WATCHDOG_RECOVERY_COUNT
+         *  times and every alternative stream is tried first. */
+        private const val IPTV_EXHAUSTED_RETUNE_LIMIT = 2
         private const val IPTV_VOD_SEEK_STEP_MS = 30_000L
         private const val IPTV_LIBRARY_FILTER_PREFS = "iptv-library-filter"
         private const val IPTV_LIBRARY_SOURCE_ID = "source-id"
@@ -306,6 +311,8 @@ class MainActivity : TvRemoteActivity() {
     private var iptvAlternativeStreams: List<LiveChannel> = emptyList()
     private var iptvAlternativeIndex = 0
     private var iptvAlternativeLoadKey: String? = null
+    private var iptvExhaustedRetuneKey: String? = null
+    private var iptvExhaustedRetuneCount = 0
     private val openExternalSubtitle = registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -519,6 +526,8 @@ class MainActivity : TvRemoteActivity() {
             if (currentChannel?.sourceKey == iptvPlayback.tunedSourceKey()) {
                 val recoveredFromFailure = iptvPlaybackFailed
                 iptvPlaybackFailed = false
+                iptvExhaustedRetuneKey = null
+                iptvExhaustedRetuneCount = 0
                 setIptvBufferingVisible(false)
                 if (blackScreenActive) endBlackout("IPTV_PLAYBACK_READY")
                 if (recoveredFromFailure && binding.channelPanel.visibility != View.VISIBLE) {
@@ -1225,8 +1234,18 @@ class MainActivity : TvRemoteActivity() {
             ) {
                 iptvAlternativeStreams
             } else {
-                withContext(Dispatchers.IO) {
-                    iptvRepository.alternativeStreams(channel.sourceKey)
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        iptvRepository.alternativeStreams(channel.sourceKey)
+                    }
+                }.getOrElse { fetchError ->
+                    debugLog.recordDebug(
+                        "IPTV_ALTERNATIVES_FAILURE | key=${channel.sourceKey}, " +
+                            "${fetchError.javaClass.simpleName}: ${fetchError.message}",
+                    )
+                    showIptvPlaybackFailure(fetchError)
+                    recoverIptvExhaustedTune(channel)
+                    return@launch
                 }.also {
                     iptvAlternativeLoadKey = channel.sourceKey
                     iptvAlternativeStreams = it
@@ -1237,6 +1256,7 @@ class MainActivity : TvRemoteActivity() {
             val alternative = alternatives.getOrNull(iptvAlternativeIndex++)
             if (alternative == null) {
                 showIptvPlaybackFailure(error)
+                recoverIptvExhaustedTune(channel)
                 return@launch
             }
             val snapshot = iptvPlayback.playbackSnapshot()
@@ -1248,16 +1268,61 @@ class MainActivity : TvRemoteActivity() {
                     "index=$iptvAlternativeIndex/${alternatives.size}",
             )
             showIptvNotice(R.string.iptv_alternative_stream)
-            iptvPlayback.play(
-                channel.copy(
-                    uri = alternative.uri,
-                    userAgent = alternative.userAgent,
-                    referrer = alternative.referrer,
-                    subtitleUrl = alternative.subtitleUrl,
-                ),
-                startPosition,
-            )
+            // A failed alternative switch must never take the app down: the
+            // exception is contained here and surfaces as the failure OSD.
+            runCatching {
+                iptvPlayback.play(
+                    channel.copy(
+                        uri = alternative.uri,
+                        userAgent = alternative.userAgent,
+                        referrer = alternative.referrer,
+                        subtitleUrl = alternative.subtitleUrl,
+                    ),
+                    startPosition,
+                )
+            }.onFailure {
+                debugLog.recordDebug(
+                    "IPTV_ALTERNATIVE_PLAY_FAILURE | key=${channel.sourceKey}, " +
+                        "${it.javaClass.simpleName}: ${it.message}",
+                )
+                iptvAlternativeIndex--
+                showIptvPlaybackFailure(it)
+                recoverIptvExhaustedTune(channel)
+            }
         }
+    }
+
+    /** Last-resort guard for a stream that freezes and never recovers: the
+     *  watchdog has already re-prepared MAX_WATCHDOG_RECOVERY_COUNT times and
+     *  every alternative stream has failed, so the tune would otherwise die
+     *  silently on a frozen frame. Performs a bounded number of automatic
+     *  full re-tunes of the same channel; when they are used up the failure
+     *  OSD with the retry button stays the only recovery path. */
+    private fun recoverIptvExhaustedTune(channel: LiveChannel) {
+        if (currentChannel?.sourceKey != channel.sourceKey) return
+        if (iptvExhaustedRetuneKey != channel.sourceKey) {
+            iptvExhaustedRetuneKey = channel.sourceKey
+            iptvExhaustedRetuneCount = 0
+        }
+        if (iptvExhaustedRetuneCount >= IPTV_EXHAUSTED_RETUNE_LIMIT) {
+            debugLog.recordDebug(
+                "IPTV_EXHAUSTED_RETUNE_GIVE_UP | key=${channel.sourceKey}, " +
+                    "attempts=$iptvExhaustedRetuneCount",
+            )
+            return
+        }
+        iptvExhaustedRetuneCount++
+        val attempt = iptvExhaustedRetuneCount
+        debugLog.recordDebug(
+            "IPTV_EXHAUSTED_RETUNE | key=${channel.sourceKey}, " +
+                "attempt=$attempt/$IPTV_EXHAUSTED_RETUNE_LIMIT",
+        )
+        showIptvNotice(R.string.iptv_reconnecting)
+        // stop() resets the tuned key and playback state so selectChannel is
+        // not swallowed by the CHANNEL_SELECT_IGNORED connecting guard, and
+        // the fresh tune restarts the watchdog retry/alternative cycle.
+        iptvPlayback.stop()
+        selectChannel(channel, recordHistory = !currentPlaybackUsesIptvLibrary)
     }
 
     private fun showIptvPlaybackFailure(error: Throwable? = null) {

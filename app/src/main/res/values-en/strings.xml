@@ -306,6 +306,7 @@
     <string name="subtitles_default">Keep subtitles enabled when changing channels</string>
     <string name="black_screen_while_tuning">Show black screen while switching channels</string>
     <string name="black_screen_while_tuning_desc">The screen stays black until the new channel renders; the previous channel’s frozen picture stays hidden.</string>
+    <string name="blackout_message">TV broadcast starting soon</string>
     <string name="nightly_refresh_section">XMLTV nightly refresh</string>
     <string name="nightly_refresh_enabled">Nightly refresh (keep EPG fresh)</string>
     <string name="nightly_refresh_start_hour">Refresh time</string>
