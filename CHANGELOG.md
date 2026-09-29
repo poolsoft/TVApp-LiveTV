@@ -5,6 +5,11 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### XMLTV Gece Yenileme Politikası (JobScheduler)
+* **EPG hep taze, kullanıcı etkileşimi bozulmaz:** Kayıtlı XMLTV URL kaynakları artık her gece yerel saat ~04:00 penceresinde cihaz boşken sessizce yenilenir. Job minimum 6 saatlik flex penceresiyle planlanır; cihaz o sırada uyanıksa pencere içinde, değilse sabah ilk açılışta koşar; `setPersisted(true)` ile yeniden başlatmalarda kaybolmaz. Pil düşükse bekler (`setRequiresBatteryNotLow`).
+* **Kapsam:** Gece işi tüm etkin URL kaynaklarını yeniler, ardından Xtream kısa EPG'yi tazeler ve süresi geçmiş programları temizler; tek kaynağın hatası diğerlerini engellemez. Başarı (`NIGHTLY_REFRESH_SUCCESS`) ve hata (`NIGHTLY_REFRESH_FAILURE`) mevcut debug log tesisine yazılır.
+* **Yaşam döngüsü:** Job, XMLTV URL kaynağı eklenince/güncellenince planlanır; son URL kaynağı silindiğinde veya tüm veriler temizlendiğinde iptal edilir — boşta gereksiz iş yapmaz. Mevcut 12 saatlik periyodik job, gece penceresinin yedek güvencesi olarak kaldı.
+* **Test edilebilirlik:** Pencere gecikmesi hesabı saf `NightlyRefreshWindows` nesnesine taşındı (java.time, DST dahil) ve birim testiyle sabitlendi.
 ### IPTV/XMLTV İçe Aktarma Performansı ve Ana İş Parçacığı Denetimi
 * **XMLTV zaman çözümleme hızlandırıldı:** Programme `start/stop` ayrıştırma her program satırında üç `SimpleDateFormat` kuruyordu; artık önceden derlenmiş, thread-safe `java.time` biçimlendiricilerle (`XmlTvTime`) yapılıyor. Ofsetsiz zaman damgaları artık cihaz yereline değil UTC'ye düşer (XMLTV belirtimiyle uyumlu, cihazdan bağımsız kararlı sonuç).
 * **EPG anahtar normalizasyonu:** `normalizeEpgKey` içindeki üç regex her çağrıda yeniden derleniyordu; 100.000+ programlı içe aktarmada yüz binlerce `Pattern` derlemesi kesildi (kalıplar önceden derlenir, eşleştirme kuralları birebir korunur).

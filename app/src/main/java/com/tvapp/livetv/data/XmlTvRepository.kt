@@ -39,6 +39,12 @@ class XmlTvRepository(context: Context) {
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
     private val debugLog = CrashReportStore(appContext)
 
+    init {
+        // JobService kısa ömürlü örneklerden arayüz dışı hata kaydı için statik köprü;
+        // log yazımı zaten CrashReportLogWriter iş parçacığına devredilir.
+        staticDebugLog = debugLog
+    }
+
     fun sources(): List<XmlTvSourceEntity> = dao.sources()
 
     fun sourceSummaries(): List<XmlTvSourceSummary> = sources().map { source ->
@@ -151,6 +157,7 @@ class XmlTvRepository(context: Context) {
                 )
             }.also {
                 ensurePeriodicRefresh()
+                ensureNightlyRefresh()
             }
         } finally {
             connection.disconnect()
@@ -202,7 +209,10 @@ class XmlTvRepository(context: Context) {
         }
         updateSourceSummary()
         EpgSnapshotCache.invalidateAll()
-        if (sources().none { it.kind == KIND_URL }) cancelPeriodicRefresh()
+        if (sources().none { it.kind == KIND_URL }) {
+            cancelPeriodicRefresh()
+            cancelNightlyRefresh()
+        }
     }
 
     fun refreshSource(
@@ -247,6 +257,7 @@ class XmlTvRepository(context: Context) {
         legacyCacheFile.delete()
         EpgSnapshotCache.invalidateAll()
         cancelPeriodicRefresh()
+        cancelNightlyRefresh()
     }
 
     fun ensurePeriodicRefresh() {
@@ -257,10 +268,51 @@ class XmlTvRepository(context: Context) {
                 ComponentName(appContext, XmlTvRefreshJobService::class.java),
             )
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                .setPeriodic(REFRESH_INTERVAL_MS)
+                .setPeriodic(REFRESH_INTERVAL_MS, REFRESH_INTERVAL_MS / 2)
                 .build(),
         )
     }
+
+    /** Gece yenileme politikası: kayıtlı XMLTV URL kaynaklarını her gece ~04:00
+     *  penceresinde sessizce taze tutar. TV'ler boşta (idle) moduna nadiren geçtiği
+     *  için zorunlu idle kullanılmaz; cihaz o saatte uyku modundaysa iş, sistem
+     *  uyandığında (bakım penceresi veya sabah açılışı) gecikmeden koşar. Pil
+     *  kısıtı TV'de pratikte her zaman sağlanır; kısıt yine de açık kalır. Süre sonu
+     *  pencereyi sabaha kadar sınırlar; böylece günde en az bir kez tazelenir ve
+     *  kullanıcı etkileşimi sırasında planlanmış ağ işi kuyruğa binmez. */
+    fun ensureNightlyRefresh() {
+        val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        val latency = nextNightlyWindowDelayMillis()
+        scheduler.schedule(
+            JobInfo.Builder(
+                NIGHTLY_REFRESH_JOB_ID,
+                ComponentName(appContext, XmlTvRefreshJobService::class.java),
+            )
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                .setMinimumLatency(latency)
+                .setOverrideDeadline(latency + NIGHTLY_REFRESH_FLEX_WINDOW_MS)
+                .setRequiresBatteryNotLow(true)
+                .setPersisted(true)
+                .build(),
+        )
+    }
+
+    fun cancelNightlyRefresh() {
+        val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        scheduler.cancel(NIGHTLY_REFRESH_JOB_ID)
+    }
+
+    /** Sıradaki ~04:00 yerel gece penceresine kalan süre; hesap test edilebilir
+     *  NightlyRefreshWindows'a devredilir. */
+    private fun nextNightlyWindowDelayMillis(now: Long = System.currentTimeMillis()): Long =
+        NightlyRefreshWindows.nextWindowDelayMillis(
+            now,
+            NIGHTLY_REFRESH_WINDOW_START_HOUR,
+        )
+
+    /** Kayıtlı URL kaynağı kalmadıysa gece job'u iptal edilir; boşta iş yapmaz. */
+    fun hasNightlyRefreshWork(): Boolean =
+        sources().any { it.kind == KIND_URL && it.enabled }
 
     fun requestXtreamRefresh(force: Boolean = false) {
         val scheduler = appContext.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
@@ -742,6 +794,14 @@ class XmlTvRepository(context: Context) {
     private fun String.normalize(): String = normalizeEpgKey()
 
     companion object {
+        @Volatile
+        private var staticDebugLog: CrashReportStore? = null
+
+        /** Arayüz dışı gece yenileme hatalarını mevcut debug log tesisine yazar. */
+        fun recordNightlyRefreshDebug(event: String) {
+            staticDebugLog?.recordDebug(event)
+        }
+
         internal const val XTREAM_REFRESH_JOB_ID = 0x545651
         internal const val EXTRA_FORCE_REFRESH = "force-xtream-refresh"
         const val KEY_SOURCE = "source"
@@ -757,6 +817,9 @@ class XmlTvRepository(context: Context) {
         const val XTREAM_MIN_INTERVAL_MS = 6 * 60 * 60 * 1_000L
         const val REFRESH_JOB_ID = 0x545650
         const val REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1_000L
+        const val NIGHTLY_REFRESH_JOB_ID = 0x545652
+        const val NIGHTLY_REFRESH_WINDOW_START_HOUR = 4
+        const val NIGHTLY_REFRESH_FLEX_WINDOW_MS = 6 * 60 * 60 * 1_000L
         const val AUTO_REFRESH_THRESHOLD_MS = 12 * 60 * 60 * 1_000L
         private const val XTREAM_REFRESH_DELAY_MS = 1_000L
         private const val NORMALIZATION_VERSION = 2

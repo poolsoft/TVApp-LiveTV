@@ -20,22 +20,52 @@ class XmlTvRefreshJobService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         refreshJobs[params.jobId] = scope.launch {
             val needsRetry = refreshMutex.withLock {
-                runCatching {
+                val outcome = runCatching {
                     val repository = XmlTvRepository(this@XmlTvRefreshJobService)
-                    if (params.jobId == XmlTvRepository.XTREAM_REFRESH_JOB_ID) {
-                        repository.refreshXtreamShortEpg(
-                            force = params.extras.getBoolean(XmlTvRepository.EXTRA_FORCE_REFRESH),
-                        )
-                    } else {
-                        repository.refreshSavedUrls()
-                        repository.refreshXtreamShortEpg(force = true)
+                    when (params.jobId) {
+                        XmlTvRepository.XTREAM_REFRESH_JOB_ID ->
+                            repository.refreshXtreamShortEpg(
+                                force = params.extras.getBoolean(XmlTvRepository.EXTRA_FORCE_REFRESH),
+                            )
+                        XmlTvRepository.NIGHTLY_REFRESH_JOB_ID -> nightlyRefresh(repository)
+                        else -> {
+                            repository.refreshSavedUrls()
+                            repository.refreshXtreamShortEpg(force = true)
+                        }
                     }
-                }.isFailure
+                }
+                outcome
+                    .onSuccess { imported ->
+                        if (params.jobId == XmlTvRepository.NIGHTLY_REFRESH_JOB_ID) {
+                            XmlTvRepository.recordNightlyRefreshDebug(
+                                "NIGHTLY_REFRESH_SUCCESS | programs=$imported",
+                            )
+                        }
+                    }
+                    .onFailure { error ->
+                        // Sessiz gece işinde arayüz yok; kalıcı operasyonel hata
+                        // mevcut debug log tesisine yazılır (hassas veri içermez).
+                        XmlTvRepository.recordNightlyRefreshDebug(
+                            "NIGHTLY_REFRESH_FAILURE | ${error.javaClass.name}: ${error.message}",
+                        )
+                    }
+                outcome.isFailure
             }
             refreshJobs.remove(params.jobId)
             jobFinished(params, needsRetry)
         }
         return true
+    }
+
+    /** Gece penceresinde EPG'yi taze tutar: tüm etkin URL kaynakları, ardından
+     *  Xtream kısa EPG ve süresi geçmiş program temizliği. Her kaynak kendi
+     *  kayıt hatası güncellemesini alır; bir kaynak başarısız olsa bile diğerleri
+     *  yenilenir. */
+    private suspend fun nightlyRefresh(repository: XmlTvRepository): Int {
+        val sourceCount = repository.refreshSavedUrls()
+        repository.refreshXtreamShortEpg(force = true)
+        repository.purgeExpiredPrograms()
+        return sourceCount
     }
 
     override fun onStopJob(params: JobParameters): Boolean {
