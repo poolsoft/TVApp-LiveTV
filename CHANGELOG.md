@@ -5,6 +5,9 @@ Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri
 ---
 
 ## [Geliştirme / En Son Değişiklikler]
+### IPTV Watchdog Kurtarma Denemelerine Geri Çekim (Backoff)
+* **Yavaş sunucuya anlık tekrar tekrar vurma yok:** İzleyicinin (watchdog) yeniden hazırlama (re-prepare) denemeleri artık geri çekimli: 1. deneme anında yapılır, sonraki denemeler 2 sn, 4 sn, 6 sn… şeklinde gecikmeli (8 sn üst sınır). Sunucu yavaşladığında veya kısıtladığında oynatıcı üst üste anında bağlanma denemeleriyle sunucuyu zorlamaz; yayın birkaç saniye içinde geri döner.
+* **Kendiliğinden düzelme beklemeyi iptal eder:** Geri çekim beklerken yayın kendiliğinden iyileşirse (READY durumu, ilk kare) bekleyen gecikmeli deneme iptal edilir; kanal değişimi, stop/release ve manuel Tekrar Dene de bekleyen denemeyi temizler. Bekleme sürerken watchdog yeniden sayım yapmaz, deneme sayacı şişmez. Deneme gecikme hesabı test edilebilir saf fonksiyona taşındı (`IptvPlaybackHealthTest`).
 ### Yayın Donmalarına Karşı Otomatik Kurtarma
 * **Donma sonrası sessiz ölüm engellendi:** IPTV yayın donduğunda izleyici (watchdog) zaten birkaç kez yeniden hazırlıyor ve tüm alternatif akışları deniyordu; hepsi tükenirse kanal ölü karede kalıyordu. Artık bu noktada aynı kanal için sınırlı sayıda (2) tam otomatik yeniden ayarlama (re-tune) yapılır; bunlar da yetmezse hata mesajı + Tekrar Dene düğümü kalıcı kurtarma yolu olarak kalır. Uygulama hiçbir koşulda kendi kendini kapatmaz.
 * **Crash güvenliği:** Alternatif akışa geçiş ve alternatif akış listesi veritabanı okuması artık yakalanan hataya dönüşür; beklenmedik bir oynatıcı hatası çökme yerine `IPTV_ALTERNATIVE_PLAY_FAILURE` / `IPTV_ALTERNATIVES_FAILURE` kaydı + ekranda hata iletisi olarak görünür. Süreç boyunca `IPTV_EXHAUSTED_RETUNE` kayıtları yazılır; başarılı oynatma sayaçları sıfırlar.

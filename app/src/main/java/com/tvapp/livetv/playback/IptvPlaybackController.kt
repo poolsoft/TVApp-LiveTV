@@ -58,6 +58,11 @@ class IptvPlaybackController(
     private var recoveryAttempt = 0
     private var recoveryExhausted = false
     private var bufferingStartedAt: Long? = null
+    /** ElapsedRealtime deadline of the currently scheduled delayed watchdog
+     *  re-prepare, or null when no recovery is pending. Kept separately from
+     *  retryHandler bookkeeping so state transitions can cancel a pending
+     *  attempt even after the handler callbacks were already removed. */
+    private var pendingRecoveryAt: Long? = null
     private val playbackPreferencesStore = IptvPlaybackPreferencesStore(appContext)
     private var playbackPreferences = playbackPreferencesStore.load()
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
@@ -80,6 +85,23 @@ class IptvPlaybackController(
             current.prepare()
             current.playWhenReady = true
         }
+    }
+    /** Executes one deferred watchdog re-prepare. Runs on the main handler
+     *  after the backoff delay; guarded by tune generation so a channel
+     *  switch or stop can never let it fire into the new playback. */
+    private val recoveryRunnable = Runnable {
+        val generation = tuneGeneration
+        pendingRecoveryAt = null
+        if (released || generation != tuneGeneration) return@Runnable
+        currentChannel ?: return@Runnable
+        val current = player ?: return@Runnable
+        explicitLoading = false
+        bufferingStartedAt = SystemClock.elapsedRealtime()
+        updateHealthPhase(IptvPlaybackPhase.BUFFERING)
+        current.prepare()
+        current.playWhenReady = true
+        resetProgressObservation()
+        tuneStartedAt = SystemClock.elapsedRealtime()
     }
     private val watchdogRunnable = object : Runnable {
         override fun run() {
@@ -104,12 +126,41 @@ class IptvPlaybackController(
     var onHealthChanged: ((IptvPlaybackHealthSnapshot) -> Unit)? = null
     var onRecovery: ((IptvRecoveryEvent) -> Unit)? = null
 
+    /** Cancels a watchdog re-prepare that is still waiting out its backoff.
+     *  Called when the stream makes progress on its own (READY state, first
+     *  frame) or the tune ends, so a delayed attempt never fires into a
+     *  recovered or replaced playback. */
+    private fun cancelPendingWatchdogRecovery() {
+        pendingRecoveryAt = null
+        retryHandler.removeCallbacks(recoveryRunnable)
+    }
+
+    /** Schedules a backoff delay for watchdog recovery attempts beyond the
+     *  first: attempt 1 re-prepares immediately, later attempts wait 2s, 4s,
+     *  6s... capped at 8s so a struggling server is given room to breathe
+     *  instead of being hammered with instant re-prepares. */
+    private fun scheduleWatchdogRecovery() {
+        val generation = tuneGeneration
+        val delayMillis = iptvWatchdogRecoveryDelayMillis(
+            attempt = recoveryAttempt,
+            base = WATCHDOG_RECOVERY_BACKOFF_BASE_MS,
+            max = WATCHDOG_RECOVERY_BACKOFF_MAX_MS,
+        )
+        if (delayMillis <= 0L) {
+            recoveryRunnable.run()
+            return
+        }
+        pendingRecoveryAt = SystemClock.elapsedRealtime() + delayMillis
+        retryHandler.postDelayed(recoveryRunnable, delayMillis)
+    }
+
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
         released = false
         tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
+        cancelPendingWatchdogRecovery()
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
@@ -194,6 +245,7 @@ class IptvPlaybackController(
                             bufferingStartedAt = null
                             retryHandler.removeCallbacks(retryRunnable)
                             retryCount = 0
+                            cancelPendingWatchdogRecovery()
                             hasReachedReady = true
                             explicitLoading = false
                             updateHealthPhase(IptvPlaybackPhase.READY)
@@ -203,6 +255,7 @@ class IptvPlaybackController(
                         }
                         Player.STATE_ENDED, Player.STATE_IDLE -> {
                             bufferingStartedAt = null
+                            cancelPendingWatchdogRecovery()
                             updateHealthPhase(
                                 if (playbackState == Player.STATE_ENDED) {
                                     IptvPlaybackPhase.ENDED
@@ -261,6 +314,7 @@ class IptvPlaybackController(
                     val now = SystemClock.elapsedRealtime()
                     if (firstFrameAt == null) firstFrameAt = now
                     lastFrameAt = now
+                    cancelPendingWatchdogRecovery()
                     recoveryAttempt = 0
                     recoveryExhausted = false
                     onHealthChanged?.invoke(healthSnapshot())
@@ -321,6 +375,7 @@ class IptvPlaybackController(
         tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
+        cancelPendingWatchdogRecovery()
         retryCount = 0
         onBuffering?.invoke(IptvBufferingState.NONE)
         player?.stop()
@@ -407,6 +462,7 @@ class IptvPlaybackController(
     fun retry(): Boolean {
         val current = player ?: return false
         retryHandler.removeCallbacks(retryRunnable)
+        cancelPendingWatchdogRecovery()
         retryCount = 0
         recoveryAttempt = 0
         recoveryExhausted = false
@@ -653,6 +709,7 @@ class IptvPlaybackController(
     fun release() {
         tuneGeneration++
         released = true
+        cancelPendingWatchdogRecovery()
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
         onBuffering?.invoke(IptvBufferingState.NONE)
@@ -719,6 +776,7 @@ class IptvPlaybackController(
 
     private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
         val channel = currentChannel ?: return null
+        if (pendingRecoveryAt != null) return null
         if (recoveryExhausted) return null
         val current = player ?: return null
         if (!current.playWhenReady || current.playbackState == Player.STATE_ENDED) {
@@ -773,13 +831,12 @@ class IptvPlaybackController(
             return
         }
         onRecovery?.invoke(IptvRecoveryEvent(reason, IptvRecoveryAction.REPREPARE, recoveryAttempt))
-        explicitLoading = false
-        bufferingStartedAt = SystemClock.elapsedRealtime()
-        updateHealthPhase(IptvPlaybackPhase.BUFFERING)
-        current.prepare()
-        current.playWhenReady = true
-        resetProgressObservation()
-        tuneStartedAt = SystemClock.elapsedRealtime()
+        // Attempt 1 re-prepares immediately; later attempts wait out their
+        // backoff first so an overloaded server is not re-hit every 2s. The
+        // watchdog stays quiet while a recovery is pending, and the wait is
+        // cancelled if the stream recovers on its own meanwhile.
+        cancelPendingWatchdogRecovery()
+        scheduleWatchdogRecovery()
     }
 
     private fun updateHealthPhase(phase: IptvPlaybackPhase) {
@@ -817,6 +874,8 @@ class IptvPlaybackController(
         const val STALL_TIMEOUT_MS = 12_000L
         const val MIN_PROGRESS_MS = 500L
         const val MAX_WATCHDOG_RECOVERY_COUNT = 2
+        const val WATCHDOG_RECOVERY_BACKOFF_BASE_MS = 2_000L
+        const val WATCHDOG_RECOVERY_BACKOFF_MAX_MS = 8_000L
         const val ADAPTIVE_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 2_500
         const val ADAPTIVE_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 1_000
         const val ADAPTIVE_MIN_DURATION_TO_RETAIN_MS = 2_000

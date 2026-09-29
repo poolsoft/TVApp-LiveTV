@@ -80,6 +80,20 @@ data class IptvPlaybackHealthSnapshot(
     val fallbackReason: String? = null,
 )
 
+/** Backoff for watchdog recovery attempts: the first attempt re-prepares
+ *  immediately, later attempts wait longer so an overloaded or throttling
+ *  server is not hammered with instant re-prepares. The growth is linear
+ *  (base per extra attempt) and capped so a live channel still returns
+ *  within a few seconds. */
+internal fun iptvWatchdogRecoveryDelayMillis(
+    attempt: Int,
+    base: Long,
+    max: Long,
+): Long = when {
+    attempt <= 1 -> 0L
+    else -> (base * (attempt - 1)).coerceAtMost(max)
+}
+
 internal fun classifyIptvPlaybackFailure(errorCodeName: String): IptvPlaybackFailureClass {
     val code = errorCodeName.uppercase()
     return when {

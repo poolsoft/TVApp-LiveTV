@@ -57,6 +57,15 @@ class IptvPlaybackHealthTest {
         assertEquals(null, reason(expectsVideo = true, isBuffering = true, bufferingMillis = 5_000))
     }
 
+    @Test
+    fun watchdogRecoveryBackoffGrowsAndCaps() {
+        assertEquals(0L, iptvWatchdogRecoveryDelayMillis(0, base = 2_000, max = 8_000))
+        assertEquals(0L, iptvWatchdogRecoveryDelayMillis(1, base = 2_000, max = 8_000))
+        assertEquals(2_000L, iptvWatchdogRecoveryDelayMillis(2, base = 2_000, max = 8_000))
+        assertEquals(4_000L, iptvWatchdogRecoveryDelayMillis(3, base = 2_000, max = 8_000))
+        assertEquals(8_000L, iptvWatchdogRecoveryDelayMillis(9, base = 2_000, max = 8_000))
+    }
+
     private fun reason(
         expectsVideo: Boolean,
         firstFrameRendered: Boolean = false,
