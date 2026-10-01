@@ -11,6 +11,20 @@ import com.tvapp.livetv.tifinput.SharedIptvInputChannel
 
 @Dao
 interface IptvDao {
+    @Query("UPDATE iptv_sources SET name = :name WHERE id = :sourceId")
+    suspend fun renameSource(sourceId: Long, name: String)
+    @Query("SELECT liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery FROM iptv_sources WHERE id = :sourceId")
+    suspend fun sourcePlaybackOptions(sourceId: Long): com.tvapp.livetv.settings.IptvSourcePlaybackOptions?
+
+    @Query("UPDATE iptv_sources SET liveBufferSeconds = :liveBuffer, vodBufferSeconds = :vodBuffer, maximumVideoHeight = :height, automaticRecovery = :recovery WHERE id = :sourceId")
+    suspend fun updateSourcePlaybackOptions(sourceId: Long, liveBuffer: Int?, vodBuffer: Int?, height: Int?, recovery: Boolean?)
+
+    @Query("UPDATE iptv_sources SET liveBufferSeconds = :seconds WHERE id = :sourceId")
+    suspend fun updateLiveBuffer(sourceId: Long, seconds: Int)
+
+    @Query("UPDATE iptv_sources SET vodBufferSeconds = :seconds WHERE id = :sourceId")
+    suspend fun updateVodBuffer(sourceId: Long, seconds: Int)
+
     @Query(
         "SELECT SUBSTR(TRIM(displayName), 1, 1) AS initial, MIN(originalIndex) AS firstIndex " +
             "FROM iptv_channels WHERE sourceId = :sourceId " +

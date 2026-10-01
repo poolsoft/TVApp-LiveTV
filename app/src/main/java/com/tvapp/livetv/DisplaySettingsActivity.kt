@@ -408,6 +408,22 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             markChanged()
         }
         val speedOptions = IptvPlaybackPreferences.SPEED_OPTIONS
+        val qualityHeights = IptvPlaybackPreferences.QUALITY_HEIGHT_OPTIONS
+        choice(
+            R.string.iptv_maximum_video_height,
+            qualityHeights.map { height ->
+                if (height == 0) getString(R.string.iptv_quality_auto)
+                else getString(R.string.iptv_maximum_video_height_value, height)
+            },
+            qualityHeights.indexOf(iptvPlaybackPreferences.maximumVideoHeight).coerceAtLeast(0),
+        ) { index ->
+            iptvPlaybackStore.saveMaximumVideoHeight(qualityHeights[index])
+            markChanged()
+        }
+        toggle(R.string.iptv_automatic_recovery, iptvPlaybackPreferences.automaticRecovery) {
+            iptvPlaybackStore.saveAutomaticRecovery(it)
+            markChanged()
+        }
         choice(
             R.string.iptv_default_vod_speed,
             speedOptions.map { String.format(java.util.Locale.getDefault(), "%.2gx", it) },

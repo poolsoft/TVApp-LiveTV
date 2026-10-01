@@ -93,8 +93,16 @@ class IptvRepository(context: Context) {
     suspend fun rename(source: IptvSourceEntity, name: String) {
         val normalized = name.trim()
         require(normalized.isNotBlank()) { "Liste adi bos olamaz." }
-        dao.updateSource(source.copy(name = normalized))
+        dao.renameSource(source.id, normalized)
         notifySharedChannelsChanged()
+    }
+
+    suspend fun saveSourcePlaybackOptions(sourceId: Long, options: com.tvapp.livetv.settings.IptvSourcePlaybackOptions) {
+        require(options.liveBufferSeconds == null || options.liveBufferSeconds in com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS)
+        require(options.vodBufferSeconds == null || options.vodBufferSeconds in com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS)
+        require(options.maximumVideoHeight == null || options.maximumVideoHeight in com.tvapp.livetv.settings.IptvPlaybackPreferences.QUALITY_HEIGHT_OPTIONS)
+        dao.updateSourcePlaybackOptions(sourceId, options.liveBufferSeconds, options.vodBufferSeconds,
+            options.maximumVideoHeight, options.automaticRecovery)
     }
 
     suspend fun sourceCategories(sourceId: Long): List<String> =
@@ -670,7 +678,8 @@ class IptvRepository(context: Context) {
                 var selectionFinishedAt = readingFinishedAt
                 var replacementFinishedAt = readingFinishedAt
                 val imported = database.withTransaction {
-                    val existing = replacementSource ?: dao.getSourceByLocation(location)
+                    val existing = replacementSource?.let { dao.getSource(it.id) }
+                        ?: dao.getSourceByLocation(location)
                     val sourceId = existing?.id ?: dao.insertSource(
                         IptvSourceEntity(
                             name = name,

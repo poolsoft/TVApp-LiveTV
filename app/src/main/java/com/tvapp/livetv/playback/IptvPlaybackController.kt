@@ -26,6 +26,17 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
+import com.tvapp.livetv.settings.IptvSourcePlaybackOptions
+import com.tvapp.livetv.data.local.TVAppDatabase
+import com.tvapp.livetv.diagnostics.CrashReportStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.tvapp.livetv.ui.isRadioChannel
 import java.util.Locale
 
@@ -68,6 +79,13 @@ class IptvPlaybackController(
     private var targetBufferSeconds = playbackPreferences.targetBufferSeconds
     private var vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
     private var muted = false
+    private val preparationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var preparationJob: Job? = null
+    private var bufferSaveJob: Job? = null
+    private val database by lazy { TVAppDatabase.getInstance(appContext) }
+    private var sourcePlaybackOptions = IptvSourcePlaybackOptions()
+    private var automaticRecovery = true
+    private var maximumVideoHeight = 0
 
     /** Incremented on every play()/stop()/release(). Everything queued on
      *  retryHandler and every player callback carries the generation it was
@@ -156,17 +174,68 @@ class IptvPlaybackController(
 
     fun play(channel: LiveChannel, startPositionMillis: Long = 0L) {
         require(channel.source == LiveChannel.Source.IPTV)
-        released = false
+        preparationJob?.cancel()
+        released = true
         tuneGeneration++
+        val generation = tuneGeneration
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
         cancelPendingWatchdogRecovery()
+        player?.stop()
+        player?.clearMediaItems()
+        currentChannel = channel
+        automaticRecovery = false
+        healthPhase = IptvPlaybackPhase.PREPARING
+        preparationJob = preparationScope.launch {
+            val options = try {
+                withContext(Dispatchers.IO) {
+                    sourceId(channel)?.let { database.iptvDao().sourcePlaybackOptions(it) }
+                        ?: IptvSourcePlaybackOptions()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (generation != tuneGeneration) return@launch
+                CrashReportStore(appContext).recordDebug("IPTV_PROFILE_LOAD_FAILURE | ${error.javaClass.simpleName}")
+                healthPhase = IptvPlaybackPhase.FAILED
+                onPlaybackError?.invoke(PlaybackException(
+                    appContext.getString(com.tvapp.livetv.R.string.iptv_profile_load_error), error, PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                ))
+                return@launch
+            }
+            if (generation != tuneGeneration) return@launch
+            try {
+                playPrepared(channel, startPositionMillis, options)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                released = true
+                automaticRecovery = false
+                player?.stop()
+                healthPhase = IptvPlaybackPhase.FAILED
+                CrashReportStore(appContext).recordDebug("IPTV_PREPARATION_FAILURE | ${error.javaClass.simpleName}")
+                onPlaybackError?.invoke(PlaybackException(
+                    appContext.getString(com.tvapp.livetv.R.string.iptv_error_generic), error, PlaybackException.ERROR_CODE_UNSPECIFIED,
+                ))
+            }
+        }
+    }
+
+    private fun sourceId(channel: LiveChannel): Long? = channel.inputId
+        .takeIf { it.startsWith("iptv:") }?.removePrefix("iptv:")?.toLongOrNull()
+
+    private fun playPrepared(channel: LiveChannel, startPositionMillis: Long, options: IptvSourcePlaybackOptions) {
+        released = false
         retryCount = 0
         selectedVideoTrackId = null
         currentChannel = channel
         val previousBufferSeconds = targetBufferSeconds
         playbackPreferences = playbackPreferencesStore.load()
-        targetBufferSeconds = playbackPreferences.targetBufferSeconds
+        sourcePlaybackOptions = options
+        val effective = options.resolve(playbackPreferences, channel.iptvContentType.equals("VOD", true))
+        targetBufferSeconds = effective.bufferSeconds
+        automaticRecovery = effective.automaticRecovery
+        maximumVideoHeight = effective.maximumVideoHeight
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
         if (player != null && previousBufferSeconds != targetBufferSeconds) {
             playerView.player = null
@@ -292,7 +361,7 @@ class IptvPlaybackController(
                     // stalling the screen in silent retries for several seconds.
                     val isConnectionFailure = lastFailureClass in CONNECTION_FAILURE_CLASSES
                     val maxRetries = if (isConnectionFailure) 1 else MAX_RETRY_COUNT
-                    if (!released && retryCount < maxRetries) {
+                    if (!released && automaticRecovery && retryCount < maxRetries) {
                         val delay = if (isConnectionFailure) {
                             CONNECTION_RETRY_DELAY_MS
                         } else {
@@ -329,6 +398,14 @@ class IptvPlaybackController(
             player = created
             playerView.player = created
         }
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+            .setMaxVideoSize(profile.maximumWidth, minOf(
+                profile.maximumHeight, maximumVideoHeight.takeIf { it > 0 } ?: Int.MAX_VALUE,
+            ))
+            .setMaxVideoBitrate(profile.maximumBitrate)
+            .build()
+        exoPlayer.volume = if (muted) 0f else 1f
         val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer)
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
@@ -367,11 +444,12 @@ class IptvPlaybackController(
         exoPlayer.prepare()
         exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
-        retryHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
+        if (automaticRecovery) retryHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
         onHealthChanged?.invoke(healthSnapshot())
     }
 
     fun stop() {
+        preparationJob?.cancel()
         tuneGeneration++
         retryHandler.removeCallbacks(retryRunnable)
         retryHandler.removeCallbacks(watchdogRunnable)
@@ -460,6 +538,10 @@ class IptvPlaybackController(
     }
 
     fun retry(): Boolean {
+        if (released) {
+            currentChannel?.let { play(it); return true }
+            return false
+        }
         val current = player ?: return false
         retryHandler.removeCallbacks(retryRunnable)
         cancelPendingWatchdogRecovery()
@@ -490,23 +572,44 @@ class IptvPlaybackController(
 
     fun targetBufferSeconds(): Int = targetBufferSeconds
 
+    fun automaticRecoveryEnabled(): Boolean = automaticRecovery
+
     fun setTargetBufferSeconds(seconds: Int): Int {
         if (profile != IptvPlaybackProfile.PRIMARY) return targetBufferSeconds
         val updated = seconds.takeIf { it in com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS }
             ?: return targetBufferSeconds
         if (updated == targetBufferSeconds) return updated
         targetBufferSeconds = updated
-        playbackPreferencesStore.saveTargetBufferSeconds(updated)
-        val channel = currentChannel ?: return updated
+        val channel = currentChannel
+        val isVod = channel?.iptvContentType.equals("VOD", true)
+        val sourceBuffer = if (isVod) sourcePlaybackOptions.vodBufferSeconds else sourcePlaybackOptions.liveBufferSeconds
+        val id = channel?.let(::sourceId)
+        if (sourceBuffer == null || id == null) playbackPreferencesStore.saveTargetBufferSeconds(updated)
+        channel ?: return updated
         val resumePosition = player?.currentPosition?.takeIf {
             contentKind() == IptvContentKind.VOD
         } ?: 0L
-        retryHandler.removeCallbacks(retryRunnable)
-        playerView.player = null
-        player?.release()
-        player = null
-        trackSelector = null
-        play(channel, resumePosition)
+        val generation = tuneGeneration
+        bufferSaveJob?.cancel()
+        bufferSaveJob = preparationScope.launch {
+            try {
+                if (sourceBuffer != null && id != null) withContext(Dispatchers.IO) {
+                    if (isVod) database.iptvDao().updateVodBuffer(id, updated)
+                    else database.iptvDao().updateLiveBuffer(id, updated)
+                }
+                if (generation != tuneGeneration) return@launch
+                // LoadControl cannot be changed on an existing player.
+                playerView.player = null
+                player?.release()
+                player = null
+                trackSelector = null
+                play(channel, resumePosition)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                CrashReportStore(appContext).recordDebug("IPTV_PROFILE_SAVE_FAILURE | ${error.javaClass.simpleName}")
+            }
+        }
         return updated
     }
 
@@ -707,6 +810,7 @@ class IptvPlaybackController(
     }
 
     fun release() {
+        preparationScope.coroutineContext.cancelChildren()
         tuneGeneration++
         released = true
         cancelPendingWatchdogRecovery()
@@ -775,6 +879,7 @@ class IptvPlaybackController(
     }
 
     private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
+        if (!automaticRecovery) return null
         val channel = currentChannel ?: return null
         if (pendingRecoveryAt != null) return null
         if (recoveryExhausted) return null
@@ -813,6 +918,7 @@ class IptvPlaybackController(
     }
 
     private fun recoverFromWatchdog(reason: IptvRecoveryReason, generation: Long = tuneGeneration) {
+        if (!automaticRecovery) return
         val current = player ?: return
         if (generation != tuneGeneration || released) return
         recoveryAttempt++

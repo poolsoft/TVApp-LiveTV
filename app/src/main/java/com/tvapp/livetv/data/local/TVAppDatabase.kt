@@ -19,7 +19,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
     ],
-    version = 24,
+    version = 26,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -62,11 +62,30 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_22_23,
                 MIGRATION_23_24,
                 MIGRATION_25_24,
+                MIGRATION_24_26,
+                MIGRATION_25_26,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_24_26 = object : Migration(24, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN liveBufferSeconds INTEGER")
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN vodBufferSeconds INTEGER")
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN maximumVideoHeight INTEGER")
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN automaticRecovery INTEGER")
+            }
+        }
+
+        // Version 25 belonged to the removed remote-editor experiment, not playback profiles.
+        internal val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                MIGRATION_25_24.migrate(db)
+                MIGRATION_24_26.migrate(db)
+            }
         }
 
         private val MIGRATION_1_2 = object : Migration(1, 2) {

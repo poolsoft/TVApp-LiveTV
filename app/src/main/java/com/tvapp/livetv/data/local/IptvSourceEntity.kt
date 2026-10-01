@@ -19,4 +19,8 @@ data class IptvSourceEntity(
     val username: String? = null,
     val password: String? = null,
     val macAddress: String? = null,
+    val liveBufferSeconds: Int? = null,
+    val vodBufferSeconds: Int? = null,
+    val maximumVideoHeight: Int? = null,
+    val automaticRecovery: Boolean? = null,
 )

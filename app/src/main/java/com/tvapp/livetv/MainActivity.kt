@@ -1246,6 +1246,10 @@ class MainActivity : TvRemoteActivity() {
             showPlaybackError(channel, error.message ?: error.errorCodeName)
             return
         }
+        if (!iptvPlayback.automaticRecoveryEnabled()) {
+            showPlaybackError(channel, error.message ?: error.errorCodeName)
+            return
+        }
         lifecycleScope.launch {
             val alternatives = if (iptvAlternativeLoadKey == channel.sourceKey &&
                 iptvAlternativeStreams.isNotEmpty()

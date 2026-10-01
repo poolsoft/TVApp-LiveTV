@@ -322,6 +322,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 add(SourceAction.EDIT_URL to getString(R.string.edit_iptv_source_url))
             }
             add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
+            add(SourceAction.PLAYBACK_OPTIONS to getString(R.string.iptv_source_playback_options))
             add(SourceAction.DELETE to getString(R.string.delete))
         }
         val padding = (20 * resources.displayMetrics.density).toInt()
@@ -385,7 +386,97 @@ class IptvSourcesActivity : TvRemoteActivity() {
             }
             SourceAction.EDIT_URL -> promptSourceUrl(summary)
             SourceAction.DELETE -> confirmDeleteSource(summary)
+            SourceAction.PLAYBACK_OPTIONS -> showSourcePlaybackOptions(summary)
         }
+    }
+
+    private fun showSourcePlaybackOptions(summary: IptvSourceSummary) {
+        val source = summary.source
+        var options = com.tvapp.livetv.settings.IptvSourcePlaybackOptions(
+            source.liveBufferSeconds, source.vodBufferSeconds, source.maximumVideoHeight, source.automaticRecovery,
+        )
+        val global = com.tvapp.livetv.settings.IptvPlaybackPreferencesStore(this).load()
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, padding / 2)
+        }
+        val refreshRows = mutableListOf<() -> Unit>()
+        fun bufferLabel(value: Int) = if (value == 0) getString(R.string.automatic_abr)
+            else getString(R.string.seconds_value, value)
+        fun qualityLabel(value: Int) = if (value == 0) getString(R.string.iptv_quality_auto)
+            else getString(R.string.iptv_maximum_video_height_value, value)
+        fun inherited(value: String) = getString(R.string.inherit_playback_setting_value, value)
+        fun <T> addChoice(title: Int, values: List<T?>, labels: List<String>, current: () -> T?, update: (T?) -> Unit) {
+            val row = TextView(this).apply {
+                textSize = 16f
+                setTextColor(getColor(R.color.text_primary))
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(padding, padding / 2, padding, padding / 2)
+                com.tvapp.livetv.ui.TvUiComponents.applyFocusableRow(this)
+            }
+            val refresh = { row.text = getString(title) + ": " + labels[values.indexOf(current()).coerceAtLeast(0)] }
+            refreshRows += refresh
+            refresh()
+            row.setOnClickListener {
+                AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+                    .setTitle(title)
+                    .setSingleChoiceItems(labels.toTypedArray(), values.indexOf(current()).coerceAtLeast(0)) { dialog, index ->
+                        update(values[index])
+                        refresh()
+                        dialog.dismiss()
+                        row.requestFocus()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
+            content.addView(row, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = padding / 2 })
+        }
+        val buffers = listOf<Int?>(null) + com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS
+        val bufferLabels = listOf(inherited(bufferLabel(global.targetBufferSeconds))) + buffers.drop(1).map { bufferLabel(it!!) }
+        addChoice(R.string.iptv_source_live_buffer, buffers, bufferLabels,
+            { options.liveBufferSeconds }) { options = options.copy(liveBufferSeconds = it) }
+        addChoice(R.string.iptv_source_vod_buffer, buffers, bufferLabels,
+            { options.vodBufferSeconds }) { options = options.copy(vodBufferSeconds = it) }
+        val heights = listOf<Int?>(null) + com.tvapp.livetv.settings.IptvPlaybackPreferences.QUALITY_HEIGHT_OPTIONS
+        addChoice(R.string.iptv_maximum_video_height, heights,
+            listOf(inherited(qualityLabel(global.maximumVideoHeight))) + heights.drop(1).map { qualityLabel(it!!) },
+            { options.maximumVideoHeight }) { options = options.copy(maximumVideoHeight = it) }
+        addChoice(R.string.iptv_automatic_recovery, listOf<Boolean?>(null, true, false),
+            listOf(inherited(getString(if (global.automaticRecovery) R.string.on else R.string.off)), getString(R.string.on), getString(R.string.off)),
+            { options.automaticRecovery }) { options = options.copy(automaticRecovery = it) }
+        val scroll = android.widget.ScrollView(this).apply { addView(content) }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(getString(R.string.iptv_source_playback_options_title, source.name))
+            .setView(scroll)
+            .setPositiveButton(R.string.save, null)
+            .setNeutralButton(R.string.reset_source_playback_options, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                options = com.tvapp.livetv.settings.IptvSourcePlaybackOptions()
+                refreshRows.forEach { it() }
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                save.isEnabled = false
+                lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) { runCatching { repository.saveSourcePlaybackOptions(source.id, options) } }
+                    save.isEnabled = true
+                    result.onSuccess {
+                        dialog.dismiss()
+                        setResult(RESULT_OK)
+                        binding.importStatus.setText(R.string.iptv_source_playback_options_saved)
+                        loadSources()
+                    }.onFailure(::showError)
+                }
+            }
+            content.getChildAt(0)?.requestFocus()
+        }
+        dialog.show()
     }
 
     private fun promptSourceUrl(summary: IptvSourceSummary) {
@@ -672,7 +763,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             .show()
     }
 
-    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE }
+    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE, PLAYBACK_OPTIONS }
 
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()

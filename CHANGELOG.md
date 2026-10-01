@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-01 - IPTV kaynak oynatma profilleri
+
+- Kaynak işlemlerine canlı/VOD buffer, azami çözünürlük ve otomatik kurtarma ayarları eklendi. Boş tercihler genel ayarı kullanır; genel kalite ve kurtarma seçenekleri IPTV ayarlarında bulunur.
+- Kaynağa özel buffer varsa oynatma çubuğundaki değişiklik o kaynağa, yoksa genel ayara kaydedilir. Kalite tercihi cihazın MultiView sınırını aşamaz.
+- Room 24/25 -> 26 veri koruyan geçişleri ve yedek desteği eklendi. Kaynak yenilemesi oynatma tercihlerini korur.
+- Header/DRM, medya/ses entegrasyonu, güncelleme özeti, alternatif yayınlar, ayar araması, dizi ve ilk kurulum işleri TASKS.md içinde sıraya alındı; bu özellikler henüz tamamlanmadı.
+
 ## 2026-10-01 - Dialog düğmesi odağı
 
 - Koyu dialogların alt eylem düğmeleri kumanda odağında mavi dolgu, açık kenarlık ve koyu yazıyla belirginleşir. Dialog listelerinin, bağlam menülerinin ve giriş alanlarının görünümü değiştirilmedi.

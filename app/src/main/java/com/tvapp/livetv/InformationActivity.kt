@@ -27,7 +27,8 @@ class InformationActivity : TvRemoteActivity() {
             title.setText(R.string.user_guide)
             body.text = getString(R.string.user_guide_content) + "\n\n" +
                 getString(R.string.user_guide_search_archive) + "\n\n" +
-                getString(R.string.user_guide_alphabet_navigation)
+                getString(R.string.user_guide_alphabet_navigation) + "\n\n" +
+                getString(R.string.user_guide_source_playback)
         } else {
             title.setText(R.string.about)
             body.setText(R.string.loading)

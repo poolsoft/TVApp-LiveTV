@@ -5,6 +5,8 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 ## Türkçe
 
+- IPTV listelerine özel canlı/VOD arabelleği, çözünürlük sınırı ve otomatik yeniden deneme tercihleri; istenirse genel ayarları kullanma.
+
 - İsteğe bağlı harf çubuğuyla uzun kanal listelerinde hızlı gezinme; kanal sırasını ve izlenen yayını değiştirmeden kayda atlama.
 ### Uygulama adı
 

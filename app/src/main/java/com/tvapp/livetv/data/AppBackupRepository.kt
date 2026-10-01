@@ -462,6 +462,11 @@ class AppBackupRepository(context: Context) {
             name("username").nullableValue(source.username)
             name("password").nullableValue(source.password)
             name("macAddress").nullableValue(source.macAddress)
+            name("liveBufferSeconds").value(source.liveBufferSeconds?.toLong())
+            name("vodBufferSeconds").value(source.vodBufferSeconds?.toLong())
+            name("maximumVideoHeight").value(source.maximumVideoHeight?.toLong())
+            name("automaticRecovery")
+            source.automaticRecovery?.let { value(it) } ?: nullValue()
         }
 
         fun JsonWriter.write(channel: IptvChannelEntity) = apply {
@@ -532,6 +537,10 @@ class AppBackupRepository(context: Context) {
             lastUpdatedAt = optLong("lastUpdatedAt", 0L),
             serverUrl = nullableString("serverUrl"), username = nullableString("username"),
             password = nullableString("password"), macAddress = nullableString("macAddress"),
+            liveBufferSeconds = nullableInt("liveBufferSeconds"),
+            vodBufferSeconds = nullableInt("vodBufferSeconds"),
+            maximumVideoHeight = nullableInt("maximumVideoHeight"),
+            automaticRecovery = if (isNull("automaticRecovery")) null else getBoolean("automaticRecovery"),
         )
 
         fun JSONObject.toIptvChannel(sourceId: Long) = IptvChannelEntity(

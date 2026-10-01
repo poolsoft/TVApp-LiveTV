@@ -4,6 +4,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
 
+- IPTV kaynak menüsündeki **Oynatma ayarları** ile canlı/VOD buffer, azami video çözünürlüğü ve otomatik kurtarma kaynak bazında ayarlanabilir. Her alan genel ayarı kullanabilir; tercihler liste güncellemesinde ve yedekten dönüşte korunur. Kalite sınırı yalnız mevcut yayın çeşitleri arasından seçim yapar, cihazın MultiView sınırlarını yükseltmez. Değişiklikler kanal yeniden açıldığında uygulanır.
+
 - Cihazın vendor TIF girişlerini `TvInputManager` ile keşfetmek
 - `TvContract` kanal tablosunu okumak
 - Preview/öneri kanallarını ayırarak yalnızca donanım tuner kanallarını listelemek

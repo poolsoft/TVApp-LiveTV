@@ -3,6 +3,29 @@
 Durumlar: `[ ]` bekliyor, `[~]` devam ediyor, `[x]` tamamlandı. Öncelikler: P0 kritik,
 P1 yüksek, P2 normal, P3 sonraki sürüm.
 
+## IPTV geliştirme uygulama sırası (2026-10-01)
+
+Kullanıcının onayladığı kapsam; ayrı bir medya merkezi ana ekranı eklenmez.
+Her aşama kendi testleriyle doğrulanıp gönderilir, aşağıdakiler topluca tamamlandı sayılmaz.
+
+1. `IPTVCORE-004`: Kaynakta canlı/VOD buffer, azami kalite ve otomatik kurtarma;
+   her alan ayrı ayrı genel ayarı miras alabilir. Yenileme ve yedekleme tercihleri korur.
+2. `IPTVCORE-005`: M3U özel header/DRM alanları, HLS/DASH/TS test matrisi.
+3. `IPTVCORE-006`: Sistem medya oturumu, aktif oynatıcı için tek ses odağı sahibi,
+   Home dönüşü/PiP/Multi-View regresyonu ve isteğe bağlı kare hızı eşleme.
+4. `FEATURE-006` + `FEATURE-005`: Gerçek eklenen/kaldırılan/korunan kayıt özeti;
+   alternatif akış sırası ve geçici atlama, kanal geçmişini değiştirmeden.
+5. `FEATURE-007`: Ayarlarda yerelleştirilmiş başlık/anahtar sözcük araması, sonuçtan ilgili sekme/satıra odak.
+6. `FEATURE-003`: Sayfalı sezon/bölüm, kaldığın bölüm ve sonraki bölüm; büyük keşif ekranı yok.
+7. `STORE-003`: Tuner yeteneğine göre kısa, atlanabilir ilk kurulum; satın alma işi bu kapsamda değil.
+
+- [ ] **FEATURE-006 (P1): Kaynak güncelleme özeti**
+  Staging karşılaştırmasından yeni, kaldırılan ve korunmuş seçili kayıt sayılarını hesapla.
+  İptal/başarısız indirme başarı özeti göstermez; yalnız tamamlanan atomik güncelleme sonucu yayımlanır.
+- [ ] **FEATURE-007 (P2): Ayar araması**
+  Mevcut sekmeleri koruyarak buffer, EPG, altyazı ve benzeri başlıkları arat;
+  seçilen sonucun gerçek ayar satırına odaklan, sahte/boş sonuç oluşturma.
+
 ## Harfle gezinme
 
 - [~] **UIALPHA-001 (P2): Filtreye bağlı harf çubuğu**
@@ -171,11 +194,18 @@ korumalıdır.
   **Kabul:** Sonsuz yeniden bağlanma döngüsü oluşmaz; kanal/listesi ve izleme geçmişi değişmez;
   her denemenin nedeni ve sonucu hassas veri olmadan teşhis kaydına düşer.
 
-- [ ] **IPTVCORE-004 (P1): Kaynak bazlı oynatma profili**
+- [x] **IPTVCORE-004 (P1): Kaynak bazlı oynatma profili**
   Her IPTV kaynağı için canlı buffer/gecikme, VOD buffer, ABR/kalite, otomatik kurtarma ve gelecekteki
   oynatıcı tercihini sakla. Kanal bazlı istisna yalnız gerçekten gerektiğinde kullanılmalıdır.
   **Kabul:** Varsayılanlar düşük RAM TV stick için güvenlidir; mevcut global ayarlar migration sonrası
   korunur; kaynak yenileme tercihleri silmez.
+  **2026-10-01:** Canlı/VOD buffer, azami çözünürlük ve otomatik kurtarma kaynak menüsüne eklendi;
+  alanlar ayrı ayrı genel ayarı kullanabilir. Genel kalite/kurtarma ayarları, profil kullanan seekbar
+  buffer değişimi, kaynak yenileme/adlandırma koruması ve yedek desteği tamamlandı.
+  Room 24/25 -> 26 geçişleri ve eski yedek uyumluluğu emülatörde doğrulandı; iki debug varyantın
+  birim testleri ve derlemeleri geçti. Android 11 fiziksel TV'de kumanda odağı ve yayın testi gerekli.
+  Gelecekte başka motor eklenirse kaynak motor tercihi ayrı genişletme olarak ele alınacak;
+  bu sürüm yalnız mevcut Media3 motorunu kullanır.
 
 - [ ] **IPTVCORE-005 (P1): Protokol, header ve DRM uyumluluk matrisi**
   HLS, DASH ve doğrudan MPEG-TS için User-Agent/Referrer/header aktarımını tamamla. M3U
