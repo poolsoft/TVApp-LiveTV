@@ -31,10 +31,12 @@ data class XmlTvImportProgress(
     val programsImported: Int,
 )
 
-class XmlTvRepository(context: Context) {
+class XmlTvRepository(
+    context: Context,
+    private val database: TVAppDatabase = TVAppDatabase.getInstance(context),
+) {
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences("xmltv", Context.MODE_PRIVATE)
-    private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.xmlTvDao()
     private val xtreamEpgDao = database.xtreamEpgDao()
     private val legacyCacheFile = appContext.filesDir.resolve("xmltv-programs.json")
@@ -562,7 +564,7 @@ class XmlTvRepository(context: Context) {
         }
     }
 
-    private fun importStream(
+    internal fun importStream(
         stream: InputStream,
         location: String,
         name: String,
@@ -579,8 +581,14 @@ class XmlTvRepository(context: Context) {
         val now = System.currentTimeMillis()
         val importStartedAt = SystemClock.elapsedRealtime()
         val existing = replacementSource ?: dao.sourceByLocation(location)
-        val sourceId = existing?.id ?: dao.insertSource(
-            XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
+        val stagingId = dao.insertSource(
+            XmlTvSourceEntity(
+                name = name,
+                location = "staging:${java.util.UUID.randomUUID()}",
+                kind = "staging",
+                lastUpdatedAt = now,
+                enabled = false,
+            ),
         )
 
         val batch = ArrayList<XmlTvProgramEntity>(INSERT_BATCH_SIZE)
@@ -601,127 +609,120 @@ class XmlTvRepository(context: Context) {
         fun cachedNormalizedChannelName(value: String): String =
             normalizedChannelNameCache.getOrPut(value) { value.normalize() }
 
-        var event = parser.eventType
-        while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
-            if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                when (parser.name) {
-                    "channel" -> {
-                        val id = parser.getAttributeValue(null, "id").orEmpty()
-                        var displayName = id
-                        while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "channel")) {
-                            parser.next()
-                            if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "display-name") {
-                                displayName = parser.nextText().ifBlank { id }
+        try {
+            var event = parser.eventType
+            while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                    when (parser.name) {
+                        "channel" -> {
+                            val id = parser.getAttributeValue(null, "id").orEmpty()
+                            var displayName = id
+                            while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "channel")) {
+                                parser.next()
+                                if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "display-name") {
+                                    displayName = parser.nextText().ifBlank { id }
+                                }
                             }
-                        }
-                        channelNames[id] = displayName
-                        if (filterEnabled) {
-                            val idNormalized = cachedNormalizedId(id)
-                            val nameNormalized = cachedNormalizedChannelName(displayName)
-                            if (idNormalized in targetChannelKeys!! || nameNormalized in targetChannelKeys) {
-                                matchedChannelIds += id
-                            }
-                        }
-                    }
-                    "programme" -> {
-                        val channelId = parser.getAttributeValue(null, "channel").orEmpty()
-                        val channelName = channelNames[channelId] ?: channelId
-
-                        if (filterEnabled && matchedChannelIds.isNotEmpty() && channelId !in matchedChannelIds) {
-                            val idNormalized = cachedNormalizedId(channelId)
-                            val nameNormalized = cachedNormalizedChannelName(channelName)
-                            if (idNormalized !in targetChannelKeys!! && nameNormalized !in targetChannelKeys) {
-                                skipTag(parser)
-                                event = parser.eventType
-                                continue
-                            } else {
-                                matchedChannelIds += channelId
-                            }
-                        }
-
-                        val start = XmlTvTime.parse(parser.getAttributeValue(null, "start"))
-                        val stop = XmlTvTime.parse(parser.getAttributeValue(null, "stop"))
-                        var title = ""
-                        var description = ""
-                        while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "programme")) {
-                            parser.next()
-                            if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                                when (parser.name) {
-                                    "title" -> title = parser.nextText()
-                                    "desc" -> description = parser.nextText()
+                            channelNames[id] = displayName
+                            if (filterEnabled) {
+                                val idNormalized = cachedNormalizedId(id)
+                                val nameNormalized = cachedNormalizedChannelName(displayName)
+                                if (idNormalized in targetChannelKeys!! || nameNormalized in targetChannelKeys) {
+                                    matchedChannelIds += id
                                 }
                             }
                         }
-                        if (channelId.isNotBlank() && start > 0 && stop > start) {
-                            reportProgress(XmlTvImportPhase.PARSING)
-                            batch += XmlTvProgramEntity(
-                                channelId = channelId,
-                                channelName = channelName,
-                                normalizedChannelId = cachedNormalizedId(channelId),
-                                normalizedChannelName = cachedNormalizedChannelName(channelName),
-                                title = title,
-                                description = description,
-                                startTimeMillis = start,
-                                endTimeMillis = stop,
-                                sourceId = sourceId,
-                            )
-                            totalImported++
-                            progress.bump()
-                            if (batch.size >= INSERT_BATCH_SIZE) {
-                                reportProgress(XmlTvImportPhase.SAVING)
-                                if (totalImported == batch.size) {
-                                    database.runInTransaction {
-                                        dao.updateSource(sourceId, name, location, kind, now)
-                                        dao.clearPrograms(sourceId)
-                                        dao.insertPrograms(batch)
-                                    }
+                        "programme" -> {
+                            val channelId = parser.getAttributeValue(null, "channel").orEmpty()
+                            val channelName = channelNames[channelId] ?: channelId
+
+                            if (filterEnabled && matchedChannelIds.isNotEmpty() && channelId !in matchedChannelIds) {
+                                val idNormalized = cachedNormalizedId(channelId)
+                                val nameNormalized = cachedNormalizedChannelName(channelName)
+                                if (idNormalized !in targetChannelKeys!! && nameNormalized !in targetChannelKeys) {
+                                    skipTag(parser)
+                                    event = parser.eventType
+                                    continue
                                 } else {
-                                    database.runInTransaction {
-                                        dao.insertPrograms(batch)
+                                    matchedChannelIds += channelId
+                                }
+                            }
+
+                            val start = XmlTvTime.parse(parser.getAttributeValue(null, "start"))
+                            val stop = XmlTvTime.parse(parser.getAttributeValue(null, "stop"))
+                            var title = ""
+                            var description = ""
+                            while (!(parser.eventType == org.xmlpull.v1.XmlPullParser.END_TAG && parser.name == "programme")) {
+                                parser.next()
+                                if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                                    when (parser.name) {
+                                        "title" -> title = parser.nextText()
+                                        "desc" -> description = parser.nextText()
                                     }
                                 }
-                                batch.clear()
+                            }
+                            if (channelId.isNotBlank() && start > 0 && stop > start) {
+                                reportProgress(XmlTvImportPhase.PARSING)
+                                batch += XmlTvProgramEntity(
+                                    channelId = channelId,
+                                    channelName = channelName,
+                                    normalizedChannelId = cachedNormalizedId(channelId),
+                                    normalizedChannelName = cachedNormalizedChannelName(channelName),
+                                    title = title,
+                                    description = description,
+                                    startTimeMillis = start,
+                                    endTimeMillis = stop,
+                                    sourceId = stagingId,
+                                )
+                                totalImported++
+                                progress.bump()
+                                if (batch.size >= INSERT_BATCH_SIZE) {
+                                    reportProgress(XmlTvImportPhase.SAVING)
+                                    dao.insertPrograms(batch)
+                                    batch.clear()
+                                }
                             }
                         }
                     }
                 }
+                event = parser.next()
             }
-            event = parser.next()
-        }
 
-        if (batch.isNotEmpty()) {
-            reportProgress(XmlTvImportPhase.SAVING)
-            if (totalImported == batch.size) {
-                database.runInTransaction {
-                    dao.updateSource(sourceId, name, location, kind, now)
-                    dao.clearPrograms(sourceId)
-                    dao.insertPrograms(batch)
-                }
-            } else {
-                database.runInTransaction {
-                    dao.insertPrograms(batch)
-                }
+            if (batch.isNotEmpty()) {
+                reportProgress(XmlTvImportPhase.SAVING)
+                dao.insertPrograms(batch)
+                batch.clear()
             }
-            batch.clear()
-        } else if (totalImported == 0) {
+
+            check(totalImported > 0) { appContext.getString(com.tvapp.livetv.R.string.xmltv_no_valid_programs) }
+            var sourceId = 0L
             database.runInTransaction {
-                dao.updateSource(sourceId, name, location, kind, now)
+                sourceId = existing?.id ?: dao.insertSource(
+                    XmlTvSourceEntity(name = name, location = location, kind = kind, lastUpdatedAt = now),
+                )
                 dao.clearPrograms(sourceId)
+                dao.publishStagedPrograms(stagingId, sourceId)
+                dao.updateSource(sourceId, name, location, kind, now)
+            }
+
+            EpgSnapshotCache.invalidateAll()
+            reportProgress(XmlTvImportPhase.SAVING, force = true)
+            purgeExpiredPrograms()
+            updateSourceSummary()
+            preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
+            legacyCacheFile.delete()
+            reportProgress(XmlTvImportPhase.DONE, force = true)
+            debugLog.recordDebug(
+                "XMLTV_IMPORT_TIMING | source=$sourceId, programs=$totalImported, " +
+                    "total=${SystemClock.elapsedRealtime() - importStartedAt}ms",
+            )
+            return totalImported
+        } finally {
+            database.runInTransaction {
+                dao.clearPrograms(stagingId)
+                dao.deleteSource(stagingId)
             }
         }
-
-        EpgSnapshotCache.invalidateAll()
-        reportProgress(XmlTvImportPhase.SAVING, force = true)
-        purgeExpiredPrograms()
-        updateSourceSummary()
-        preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
-        legacyCacheFile.delete()
-        reportProgress(XmlTvImportPhase.DONE, force = true)
-        debugLog.recordDebug(
-            "XMLTV_IMPORT_TIMING | source=$sourceId, programs=$totalImported, " +
-                "total=${SystemClock.elapsedRealtime() - importStartedAt}ms",
-        )
-        return totalImported
     }
 
     private fun migrateLegacyCacheIfNeeded() {

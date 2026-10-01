@@ -22,7 +22,7 @@ interface XmlTvDao {
     @Update
     fun updatePrograms(programs: List<XmlTvProgramEntity>)
 
-    @Query("SELECT * FROM xmltv_sources ORDER BY name COLLATE NOCASE")
+    @Query("SELECT * FROM xmltv_sources WHERE kind != 'staging' ORDER BY name COLLATE NOCASE")
     fun sources(): List<XmlTvSourceEntity>
 
     @Query("SELECT COUNT(*) FROM xmltv_programs WHERE sourceId = :sourceId")
@@ -77,6 +77,9 @@ interface XmlTvDao {
 
     @Query("DELETE FROM xmltv_programs WHERE sourceId = :sourceId")
     fun clearPrograms(sourceId: Long)
+
+    @Query("UPDATE xmltv_programs SET sourceId = :sourceId WHERE sourceId = :stagingId")
+    fun publishStagedPrograms(stagingId: Long, sourceId: Long)
 
     @Query(
         "SELECT * FROM xmltv_programs WHERE sourceId IN " +

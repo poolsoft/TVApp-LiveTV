@@ -22,6 +22,9 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ### Canlı TV ve kanal yönetimi
 
+- Kalite etiketleri kanal adından çıkarılmaz; TIF video biçimi ve oynatma sırasında bildirilen çözünürlük kullanılır. Veri yoksa kalite etiketi gösterilmez.
+- TIF altyazı tercihi kanal açılırken uygulanır; kapatma hem altyazı parçasını hem caption gösterimini kapatır.
+
 - Vendor TIF üzerindeki DVB TV/radyo kanallarını özel arayüzle oynatır.
 - Room veritabanında özel sıra, kanal numarası, ad, favori, gizleme, atlama ve kanal kilidi tercihlerini saklar.
 - TKGS veya vendor taramasından sonra TIF kanallarıyla yeniden eşitlenebilir.
@@ -60,6 +63,10 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - IPTV watchdog'u ilk kare gelmemesi, uzun buffer, görüntünün donması ve canlı akışın beklenmedik bitmesini ayırır. Kurtarma denemeleri sınırlıdır; kanal değiştirildiğinde eski denemeler iptal edilir ve radyo yayınları video hatası sayılmaz.
 
 ### Ekran ve sistem entegrasyonu
+
+- Siyah kanal geçişi ekranı, APK içine paketlenen yükleme animasyonunu gösterir; animasyon için ağ bağlantısı gerekmez.
+
+- XMLTV güncellemesi tamamlanıp doğrulanana kadar mevcut EPG kullanılmaya devam eder. Bozuk veya boş kaynağın güncellenmesi çalışan rehberi silmez.
 
 - Bilgi çubuğunun konumu, içeriği, saydamlığı ve ekranda kalma süresi ayarlanabilir.
 - Kanal panelinin yönü, saydamlığı ve gösterilecek kanal bilgileri özelleştirilebilir.

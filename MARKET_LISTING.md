@@ -45,6 +45,7 @@ seçenekleri kullanılabilir.
 * Uyumlu M3U ve Xtream kaynaklarında program rehberinden arşiv yayını oynatma
 * Canlı yayın ve VOD oynatma kontrolleri
 * TIF/XMLTV program rehberi ile şimdi ve sonraki program bilgisi
+* Başarısız veya boş XMLTV güncellemelerinde mevcut program rehberini koruma
 * Ses parçası ve altyazı seçimi
 * Özelleştirilebilir bilgi çubuğu ve kanal paneli
 * Son kanal, önceki kanal ve yerel izleme geçmişi
@@ -128,6 +129,7 @@ Highlights:
 * Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
 * TIF/XMLTV guide with now and next program information
+* Existing program guide is preserved when an XMLTV update fails or is empty
 * Audio track and subtitle selection
 * Customizable information bar and channel panel
 * Last channel, previous channel, and local viewing history

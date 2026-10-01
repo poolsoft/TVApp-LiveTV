@@ -45,9 +45,12 @@ class ChannelRepository(context: Context) {
         val source = tifChannels + iptvChannels
         val afterTif = SystemClock.elapsedRealtime()
         val now = System.currentTimeMillis()
-        val existingRows = channelDao.getAllChannels()
+        val existingRows = source.map(LiveChannel::sourceKey).chunked(900)
+            .flatMap { channelDao.getChannelsForKeys(it) }
         val existing = existingRows.associateBy { it.sourceKey }
-        var nextSortOrder = (existingRows.maxOfOrNull { it.sortOrder } ?: -1) + 1
+        var nextSortOrder = if (source.any { it.sourceKey !in existing }) {
+            (channelDao.maxSortOrder() ?: -1) + 1
+        } else 0
         val synchronized = source.map { channel ->
             val saved = existing[channel.sourceKey]
             if (saved == null) {

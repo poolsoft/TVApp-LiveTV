@@ -462,7 +462,6 @@ class MainActivity : TvRemoteActivity() {
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
-        prepareIptvGrid()
         setupIptvControls()
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
         debugLog.recordDebug(
@@ -769,13 +768,6 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug(
             "CHANNEL_LOAD_START | includeTif=$includeTif, preserve=$preserveCurrentPlayback",
         )
-        val inputs = if (includeTif) repository.tunerInputs() else emptyList()
-        binding.inputSummary.text = resources.getQuantityString(
-            R.plurals.input_count,
-            inputs.size,
-            inputs.size,
-        )
-
         if (channels.isEmpty()) {
             val cached = ChannelRepository.cachedChannels()
             if (cached.isNotEmpty()) {
@@ -787,6 +779,14 @@ class MainActivity : TvRemoteActivity() {
 
         channelLoadJob?.cancel()
         channelLoadJob = lifecycleScope.launch {
+            val inputs = withContext(Dispatchers.IO) {
+                if (includeTif) repository.tunerInputs() else emptyList()
+            }
+            binding.inputSummary.text = resources.getQuantityString(
+                R.plurals.input_count,
+                inputs.size,
+                inputs.size,
+            )
             val result = withContext(Dispatchers.IO) {
                 repository.channels(includeTif = includeTif)
             }
@@ -1052,6 +1052,16 @@ class MainActivity : TvRemoteActivity() {
         if (blackScreenActive) return
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
+        binding.iptvBufferingContainer.visibility = View.GONE
+        binding.blackoutAnimation.apply {
+            if (composition == null) {
+                setFailureListener { error ->
+                    debugLog.recordDebug("TUNING_ANIMATION_FAILURE | ${error.javaClass.simpleName}")
+                }
+                setAnimation(R.raw.channel_tuning)
+            }
+            playAnimation()
+        }
         blackScreenActive = true
         blackScreenTuneGeneration++
         playback.setMuted(true)
@@ -1062,6 +1072,7 @@ class MainActivity : TvRemoteActivity() {
         if (!blackScreenActive) return
         blackScreenActive = false
         binding.blackoutView.visibility = View.GONE
+        binding.blackoutAnimation.cancelAnimation()
         playback.setMuted(false)
         debugLog.recordDebug("BLACKOUT_END | reason=$reason")
     }
@@ -1146,6 +1157,7 @@ class MainActivity : TvRemoteActivity() {
                     binding.iptvPlayerView.visibility = View.GONE
                     binding.tvView.visibility = View.VISIBLE
                     playback.play(channel)
+                    applyPreferredTracks()
                 }
                 LiveChannel.Source.IPTV -> {
                     playback.stop()
@@ -1182,7 +1194,7 @@ class MainActivity : TvRemoteActivity() {
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean) {
-        val shouldShow = visible && currentChannel?.source == LiveChannel.Source.IPTV
+        val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
         if (shouldShow) {
             binding.iptvBufferingSpinner.visibility = View.VISIBLE
             binding.iptvBufferingContainer.visibility = View.VISIBLE
@@ -3518,6 +3530,7 @@ class MainActivity : TvRemoteActivity() {
         get() = (this * resources.displayMetrics.density).toInt()
 
     private fun prepareIptvGrid() {
+        if (gridCells.isNotEmpty()) return
         repeat(4) { index ->
             val cell = layoutInflater.inflate(
                 R.layout.view_iptv_grid_cell,
@@ -3840,6 +3853,7 @@ class MainActivity : TvRemoteActivity() {
         if (distinct.any { it.source == LiveChannel.Source.IPTV } &&
             !hasIptvAccess { startIptvGrid(distinct) }
         ) return
+        prepareIptvGrid()
         stopIptvOverlay()
         gridReturnChannel = currentChannel
         gridChannels = distinct
@@ -6301,12 +6315,14 @@ class MainActivity : TvRemoteActivity() {
                 currentChannel?.takeIf { it.source == LiveChannel.Source.TIF }?.let { channel ->
                     debugLog.recordDebug("TIF_SESSION_RESUME | channel=${channel.sourceKey}")
                     playback.play(channel)
+                    applyPreferredTracks()
                 }
             }
         }, 250L)
     }
 
     override fun onStop() {
+        binding.blackoutAnimation.pauseAnimation()
         saveCurrentIptvResumePosition()
         if (!isChangingConfigurations &&
             (activePassthroughInputId != null || currentChannel?.source == LiveChannel.Source.TIF)

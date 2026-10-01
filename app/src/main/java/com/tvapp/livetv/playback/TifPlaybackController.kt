@@ -171,6 +171,7 @@ class TifPlaybackController(private val tvView: TvView) {
     }
 
     fun selectSubtitle(trackId: String?) {
+        tvView.setCaptionEnabled(trackId != null)
         tvView.selectTrack(TvTrackInfo.TYPE_SUBTITLE, trackId)
     }
 

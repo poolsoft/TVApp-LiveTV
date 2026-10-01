@@ -12,6 +12,9 @@ interface ChannelDao {
     @Query("SELECT * FROM user_channels")
     suspend fun getAllChannels(): List<UserChannelEntity>
 
+    @Query("SELECT * FROM user_channels WHERE sourceKey IN (:sourceKeys)")
+    suspend fun getChannelsForKeys(sourceKeys: List<String>): List<UserChannelEntity>
+
     @Query("SELECT * FROM user_channels ORDER BY sortOrder")
     suspend fun getOrderedChannels(): List<UserChannelEntity>
 

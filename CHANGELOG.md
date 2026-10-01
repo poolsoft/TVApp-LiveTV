@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-01 - Açılış, TIF altyazı ve XMLTV güvenliği
+
+- Siyah kanal geçişi ekranındaki yazı seçilen Lottie yükleme animasyonuyla değiştirildi. Animasyon APK içinde bulunur, ilk kullanımda yüklenir ve geçiş bitince durur.
+
+- Açılışta Multi-View hücreleri hazırlanmıyor; ilk Multi-View kullanımında oluşturuluyor. Tuner giriş sorgusu arka planda çalışıyor ve kanal birleştirmede yalnız mevcut kanalların kullanıcı tercihleri okunuyor.
+- Kanal editöründeki kalite etiketleri kanal adından tahmin edilmiyor; yalnız bildirilen video biçimi kullanılıyor. Bilgi yoksa etiket gösterilmiyor.
+- TIF altyazı kapatma işleminde parça seçiminin yanında caption gösterimi de kapatılıyor; kanal açıldığında kayıtlı altyazı tercihi hemen uygulanıyor.
+- Infobar tarihi tek satırda gösteriliyor; alan daraldığında yazı boyutu otomatik küçülüyor.
+- XMLTV güncellemeleri görünmeyen geçici kaynakta hazırlanıp başarı sonunda tek veritabanı işlemiyle yayımlanıyor. Bozuk veya boş XMLTV mevcut EPG'yi silmiyor; kaynak kimliği ve elle eşleştirmeler korunuyor.
+
 Bu belgede TVApp uygulamasında yapılan tüm geliştirmeler, hata düzeltmeleri ve arayüz değişiklikleri sürüm ve tarih sırasıyla kaydedilir.
 
 ---

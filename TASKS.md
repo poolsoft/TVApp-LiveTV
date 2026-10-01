@@ -190,6 +190,9 @@ korumalıdır.
 ## Epic EPGNEXT - IPTV EPG dayanıklılığı
 
 - [ ] **EPGNEXT-001 (P1): Sınırlı ve atomik XMLTV yenileme**
+  **2026-10-01 ilerleme:** Atomik yayımlama ve bozuk/boş kaynakta eski EPG'yi koruma tamamlandı;
+  kesilmiş dosya ve boş kaynak testleri izole Room veritabanında emülatörde geçti.
+  Kanal kataloğunu koruyarak program zaman penceresini sınırlama henüz tamamlanmadı.
   Gzip destekli XMLTV'yi akış halinde ayrıştır; kanal başlıklarını eşleştirme için korurken programları
   yalnız eşleşmiş/aday kanallar ve gerekli zaman penceresi için yaz. Yeni veri doğrulanmadan çalışan
   EPG tablolarını değiştirme.
