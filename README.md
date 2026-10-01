@@ -22,6 +22,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ### Canlı TV ve kanal yönetimi
 
+- Ayarlar > Kanallar > Harfle gezinme isteğe bağlıdır (varsayılan kapalı). Kanal listesinde uzun sağ ok mevcut harflerden oluşan çubuğu açar; yukarı/aşağı harfle başlayan ilk kayda atlar, sol/Back listeye döner. Kısa sağ/sol sayfa geçişini korur. IPTV kütüphanesinde harf özeti DAO filtresiyle hesaplanır, yalnız hedef sayfa yüklenir; sıra ve izlenen yayın değişmez.
 - Kalite etiketleri kanal adından çıkarılmaz; TIF video biçimi ve oynatma sırasında bildirilen çözünürlük kullanılır. Veri yoksa kalite etiketi gösterilmez.
 - TIF altyazı tercihi kanal açılırken uygulanır; kapatma hem altyazı parçasını hem caption gösterimini kapatır.
 

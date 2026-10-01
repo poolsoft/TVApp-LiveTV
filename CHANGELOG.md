@@ -1,5 +1,10 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-01 - Dialog düğmesi odağı
+
+- Koyu dialogların alt eylem düğmeleri kumanda odağında mavi dolgu, açık kenarlık ve koyu yazıyla belirginleşir. Dialog listelerinin, bağlam menülerinin ve giriş alanlarının görünümü değiştirilmedi.
+- Ayarlar > Kanallar altında isteğe bağlı harfle gezinme eklendi. Normal kanal listesi ve tam IPTV kütüphanesinde uzun sağ ok harf çubuğunu açar; mevcut harfler filtreye göre hesaplanır. Aktif harf listeye doğru kavisli vurgulanır. Harfle gezinme otomatik kanal açmaz, kısa sağ/sol sayfa geçişini korur.
+
 ## 2026-10-01 - Açılış, TIF altyazı ve XMLTV güvenliği
 
 - Siyah kanal geçişi ekranındaki yazı seçilen Lottie yükleme animasyonuyla değiştirildi. Animasyon APK içinde bulunur, ilk kullanımda yüklenir ve geçiş bitince durur.

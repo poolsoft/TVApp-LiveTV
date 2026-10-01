@@ -12,6 +12,25 @@ import com.tvapp.livetv.tifinput.SharedIptvInputChannel
 @Dao
 interface IptvDao {
     @Query(
+        "SELECT SUBSTR(TRIM(displayName), 1, 1) AS initial, MIN(originalIndex) AS firstIndex " +
+            "FROM iptv_channels WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) GROUP BY initial",
+    )
+    suspend fun libraryInitials(sourceId: Long, category: String?, contentType: String, query: String): List<IptvInitial>
+
+    @Query(
+        "SELECT COUNT(*) FROM iptv_channels WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) AND originalIndex < :originalIndex",
+    )
+    suspend fun libraryCountBefore(sourceId: Long, category: String?, contentType: String, query: String, originalIndex: Int): Int
+
+    @Query(
         "SELECT c.sourceKey AS sourceKey, " +
             "COALESCE(u.customName, c.displayName) AS displayName, " +
             "c.streamUrl AS streamUrl, c.logoUrl AS logoUrl, " +

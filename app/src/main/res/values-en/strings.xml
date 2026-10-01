@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="channel_alphabet_navigation">Channel list alphabet navigation (hold Right)</string>
+    <string name="alphabet_navigation">Alphabet navigation. Up/down: choose letter, Left: return to list.</string>
+    <string name="user_guide_alphabet_navigation">ALPHABET NAVIGATION\nEnable alphabet navigation in Settings &gt; Channels. Hold Right in the channel list to open the alphabet rail; short Left/Right presses still change pages. Up/down selects only letters present in the current list and jumps to the first matching entry. Left or Back returns to the list; OK closes the rail, then OK in the list opens the channel. Alphabet navigation preserves channel order and does not auto-tune.</string>
     <string name="system_information">System information</string>
     <string name="epg_diagnostics">App diagnostics</string>
     <string name="epg_diagnostics_channel">App diagnostics · %1$s</string>

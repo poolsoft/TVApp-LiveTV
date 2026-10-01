@@ -49,6 +49,18 @@
         <item name="colorControlActivated">@color/accent</item>
         <item name="android:colorBackground">@color/dialog_bg</item>
         <item name="editTextStyle">@style/Widget.TVApp.Dialog.EditText</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.TVApp.Dialog.Action</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.TVApp.Dialog.Action</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.TVApp.Dialog.Action</item>
+    </style>
+
+    <style name="Widget.TVApp.Dialog.Action" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:background">@drawable/bg_dialog_action</item>
+        <item name="backgroundTint">@null</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="android:textColor">@color/dialog_action_text</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:paddingHorizontal">16dp</item>
     </style>
 
     <style name="Widget.TVApp.Dialog.EditText" parent="Widget.AppCompat.EditText">

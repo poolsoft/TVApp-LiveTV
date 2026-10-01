@@ -242,6 +242,12 @@ class MainActivity : TvRemoteActivity() {
     private var iptvLibraryLastAnchor: IptvPageAnchor? = null
     private var iptvLibraryGeneration = 0L
     private var iptvLibraryLoadJob: Job? = null
+    private var alphabetRail: com.tvapp.livetv.ui.AlphabetRail? = null
+    private var alphabetLoadJob: Job? = null
+    private var alphabetRightJob: Job? = null
+    private var alphabetRightHandled = false
+    private var alphabetBrowsing = false
+    private var alphabetTargetPosition = 0
     private var currentPlaybackUsesIptvLibrary = false
     private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
@@ -1507,7 +1513,7 @@ class MainActivity : TvRemoteActivity() {
         focusedListSourceKey = channel.sourceKey
         loadFocusedProgram(channel)
         focusedTuneJob?.cancel()
-        if (!displayPreferences.channelFocusAutoTune) return
+        if (!displayPreferences.channelFocusAutoTune || alphabetBrowsing) return
         focusedTuneJob = lifecycleScope.launch {
             delay(displayPreferences.channelFocusTuneDelayMillis.toLong())
             if (
@@ -3376,6 +3382,7 @@ class MainActivity : TvRemoteActivity() {
     private fun loadIptvLibraryWindow(
         direction: IptvPageDirection,
         targetIndex: Int = 0,
+        alphabetOriginalIndex: Int? = null,
     ) {
         if (
             channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
@@ -3397,8 +3404,17 @@ class MainActivity : TvRemoteActivity() {
         ) return
         iptvLibraryLoadJob = lifecycleScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
+            var resolvedWindowStart = targetIndex
             val page = withContext(Dispatchers.IO) {
-                iptvRepository.libraryLiveChannelsWindow(
+                if (alphabetOriginalIndex != null) {
+                    resolvedWindowStart = iptvRepository.libraryPositionBefore(
+                        sourceId, category, contentType.name, query, alphabetOriginalIndex,
+                    )
+                    iptvRepository.libraryLiveChannelsPageFrom(
+                        sourceId, category, contentType.name, IPTV_LIBRARY_PAGE_SIZE,
+                        alphabetOriginalIndex, query,
+                    )
+                } else iptvRepository.libraryLiveChannelsWindow(
                     sourceId,
                     category,
                     contentType.name,
@@ -3425,7 +3441,7 @@ class MainActivity : TvRemoteActivity() {
                     (iptvLibraryWindowStart - page.channels.size).coerceAtLeast(0)
                 IptvPageDirection.LAST ->
                     (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0)
-                IptvPageDirection.AT_INDEX -> targetIndex.coerceIn(
+                IptvPageDirection.AT_INDEX -> if (alphabetOriginalIndex != null) resolvedWindowStart else targetIndex.coerceIn(
                     0,
                     (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0),
                 )
@@ -3453,7 +3469,74 @@ class MainActivity : TvRemoteActivity() {
                     iptvLibraryChannels.lastIndex.coerceAtLeast(0)
                 else -> 0
             }
-            focusIptvLibraryPosition(target)
+            if (alphabetBrowsing) {
+                alphabetTargetPosition = target
+                binding.channelList.scrollToPosition(target)
+                loadVisiblePrograms()
+            } else focusIptvLibraryPosition(target)
+        }
+    }
+
+    private fun openChannelAlphabet() {
+        focusedTuneJob?.cancel()
+        channelPanelJob?.cancel()
+        if (alphabetRail != null || alphabetLoadJob?.isActive == true) return
+        val isLibrary = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY &&
+            iptvLibraryContentType != IptvLibraryContentType.CONTINUE
+        val sourceId = iptvLibrarySourceId
+        val category = iptvLibraryCategory
+        val type = iptvLibraryContentType
+        val query = channelSearchQuery
+        val generation = iptvLibraryGeneration
+        val channels = panelChannels().toList()
+        val initialLetter = com.tvapp.livetv.ui.AlphabetJump.letter(
+            channels.firstOrNull { it.sourceKey == focusedListSourceKey }?.displayName.orEmpty(),
+        )
+        alphabetLoadJob = lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (isLibrary && sourceId != null) {
+                        iptvRepository.libraryAlphabetTargets(sourceId, category, type.name, query)
+                    } else com.tvapp.livetv.ui.AlphabetJump.targets(
+                        channels.mapIndexed { index, channel -> channel.displayName to index },
+                    )
+                }
+            }
+            if (binding.channelPanel.visibility != View.VISIBLE ||
+                generation != iptvLibraryGeneration || query != channelSearchQuery
+            ) return@launch
+            val targets = result.getOrElse {
+                debugLog.recordDebug("ALPHABET_INDEX_FAILURE | ${it.javaClass.simpleName}")
+                scheduleChannelPanelClose()
+                return@launch
+            }
+            if (targets.isEmpty()) { scheduleChannelPanelClose(); return@launch }
+            alphabetTargetPosition = channels.indexOfFirst { it.sourceKey == focusedListSourceKey }.coerceAtLeast(0)
+            alphabetBrowsing = true
+            alphabetRail = com.tvapp.livetv.ui.AlphabetRail(binding.channelList, targets, initialLetter, onJump = { position ->
+                focusedTuneJob?.cancel()
+                if (isLibrary) {
+                    iptvLibraryLoadJob?.cancel()
+                    loadIptvLibraryWindow(IptvPageDirection.AT_INDEX, alphabetOriginalIndex = position)
+                } else {
+                    alphabetTargetPosition = position
+                    binding.channelList.scrollToPosition(position)
+                    loadVisiblePrograms()
+                }
+            }, onClose = {
+                alphabetRail = null
+                lifecycleScope.launch {
+                    if (isLibrary) iptvLibraryLoadJob?.join()
+                    binding.channelList.post {
+                        if (binding.channelPanel.visibility == View.VISIBLE && !isFinishing) {
+                            binding.channelList.findViewHolderForAdapterPosition(alphabetTargetPosition)
+                                ?.itemView?.requestFocus()
+                            scheduleChannelPanelClose()
+                        }
+                        alphabetBrowsing = false
+                    }
+                }
+            }).also { it.show() }
         }
     }
 
@@ -5247,6 +5330,9 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun hideChannelPanel() {
+        alphabetLoadJob?.cancel()
+        alphabetRightJob?.cancel()
+        alphabetRail?.close()
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
         adapter.stopProgramTicker()
@@ -6137,6 +6223,24 @@ class MainActivity : TvRemoteActivity() {
             }
             return true
         }
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT &&
+            displayPreferences.channelAlphabetNavigation &&
+            binding.channelPanel.visibility == View.VISIBLE && binding.channelList.hasFocus()
+        ) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                alphabetRightHandled = false
+                alphabetRightJob?.cancel()
+                alphabetRightJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    alphabetRightHandled = true
+                    openChannelAlphabet()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                alphabetRightJob?.cancel()
+                if (!alphabetRightHandled && !event.isCanceled) pageChannelList(1)
+            }
+            return true
+        }
         val isPictureInPictureKey = event.keyCode == KeyEvent.KEYCODE_WINDOW
         if (event.action != KeyEvent.ACTION_DOWN && isPictureInPictureKey) return true
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -6322,6 +6426,9 @@ class MainActivity : TvRemoteActivity() {
     }
 
     override fun onStop() {
+        alphabetLoadJob?.cancel()
+        alphabetRightJob?.cancel()
+        alphabetRail?.close()
         binding.blackoutAnimation.pauseAnimation()
         saveCurrentIptvResumePosition()
         if (!isChangingConfigurations &&
@@ -6344,6 +6451,9 @@ class MainActivity : TvRemoteActivity() {
         numberInputJob?.cancel()
         focusedTuneJob?.cancel()
         infoBarJob?.cancel()
+        alphabetLoadJob?.cancel()
+        alphabetRightJob?.cancel()
+        alphabetRail?.close()
         channelPanelJob?.cancel()
         programJob?.cancel()
         visibleProgramsJob?.cancel()

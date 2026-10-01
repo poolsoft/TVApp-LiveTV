@@ -275,6 +275,15 @@ class IptvRepository(context: Context) {
         query: String = "",
     ): Int = dao.libraryCount(sourceId, category, contentType, IptvFtsQuery.from(query))
 
+    suspend fun libraryAlphabetTargets(sourceId: Long, category: String?, contentType: String, query: String) =
+        com.tvapp.livetv.ui.AlphabetJump.targets(
+            dao.libraryInitials(sourceId, category, contentType, IptvFtsQuery.from(query))
+                .map { it.initial to it.firstIndex },
+        )
+
+    suspend fun libraryPositionBefore(sourceId: Long, category: String?, contentType: String, query: String, originalIndex: Int) =
+        dao.libraryCountBefore(sourceId, category, contentType, IptvFtsQuery.from(query), originalIndex)
+
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
 
     suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> =

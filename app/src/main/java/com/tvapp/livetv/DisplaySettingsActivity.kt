@@ -306,6 +306,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         toggle(R.string.show_channel_source_badge, current.showChannelSourceBadge) {
             update { copy(showChannelSourceBadge = it) }
         }
+        toggle(R.string.channel_alphabet_navigation, current.channelAlphabetNavigation) {
+            update { copy(channelAlphabetNavigation = it) }
+        }
         if (!BuildConfig.MOBILE_UI_ENABLED) {
             toggle(R.string.channel_focus_auto_tune, current.channelFocusAutoTune) {
                 update { copy(channelFocusAutoTune = it) }

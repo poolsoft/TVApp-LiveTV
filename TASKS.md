@@ -3,6 +3,16 @@
 Durumlar: `[ ]` bekliyor, `[~]` devam ediyor, `[x]` tamamlandı. Öncelikler: P0 kritik,
 P1 yüksek, P2 normal, P3 sonraki sürüm.
 
+## Harfle gezinme
+
+- [~] **UIALPHA-001 (P2): Filtreye bağlı harf çubuğu**
+  Ana kanal listesi ve IPTV kütüphanesinde ayarla aç/kapat, uzun sağ ok, sol/Back dönüş,
+  yalnız mevcut harfler ve ilk kayda atlama uygulandı. IPTV tam kataloğu UI belleğine yüklenmez.
+  Kanal editörü, IPTV seçim editörü ve XMLTV eşleştirme listesine aynı davranışın aktarımı bekliyor;
+  bu ekranlardaki sağ/sol eylemleri korunarak yalnız boş yön tuşları kullanılacak.
+  **Kabul:** Harf gezinmesi auto-tune, üyelik, sıra veya izleme geçmişini değiştirmez;
+  Android 11 Google TV kumandasında odak ve sayfa geçişi doğrulanır.
+
 ## Epic PERF - Ölçüm ve performans tabanı
 
 - [x] **PERF-001 (P0): Performans ölçüm altyapısı**
