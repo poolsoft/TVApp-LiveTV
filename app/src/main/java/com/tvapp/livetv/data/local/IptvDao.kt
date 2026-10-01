@@ -132,6 +132,7 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND originalIndex >= :fromIndex " +
@@ -144,6 +145,8 @@ interface IptvDao {
         query: String,
         fromIndex: Int,
         limit: Int,
+        initials: List<String> = emptyList(),
+        alphabetFiltered: Boolean = false,
     ): List<IptvChannelListProjection>
 
     @Query(
@@ -152,6 +155,7 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (originalIndex > :anchorIndex " +
@@ -166,6 +170,8 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
+        initials: List<String> = emptyList(),
+        alphabetFiltered: Boolean = false,
     ): List<IptvChannelListProjection>
 
     @Query(
@@ -174,6 +180,7 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND (originalIndex < :anchorIndex " +
@@ -188,6 +195,8 @@ interface IptvDao {
         anchorIndex: Int,
         anchorKey: String,
         limit: Int,
+        initials: List<String> = emptyList(),
+        alphabetFiltered: Boolean = false,
     ): List<IptvChannelListProjection>
 
     @Query(
@@ -196,6 +205,7 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "ORDER BY originalIndex DESC, sourceKey DESC LIMIT :limit",
@@ -206,6 +216,8 @@ interface IptvDao {
         contentType: String,
         query: String,
         limit: Int,
+        initials: List<String> = emptyList(),
+        alphabetFiltered: Boolean = false,
     ): List<IptvChannelListProjection>
 
     @Query(
@@ -214,6 +226,7 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query)) " +
             "AND originalIndex >= :targetIndex " +
@@ -226,6 +239,8 @@ interface IptvDao {
         query: String,
         targetIndex: Int,
         limit: Int,
+        initials: List<String> = emptyList(),
+        alphabetFiltered: Boolean = false,
     ): List<IptvChannelListProjection>
 
     @Query(
@@ -233,10 +248,29 @@ interface IptvDao {
             "WHERE sourceId = :sourceId " +
             "AND (:category IS NULL OR groupTitle = :category) " +
             "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND (:alphabetFiltered = 0 OR SUBSTR(TRIM(displayName), 1, 1) IN (:initials)) " +
             "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
             "WHERE iptv_channel_search MATCH :query))",
     )
-    suspend fun libraryCount(sourceId: Long, category: String?, contentType: String, query: String): Int
+    suspend fun libraryCount(
+        sourceId: Long, category: String?, contentType: String, query: String,
+        initials: List<String> = emptyList(), alphabetFiltered: Boolean = false,
+    ): Int
+
+    @Query(
+        "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +
+            "originalIndex, contentType, selected FROM iptv_channels WHERE sourceId = :sourceId " +
+            "AND (:category IS NULL OR groupTitle = :category) " +
+            "AND (:contentType = 'ALL' OR contentType = :contentType) " +
+            "AND SUBSTR(TRIM(displayName), 1, 1) IN (:initials) " +
+            "AND (:query = '' OR sourceKey IN (SELECT sourceKey FROM iptv_channel_search " +
+            "WHERE iptv_channel_search MATCH :query)) " +
+            "ORDER BY originalIndex, sourceKey LIMIT :limit OFFSET :offset",
+    )
+    suspend fun getAlphabetPageAtOrdinal(
+        sourceId: Long, category: String?, contentType: String, query: String,
+        initials: List<String>, limit: Int, offset: Int,
+    ): List<IptvChannelListProjection>
 
     @Query(
         "SELECT sourceKey, sourceId, tvgId, tvgName, displayName, logoUrl, groupTitle, " +

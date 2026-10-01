@@ -28,15 +28,16 @@ Her aşama kendi testleriyle doğrulanıp gönderilir, aşağıdakiler topluca t
 
 ## Harfle gezinme
 
-- [ ] **UIALPHA-002 (P2): Harfi başlangıç filtresi olarak kullanma**
+- [x] **UIALPHA-002 (P2): Harfi başlangıç filtresi olarak kullanma**
   Mevcut atlama yerine Tümü + geçerli harfler seçimi; seçilen harfle başlayan kayıtları mevcut
   kullanıcı/katalog sırasını bozmadan göster. Normal liste ve IPTV DAO sayfalaması aynı harf
   normalizasyonunu kullanmalı; katalog UI thread üzerinde taranmaz/sıralanmaz. Tümü filtreyi temizler.
-  Bu turda yalnız öneri kaydedildi, mevcut harf çubuğu davranışı değiştirilmedi.
+  Normal liste, IPTV kütüphanesi ve Devam Et görünümünde uygulandı. IPTV harfleri DAO özetiyle
+  hesaplanır; ileri/geri/son sayfa ve sayı ile seçim aynı filtreyi kullanır. Gerçek TV odak testi bekliyor.
 
 - [~] **UIALPHA-001 (P2): Filtreye bağlı harf çubuğu**
   Ana kanal listesi ve IPTV kütüphanesinde ayarla aç/kapat, uzun sağ ok, sol/Back dönüş,
-  yalnız mevcut harfler ve ilk kayda atlama uygulandı. IPTV tam kataloğu UI belleğine yüklenmez.
+  Tümü + mevcut harfler ile başlangıç filtresi uygulandı. IPTV tam kataloğu UI belleğine yüklenmez.
   Kanal editörü, IPTV seçim editörü ve XMLTV eşleştirme listesine aynı davranışın aktarımı bekliyor;
   bu ekranlardaki sağ/sol eylemleri korunarak yalnız boş yön tuşları kullanılacak.
   **Kabul:** Harf gezinmesi auto-tune, üyelik, sıra veya izleme geçmişini değiştirmez;

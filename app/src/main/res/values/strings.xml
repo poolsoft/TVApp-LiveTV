@@ -18,7 +18,7 @@
     <string name="iptv_source_playback_options_saved">Kaynak oynatma ayarları kaydedildi. Bir sonraki kanal açılışında uygulanır.</string>
     <string name="channel_alphabet_navigation">Kanal listesinde harfle gezinme (uzun sağ ok)</string>
     <string name="alphabet_navigation">Harfle gezinme. Yukarı/aşağı: harf seç, sol: listeye dön.</string>
-    <string name="user_guide_alphabet_navigation">HARFLE GEZİNME\nAyarlar &gt; Kanallar altında harfle gezinmeyi açabilirsiniz. Kanal listesinde uzun sağ ok harf çubuğunu açar; kısa sağ/sol ok sayfa değiştirir. Yukarı/aşağı ile yalnız geçerli listede bulunan harfler arasında gezinilir ve o harfle başlayan ilk kayda atlanır. Sol veya Back listeye döndürür; OK çubuğu kapatır, kanalı açmak için listede tekrar OK kullanılır. Harf seçimi kanal sırasını değiştirmez ve yayını otomatik açmaz.</string>
+    <string name="user_guide_alphabet_navigation">HARFLE GEZİNME\nAyarlar &gt; Kanallar altında harfle gezinmeyi açabilirsiniz. Kanal listesinde uzun sağ ok harf çubuğunu açar; kısa sağ/sol ok sayfa değiştirir. Yukarı/aşağı seçilen harfle başlayan kayıtları filtreler; Tümü harf filtresini temizler. Kaynak/kategori veya arama değiştirildiğinde harf filtresi temizlenir. Sol veya Back listeye döndürür; OK çubuğu kapatır, kanalı açmak için listede tekrar OK kullanılır. Harf seçimi kanal sırasını değiştirmez ve yayını otomatik açmaz.</string>
     <string name="system_information">Sistem bilgileri</string>
     <string name="epg_diagnostics">Uygulama tanılama</string>
     <string name="epg_diagnostics_channel">Uygulama tanılama · %1$s</string>

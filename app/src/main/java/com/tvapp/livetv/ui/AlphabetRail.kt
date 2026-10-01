@@ -11,7 +11,7 @@ import android.widget.PopupWindow
 import com.tvapp.livetv.R
 import kotlin.math.min
 
-/** The popup owns focus so list jumps cannot trigger selection or auto-tuning. */
+/** The popup owns focus so filtering cannot trigger selection or auto-tuning. */
 class AlphabetRail(
     private val anchor: View,
     private val targets: List<AlphabetTarget>,
@@ -37,7 +37,9 @@ class AlphabetRail(
         }
 
         private fun select(index: Int) {
-            selected = index.coerceIn(0, targets.lastIndex)
+            val target = index.coerceIn(0, targets.lastIndex)
+            if (selected == target) return
+            selected = target
             if (selected < first) first = selected
             if (selected >= first + visibleCount) first = selected - visibleCount + 1
             invalidate()
@@ -61,8 +63,10 @@ class AlphabetRail(
             path.close()
             canvas.drawPath(path, paint)
             paint.textAlign = Paint.Align.CENTER
-            paint.textSize = min(15 * resources.displayMetrics.scaledDensity, cell * 0.65f)
             for (index in first until min(first + visibleCount, targets.size)) {
+                paint.textSize = min(15 * resources.displayMetrics.scaledDensity, cell * 0.65f)
+                val textWidth = paint.measureText(targets[index].letter)
+                if (textWidth > 38 * density) paint.textSize *= 38 * density / textWidth
                 paint.color = context.getColor(if (index == selected) R.color.black else R.color.text_primary)
                 paint.isFakeBoldText = index == selected
                 val baseline = (index - first + 0.5f) * cell - (paint.ascent() + paint.descent()) / 2

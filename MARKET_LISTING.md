@@ -9,7 +9,7 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 - IPTV listelerine özel canlı/VOD arabelleği, çözünürlük sınırı ve otomatik yeniden deneme tercihleri; istenirse genel ayarları kullanma.
 
-- İsteğe bağlı harf çubuğuyla uzun kanal listelerinde hızlı gezinme; kanal sırasını ve izlenen yayını değiştirmeden kayda atlama.
+- İsteğe bağlı harf çubuğuyla uzun kanal listelerinde başlangıç harfine göre filtreleme; Tümü ile geri dönüş, kanal sırasını ve izlenen yayını koruma.
 ### Uygulama adı
 
 `TVApp: Canlı TV ve IPTV`

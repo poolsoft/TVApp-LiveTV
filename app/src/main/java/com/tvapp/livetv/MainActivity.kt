@@ -247,6 +247,10 @@ class MainActivity : TvRemoteActivity() {
     private var alphabetRightJob: Job? = null
     private var alphabetRightHandled = false
     private var alphabetBrowsing = false
+    private var alphabetFilterJob: Job? = null
+    private var alphabetLetter: String? = null
+    private var iptvAlphabetInitials: List<String>? = null
+    private var continuedAlphabetChannels: List<LiveChannel> = emptyList()
     private var alphabetTargetPosition = 0
     private var currentPlaybackUsesIptvLibrary = false
     private var lockedChannelRecordsHistory = true
@@ -3305,6 +3309,10 @@ class MainActivity : TvRemoteActivity() {
         contentType: IptvLibraryContentType,
         category: String?,
     ) {
+        alphabetFilterJob?.cancel()
+        alphabetLetter = null
+        iptvAlphabetInitials = null
+        continuedAlphabetChannels = emptyList()
         channelPanelContent = ChannelPanelContent.IPTV_LIBRARY
         adapter.showIptvMembership(true)
         iptvLibraryLoadJob?.cancel()
@@ -3338,6 +3346,7 @@ class MainActivity : TvRemoteActivity() {
         adapter.submitList(iptvLibraryChannels)
         adapter.submitPrograms(currentPrograms)
         updateIptvLibraryCount()
+        val generation = iptvLibraryGeneration
         lifecycleScope.launch {
             if (contentType == IptvLibraryContentType.CONTINUE) {
                 val sourceInputId = "iptv:$sourceId"
@@ -3353,8 +3362,10 @@ class MainActivity : TvRemoteActivity() {
                 if (
                     channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
                     iptvLibrarySourceId != sourceId ||
+                    generation != iptvLibraryGeneration ||
                     iptvLibraryContentType != IptvLibraryContentType.CONTINUE
                 ) return@launch
+                continuedAlphabetChannels = continued
                 iptvLibraryChannels = continued
                 iptvLibraryTotalCount = continued.size
                 iptvLibraryWindowStart = 0
@@ -3366,7 +3377,7 @@ class MainActivity : TvRemoteActivity() {
                 focusCurrentListChannel()
                 return@launch
             }
-            iptvLibraryTotalCount = withContext(Dispatchers.IO) {
+            val count = withContext(Dispatchers.IO) {
                 iptvRepository.libraryChannelCount(
                     sourceId,
                     category,
@@ -3374,6 +3385,8 @@ class MainActivity : TvRemoteActivity() {
                     channelSearchQuery,
                 )
             }
+            if (generation != iptvLibraryGeneration) return@launch
+            iptvLibraryTotalCount = count
             updateIptvLibraryCount()
             loadIptvLibraryWindow(IptvPageDirection.FIRST)
         }
@@ -3388,7 +3401,6 @@ class MainActivity : TvRemoteActivity() {
     private fun loadIptvLibraryWindow(
         direction: IptvPageDirection,
         targetIndex: Int = 0,
-        alphabetOriginalIndex: Int? = null,
     ) {
         if (
             channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
@@ -3399,6 +3411,7 @@ class MainActivity : TvRemoteActivity() {
         val category = iptvLibraryCategory
         val contentType = iptvLibraryContentType
         val query = channelSearchQuery
+        val initials = iptvAlphabetInitials
         val generation = iptvLibraryGeneration
         val anchor = when (direction) {
             IptvPageDirection.NEXT -> iptvLibraryLastAnchor
@@ -3410,17 +3423,8 @@ class MainActivity : TvRemoteActivity() {
         ) return
         iptvLibraryLoadJob = lifecycleScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
-            var resolvedWindowStart = targetIndex
             val page = withContext(Dispatchers.IO) {
-                if (alphabetOriginalIndex != null) {
-                    resolvedWindowStart = iptvRepository.libraryPositionBefore(
-                        sourceId, category, contentType.name, query, alphabetOriginalIndex,
-                    )
-                    iptvRepository.libraryLiveChannelsPageFrom(
-                        sourceId, category, contentType.name, IPTV_LIBRARY_PAGE_SIZE,
-                        alphabetOriginalIndex, query,
-                    )
-                } else iptvRepository.libraryLiveChannelsWindow(
+                iptvRepository.libraryLiveChannelsWindow(
                     sourceId,
                     category,
                     contentType.name,
@@ -3429,6 +3433,7 @@ class MainActivity : TvRemoteActivity() {
                     anchor,
                     targetIndex,
                     query,
+                    initials,
                 )
             }
             if (
@@ -3447,7 +3452,7 @@ class MainActivity : TvRemoteActivity() {
                     (iptvLibraryWindowStart - page.channels.size).coerceAtLeast(0)
                 IptvPageDirection.LAST ->
                     (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0)
-                IptvPageDirection.AT_INDEX -> if (alphabetOriginalIndex != null) resolvedWindowStart else targetIndex.coerceIn(
+                IptvPageDirection.AT_INDEX -> targetIndex.coerceIn(
                     0,
                     (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0),
                 )
@@ -3494,45 +3499,82 @@ class MainActivity : TvRemoteActivity() {
         val type = iptvLibraryContentType
         val query = channelSearchQuery
         val generation = iptvLibraryGeneration
-        val channels = panelChannels().toList()
-        val initialLetter = com.tvapp.livetv.ui.AlphabetJump.letter(
-            channels.firstOrNull { it.sourceKey == focusedListSourceKey }?.displayName.orEmpty(),
-        )
+        val isContinue = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY &&
+            iptvLibraryContentType == IptvLibraryContentType.CONTINUE
+        val channels = when {
+            isLibrary -> panelChannels().toList()
+            isContinue -> continuedAlphabetChannels
+            else -> buildNormalPanelChannels(includeAlphabet = false)
+        }
+        val initialLetter = alphabetLetter ?: getString(R.string.all_channels)
+        val baseTitle = binding.channelListTitle.text.toString().let {
+            if (alphabetLetter != null) it.removeSuffix(" · $alphabetLetter") else it
+        }
         alphabetLoadJob = lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     if (isLibrary && sourceId != null) {
-                        iptvRepository.libraryAlphabetTargets(sourceId, category, type.name, query)
-                    } else com.tvapp.livetv.ui.AlphabetJump.targets(
-                        channels.mapIndexed { index, channel -> channel.displayName to index },
-                    )
+                        iptvRepository.libraryAlphabetInitials(sourceId, category, type.name, query)
+                    } else channels.groupBy { com.tvapp.livetv.ui.AlphabetJump.letter(it.displayName) }
+                        .mapValues { (_, entries) -> entries.map { it.displayName } }
                 }
             }
             if (binding.channelPanel.visibility != View.VISIBLE ||
                 generation != iptvLibraryGeneration || query != channelSearchQuery
             ) return@launch
-            val targets = result.getOrElse {
+            val initialsByLetter = result.getOrElse {
                 debugLog.recordDebug("ALPHABET_INDEX_FAILURE | ${it.javaClass.simpleName}")
                 scheduleChannelPanelClose()
                 return@launch
             }
-            if (targets.isEmpty()) { scheduleChannelPanelClose(); return@launch }
-            alphabetTargetPosition = channels.indexOfFirst { it.sourceKey == focusedListSourceKey }.coerceAtLeast(0)
+            val letters = com.tvapp.livetv.ui.AlphabetJump.targets(initialsByLetter.keys.map { it to 0 })
+            val targets = listOf(com.tvapp.livetv.ui.AlphabetTarget(getString(R.string.all_channels), -1)) +
+                letters.mapIndexed { index, target -> target.copy(position = index) }
+            alphabetTargetPosition = panelChannels().indexOfFirst { it.sourceKey == focusedListSourceKey }.coerceAtLeast(0)
             alphabetBrowsing = true
             alphabetRail = com.tvapp.livetv.ui.AlphabetRail(binding.channelList, targets, initialLetter, onJump = { position ->
                 focusedTuneJob?.cancel()
+                alphabetLetter = letters.getOrNull(position)?.letter
+                binding.channelListTitle.text = listOfNotNull(baseTitle, alphabetLetter).joinToString(" · ")
+                alphabetTargetPosition = 0
                 if (isLibrary) {
+                    alphabetFilterJob?.cancel()
                     iptvLibraryLoadJob?.cancel()
-                    loadIptvLibraryWindow(IptvPageDirection.AT_INDEX, alphabetOriginalIndex = position)
+                    iptvAlphabetInitials = alphabetLetter?.let { initialsByLetter[it].orEmpty() }
+                    val selectedInitials = iptvAlphabetInitials
+                    val filterGeneration = ++iptvLibraryGeneration
+                    iptvLibraryFirstAnchor = null
+                    iptvLibraryLastAnchor = null
+                    alphabetFilterJob = lifecycleScope.launch {
+                        val count = withContext(Dispatchers.IO) {
+                            iptvRepository.libraryChannelCount(
+                                sourceId ?: return@withContext 0, category, type.name, query, selectedInitials,
+                            )
+                        }
+                        if (filterGeneration != iptvLibraryGeneration) return@launch
+                        iptvLibraryTotalCount = count
+                        updateIptvLibraryCount()
+                        loadIptvLibraryWindow(IptvPageDirection.FIRST)
+                    }
+                } else if (isContinue) {
+                    iptvLibraryChannels = channels.filter {
+                        alphabetLetter == null || com.tvapp.livetv.ui.AlphabetJump.letter(it.displayName) == alphabetLetter
+                    }.mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+                    iptvLibraryTotalCount = iptvLibraryChannels.size
+                    adapter.submitList(iptvLibraryChannels)
+                    updateIptvLibraryCount()
+                    binding.channelList.scrollToPosition(0)
                 } else {
-                    alphabetTargetPosition = position
-                    binding.channelList.scrollToPosition(position)
-                    loadVisiblePrograms()
+                    applyChannelFilter(requestFocus = false)
+                    binding.channelList.scrollToPosition(0)
                 }
             }, onClose = {
                 alphabetRail = null
                 lifecycleScope.launch {
-                    if (isLibrary) iptvLibraryLoadJob?.join()
+                    if (isLibrary) {
+                        alphabetFilterJob?.join()
+                        iptvLibraryLoadJob?.join()
+                    }
                     binding.channelList.post {
                         if (binding.channelPanel.visibility == View.VISIBLE && !isFinishing) {
                             binding.channelList.findViewHolderForAdapterPosition(alphabetTargetPosition)
@@ -3547,7 +3589,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun focusIptvLibraryPosition(position: Int) {
-        if (iptvLibraryChannels.isEmpty()) return
+        if (iptvLibraryChannels.isEmpty() || binding.channelPanel.visibility != View.VISIBLE) return
         val target = position.coerceIn(0, iptvLibraryChannels.lastIndex)
         binding.channelList.scrollToPosition(target)
         binding.channelList.post {
@@ -3589,6 +3631,7 @@ class MainActivity : TvRemoteActivity() {
                     IptvPageDirection.AT_INDEX,
                     targetIndex = index,
                     query = channelSearchQuery,
+                    initials = iptvAlphabetInitials,
                 )
             }
             val channel = page.channels.firstOrNull() ?: return@launch
@@ -5001,6 +5044,9 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun applyChannelSearch(value: String) {
+        alphabetFilterJob?.cancel()
+        alphabetLetter = null
+        iptvAlphabetInitials = null
         channelSearchQuery = value.trim()
         normalizedChannelSearchQuery = normalizeSearchText(channelSearchQuery)
         binding.channelSearchButton.isSelected = channelSearchQuery.isNotEmpty()
@@ -5020,6 +5066,7 @@ class MainActivity : TvRemoteActivity() {
                         .filter(::matchesChannelSearch)
                 }.mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
                 if (generation != iptvLibraryGeneration || query != channelSearchQuery) return@launch
+                continuedAlphabetChannels = filtered
                 iptvLibraryChannels = filtered
                 iptvLibraryTotalCount = filtered.size
                 adapter.submitList(filtered)
@@ -5076,7 +5123,7 @@ class MainActivity : TvRemoteActivity() {
         return normalPanelChannels
     }
 
-    private fun buildNormalPanelChannels(): List<LiveChannel> {
+    private fun buildNormalPanelChannels(includeAlphabet: Boolean = true): List<LiveChannel> {
         return channels.asSequence()
         .filter { channel ->
             when (sourceFilter) {
@@ -5089,6 +5136,7 @@ class MainActivity : TvRemoteActivity() {
         }
         .filter { channel -> !favoriteFilter || channel.favorite }
         .filter(::matchesChannelSearch)
+        .filter { !includeAlphabet || alphabetLetter == null || com.tvapp.livetv.ui.AlphabetJump.letter(it.displayName) == alphabetLetter }
         .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
         .toList()
     }
@@ -5098,6 +5146,10 @@ class MainActivity : TvRemoteActivity() {
         source: ChannelSourceFilter = sourceFilter,
         requestFocus: Boolean = true,
     ) {
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY || source != sourceFilter ||
+            showFavorites != favoriteFilter || !displayPreferences.channelAlphabetNavigation
+        ) alphabetLetter = null
+        alphabetFilterJob?.cancel()
         iptvLibraryLoadJob?.cancel()
         iptvLibraryGeneration++
         iptvLibraryHasPrevious = false
@@ -5115,7 +5167,7 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvFilter.isSelected = sourceFilter == ChannelSourceFilter.IPTV
         binding.favoriteFilter.isSelected = showFavorites
         binding.sourceFilterRow.visibility = View.GONE
-        binding.channelListTitle.setText(R.string.channel_list)
+        binding.channelListTitle.text = listOfNotNull(getString(R.string.channel_list), alphabetLetter).joinToString(" · ")
         updateChannelListModeIcon()
         updateChannelActionLabels()
         normalPanelChannels = buildNormalPanelChannels()
@@ -6491,6 +6543,7 @@ class MainActivity : TvRemoteActivity() {
         focusedTuneJob?.cancel()
         infoBarJob?.cancel()
         alphabetLoadJob?.cancel()
+        alphabetFilterJob?.cancel()
         alphabetRightJob?.cancel()
         alphabetRail?.close()
         channelPanelJob?.cancel()

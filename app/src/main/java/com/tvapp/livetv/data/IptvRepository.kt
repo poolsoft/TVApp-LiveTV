@@ -241,31 +241,34 @@ class IptvRepository(context: Context) {
         anchor: IptvPageAnchor? = null,
         targetIndex: Int = 0,
         query: String = "",
+        initials: List<String>? = null,
     ): IptvLibraryPage {
         val ftsQuery = IptvFtsQuery.from(query)
         val entities = when (direction) {
             IptvPageDirection.FIRST -> dao.getLibraryPageFrom(
-                sourceId, category, contentType, ftsQuery, 0, limit,
+                sourceId, category, contentType, ftsQuery, 0, limit, initials.orEmpty(), initials != null,
             )
             IptvPageDirection.NEXT -> requireNotNull(anchor).let {
                 dao.getLibraryPageAfter(
                     sourceId, category, contentType, ftsQuery,
-                    it.originalIndex, it.sourceKey, limit,
+                    it.originalIndex, it.sourceKey, limit, initials.orEmpty(), initials != null,
                 )
             }
             IptvPageDirection.PREVIOUS -> requireNotNull(anchor).let {
                 dao.getLibraryPageBefore(
                     sourceId, category, contentType, ftsQuery,
-                    it.originalIndex, it.sourceKey, limit,
+                    it.originalIndex, it.sourceKey, limit, initials.orEmpty(), initials != null,
                 ).asReversed()
             }
             IptvPageDirection.LAST -> dao.getLibraryLastPage(
-                sourceId, category, contentType, ftsQuery, limit,
+                sourceId, category, contentType, ftsQuery, limit, initials.orEmpty(), initials != null,
             ).asReversed()
             // Direct numeric jumps land at the first row at/after the requested
             // ordinal; originalIndex is sparse after category/FTS filtering, so
             // the jump is approximate by design (same as the previous OFFSET form).
-            IptvPageDirection.AT_INDEX -> dao.getLibraryPageAtOrAfter(
+            IptvPageDirection.AT_INDEX -> if (initials != null) dao.getAlphabetPageAtOrdinal(
+                sourceId, category, contentType, ftsQuery, initials, limit, targetIndex,
+            ) else dao.getLibraryPageAtOrAfter(
                 sourceId, category, contentType, ftsQuery, targetIndex, limit,
             )
         }
@@ -281,16 +284,13 @@ class IptvRepository(context: Context) {
         category: String?,
         contentType: String,
         query: String = "",
-    ): Int = dao.libraryCount(sourceId, category, contentType, IptvFtsQuery.from(query))
+        initials: List<String>? = null,
+    ): Int = dao.libraryCount(sourceId, category, contentType, IptvFtsQuery.from(query), initials.orEmpty(), initials != null)
 
-    suspend fun libraryAlphabetTargets(sourceId: Long, category: String?, contentType: String, query: String) =
-        com.tvapp.livetv.ui.AlphabetJump.targets(
-            dao.libraryInitials(sourceId, category, contentType, IptvFtsQuery.from(query))
-                .map { it.initial to it.firstIndex },
-        )
-
-    suspend fun libraryPositionBefore(sourceId: Long, category: String?, contentType: String, query: String, originalIndex: Int) =
-        dao.libraryCountBefore(sourceId, category, contentType, IptvFtsQuery.from(query), originalIndex)
+    suspend fun libraryAlphabetInitials(sourceId: Long, category: String?, contentType: String, query: String) =
+        dao.libraryInitials(sourceId, category, contentType, IptvFtsQuery.from(query))
+            .groupBy { com.tvapp.livetv.ui.AlphabetJump.letter(it.initial) }
+            .mapValues { (_, entries) -> entries.map { it.initial } }
 
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
 

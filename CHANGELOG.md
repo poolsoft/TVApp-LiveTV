@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - Harf filtresi
+
+- Harf çubuğu ilk kayda atlamak yerine seçilen harfle başlayan kayıtları mevcut sırayla gösterir; Tümü harf filtresini temizler. Normal kanal listesi, IPTV kütüphanesi ve Devam Et görünümü desteklenir.
+- IPTV sayfalaması, kayıt sayısı ve filtreli sayı ile seçim veritabanında çalışır. Türkçe harflerin büyük/küçük biçimleri birlikte eşleşir; hızlı harf değişiminde eski sorgular yeni listeyi ezmez.
+- Uzun sağ ok, kısa sağ/sol sayfa geçişi ve sol/Back dönüş korunur; harf seçimi yayını otomatik değiştirmez.
+
 ## 2026-10-01 - MultiView ve PiP geçişleri
 
 - Tek kanal MultiView olarak açılabilir; uygun tek IPTV seçimi PiP/MultiView görünüm seçimi sunar. Mevcut MultiView/PiP kanalları seçici yeniden açılırken korunur.
