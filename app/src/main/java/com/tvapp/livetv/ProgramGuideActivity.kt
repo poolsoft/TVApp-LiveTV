@@ -430,8 +430,7 @@ class ProgramGuideActivity : TvRemoteActivity() {
         focusedChannelIndex = target
         focusedChannel = channel
         scheduleAdapter.selectChannel(channel.sourceKey)
-        binding.selectedChannelNumber.text = channel.displayNumber
-        binding.selectedChannelName.text = channel.displayName
+        updateSelectedChannelHeader(channel)
         syncScrollToRow(target)
 
         val cachedPrograms = programSchedules[channel.sourceKey]
