@@ -4,6 +4,8 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
 
+- MultiView tek kanalla başlayabilir. Farklı bir IPTV kanalı tek başına seçildiğinde PiP veya MultiView seçilir; aynı yayın iki kez açılmaz. MultiView/PiP açıkken yeşil tuş mevcut seçimlerle seçiciyi açar; MultiView’de uzun OK menüsünden kanal eklenebilir. Bir/iki yayınlı MultiView’de uygun IPTV hücresi uzun OK ile PiP görünümüne çevrilebilir. En fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı korunur. TIF iç video yüzeyi hücre ve tam ekran ölçülerine uyarlanır.
+
 - IPTV kaynak menüsündeki **Oynatma ayarları** ile canlı/VOD buffer, azami video çözünürlüğü ve otomatik kurtarma kaynak bazında ayarlanabilir. Her alan genel ayarı kullanabilir; tercihler liste güncellemesinde ve yedekten dönüşte korunur. Kalite sınırı yalnız mevcut yayın çeşitleri arasından seçim yapar, cihazın MultiView sınırlarını yükseltmez. Değişiklikler kanal yeniden açıldığında uygulanır.
 
 - Cihazın vendor TIF girişlerini `TvInputManager` ile keşfetmek

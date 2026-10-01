@@ -252,6 +252,7 @@ class MainActivity : TvRemoteActivity() {
     private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
     private var iptvOverlayActive = false
+    private var iptvOverlayChannel: LiveChannel? = null
     private var iptvGridActive = false
     private var gridActiveIndex = 0
     private var gridLongPressHandled = false
@@ -493,6 +494,7 @@ class MainActivity : TvRemoteActivity() {
             applyPreferredTracks()
         }
         playback.onVideoSizeChanged = { width, height ->
+            binding.tvView.setVideoSize(width, height)
             debugLog.recordDebug(
                 "TIF_VIDEO_SIZE_RAW | channel=${currentChannel?.sourceKey}, width=$width, height=$height",
             )
@@ -3677,17 +3679,24 @@ class MainActivity : TvRemoteActivity() {
 
     private fun startIptvOverlay(channel: LiveChannel) {
         if (!hasIptvAccess { startIptvOverlay(channel) }) return
-        if (currentChannel == null) return
+        val background = if (iptvGridActive) {
+            gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } ?: gridReturnChannel
+        } else currentChannel
+        if (background == null) return
         if (channel.source != LiveChannel.Source.IPTV) {
             Toast.makeText(this, R.string.iptv_pip_requires_iptv, Toast.LENGTH_LONG).show()
             return
         }
-        if (channel.sourceKey == currentChannel?.sourceKey) {
+        if (channel.sourceKey == background.sourceKey) {
             Toast.makeText(this, R.string.iptv_pip_requires_different_channel, Toast.LENGTH_LONG).show()
             return
         }
-        if (iptvGridActive) stopIptvGrid(resumePrevious = true)
+        if (iptvGridActive) {
+            stopIptvGrid(resumePrevious = false)
+            playSelectedChannel(background, recordHistory = false)
+        }
         iptvOverlayActive = true
+        iptvOverlayChannel = channel
         endBlackout("IPTV_OVERLAY")
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_OVERLAY)
         val width = (resources.displayMetrics.widthPixels * 0.32f).toInt()
@@ -3710,14 +3719,18 @@ class MainActivity : TvRemoteActivity() {
     private fun stopIptvOverlay() {
         if (!iptvOverlayActive) return
         iptvOverlayActive = false
+        iptvOverlayChannel = null
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
         secondaryIptvPlayback.stop()
         binding.secondaryIptvPlayerView.visibility = View.GONE
         debugLog.recordDebug("IPTV_OVERLAY_STOP")
     }
 
-    private fun showIptvGridPicker() {
-        val choices = availableMultiViewChannels()
+    private fun showIptvGridPicker(initialSelection: List<LiveChannel>? = null) {
+        val initial = initialSelection ?: if (iptvGridActive) gridChannels else if (iptvOverlayActive) {
+            listOfNotNull(currentChannel, iptvOverlayChannel)
+        } else emptyList()
+        val choices = (availableMultiViewChannels() + initial).distinctBy { it.sourceKey }
         if (choices.isEmpty()) {
             Toast.makeText(this, R.string.iptv_grid_no_channels, Toast.LENGTH_LONG).show()
             return
@@ -3725,11 +3738,7 @@ class MainActivity : TvRemoteActivity() {
         channelPanelJob?.cancel()
         val selected = linkedMapOf<String, LiveChannel>()
         val maximumSelections = deviceResourcePolicy.maximumGridStreams
-        currentChannel?.let { cur ->
-            choices.firstOrNull { it.sourceKey == cur.sourceKey }?.let {
-                selected[it.sourceKey] = it
-            }
-        }
+        initial.forEach { selected[it.sourceKey] = it }
         var sourceFilter = MultiViewPickerFilter.ALL
         var query = ""
         var visibleChoices = choices
@@ -3841,11 +3850,16 @@ class MainActivity : TvRemoteActivity() {
                     R.string.iptv_grid_empty,
                     Toast.LENGTH_SHORT,
                 ).show()
-                selectedChannels.size == 1 -> Toast.makeText(
-                    this,
-                    R.string.iptv_grid_empty,
-                    Toast.LENGTH_SHORT,
-                ).show()
+                selectedChannels.size == 1 && selectedChannels.single().source == LiveChannel.Source.IPTV &&
+                    selectedChannels.single().sourceKey != currentChannel?.sourceKey && currentChannel != null -> {
+                    AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
+                        .setTitle(R.string.multiview_single_mode)
+                        .setItems(arrayOf(getString(R.string.pip_start_action), getString(R.string.iptv_grid_start))) { _, mode ->
+                            dialog.dismiss()
+                            if (mode == 0) startIptvOverlay(selectedChannels.single()) else startIptvGrid(selectedChannels)
+                        }
+                        .setNegativeButton(R.string.cancel, null).show()
+                }
                 else -> {
                     dialog.dismiss()
                     startIptvGrid(selectedChannels)
@@ -3931,8 +3945,12 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun startIptvGrid(selected: List<LiveChannel>) {
-        val distinct = selected.distinctBy { it.sourceKey }.take(deviceResourcePolicy.maximumGridStreams)
-        if (distinct.size < 2) return
+        val distinct = selected.distinctBy { it.sourceKey }
+        if (distinct.isEmpty()) return
+        if (distinct.size > deviceResourcePolicy.maximumGridStreams) {
+            Toast.makeText(this, getString(R.string.iptv_grid_maximum, deviceResourcePolicy.maximumGridStreams), Toast.LENGTH_SHORT).show()
+            return
+        }
         if (distinct.count { it.source == LiveChannel.Source.TIF } > 1) {
             Toast.makeText(this, R.string.multiview_requires_single_tuner, Toast.LENGTH_LONG).show()
             return
@@ -3942,18 +3960,21 @@ class MainActivity : TvRemoteActivity() {
         ) return
         prepareIptvGrid()
         stopIptvOverlay()
-        gridReturnChannel = currentChannel
+        val previousActiveKey = gridChannels.getOrNull(gridActiveIndex)?.sourceKey
+        if (!iptvGridActive) {
+            gridReturnChannel = currentChannel
+            playback.stop()
+            iptvPlayback.stop()
+        }
         gridChannels = distinct
         gridSelectedKeys.clear()
         gridSelectedKeys += distinct.map { it.sourceKey }
-        gridActiveIndex = distinct.indexOfFirst { it.sourceKey == currentChannel?.sourceKey }
+        gridActiveIndex = distinct.indexOfFirst { it.sourceKey == (previousActiveKey ?: currentChannel?.sourceKey) }
             .takeIf { it >= 0 } ?: 0
         gridFullscreenIndex = null
         iptvGridActive = true
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_GRID)
         endBlackout("IPTV_GRID")
-        playback.stop()
-        iptvPlayback.stop()
         binding.iptvPlayerView.visibility = View.GONE
         binding.audioOnlyPanel.visibility = View.GONE
         hideChannelPanel()
@@ -3976,6 +3997,7 @@ class MainActivity : TvRemoteActivity() {
                 gridPlayerViews[index].visibility = View.VISIBLE
                 if (renderedGridKeys[index] != channel.sourceKey) {
                     controller.stop()
+                    controller.setMuted(index != gridActiveIndex)
                     controller.play(channel)
                     renderedGridKeys[index] = channel.sourceKey
                 }
@@ -3989,6 +4011,7 @@ class MainActivity : TvRemoteActivity() {
             if (renderedGridTifKey != tifChannel.sourceKey) {
                 binding.tvView.visibility = View.GONE
                 playback.stop()
+                binding.tvView.setVideoSize(0, 0)
                 playback.play(tifChannel)
                 renderedGridTifKey = tifChannel.sourceKey
             }
@@ -4021,7 +4044,7 @@ class MainActivity : TvRemoteActivity() {
             val rowSpec: GridLayout.Spec
             val columnSpec: GridLayout.Spec
             when {
-                fullscreen == index -> {
+                fullscreen == index || count == 1 -> {
                     rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
                     columnSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
                 }
@@ -4069,6 +4092,7 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         val cell = gridCells[tifIndex]
+        binding.tvView.fitSurfaceToBounds = true
         if (cell.width <= 0 || cell.height <= 0) return
         val targetLeft = (binding.iptvGrid.x + cell.x).toInt()
         val targetTop = (binding.iptvGrid.y + cell.y).toInt()
@@ -4097,6 +4121,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun restorePrimaryPlayerSurfaces() {
+        binding.tvView.fitSurfaceToBounds = false
         listOf<View>(binding.tvView, binding.iptvPlayerView).forEach { view ->
             view.layoutParams = (view.layoutParams as FrameLayout.LayoutParams).apply {
                 width = FrameLayout.LayoutParams.MATCH_PARENT
@@ -4215,12 +4240,6 @@ class MainActivity : TvRemoteActivity() {
         val mutable = gridChannels.toMutableList()
         if (gridActiveIndex !in mutable.indices) return
         mutable.removeAt(gridActiveIndex)
-        if (mutable.size == 1) {
-            val remaining = mutable.single()
-            stopIptvGrid(resumePrevious = false)
-            playSelectedChannel(remaining, recordHistory = false)
-            return
-        }
         if (mutable.isEmpty()) {
             stopIptvGrid(resumePrevious = true)
             return
@@ -4235,10 +4254,25 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showActiveGridChannelActions() {
         val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
-        AlertDialog.Builder(this)
+        val labels = mutableListOf(getString(R.string.grid_channel_change), getString(R.string.grid_channel_close),
+            getString(R.string.multiview_add_channels))
+        val pipBackground = if (gridChannels.size == 2) gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } else gridReturnChannel
+        val canUsePip = gridChannels.size <= 2 && channel.source == LiveChannel.Source.IPTV &&
+            pipBackground != null && pipBackground.sourceKey != channel.sourceKey
+        if (canUsePip) labels += getString(R.string.multiview_to_pip)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(channel.displayName)
-            .setItems(arrayOf(getString(R.string.grid_channel_change), getString(R.string.grid_channel_close))) { _, which ->
-                if (which == 0) showGridChannelReplacementPicker() else closeActiveGridChannel()
+            .setItems(labels.toTypedArray()) { _, which ->
+                when (which) {
+                    0 -> showGridChannelReplacementPicker()
+                    1 -> closeActiveGridChannel()
+                    2 -> showIptvGridPicker()
+                    3 -> {
+                        stopIptvGrid(resumePrevious = false)
+                        pipBackground?.let { playSelectedChannel(it, recordHistory = false) }
+                        startIptvOverlay(channel)
+                    }
+                }
             }
             .setNegativeButton(R.string.close, null)
             .show()
@@ -4393,9 +4427,7 @@ class MainActivity : TvRemoteActivity() {
             if (iptvGridActive) {
                 stopIptvGrid(resumePrevious = true)
             } else {
-                gridSelectedKeys.clear()
-                gridSelectedKeys += channel.sourceKey
-                showIptvGridPicker()
+                showIptvGridPicker(listOf(channel))
             }
         }
         AlertDialog.Builder(this)
@@ -5964,6 +5996,9 @@ class MainActivity : TvRemoteActivity() {
         }
         if (routedAction == RemoteAction.HANDLE_GRID) {
             when (event.keyCode) {
+                KeyEvent.KEYCODE_PROG_GREEN -> if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    showIptvGridPicker()
+                }
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER -> {
                     if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {

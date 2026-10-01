@@ -99,7 +99,9 @@ still needs device verification.
 - `INPUT/SOURCE` owns physical input selection, including DTV/ATV and HDMI/AV when exposed by the
   device. Do not assign physical input selection to a color key.
 - On the unobstructed playback screen and in the channel list, Green opens the unified PiP/Multi-View
-  picker: one selected IPTV channel starts PiP, while two to four selected channels start Multi-View.
+  picker: one selected IPTV channel offers PiP or Multi-View when it differs from the background;
+  the background itself or a single TIF channel can start a one-cell Multi-View without duplicate playback.
+  Two to four selected channels start Multi-View. Green in Multi-View reopens the picker with current selections.
   Blue opens Settings on unobstructed playback. The infobar hint must describe this context only.
 - In the channel list: Red opens the relevant editor; Yellow short-press cycles list sources and
   Yellow long-press opens direct source selection. Normal-list Blue opens channel search and

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="user_guide_multiview_selection">MULTIVIEW VE PIP\nTek kanal MultiView olarak açılabilir. Arka plandakinden farklı tek IPTV kanalı seçilirse PiP veya MultiView seçilir. Açık MultiView/PiP’de yeşil tuş mevcut seçimleri koruyarak seçiciyi açar. MultiView’de uzun OK ile Değiştir, Kapat veya Kanal ekle seçilir. Bir veya iki yayın varsa uygun IPTV hücresi aynı menüden PiP’e dönüştürülebilir. Aynı yayın iki kez açılmaz; en fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı kullanılabilir.</string>
+    <string name="multiview_single_mode">Tek kanal görünümü</string>
+    <string name="multiview_add_channels">Kanal ekle / seçimleri düzenle</string>
+    <string name="multiview_to_pip">PiP görünümüne geç</string>
     <string name="iptv_profile_load_error">Kaynağın oynatma ayarları okunamadı</string>
     <string name="user_guide_source_playback">KAYNAK OYNATMA AYARLARI\nIPTV yönetiminde kaynağa uzun OK basıp Oynatma ayarlarını açın. Canlı ve VOD buffer, azami çözünürlük ve otomatik kurtarma ayrı ayarlanabilir; Genel ayarı kullan seçeneği kaynağın ilgili tercihini kaldırır. Kaydet sonrası kanal yeniden açıldığında uygulanır. Kaynağa özel buffer varsa oynatma çubuğu o kaynağın buffer değerini değiştirir, yoksa genel ayarı değiştirir. Kalite bir üst sınırdır, mevcut olmayan çözünürlük oluşturmaz ve MultiView cihaz sınırını aşmaz. Otomatik kurtarma kapalıyken elle yeniden deneyebilirsiniz.</string>
     <string name="iptv_source_playback_options">Kaynağa özel oynatma ayarları</string>
@@ -529,7 +533,7 @@
     <string name="device_resource_summary">%1$d MB bellek sınıfı · %2$d donanım video çözücü · en fazla %3$d eşzamanlı akış</string>
     <string name="device_resources">Cihaz kaynakları</string>
     <string name="multiview_force_four_streams">MultiView’da 4 kanalı zorla</string>
-    <string name="iptv_grid_empty">MultiView için en az iki kanal seçin.</string>
+    <string name="iptv_grid_empty">En az bir kanal seçin.</string>
     <string name="iptv_pip_requires_iptv">PiP için bir IPTV kanalı seçin.</string>
     <string name="iptv_pip_requires_different_channel">PiP için açık kanaldan farklı bir IPTV kanalı seçin.</string>
     <string name="iptv_grid_no_channels">MultiView için kullanılabilir canlı kanal yok.</string>

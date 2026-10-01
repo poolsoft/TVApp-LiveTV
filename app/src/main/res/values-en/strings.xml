@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="user_guide_multiview_selection">MULTIVIEW AND PIP\nMultiView can start with one channel. A single IPTV channel different from the background offers PiP or MultiView. Green in MultiView/PiP reopens the picker with current selections preserved. Long OK in MultiView offers Change, Close or Add channels. With one or two streams, a suitable IPTV cell can switch to PiP from the same menu. The same channel is not played twice; at most one TIF channel and the device stream limit are allowed.</string>
+    <string name="multiview_single_mode">Single channel view</string>
+    <string name="multiview_add_channels">Add channels / edit selection</string>
+    <string name="multiview_to_pip">Switch to PiP view</string>
     <string name="iptv_profile_load_error">Source playback settings could not be read</string>
     <string name="user_guide_source_playback">SOURCE PLAYBACK SETTINGS\nLong-press OK on a source in IPTV management and open Playback settings. Live and VOD buffer, maximum resolution and automatic recovery can be configured separately; Use global setting clears that source preference. Saved settings apply when the channel is reopened. With a source buffer override, the playback bar changes that source buffer; otherwise it changes the global preference. Quality is an upper limit: it cannot create unavailable resolutions or exceed MultiView device limits. Manual retry remains available when automatic recovery is off.</string>
     <string name="iptv_source_playback_options">Source playback settings</string>
@@ -516,7 +520,7 @@
     <string name="device_resource_summary">%1$d MB memory class · %2$d hardware video decoders · up to %3$d concurrent streams</string>
     <string name="device_resources">Device resources</string>
     <string name="multiview_force_four_streams">Force 4 MultiView streams</string>
-    <string name="iptv_grid_empty">Select at least two channels for MultiView.</string>
+    <string name="iptv_grid_empty">Select at least one channel.</string>
     <string name="iptv_pip_requires_iptv">Select an IPTV channel for PiP.</string>
     <string name="iptv_pip_requires_different_channel">Select an IPTV channel other than the current channel for PiP.</string>
     <string name="iptv_grid_no_channels">No live channels are available for MultiView.</string>

@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-01 - MultiView ve PiP geçişleri
+
+- Tek kanal MultiView olarak açılabilir; uygun tek IPTV seçimi PiP/MultiView görünüm seçimi sunar. Mevcut MultiView/PiP kanalları seçici yeniden açılırken korunur.
+- MultiView’de yeşil tuş ve uzun OK menüsü kanal ekleme/seçim düzenleme açar. Bir/iki yayınlı görünümde IPTV hücresi PiP görünümüne çevrilebilir; aynı kanal çift oynatılmaz ve tek tuner sınırı korunur.
+- Seçimler güncellenirken değişmeyen hücreler yeniden başlatılmaz; kapasiteyi aşan seçimler sessizce kırpılmaz.
+- TIF iç SurfaceView ölçüsü MultiView hücresi/tam ekran geçişinde yeniden hesaplanır; yalnız dış TvView çerçevesinin büyümesi engellenir. Bildirilen video oranı korunur; normal görünüm vendor yerleşimini kullanır.
+
 ## 2026-10-01 - IPTV kaynak oynatma profilleri
 
 - Kaynak işlemlerine canlı/VOD buffer, azami çözünürlük ve otomatik kurtarma ayarları eklendi. Boş tercihler genel ayarı kullanır; genel kalite ve kurtarma seçenekleri IPTV ayarlarında bulunur.
