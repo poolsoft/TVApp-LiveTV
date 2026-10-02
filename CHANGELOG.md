@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - MultiView seçim özeti ve TIF yüzey ölçümü
+
+- MultiView seçici artık bütün katalog yerine yalnız eklenen kanalları gösterir. Kanal ekle mevcut kanal listesini açar; kaynak, arama ve harf filtreleriyle seçim yapılır. OK ekler/çıkarır, Yeşil veya Back özete döner. Seçim sırasında otomatik kanal açma ve liste zaman aşımı kapalıdır.
+- Özette Yeşil başlatır, Sarı kanal ekler, Kırmızı temizler. Tek TIF ve cihaz yayın sınırı korunur; geçici seçim anahtarları ekran yeniden oluşturulurken saklanır.
+- TIF iç video yüzeyi dış çerçeveyle birlikte yeniden ölçülür ve yüzey buffer boyutu yerleşime bağlanır. Ölçüm testi eklendi; vendor görüntüsünün tam ekran büyümesi gerçek TV üzerinde ayrıca doğrulanmalıdır.
+- VOD ekranının kaynak/kategori, gezinme, detay, sayfalama ve hata davranışı için beş aşamalı plan TASKS.md içine kaydedildi; VOD arayüzü bu değişiklikte yenilenmedi.
+
 ## 2026-10-02 - Harf filtresi
 
 - Harf çubuğu ilk kayda atlamak yerine seçilen harfle başlayan kayıtları mevcut sırayla gösterir; Tümü harf filtresini temizler. Normal kanal listesi, IPTV kütüphanesi ve Devam Et görünümü desteklenir.

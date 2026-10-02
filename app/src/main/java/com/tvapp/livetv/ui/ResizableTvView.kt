@@ -22,6 +22,22 @@ class ResizableTvView @JvmOverloads constructor(context: Context, attrs: Attribu
         if (fitSurfaceToBounds) requestLayout()
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        if (!fitSurfaceToBounds) return
+        val scale = if (videoWidth > 0 && videoHeight > 0)
+            min(measuredWidth.toFloat() / videoWidth, measuredHeight.toFloat() / videoHeight) else null
+        val surfaceWidth = scale?.let { (videoWidth * it).toInt() } ?: measuredWidth
+        val surfaceHeight = scale?.let { (videoHeight * it).toInt() } ?: measuredHeight
+        for (index in 0 until childCount) {
+            (getChildAt(index) as? SurfaceView)?.let { surface ->
+                surface.holder.setSizeFromLayout()
+                surface.measure(MeasureSpec.makeMeasureSpec(surfaceWidth, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(surfaceHeight, MeasureSpec.EXACTLY))
+            }
+        }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         if (!fitSurfaceToBounds) return

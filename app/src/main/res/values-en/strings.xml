@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="user_guide_multiview_selection">MULTIVIEW AND PIP\nMultiView can start with one channel. A single IPTV channel different from the background offers PiP or MultiView. Green in MultiView/PiP reopens the picker with current selections preserved. Long OK in MultiView offers Change, Close or Add channels. With one or two streams, a suitable IPTV cell can switch to PiP from the same menu. The same channel is not played twice; at most one TIF channel and the device stream limit are allowed.</string>
+    <string name="multiview_selected_name">%1$d · %2$s</string>
+    <string name="multiview_add_channel">Add to MultiView selection</string>
+    <string name="multiview_remove_channel">Remove from MultiView selection</string>
+    <string name="multiview_selection_count">Selected (%1$d)</string>
+    <string name="multiview_live_only">Select a live stream for MultiView.</string>
+    <string name="user_guide_multiview_selection">MULTIVIEW AND PIP\nGreen opens a summary showing only added channels. Add channels or Yellow opens the existing channel list with source, search and letter filters. In this mode OK adds/removes a channel without changing playback. Green or Back returns to the summary. In the summary Green starts playback and Red clears selections. MultiView can start with one channel; a single IPTV channel different from the background also offers PiP. Current MultiView/PiP selections are preserved. Long OK opens cell actions. The same channel is not played twice; at most one TIF channel and the device stream limit are allowed.</string>
     <string name="multiview_single_mode">Single channel view</string>
     <string name="multiview_add_channels">Add channels / edit selection</string>
     <string name="multiview_to_pip">Switch to PiP view</string>

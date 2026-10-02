@@ -26,6 +26,43 @@ Her aşama kendi testleriyle doğrulanıp gönderilir, aşağıdakiler topluca t
   Mevcut sekmeleri koruyarak buffer, EPG, altyazı ve benzeri başlıkları arat;
   seçilen sonucun gerçek ayar satırına odaklan, sahte/boş sonuç oluşturma.
 
+## VOD ekranı yenileme planı (2026-10-02)
+
+Bu kapsam plan aşamasında; büyük Netflix benzeri keşif ekranı kurulmayacak.
+
+- [ ] **VODUI-001 (P0): Arama ve yükleme yaşam döngüsü**
+  VodHomeActivity.reloadGrid eski işi iptal edip loadingPage durumunu sıfırlamalı.
+  Sayfa sorgusu kaynak/index değerlerini yerel kopyalarda taşımalı; eski sorgu yeni aramanın
+  cursor değerlerini değiştirmemeli. Hatalar boş katalog gibi gösterilmemeli; tekrar dene olmalı.
+  **Kabul:** Yükleme sürerken art arda arama, boş sonuç ve ağ/veritabanı hatası ekranı kilitlemez.
+- [ ] **VODUI-002 (P1): Tek kaynak ve kategori seçimi**
+  Üstte kayıtlı IPTV listesi, ardından kategori; son seçilen kaynak/kategori hatırlanır.
+  Binlerce film farklı kaynaklardan tek görünümde karıştırılmaz. Mavi arama, sarı filtre dialogu;
+  arama alanı başlangıç odağını ve yazılım klavyesini kendiliğinden açmaz.
+- [ ] **VODUI-003 (P1): Sade katalog ve detay**
+  TV için 4-5, telefonda 2-3 poster sütunu; mevcut Coil cache ve kaynak görselleri kullanılır.
+  Görsel yoksa gerçek başlıkla sade kart; sahte poster, puan, yıl veya açıklama üretilmez.
+  Başlık iki satır, belirgin odak ve konum göstergesi. OK detay OSD; Oynat/Devam et/Baştan başlat.
+- [ ] **VODUI-004 (P1): Bounded sayfalama ve odak**
+  Bütün gezilmiş kataloğu biriktirip tekrar diff etmek yerine sınırlı pencere ve DAO keyset.
+  Devam Et en fazla mevcut bounded geçmiş kadar; kaynak filtresine uyar. Back önce detayı kapatır,
+  sonra filtreyi/ekranı terk eder. Oynatmadan dönüşte aynı karta ve kaydırma konumuna dönülür.
+- [ ] **VODUI-005 (P2): Bölüm görünümü ve doğrulama**
+  Xtream gerçek sezon/bölüm bilgisi sağlıyorsa sade sezon/bölüm seçimi; düz M3U başlıklarından
+  tahmin edilen metadata gerçek bilgi gibi sunulmaz. Sonraki bölüm isteğe bağlıdır.
+  **Kabul:** 15.000 kayıt, eksik görsel/metadata, kumanda ve mobil dokunma test matrisi.
+
+## MultiView liste seçimi (2026-10-02)
+
+- [~] **MULTIVIEW-SELECT (P1): Mevcut kanal listesinden seçim**
+  Dialog yalnız eklenen kanalları ve Başlat/Kanal ekle eylemlerini gösterir. Kanal ekle mevcut
+  normal/IPTV kanal listesini kullanır; arama, kaynak ve harf filtresi korunur. Seçim modunda OK
+  ekler/çıkarır, yeşil/Back özet dialoguna döner; auto-tune ve geçmiş kaydı yapılmaz.
+  En fazla bir TIF ve cihaz kapasitesi, VOD reddi korunur. Gerçek TV kumanda doğrulaması bekliyor.
+- [~] **MULTIVIEW-TIF-SIZE (P0): İç yüzey ve buffer ölçüsü**
+  TvView çerçevesiyle birlikte SurfaceView ölçümü ve yerleşimden buffer boyutu güncellenir.
+  Grid/tam ekran/oran regresyonu emülatörde; gerçek MediaTek görüntü ölçeği TV üzerinde doğrulanmalı.
+
 ## Harfle gezinme
 
 - [x] **UIALPHA-002 (P2): Harfi başlangıç filtresi olarak kullanma**

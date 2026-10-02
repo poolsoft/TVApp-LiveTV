@@ -17,11 +17,16 @@ class RemoteActionRouterTest {
     }
 
     @Test
-    fun `playback modes take priority over OSD state`() {
+    fun `channel picker owns input over background grid`() {
         assertEquals(
-            RemoteAction.HANDLE_GRID,
+            RemoteAction.HANDLE_CHANNEL_PANEL,
             route(mode = PlaybackSurfaceMode.IPTV_GRID, primary = PrimaryOsd.CHANNEL_PANEL),
         )
+    }
+
+    @Test
+    fun `grid keeps input when the channel picker is closed`() {
+        assertEquals(RemoteAction.HANDLE_GRID, route(mode = PlaybackSurfaceMode.IPTV_GRID))
     }
 
     @Test

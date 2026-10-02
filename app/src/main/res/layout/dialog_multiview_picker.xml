@@ -17,6 +17,7 @@
 
     <TextView
         android:id="@+id/picker_filter_label"
+        android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
@@ -113,7 +114,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/channel_source_short"
+                android:text="@string/multiview_add_channels"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -122,6 +123,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="0.8"
+            android:visibility="gone"
             android:gravity="center_vertical"
             android:orientation="horizontal">
             <View

@@ -27,6 +27,15 @@ class ChannelAdapter(
     private val channels = mutableListOf<LiveChannel>()
     private val channelIndexBySourceKey = mutableMapOf<String, Int>()
     private val programs = mutableMapOf<String, ProgramSummary>()
+    private var multiViewSlots = emptyMap<String, Int>()
+
+    fun showMultiViewSelection(keys: List<String>) {
+        val slots = keys.mapIndexed { index, key -> key to index + 1 }.toMap()
+        if (slots == multiViewSlots) return
+        val changed = (multiViewSlots.keys + slots.keys).filter { multiViewSlots[it] != slots[it] }
+        multiViewSlots = slots
+        changed.forEach { key -> channelIndexBySourceKey[key]?.let { notifyItemChanged(it) } }
+    }
     private var rowOptions = ChannelRowOptions()
     private var showIptvMembership = false
     private var selectedId: Long? = null
@@ -200,7 +209,9 @@ class ChannelAdapter(
                     else -> 11f
                 },
             )
-            channelName.text = channel.displayName
+            channelName.text = multiViewSlots[channel.sourceKey]?.let {
+                root.context.getString(R.string.multiview_selected_name, it, channel.displayName)
+            } ?: channel.displayName
             channelQuality.visibility = View.GONE
             channelTypeIcon.setImageResource(
                 when {

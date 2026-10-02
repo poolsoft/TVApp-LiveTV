@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="user_guide_multiview_selection">MULTIVIEW VE PIP\nTek kanal MultiView olarak açılabilir. Arka plandakinden farklı tek IPTV kanalı seçilirse PiP veya MultiView seçilir. Açık MultiView/PiP’de yeşil tuş mevcut seçimleri koruyarak seçiciyi açar. MultiView’de uzun OK ile Değiştir, Kapat veya Kanal ekle seçilir. Bir veya iki yayın varsa uygun IPTV hücresi aynı menüden PiP’e dönüştürülebilir. Aynı yayın iki kez açılmaz; en fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı kullanılabilir.</string>
+    <string name="multiview_selected_name">%1$d · %2$s</string>
+    <string name="multiview_add_channel">MultiView seçimine ekle</string>
+    <string name="multiview_remove_channel">MultiView seçiminden çıkar</string>
+    <string name="multiview_selection_count">Seçilenler (%1$d)</string>
+    <string name="multiview_live_only">MultiView için canlı yayın seçin.</string>
+    <string name="user_guide_multiview_selection">MULTIVIEW VE PIP\nYeşil tuş yalnız eklenen kanalları gösteren seçim özetini açar. Kanal ekle veya Sarı mevcut kanal listesine geçer; kaynak, arama ve harf filtresi kullanılabilir. Bu modda OK ekler/çıkarır; yayın değişmez. Yeşil veya Back özete döner. Özette Yeşil başlatır, Kırmızı temizler. Tek kanal MultiView olarak açılabilir; arka plandakinden farklı tek IPTV kanalı PiP seçeneği de sunar. Açık MultiView/PiP’de seçimler korunur. Uzun OK hücre işlemlerini açar. Aynı yayın iki kez açılmaz; en fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı kullanılabilir.</string>
     <string name="multiview_single_mode">Tek kanal görünümü</string>
     <string name="multiview_add_channels">Kanal ekle / seçimleri düzenle</string>
     <string name="multiview_to_pip">PiP görünümüne geç</string>

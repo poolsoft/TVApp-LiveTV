@@ -54,6 +54,7 @@ class RemoteActionRouter {
     ): RemoteAction {
         if (context.dialogOwnsInput) return RemoteAction.FORWARD_TO_DIALOG
         if (key == RemoteKey.SETTINGS) return RemoteAction.HANDLE_SETTINGS_PRESS
+        if (context.playbackUiState.primaryOsd == PrimaryOsd.CHANNEL_PANEL) return RemoteAction.HANDLE_CHANNEL_PANEL
 
         when (context.playbackUiState.playbackMode) {
             PlaybackSurfaceMode.IPTV_GRID -> return RemoteAction.HANDLE_GRID

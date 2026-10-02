@@ -93,7 +93,7 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - `INPUT/SOURCE`: DTV/ATV ve HDMI/AV gibi fiziksel TV girişlerini açar.
 - Ana yayın ekranında `Kırmızı`: Kumanda `INPUT/SOURCE` tuşunu uygulamaya iletmiyorsa TV girişlerini açar.
 - Kanal listesinde `Kırmızı`: Kanal düzenleyiciyi açar.
-- Yayın ekranında ve kanal listesinde `Yeşil` kısa basış IPTV PiP seçimini, uzun basış MultiView seçimini açar. MultiView sıfır veya bir DVB kanalı ile cihaz kapasitesine kadar IPTV yayınını birlikte oynatır.
+- Yayın ekranında ve kanal listesinde `Yeşil` MultiView seçim özetini açar. Özette yalnız eklenen kanallar bulunur. `Kanal ekle` mevcut kanal listesini açar; kaynak, arama ve harf filtresi kullanılabilir. Bu modda `OK` kanalı ekler/çıkarır, yayın değişmez. `Yeşil` veya `Back` özete döner; özette `Yeşil` başlatır, `Sarı` kanal ekler, `Kırmızı` seçimi temizler. MultiView en fazla bir DVB kanalı ile cihaz kapasitesine kadar IPTV yayını oynatır.
 - Normal kanal listesinde `Mavi`: Kanal aramasını açar.
 - Tam IPTV listesinde `Kırmızı`: IPTV kaynak yönetimini açar.
 - Tam IPTV listesinde `Sarı`: Kaynak, Canlı/VOD ve kategori seçimini açar.

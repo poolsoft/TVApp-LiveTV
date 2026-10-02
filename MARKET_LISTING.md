@@ -5,7 +5,7 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 ## Türkçe
 
-- Tek yayınla başlayabilen MultiView, sonradan kanal ekleme ve uygun IPTV yayınları için PiP/MultiView geçişi.
+- Tek yayınla başlayabilen MultiView, mevcut kanal listesinin arama/filtreleriyle kanal ekleme, yalnız eklenen kanalları gösteren seçim özeti ve uygun IPTV yayınları için PiP/MultiView geçişi.
 
 - IPTV listelerine özel canlı/VOD arabelleği, çözünürlük sınırı ve otomatik yeniden deneme tercihleri; istenirse genel ayarları kullanma.
 
