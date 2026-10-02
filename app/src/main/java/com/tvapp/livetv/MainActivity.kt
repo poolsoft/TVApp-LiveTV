@@ -44,6 +44,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -281,6 +282,7 @@ class MainActivity : TvRemoteActivity() {
     private var lastChannelLongPressJob: Job? = null
     private var lastChannelLongPressHandled = false
     private var gridFullscreenIndex: Int? = null
+    private var gridTifViewportGeneration = 0
     private var gridReturnChannel: LiveChannel? = null
     private var gridChannels: List<LiveChannel> = emptyList()
     private val gridSelectedKeys = mutableListOf<String>()
@@ -3840,6 +3842,9 @@ class MainActivity : TvRemoteActivity() {
             gridLabels += label
             renderedGridKeys += null
             gridControllers += IptvPlaybackController(context = this, playerView = playerView, profile = gridProfileForCellCount(deviceResourcePolicy.maximumGridStreams)).apply {
+                onHealthChanged = {
+                    if (iptvGridActive && gridFullscreenIndex != null && gridFullscreenIndex != index) pause()
+                }
                 onPlaybackError = { error ->
                     debugLog.recordDebug(
                         "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}",
@@ -4112,7 +4117,6 @@ class MainActivity : TvRemoteActivity() {
                 binding.tvView.visibility = View.GONE
                 playback.stop()
                 binding.tvView.setVideoSize(0, 0)
-                playback.play(tifChannel)
                 renderedGridTifKey = tifChannel.sourceKey
             }
         }
@@ -4137,6 +4141,7 @@ class MainActivity : TvRemoteActivity() {
                 return@forEachIndexed
             }
             if (fullscreen != null && fullscreen != index) {
+                gridControllers[index].pause()
                 cell.visibility = View.GONE
                 return@forEachIndexed
             }
@@ -4182,12 +4187,25 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         binding.iptvGrid.post(::positionGridTifSurface)
+        binding.iptvGrid.doOnLayout {
+            if (!iptvGridActive) return@doOnLayout
+            gridControllers.forEachIndexed { index, controller ->
+                if (gridCells[index].visibility == View.VISIBLE &&
+                    gridChannels.getOrNull(index)?.source == LiveChannel.Source.IPTV
+                ) {
+                    controller.reattachVideoSurface()
+                    controller.goLive()
+                    controller.play()
+                }
+            }
+        }
     }
 
     private fun positionGridTifSurface() {
         val tifIndex = gridChannels.indexOfFirst { it.source == LiveChannel.Source.TIF }
         if (!iptvGridActive || tifIndex !in gridCells.indices) return
         if (gridFullscreenIndex != null && gridFullscreenIndex != tifIndex) {
+            gridTifViewportGeneration++
             binding.tvView.visibility = View.GONE
             return
         }
@@ -4218,6 +4236,21 @@ class MainActivity : TvRemoteActivity() {
             gravity = Gravity.TOP or Gravity.START
         }
         binding.tvView.visibility = View.VISIBLE
+        val generation = ++gridTifViewportGeneration
+        val channel = gridChannels[tifIndex]
+        binding.tvView.doOnLayout {
+            binding.tvView.post {
+                if (!iptvGridActive || generation != gridTifViewportGeneration ||
+                    gridChannels.getOrNull(tifIndex)?.sourceKey != channel.sourceKey ||
+                    binding.tvView.visibility != View.VISIBLE
+                ) return@post
+                // Recreate the vendor session after the final viewport is laid out.
+                playback.stop()
+                playback.setMuted(gridActiveIndex != tifIndex)
+                playback.play(channel)
+                debugLog.recordDebug("MULTIVIEW_TIF_VIEWPORT | width=${binding.tvView.width}, height=${binding.tvView.height}")
+            }
+        }
     }
 
     private fun restorePrimaryPlayerSurfaces() {
@@ -4297,6 +4330,7 @@ class MainActivity : TvRemoteActivity() {
         val focused = gridChannels.getOrNull(gridActiveIndex)
         val fallback = gridReturnChannel
         iptvGridActive = false
+        gridTifViewportGeneration++
         gridLongPressJob?.cancel()
         gridFullscreenIndex = null
         gridControllers.forEach(IptvPlaybackController::stop)

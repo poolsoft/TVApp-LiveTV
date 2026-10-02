@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - MultiView tam ekran dönüşü
+
+- TIF yüzeyinde eski vendor dikdörtgeni yeni tam ekran ölçüsünden önce uygulanmaz. Görünür alan değiştiğinde TIF oturumu son yerleşim ölçüsüyle yeniden kurulur; gecikmiş eski yerleşim işleri iptal edilir.
+- Tam ekranda gizlenen IPTV hücreleri duraklatılır; dönüşte yüzeyleri yeniden bağlanıp canlı uçtan devam edilir. Yüzey dönüşünün ilk anları donma olarak değerlendirilmez; seçim ve ses odağı korunur.
+- Yüzeyin ara ölçülere geçmeden doğru en-boy oranıyla büyütülüp küçültülmesi için test genişletildi. Fiziksel MediaTek TV üzerinde görüntü ölçekleme ve çoklu yayın dönüşü ayrıca doğrulanmalıdır.
+
 ## 2026-10-02 - Canlı TV / VOD mod ayrımı
 
 - VOD oynatırken OK/MENU filmi duraklatıp kütüphaneyi açar. Back önce kontrolleri ve infobarı kapatır; canlı kanallara otomatik dönüş yapılmaz.

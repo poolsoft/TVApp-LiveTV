@@ -62,6 +62,7 @@ class IptvPlaybackController(
     private var explicitLoading = true
     private var healthPhase = IptvPlaybackPhase.IDLE
     private var tuneStartedAt = 0L
+    private var videoSurfaceAttachedAt = 0L
     private var firstFrameAt: Long? = null
     @Volatile private var lastFrameAt: Long? = null
     private var lastErrorCode: String? = null
@@ -248,6 +249,7 @@ class IptvPlaybackController(
         tuneStartedAt = SystemClock.elapsedRealtime()
         firstFrameAt = null
         lastFrameAt = null
+        videoSurfaceAttachedAt = 0L
         lastErrorCode = null
         lastFailureClass = null
         recoveryAttempt = 0
@@ -468,6 +470,15 @@ class IptvPlaybackController(
      *  previous channel while a single shared player instance is reused. */
     fun tunedSourceKey(): String? = currentChannel?.sourceKey
 
+    fun reattachVideoSurface() {
+        val activePlayer = player ?: return
+        cancelPendingWatchdogRecovery()
+        videoSurfaceAttachedAt = SystemClock.elapsedRealtime()
+        lastObservedPosition = C.TIME_UNSET
+        playerView.player = null
+        playerView.player = activePlayer
+    }
+
     fun contentKind(): IptvContentKind {
         val current = player ?: return IptvContentKind.UNKNOWN
         return when {
@@ -486,6 +497,7 @@ class IptvPlaybackController(
     }
 
     fun pause() {
+        cancelPendingWatchdogRecovery()
         player?.pause()
     }
 
@@ -903,13 +915,13 @@ class IptvPlaybackController(
             observation = IptvWatchdogObservation(
                 expectsVideo = !channel.isRadioChannel(),
                 firstFrameRendered = firstFrameAt != null,
-                startupMillis = now - tuneStartedAt,
+                startupMillis = now - maxOf(tuneStartedAt, videoSurfaceAttachedAt),
                 isIdle = current.playbackState == Player.STATE_IDLE,
                 isBuffering = current.playbackState == Player.STATE_BUFFERING,
                 bufferingMillis = bufferingFor,
                 isReadyAndPlaying = current.playbackState == Player.STATE_READY && current.isPlaying,
                 stalledProgressMillis = if (progressAdvanced) 0L else now - lastProgressAt,
-                staleFrameMillis = lastFrameAt?.let { now - it },
+                staleFrameMillis = lastFrameAt?.let { now - maxOf(it, videoSurfaceAttachedAt) },
             ),
             firstFrameTimeoutMillis = FIRST_FRAME_TIMEOUT_MS,
             bufferingTimeoutMillis = BUFFERING_TIMEOUT_MS,

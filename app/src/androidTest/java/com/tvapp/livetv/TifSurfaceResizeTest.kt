@@ -12,6 +12,30 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class TifSurfaceResizeTest {
+    @Test fun surfaceOnlyReceivesFinalAspectFittedBounds() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = ResizableTvView(ApplicationProvider.getApplicationContext())
+            val surface = (0 until view.childCount).map(view::getChildAt).filterIsInstance<SurfaceView>().single()
+            view.fitSurfaceToBounds = true
+            view.setVideoSize(1920, 1080)
+            fun layout(width: Int, height: Int) {
+                view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                view.layout(0, 0, width, height)
+            }
+            layout(400, 400)
+            val sizes = mutableListOf<Pair<Int, Int>>()
+            surface.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+                sizes += (right - left) to (bottom - top)
+            }
+            layout(800, 800)
+            assertEquals(listOf(800 to 450), sizes)
+            sizes.clear()
+            layout(400, 400)
+            assertEquals(listOf(400 to 225), sizes)
+        }
+    }
+
     @Test fun surfaceFollowsGridAndFullscreenBoundsWithoutRetuning() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val view = ResizableTvView(ApplicationProvider.getApplicationContext())

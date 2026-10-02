@@ -39,8 +39,10 @@ class ResizableTvView @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        if (!fitSurfaceToBounds) return
+        if (!fitSurfaceToBounds) {
+            super.onLayout(changed, left, top, right, bottom)
+            return
+        }
         // TIF may retain a requested surface rectangle from the previous grid size.
         val scale = if (videoWidth > 0 && videoHeight > 0) min(width.toFloat() / videoWidth, height.toFloat() / videoHeight) else null
         val surfaceWidth = scale?.let { (videoWidth * it).toInt() } ?: width
