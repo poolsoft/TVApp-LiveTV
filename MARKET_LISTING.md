@@ -6,6 +6,7 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 ## Türkçe
 
 - Ayrı Canlı TV ve VOD modları: film izlerken canlı kanallara yanlışlıkla geçmeden kütüphaneye dönüş, son filme devam ve son canlı kanala açık geçiş.
+- Kaynak ve kategori bazlı Sinema/Dizi kütüphanesi; favoriler, son izlenenler, isimli devam alanı, arama ve sıralama. Xtream kaynaklarında gerçek sezon/bölüm seçimi; sınırlı görsel önbelleği ve sayfalı katalog.
 
 - Tek yayınla başlayabilen MultiView, mevcut kanal listesinin arama/filtreleriyle kanal ekleme, yalnız eklenen kanalları gösteren seçim özeti ve uygun IPTV yayınları için PiP/MultiView geçişi.
 
@@ -133,6 +134,7 @@ Highlights:
 * Four-digit PIN channel lock
 * M3U/M3U8 import from URL or file, playlist refresh, and source management
 * Paged loading, search, categories, and Live/VOD filters for large IPTV lists
+* Separate Movies/Series library with playlist/category selection, favorites, recently watched, named resume actions and provider-supplied Xtream seasons/episodes
 * Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
 * TIF/XMLTV guide with now and next program information

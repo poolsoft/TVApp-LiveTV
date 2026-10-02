@@ -18,8 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvProgramEntity::class,
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
+        VodMetadataEntity::class,
     ],
-    version = 26,
+    version = 27,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class TVAppDatabase : RoomDatabase() {
     abstract fun iptvDao(): IptvDao
     abstract fun xmlTvDao(): XmlTvDao
     abstract fun xtreamEpgDao(): XtreamEpgDao
+    abstract fun vodDao(): VodDao
 
     companion object {
         @Volatile
@@ -64,11 +66,20 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_25_24,
                 MIGRATION_24_26,
                 MIGRATION_25_26,
+                MIGRATION_26_27,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_26_27 = object : Migration(26, 27) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS vod_metadata (sourceKey TEXT NOT NULL PRIMARY KEY, sourceId INTEGER NOT NULL, kind TEXT NOT NULL, providerId TEXT NOT NULL, parentKey TEXT, seasonNumber INTEGER, episodeNumber INTEGER, name TEXT NOT NULL, logoUrl TEXT, category TEXT, description TEXT, durationMillis INTEGER, streamUrl TEXT, updatedAt INTEGER NOT NULL, FOREIGN KEY(sourceId) REFERENCES iptv_sources(id) ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vod_metadata_sourceId_kind_name ON vod_metadata(sourceId,kind,name)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_vod_metadata_parentKey_seasonNumber_episodeNumber ON vod_metadata(parentKey,seasonNumber,episodeNumber)")
+            }
         }
 
         internal val MIGRATION_24_26 = object : Migration(24, 26) {

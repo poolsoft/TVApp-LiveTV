@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Base64
 import java.util.Locale
 import java.util.TimeZone
+import com.tvapp.livetv.data.local.VodMetadataEntity
 
 data class XtreamEpgListing(
     val title: String,
@@ -96,6 +97,105 @@ internal class XtreamClient(
             }
         }
         return result
+    }
+
+    fun series(sourceId: Long, now: Long): Sequence<VodMetadataEntity> = sequence {
+        val groups = categories("get_series_categories")
+        open("get_series").useConnection { connection ->
+            JsonReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { reader ->
+                reader.beginArray()
+                while (reader.hasNext()) {
+                    val fields = reader.metadataFields()
+                    val id = fields["series_id"]?.takeIf { it.all(Char::isDigit) && it.isNotBlank() } ?: continue
+                    val name = fields["name"]?.takeIf(String::isNotBlank) ?: continue
+                    yield(VodMetadataEntity(sourceKey = "vod:$sourceId:series:$id", sourceId = sourceId,
+                        kind = "SERIES", providerId = id, name = name, logoUrl = fields["cover"],
+                        category = groups[fields["category_id"]] ?: fields["category_id"],
+                        description = fields["plot"], updatedAt = now))
+                }
+                reader.endArray()
+            }
+        }
+    }
+
+    /** Episodes are streamed, rather than buffering an entire provider response. */
+    fun episodes(series: VodMetadataEntity, now: Long): Sequence<VodMetadataEntity> = sequence {
+        open("get_series_info", mapOf("series_id" to series.providerId)).useConnection { connection ->
+            JsonReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { reader ->
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    if (reader.nextName() != "episodes") { reader.skipValue(); continue }
+                    // Providers may return an empty array instead of an episodes object.
+                    if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            val fields = reader.metadataFields()
+                            episode(series, fields, fields["season"]?.toIntOrNull(), now)?.let { yield(it) }
+                        }
+                        reader.endArray()
+                    } else if (reader.peek() == JsonToken.BEGIN_OBJECT) {
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            val season = reader.nextName().toIntOrNull()
+                            if (reader.peek() != JsonToken.BEGIN_ARRAY) { reader.skipValue(); continue }
+                            reader.beginArray()
+                            while (reader.hasNext()) {
+                                episode(series, reader.metadataFields(), season, now)?.let { yield(it) }
+                            }
+                            reader.endArray()
+                        }
+                        reader.endObject()
+                    } else reader.skipValue()
+                }
+                reader.endObject()
+            }
+        }
+    }
+
+    private fun episode(series: VodMetadataEntity, fields: Map<String, String>, season: Int?, now: Long): VodMetadataEntity? {
+        val id = fields["id"]?.takeIf { it.isNotBlank() && it.all(Char::isDigit) } ?: return null
+        val extension = fields["container_extension"]?.takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) } ?: return null
+        return VodMetadataEntity(sourceKey = "vod:${series.sourceId}:episode:$id", sourceId = series.sourceId,
+            kind = "EPISODE", providerId = id, parentKey = series.sourceKey,
+            seasonNumber = season ?: fields["season"]?.toIntOrNull(), episodeNumber = fields["episode_num"]?.toIntOrNull(),
+            name = fields["title"]?.takeIf(String::isNotBlank) ?: id,
+            logoUrl = fields["movie_image"] ?: series.logoUrl, category = series.category,
+            description = fields["plot"], durationMillis = fields["duration_secs"]?.toLongOrNull()?.takeIf { it > 0 }?.times(1000),
+            streamUrl = "$baseUrl/series/${encodePath(username)}/${encodePath(password)}/$id.$extension", updatedAt = now)
+    }
+
+    fun movieDetails(key: String, sourceId: Long, streamId: String, now: Long): VodMetadataEntity? {
+        var fields = emptyMap<String, String>()
+        open("get_vod_info", mapOf("vod_id" to streamId)).useConnection { connection ->
+            JsonReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { reader ->
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    if (reader.nextName() == "info" && reader.peek() == JsonToken.BEGIN_OBJECT) fields = reader.metadataFields()
+                    else reader.skipValue()
+                }
+                reader.endObject()
+            }
+        }
+        if (fields.isEmpty()) return null
+        return VodMetadataEntity(sourceKey = key, sourceId = sourceId, kind = "MOVIE", providerId = streamId,
+            name = fields["name"].orEmpty(), logoUrl = fields["movie_image"], description = fields["plot"] ?: fields["description"],
+            durationMillis = fields["duration_secs"]?.toLongOrNull()?.takeIf { it > 0 }?.times(1000), updatedAt = now)
+    }
+
+    private fun JsonReader.metadataFields(): Map<String, String> {
+        if (peek() != JsonToken.BEGIN_OBJECT) { skipValue(); return emptyMap() }
+        val fields = mutableMapOf<String, String>()
+        beginObject()
+        while (hasNext()) {
+            val key = nextName()
+            if (key == "info" && peek() == JsonToken.BEGIN_OBJECT) fields.putAll(metadataFields())
+            else if (key in setOf("series_id", "name", "cover", "category_id", "plot", "id", "title",
+                    "season", "episode_num", "container_extension", "movie_image", "duration_secs", "description")) {
+                scalarString()?.takeIf { it != "null" && it.isNotBlank() }?.let { fields[key] = it }
+            } else skipValue()
+        }
+        endObject()
+        return fields
     }
 
     private fun streams(action: String): Sequence<StreamItem> = sequence {

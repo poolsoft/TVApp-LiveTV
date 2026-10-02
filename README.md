@@ -9,7 +9,10 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 - Canlı kanal listesi filmleri içermez. VOD izlerken OK/MENU filmi duraklatıp VOD kütüphanesini açar; Back önce oynatma kontrollerini veya infobarı kapatır, ardından kütüphaneye döner.
 - VOD modunda kanal numaraları, CH+/CH- ve LAST canlı yayına geçirmez. Medya kontrolleri ve ileri/geri sarma kullanılabilir.
 - Yayın ekranında kırmızı **Mod** menüsünden Canlı TV, VOD veya son filme devam seçilir. Oynatma kontrollerindeki kırmızı tuşun mevcut tekrar dene görevi korunur.
-- VOD kütüphanesinde kırmızı Canlı TV'ye döner, yeşil son filme devam eder. Canlı kanal ve film geçmişleri ayrıdır; kütüphaneye dönüşte mevcut liste ve kaydırma konumu korunur.
+- VOD kütüphanesinde kırmızı Canlı TV'ye döner, yeşil son içeriğe devam eder, sarı kayıtlı liste seçer, mavi arama/filtre açar. Canlı kanal ve film geçmişleri ayrıdır; kütüphaneye dönüşte mevcut liste ve odak korunur.
+- Sinema ve Dizi sekmeleri, kaynak/kategori seçimi, favoriler, devam edilecekler, son izlenenler ve ada/kaynak sırasına göre sıralama bulunur. Her kaynak için filtreler ve sayfa hatırlanır; katalog 60 kayıtlık sayfalarda sorgulanır. CH+/CH- ve sayfa okları sayfa değiştirir.
+- Son açılan içerik adı ve kayıtlı konumu üstte gösterilir. OK detayları açar; Oynat, Devam et, Baştan başlat ve favori eylemleri bulunur. Görseller mevcut sınırlı Coil önbelleğini kullanır; tüm posterler önceden indirilmez. Eksik açıklama veya poster üretilmez.
+- Xtream dizileri açıldığında gerçek sezon/bölüm bilgileri alınır; bölüm bilgileri yalnız seçilen dizi için indirilir. Metadata altı saat önbellekte tutulur. M3U içerikleri düz katalogdur; başlıklardan sezon veya bölüm tahmini yapılmaz. Otomatik sonraki bölüm oynatma bu kapsamda yoktur.
 
 - MultiView tek kanalla başlayabilir. Farklı bir IPTV kanalı tek başına seçildiğinde PiP veya MultiView seçilir; aynı yayın iki kez açılmaz. MultiView/PiP açıkken yeşil tuş mevcut seçimlerle seçiciyi açar; MultiView’de uzun OK menüsünden kanal eklenebilir. Bir/iki yayınlı MultiView’de uygun IPTV hücresi uzun OK ile PiP görünümüne çevrilebilir. En fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı korunur. TIF iç video yüzeyi hücre ve tam ekran ölçülerine uyarlanır.
 

@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="vod_movies">Sinema</string>
+    <string name="vod_series">Dizi</string>
+    <string name="vod_search_filters">Arama / Filtre</string>
+    <string name="vod_all_categories">Tüm kategoriler</string>
+    <string name="vod_favorites">Favoriler</string>
+    <string name="vod_recent">Son izlenenler</string>
+    <string name="vod_continue_item">Devam et</string>
+    <string name="vod_return_item">İçeriğe dön</string>
+    <string name="vod_continue_named">%1$s içeriğine devam et</string>
+    <string name="vod_saved_position">Kaldığın yer: %1$s</string>
+    <string name="vod_sort_name">Sıralama: Ad</string>
+    <string name="vod_sort_source">Sıralama: Kaynak sırası</string>
+    <string name="vod_count">%1$d içerik</string>
+    <string name="vod_page_count">%1$d / %2$d</string>
+    <string name="vod_previous_page">Önceki sayfa</string>
+    <string name="vod_next_page">Sonraki sayfa</string>
+    <string name="vod_no_sources">VOD için kayıtlı bir IPTV listesi ekleyin.</string>
+    <string name="vod_description_unknown">Bu içerik için sağlayıcı açıklama bildirmedi.</string>
+    <string name="vod_seasons">Sezonlar</string>
+    <string name="vod_season">Sezon %1$d</string>
+    <string name="vod_season_title">%1$s · Sezon %2$d</string>
+    <string name="vod_episodes_unavailable">Sağlayıcıdan kullanılabilir sezon ve bölüm bilgisi alınamadı.</string>
     <string name="vod_load_failed">VOD listesi yüklenemedi. Yeniden denemek için seçin.</string>
     <string name="playback_mode_title">Canlı TV / VOD</string>
     <string name="playback_mode_short">Mod</string>
@@ -685,4 +707,5 @@
     <string name="vod_remove_from_continue">Devam Et listesinden kaldır</string>
     <string name="vod_home_sidebar">VOD Ana Sayfa</string>
     <string name="txt_key_hint">TXT: Altyazı/Teletext</string>
+    <string name="user_guide_vod_library">VOD KÜTÜPHANESİ\nSinema/Dizi sekmesini, üstten listeyi ve kategoriyi seçin. Sarı liste seçer; Mavi arama/filtre açar: Tümü, Favoriler, Devam edilecekler, Son izlenenler ve ada/kaynak sırasına göre sıralama. Kırmızı Canlı TV’ye geçer, Yeşil adı üstte görünen son içeriğe döner. OK detayları açar; Oynat/Devam et/Baştan başlat ve yıldızla favori işlemi yapılır. CH+/CH- veya sayfa okları katalog sayfasını değiştirir. Back önce pencereyi, ardından bölüm görünümünü veya filtreyi kapatır; son olarak Canlı TV eylemine odaklanır, kendiliğinden canlı yayına geçmez. Liste başına filtreler ve odak korunur. Xtream sağlayıcısı gerçek bilgi verirse sezon ve bölüm seçilebilir; düz M3U başlıklarından sezon tahmini yapılmaz. Görseller sınırlı önbelleği kullanır.</string>
 </resources>

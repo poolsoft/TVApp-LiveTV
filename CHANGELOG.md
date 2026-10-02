@@ -1,5 +1,14 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - Kaynak bazlı VOD kütüphanesi
+
+- Sinema/Dizi sekmeleri, liste/kategori seçimi, arama, favoriler, devam edilecekler, son izlenenler ve sıralama eklendi. Kaynak başına filtre, sayfa ve kart odağı korunur.
+- İsimli son içerik alanı, poster kartları ve kaydırılabilir gerçek açıklamalı detay penceresi eklendi. Kırmızı Canlı TV, yeşil son içerik, sarı kaynak, mavi arama/filtre görevindedir.
+- Katalog 60 kayıtlık DAO sayfalarıyla tutulur; CH+/CH- ve dokunulabilir sayfa okları kullanılabilir. Klavye kataloğu daraltmaz; geç gelen sorgular güncel görünümü değiştiremez.
+- Xtream sezon ve bölümleri isteğe bağlı indirilir; metadata altı saat önbellekte tutulur. Room 26 → 27 geçişi mevcut verileri silmeden yalnız metadata tablosu ekler.
+- Görseller mevcut sınırlı Coil önbelleğini kullanır; olmayan poster/açıklama üretilmez. Otomatik sonraki bölüm oynatma ertelidir; gerçek TV ve sağlayıcı üzerinde ayrıca doğrulama gerekir.
+- 15.000 kayıt, migration, Xtream yanıtları, klavye yerleşimi ve dolu katalog/detail dönüşü için beş emülatör testi geçti. Dokunmayla açılan kart da dönüş odağı olarak korunur; yüklenmekte olan eski sayfadaki kartlar açılmaz.
+
 ## 2026-10-02 - Diyalog okunabilirliği ve VOD liste kararlılığı
 
 - Standart OSD diyalogları sistemin gündüz/gece seçiminden bağımsız koyu temayı kullanır. Liste seçenekleri ve alt eylem düğmeleri okunabilir renklerle gösterilir; özel içerik tasarımları değiştirilmez.

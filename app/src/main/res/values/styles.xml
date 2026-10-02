@@ -77,6 +77,19 @@
         <item name="android:paddingBottom">10dp</item>
     </style>
 
+    <style name="VodAction">
+        <item name="android:background">@drawable/bg_filter_icon</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingHorizontal">10dp</item>
+        <item name="android:drawablePadding">6dp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+
     <style name="SettingsSectionTitle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

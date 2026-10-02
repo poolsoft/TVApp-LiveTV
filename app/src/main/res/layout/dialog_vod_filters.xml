@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+    <EditText android:id="@+id/vod_search" android:layout_width="match_parent" android:layout_height="48dp"
+        android:inputType="text" android:imeOptions="actionDone" android:maxLines="1" android:hint="@string/vod_search_hint"
+        android:importantForAutofill="no" android:background="@drawable/bg_focusable" android:paddingHorizontal="12dp"
+        android:textColor="@color/text_primary" android:textColorHint="@color/text_secondary" />
+    <TextView android:id="@+id/vod_view_filter" style="@style/VodAction" android:layout_width="match_parent"
+        android:layout_height="48dp" android:layout_marginTop="8dp" android:gravity="start|center_vertical" />
+    <TextView android:id="@+id/vod_order_filter" style="@style/VodAction" android:layout_width="match_parent"
+        android:layout_height="48dp" android:layout_marginTop="8dp" android:gravity="start|center_vertical" />
+</LinearLayout>

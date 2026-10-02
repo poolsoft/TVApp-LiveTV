@@ -28,6 +28,25 @@ Her aşama kendi testleriyle doğrulanıp gönderilir, aşağıdakiler topluca t
 
 ## VOD ekranı yenileme planı (2026-10-02)
 
+### Birlikte uygulanacak kapsam
+
+- Tek kaynak, kategori, Sinema/Dizi, arama, favoriler, devam edilenler ve son izlenenler.
+- Kaynak bazında kalıcı filtre ve sıralama; sınırlı katalog sayfaları, önceki/sonraki sayfa,
+  oynatmadan dönüşte odak ve konumun korunması. Tam katalog UI belleğinde tutulmaz.
+- İsimli son içerik alanı, iki satırlık kart başlıkları, mevcut Coil disk/bellek cache'i,
+  gerçek metadata ile kaydırılabilir detay ve Devam et/Baştan başlat/Favori işlemleri.
+- Kırmızı Canlı TV, Yeşil son içeriğe devam, Sarı kaynak, Mavi arama/filtreler.
+- Xtream dizi kataloğu ve sezon/bölüm bilgisi istek üzerine cache'lenir. M3U'da gerçek
+  sezon bilgisi yoksa bölüm hiyerarşisi uydurulmaz. Sonraki bölüm manuel seçilir;
+  otomatik oynatma bu kapsamda yoktur.
+- Room migration kullanıcı verilerini korur. DAO, migration, parser ve kumanda testleri;
+  gerçek TV ve özel sağlayıcı üzerinde ayrıca kabul testi.
+
+**Uygulama durumu:** Bu kapsam birlikte kodlandı. 15.000 kayıtlı DAO, migration,
+Xtream yanıt ayrıştırma, klavye geometrisi ve dolu katalog/detail gezinmesi için beş
+emülatör testi geçti. Local/Paid birim testleri ve debug derlemeleri başarılı.
+Fiziksel TV, düşük güçlü stick ve gerçek sağlayıcı kabulü tamamlanmış sayılmaz.
+
 Canlı TV ve sade VOD ayrı kullanım modlarıdır; büyük Netflix benzeri keşif ekranı kurulmayacak.
 
 - [x] **VODMODE-001 (P0): Canlı TV / VOD ayrımı**
@@ -35,30 +54,34 @@ Canlı TV ve sade VOD ayrı kullanım modlarıdır; büyük Netflix benzeri keş
   OK/MENU ile filmi duraklatıp kütüphaneye dönüş ve son filme devam uygulandı.
   Kumanda yönlendirmesi ve içerik türü testleri eklendi. Gerçek TV odak testi bekliyor.
 
-- [ ] **VODUI-001 (P0): Arama ve yükleme yaşam döngüsü**
-  VodHomeActivity.reloadGrid eski işi iptal edip loadingPage durumunu sıfırlamalı.
-  Sayfa sorgusu kaynak/index değerlerini yerel kopyalarda taşımalı; eski sorgu yeni aramanın
-  cursor değerlerini değiştirmemeli. Hatalar boş katalog gibi gösterilmemeli; tekrar dene olmalı.
+- [~] **VODUI-001 (P0): Arama ve yükleme yaşam döngüsü**
+  VodHomeActivity.loadPage eski işi iptal eder; sorgular kaynak/filtre/sayfa değerlerini
+  yerel kopyada taşır. Geç gelen sonuç generation kontrolünü geçmeden görünümü değiştiremez.
+  Hatalar boş katalog gibi gösterilmez; yeniden dene eylemi vardır.
   **Kabul:** Yükleme sürerken art arda arama, boş sonuç ve ağ/veritabanı hatası ekranı kilitlemez.
   **Durum (2026-10-02):** İş iptali, yerel sorgu imleçleri, adapter tamamlanma kontrolü,
   yükleme göstergesi ve yeniden deneme uygulandı. Arama klavyesi katalog ölçülerini değiştirmez.
   Verili büyük katalog ve hata enjeksiyonu ile kabul doğrulaması ayrıca yapılmalı.
-- [ ] **VODUI-002 (P1): Tek kaynak ve kategori seçimi**
+- [x] **VODUI-002 (P1): Tek kaynak ve kategori seçimi**
   Üstte kayıtlı IPTV listesi, ardından kategori; son seçilen kaynak/kategori hatırlanır.
-  Binlerce film farklı kaynaklardan tek görünümde karıştırılmaz. Mavi arama, sarı filtre dialogu;
+  Binlerce film farklı kaynaklardan tek görünümde karıştırılmaz. Mavi arama/filtre, sarı liste dialogu;
   arama alanı başlangıç odağını ve yazılım klavyesini kendiliğinden açmaz.
-- [ ] **VODUI-003 (P1): Sade katalog ve detay**
+- [x] **VODUI-003 (P1): Sade katalog ve detay**
   TV için 4-5, telefonda 2-3 poster sütunu; mevcut Coil cache ve kaynak görselleri kullanılır.
   Görsel yoksa gerçek başlıkla sade kart; sahte poster, puan, yıl veya açıklama üretilmez.
   Başlık iki satır, belirgin odak ve konum göstergesi. OK detay OSD; Oynat/Devam et/Baştan başlat.
-- [ ] **VODUI-004 (P1): Bounded sayfalama ve odak**
-  Bütün gezilmiş kataloğu biriktirip tekrar diff etmek yerine sınırlı pencere ve DAO keyset.
+- [~] **VODUI-004 (P1): Bounded sayfalama ve odak**
+  Bütün gezilmiş kataloğu biriktirip tekrar diff etmek yerine 60 kayıtlık DAO sayfaları.
+  Birleşik film/dizi sorgusunda filtre ve sıralama veritabanında; sayfa atlama LIMIT/OFFSET ile.
+  Derin sayfa performansı fiziksel düşük güçlü cihazda ayrıca ölçülmeli.
   Devam Et en fazla mevcut bounded geçmiş kadar; kaynak filtresine uyar. Back önce detayı kapatır,
   sonra filtreyi/ekranı terk eder. Oynatmadan dönüşte aynı karta ve kaydırma konumuna dönülür.
-- [ ] **VODUI-005 (P2): Bölüm görünümü ve doğrulama**
+- [~] **VODUI-005 (P2): Bölüm görünümü ve doğrulama**
   Xtream gerçek sezon/bölüm bilgisi sağlıyorsa sade sezon/bölüm seçimi; düz M3U başlıklarından
   tahmin edilen metadata gerçek bilgi gibi sunulmaz. Sonraki bölüm isteğe bağlıdır.
   **Kabul:** 15.000 kayıt, eksik görsel/metadata, kumanda ve mobil dokunma test matrisi.
+  **Durum:** Xtream sezon/bölüm sorgusu ve isteğe bağlı metadata önbelleği uygulandı.
+  Otomatik sonraki bölüm ertelidir; gerçek sağlayıcı/TV ve mobil dokunma matrisi ayrıca doğrulanmalı.
 
 ## MultiView liste seçimi (2026-10-02)
 

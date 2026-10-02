@@ -293,6 +293,7 @@ class IptvRepository(context: Context) {
             .mapValues { (_, entries) -> entries.map { it.initial } }
 
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
+        ?: database.vodDao().metadata(sourceKey)?.let(VodRepository::playbackChannel)
 
     suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> =
         dao.getAlternativeChannels(sourceKey)
