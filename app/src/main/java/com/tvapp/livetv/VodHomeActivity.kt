@@ -7,6 +7,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -140,7 +141,7 @@ class VodHomeActivity : TvRemoteActivity() {
                     restoreFilters()
                     initialized = true
                 }
-                loadPage(restoreFocus = focusedKey != null)
+                loadPage(restoreFocus = true)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { showFailure(error) }
         }
@@ -315,7 +316,7 @@ class VodHomeActivity : TvRemoteActivity() {
         focusedPosition = 0
         parentTitle = null
         saveFilters()
-        loadPage()
+        loadPage(restoreFocus = true)
     }
 
     private fun selectSection(section: String) {
@@ -371,8 +372,19 @@ class VodHomeActivity : TvRemoteActivity() {
             form.vodOrderFilter.setText(if (order == "NAME") R.string.vod_sort_name else R.string.vod_sort_source)
         }
         labels()
-        form.vodViewFilter.setOnClickListener { view = VIEWS[(VIEWS.indexOf(view) + 1) % VIEWS.size]; labels() }
-        form.vodOrderFilter.setOnClickListener { order = if (order == "NAME") "SOURCE" else "NAME"; labels() }
+        form.vodViewFilter.setOnClickListener {
+            PopupMenu(builder.context, form.vodViewFilter).apply {
+                VIEWS.forEachIndexed { index, value -> menu.add(0, index, index, viewLabel(value)) }
+                setOnMenuItemClickListener { selected -> view = VIEWS[selected.itemId]; labels(); true }
+            }.show()
+        }
+        form.vodOrderFilter.setOnClickListener {
+            PopupMenu(builder.context, form.vodOrderFilter).apply {
+                menu.add(0, 0, 0, R.string.vod_sort_source)
+                menu.add(0, 1, 1, R.string.vod_sort_name)
+                setOnMenuItemClickListener { selected -> order = if (selected.itemId == 1) "NAME" else "SOURCE"; labels(); true }
+            }.show()
+        }
         val d = builder.setTitle(R.string.vod_search_filters).setView(form.root)
             .setPositiveButton(R.string.apply) { _, _ ->
                 hideKeyboard(form.vodSearch)
@@ -388,7 +400,7 @@ class VodHomeActivity : TvRemoteActivity() {
         }
         showDialog(d)
         d.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        form.vodViewFilter.requestFocus()
+        form.vodViewFilter.post { if (d.isShowing) form.vodViewFilter.requestFocus() }
     }
 
     private fun viewLabel(view: String): String = getString(when (view) {
@@ -439,6 +451,11 @@ class VodHomeActivity : TvRemoteActivity() {
             }
         }
         showDialog(shown, onDismiss = { if (!navigating) loadPage(restoreFocus = true) })
+        shown.getButton(AlertDialog.BUTTON_POSITIVE).post {
+            if (shown.isShowing) shown.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+        }
+        shown.getButton(AlertDialog.BUTTON_POSITIVE).nextFocusUpId = detail.vodDetailScroll.id
+        detail.vodDetailScroll.nextFocusDownId = android.R.id.button1
         detail.vodDetailScroll.layoutParams.height = (resources.displayMetrics.heightPixels * .25f).toInt()
         detailJob?.cancel()
         detailJob = lifecycleScope.launch {
@@ -501,12 +518,14 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun showDialog(value: AlertDialog, onDismiss: (() -> Unit)? = null) {
+        val returnFocus = currentFocus
         dialog?.setOnDismissListener(null)
         dialog?.dismiss()
         dialog = value
         value.setOnDismissListener {
             if (dialog === value) dialog = null
             hideKeyboard(value.currentFocus)
+            returnFocus?.takeIf { it.isAttachedToWindow && it.isShown }?.requestFocus()
             onDismiss?.invoke()
         }
         value.show()
@@ -536,8 +555,10 @@ class VodHomeActivity : TvRemoteActivity() {
     override fun onBackPressed() {
         if (dialog?.isShowing == true) { dialog?.dismiss(); return }
         if (filter.parentKey != null) { changeFilter(filter.copy(parentKey = null, season = null)); return }
-        if (filter.query.isNotBlank() || filter.view != "ALL" || filter.category != null) {
-            changeFilter(filter.copy(query = "", view = "ALL", category = null)); return
+        if (binding.vodGrid.hasFocus() || binding.continueWatchingRow.hasFocus() ||
+            currentFocus in listOf(binding.vodPrevious, binding.vodNext, binding.vodLiveAction,
+                binding.vodContinueAction, binding.vodListAction, binding.vodSearchAction)) {
+            focusSection(); return
         }
         binding.vodLiveAction.requestFocus()
     }
@@ -557,13 +578,47 @@ class VodHomeActivity : TvRemoteActivity() {
             }
             return true
         }
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && binding.vodGrid.hasFocus()) {
+        if (event.action == KeyEvent.ACTION_DOWN && binding.vodGrid.hasFocus()) {
             val columns = (binding.vodGrid.layoutManager as GridLayoutManager).spanCount
-            if (key == KeyEvent.KEYCODE_DPAD_DOWN && focusedPosition >= gridAdapter.itemCount - columns &&
-                (pageIndex + 1) * PAGE_SIZE < total) { changePage(1); return true }
-            if (key == KeyEvent.KEYCODE_DPAD_UP && focusedPosition < columns && pageIndex > 0) { changePage(-1); return true }
+            val lastRow = ((gridAdapter.itemCount - 1).coerceAtLeast(0) / columns) * columns
+            if (key == KeyEvent.KEYCODE_DPAD_DOWN && focusedPosition >= lastRow) {
+                when {
+                    binding.vodNext.isEnabled -> binding.vodNext.requestFocus()
+                    binding.vodPrevious.isEnabled -> binding.vodPrevious.requestFocus()
+                    else -> binding.vodLiveAction.requestFocus()
+                }
+                return true
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_UP && focusedPosition < columns) { focusSection(); return true }
+            if (key == KeyEvent.KEYCODE_DPAD_LEFT && focusedPosition % columns == 0) return true
+            if (key == KeyEvent.KEYCODE_DPAD_RIGHT && (focusedPosition % columns == columns - 1 ||
+                focusedPosition == gridAdapter.itemCount - 1)) return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val focus = currentFocus
+            if (key == KeyEvent.KEYCODE_DPAD_DOWN && (focus in listOf(binding.vodMovies, binding.vodSeries,
+                    binding.vodCategoryAction, binding.vodResumeAction) || binding.continueWatchingRow.hasFocus())) {
+                focusCatalog(); return true
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_UP && focus in listOf(binding.vodPrevious, binding.vodNext,
+                    binding.vodLiveAction, binding.vodContinueAction, binding.vodListAction, binding.vodSearchAction)) {
+                focusCatalog(); return true
+            }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun focusSection() {
+        (if (filter.section == "SERIES") binding.vodSeries else binding.vodMovies).requestFocus()
+    }
+
+    private fun focusCatalog() {
+        if (gridAdapter.itemCount == 0) {
+            if (binding.vodEmpty.isFocusable) binding.vodEmpty.requestFocus()
+            return
+        }
+        pendingFocus = true
+        restoreGridFocus()
     }
 
     companion object {

@@ -3,6 +3,7 @@ package com.tvapp.livetv
 import android.content.Intent
 import android.content.Context
 import android.view.View
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -38,17 +39,49 @@ class VodHomeLayoutTest {
                 description = (1..30).joinToString("\n") { "Fixture description line $it" }, updatedAt = System.currentTimeMillis())))
             prefs.edit().putLong("source", source).commit()
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
             ActivityScenario.launch<VodHomeActivity>(Intent(context, VodHomeActivity::class.java)).use { scenario ->
                 assertTrue(device.wait(Until.hasObject(By.text("Fixture movie 0")), 10000))
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
+                device.pressDPadUp()
+                device.waitForIdle()
+                scenario.onActivity { assertEquals(R.id.vod_movies, it.currentFocus?.id) }
+                device.pressDPadDown()
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
+                device.pressKeyCode(KeyEvent.KEYCODE_PROG_BLUE)
+                assertTrue(device.wait(Until.hasObject(By.res("com.tvapp.livetv", "vod_view_filter")), 5000))
+                device.waitForIdle()
+                device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-filter-focus-test.png"))
+                assertTrue(device.wait(Until.hasObject(By.res("com.tvapp.livetv", "vod_view_filter").focused(true)), 5000))
+                device.pressDPadCenter()
+                assertTrue(device.wait(Until.hasObject(By.text(context.getString(R.string.vod_favorites))), 5000))
+                device.pressBack()
+                device.pressBack()
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
                 device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-catalog-test.png"))
                 scenario.onActivity { it.findViewById<View>(R.id.vod_next).performClick() }
                 assertTrue(device.wait(Until.hasObject(By.text("Fixture movie 60")), 5000))
                 scenario.onActivity { it.findViewById<View>(R.id.vod_previous).performClick() }
                 assertTrue(device.wait(Until.hasObject(By.text("Fixture movie 59")), 5000))
+                device.waitForIdle()
+                device.pressDPadDown()
+                device.waitForIdle()
+                scenario.onActivity { assertEquals(R.id.vod_next, it.currentFocus?.id) }
+                device.pressDPadUp()
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
                 scenario.onActivity { it.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.vod_grid).scrollToPosition(0) }
                 assertTrue(device.wait(Until.hasObject(By.text("Fixture movie 0")), 5000))
-                device.findObject(By.text("Fixture movie 0")).click()
+                scenario.onActivity {
+                    it.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.vod_grid)
+                        .findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                }
+                device.pressDPadCenter()
                 assertTrue(device.wait(Until.hasObject(By.res("com.tvapp.livetv", "vod_detail_scroll")), 5000))
+                assertTrue(device.hasObject(By.res("android", "button1").focused(true)))
                 device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-detail-test.png"))
                 device.pressBack()
                 assertTrue(device.wait(Until.gone(By.res("com.tvapp.livetv", "vod_detail_scroll")), 5000))

@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-03 - VOD kumanda gezinmesi
+
+- VOD ilk açılışta içerik odağına geçer. Üst sekme/kategoriden Aşağı son karta, ilk satırdan Yukarı veya katalogda Back aktif sekmeye döner; Back arama/kategori filtresini silmez.
+- Son satırdan Aşağı sayfa eylemlerine ulaşılır; sayfa değişimi CH+/CH- ve sayfa düğmeleriyle yapılır. Yatay oklar kart ızgarasının kenarından ilgisiz düğmelere atlamaz.
+- Filtre/sıralama satırları tekrarlanan OK ile değer döndürmek yerine görünür seçenek menüsü açar. Filtre uygulandığında katalog odağına dönülür; dialog kapatıldığında açan kontrolün odağı korunur.
+- Detay dialogu Oynat/Devam et/Sezonlar üzerinde açılır; Yukarı açıklama alanına, açıklamadan Aşağı oynatma eylemine geçer. Fiziksel TV doğrulaması ayrıca gereklidir.
+
 ## 2026-10-02 - Kaynak bazlı VOD kütüphanesi
 
 - Sinema/Dizi sekmeleri, liste/kategori seçimi, arama, favoriler, devam edilecekler, son izlenenler ve sıralama eklendi. Kaynak başına filtre, sayfa ve kart odağı korunur.
