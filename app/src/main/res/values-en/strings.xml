@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="playback_mode_title">Live TV / VOD</string>
+    <string name="playback_mode_short">Mode</string>
+    <string name="switch_to_live_tv">Switch to Live TV</string>
+    <string name="vod_library_key_hint">OK / MENU: VOD library</string>
+    <string name="user_guide_playback_modes">LIVE TV AND VOD\nThe live channel list excludes films. During a film, OK or MENU opens the VOD library and pauses playback. Back closes controls/the infobar first, then opens the VOD library. Channel and number keys never switch to live TV. The media key opens controls; left/right seeks. Red on unobstructed playback opens Mode: switch to Live TV, VOD library, or continue the last film. Red keeps its retry action while controls are active. In the VOD library Red opens Live TV and Green continues the last film. Back clears search, then focuses the Live TV action without switching modes.</string>
     <string name="multiview_selected_name">%1$d · %2$s</string>
     <string name="multiview_add_channel">Add to MultiView selection</string>
     <string name="multiview_remove_channel">Remove from MultiView selection</string>

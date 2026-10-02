@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="playback_mode_title">Canlı TV / VOD</string>
+    <string name="playback_mode_short">Mod</string>
+    <string name="switch_to_live_tv">Canlı TV’ye geç</string>
+    <string name="vod_library_key_hint">OK / MENU: VOD içerikleri</string>
+    <string name="user_guide_playback_modes">CANLI TV VE VOD\nCanlı kanal listesi filmlerden ayrıdır. Film oynarken OK veya MENU VOD listesini açar ve filmi duraklatır; Back önce kontrolleri/bilgi çubuğunu kapatır, ardından VOD listesine döner. Kanal ve sayı tuşları canlı yayına geçirmez. Medya tuşuyla kontroller açılır; sağ/sol sarar. Ekran boşken Kırmızı Mod menüsünü açar: Canlı TV’ye geç, VOD içerikleri veya son filme Devam et. Kontroller açıkken kırmızı yeniden dene görevini korur. VOD listesinde kırmızı Canlı TV, yeşil Devam et eylemidir. Back aramayı temizler, ardından Canlı TV eylemine odaklanır; kendiliğinden mod değiştirmez.</string>
     <string name="multiview_selected_name">%1$d · %2$s</string>
     <string name="multiview_add_channel">MultiView seçimine ekle</string>
     <string name="multiview_remove_channel">MultiView seçiminden çıkar</string>

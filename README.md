@@ -4,6 +4,13 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
 
+### Canlı TV / VOD modları
+
+- Canlı kanal listesi filmleri içermez. VOD izlerken OK/MENU filmi duraklatıp VOD kütüphanesini açar; Back önce oynatma kontrollerini veya infobarı kapatır, ardından kütüphaneye döner.
+- VOD modunda kanal numaraları, CH+/CH- ve LAST canlı yayına geçirmez. Medya kontrolleri ve ileri/geri sarma kullanılabilir.
+- Yayın ekranında kırmızı **Mod** menüsünden Canlı TV, VOD veya son filme devam seçilir. Oynatma kontrollerindeki kırmızı tuşun mevcut tekrar dene görevi korunur.
+- VOD kütüphanesinde kırmızı Canlı TV'ye döner, yeşil son filme devam eder. Canlı kanal ve film geçmişleri ayrıdır; kütüphaneye dönüşte mevcut liste ve kaydırma konumu korunur.
+
 - MultiView tek kanalla başlayabilir. Farklı bir IPTV kanalı tek başına seçildiğinde PiP veya MultiView seçilir; aynı yayın iki kez açılmaz. MultiView/PiP açıkken yeşil tuş mevcut seçimlerle seçiciyi açar; MultiView’de uzun OK menüsünden kanal eklenebilir. Bir/iki yayınlı MultiView’de uygun IPTV hücresi uzun OK ile PiP görünümüne çevrilebilir. En fazla bir TIF ve cihazın izin verdiği toplam yayın sayısı korunur. TIF iç video yüzeyi hücre ve tam ekran ölçülerine uyarlanır.
 
 - IPTV kaynak menüsündeki **Oynatma ayarları** ile canlı/VOD buffer, azami video çözünürlüğü ve otomatik kurtarma kaynak bazında ayarlanabilir. Her alan genel ayarı kullanabilir; tercihler liste güncellemesinde ve yedekten dönüşte korunur. Kalite sınırı yalnız mevcut yayın çeşitleri arasından seçim yapar, cihazın MultiView sınırlarını yükseltmez. Değişiklikler kanal yeniden açıldığında uygulanır.

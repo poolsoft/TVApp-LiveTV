@@ -5,6 +5,8 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 ## Türkçe
 
+- Ayrı Canlı TV ve VOD modları: film izlerken canlı kanallara yanlışlıkla geçmeden kütüphaneye dönüş, son filme devam ve son canlı kanala açık geçiş.
+
 - Tek yayınla başlayabilen MultiView, mevcut kanal listesinin arama/filtreleriyle kanal ekleme, yalnız eklenen kanalları gösteren seçim özeti ve uygun IPTV yayınları için PiP/MultiView geçişi.
 
 - IPTV listelerine özel canlı/VOD arabelleği, çözünürlük sınırı ve otomatik yeniden deneme tercihleri; istenirse genel ayarları kullanma.

@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.KeyEvent
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -38,6 +39,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private lateinit var repository: IptvRepository
     private lateinit var debugLog: CrashReportStore
     private lateinit var history: PlaybackHistoryStore
+    private lateinit var legacyHistory: PlaybackHistoryStore
     private lateinit var resumeStore: IptvResumeStore
 
     private lateinit var continueAdapter: VodHomeAdapter
@@ -63,8 +65,12 @@ class VodHomeActivity : TvRemoteActivity() {
         setContentView(binding.root)
         repository = IptvRepository(this)
         debugLog = CrashReportStore(this)
-        history = PlaybackHistoryStore(this)
+        history = PlaybackHistoryStore(this, "vod-playback-history")
+        legacyHistory = PlaybackHistoryStore(this)
         resumeStore = IptvResumeStore(this)
+        binding.vodLiveAction.setOnClickListener { openLiveTv() }
+        binding.vodResumeAction.setOnClickListener { resumeLastVod() }
+        binding.root.post { binding.vodLiveAction.requestFocus() }
 
         continueAdapter = VodHomeAdapter(
             onItemClick = ::openItem,
@@ -117,6 +123,7 @@ class VodHomeActivity : TvRemoteActivity() {
 
     override fun onStart() {
         super.onStart()
+        binding.vodResumeAction.visibility = if (lastVodKey() != null) View.VISIBLE else View.GONE
         ChannelLogoLoader.configure(this, DeviceCapabilitiesSession.get(this))
         // Returned from playback: resume positions and history may have changed.
         lifecycleScope.launch {
@@ -127,7 +134,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private suspend fun refreshContinueRow() {
         val items = withContext(Dispatchers.IO) {
             ContinueWatchingRepository(
-                historyKeys = history::keys,
+                historyKeys = { (history.keys() + legacyHistory.keys()).distinct() },
                 resumeEntry = { key -> resumeStore.entries().firstOrNull { it.sourceKey == key } },
                 resolveChannel = { key -> runCatching { repository.channel(key) }.getOrNull() },
             ).items()
@@ -212,10 +219,13 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodEmpty.visibility = if (empty) View.VISIBLE else View.GONE
     }
 
-    private fun openItem(item: ContinueWatchingItem) {
+    private fun openItem(item: ContinueWatchingItem) = openItem(item, startOver = false)
+
+    private fun openItem(item: ContinueWatchingItem, startOver: Boolean) {
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.channel.sourceKey)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra(MainActivity.EXTRA_VOD_START_OVER, startOver)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         startActivity(intent)
     }
@@ -230,13 +240,11 @@ class VodHomeActivity : TvRemoteActivity() {
             .setItems(actions) { _, which ->
                 when (which) {
                     0 -> {
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            resumeStore.clear(item.channel.sourceKey)
-                        }
-                        openItem(item.copy(resumeEntry = null))
+                        openItem(item, startOver = true)
                     }
                     1 -> {
                         history.remove(item.channel.sourceKey)
+                        legacyHistory.remove(item.channel.sourceKey)
                         lifecycleScope.launch {
                             refreshContinueRow()
                         }
@@ -247,12 +255,38 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     override fun onBackPressed() {
-        // Back first clears search state, then leaves the screen.
         if (binding.vodSearch.text.isNotBlank()) {
             binding.vodSearch.setText("")
             return
         }
-        super.onBackPressed()
+        binding.vodLiveAction.requestFocus()
+    }
+
+    private fun lastVodKey(): String? = getSharedPreferences(MainActivity.MODE_PREFS, MODE_PRIVATE)
+        .getString(MainActivity.LAST_VOD_KEY, null)
+
+    private fun resumeLastVod() {
+        val key = lastVodKey() ?: return
+        startActivity(Intent(this, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, key)
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    }
+
+    private fun openLiveTv() {
+        startActivity(Intent(this, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_LIVE_MODE, true)
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val key = tvRemoteKeyCode(event.keyCode)
+        if (key == KeyEvent.KEYCODE_PROG_RED || key == KeyEvent.KEYCODE_PROG_GREEN) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                if (key == KeyEvent.KEYCODE_PROG_RED) openLiveTv() else resumeLastVod()
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     companion object {

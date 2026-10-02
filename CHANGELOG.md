@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - Canlı TV / VOD mod ayrımı
+
+- VOD oynatırken OK/MENU filmi duraklatıp kütüphaneyi açar. Back önce kontrolleri ve infobarı kapatır; canlı kanallara otomatik dönüş yapılmaz.
+- Film modunda kanal numarası, CH+/CH- ve LAST canlı yayını açmaz. Canlı kanal listesi VOD içeriklerini göstermez.
+- Kırmızı Mod menüsü ve VOD kütüphanesindeki Canlı TV / Devam Et eylemleri eklendi. Son canlı kanal ile son film ayrı hatırlanır; film geçmişi canlı kanal geçmişine karışmaz.
+- Film değiştirilirken devam konumu eski filme kaydedilir; geciken VOD sorgusu açık mod değişimini geri çeviremez. Kumanda yönlendirmesi ve içerik türü için testler eklendi.
+
 ## 2026-10-02 - MultiView seçim özeti ve TIF yüzey ölçümü
 
 - MultiView seçici artık bütün katalog yerine yalnız eklenen kanalları gösterir. Kanal ekle mevcut kanal listesini açar; kaynak, arama ve harf filtreleriyle seçim yapılır. OK ekler/çıkarır, Yeşil veya Back özete döner. Seçim sırasında otomatik kanal açma ve liste zaman aşımı kapalıdır.

@@ -28,7 +28,12 @@ Her aşama kendi testleriyle doğrulanıp gönderilir, aşağıdakiler topluca t
 
 ## VOD ekranı yenileme planı (2026-10-02)
 
-Bu kapsam plan aşamasında; büyük Netflix benzeri keşif ekranı kurulmayacak.
+Canlı TV ve sade VOD ayrı kullanım modlarıdır; büyük Netflix benzeri keşif ekranı kurulmayacak.
+
+- [x] **VODMODE-001 (P0): Canlı TV / VOD ayrımı**
+  Açık mod seçimi, ayrı son kanal/film ve geçmiş, VOD'da canlı kanal gezinmesini engelleme,
+  OK/MENU ile filmi duraklatıp kütüphaneye dönüş ve son filme devam uygulandı.
+  Kumanda yönlendirmesi ve içerik türü testleri eklendi. Gerçek TV odak testi bekliyor.
 
 - [ ] **VODUI-001 (P0): Arama ve yükleme yaşam döngüsü**
   VodHomeActivity.reloadGrid eski işi iptal edip loadingPage durumunu sıfırlamalı.

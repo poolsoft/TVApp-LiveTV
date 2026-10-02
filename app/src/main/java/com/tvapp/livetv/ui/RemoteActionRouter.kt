@@ -37,12 +37,15 @@ enum class RemoteAction {
     HANDLE_LAST_CHANNEL_PRESS,
     HANDLE_IPTV_MEDIA,
     HANDLE_PLAYBACK,
+    OPEN_VOD_LIBRARY,
+    IGNORE_CHANNEL_NAVIGATION,
 }
 
 data class RemoteUiContext(
     val playbackUiState: PlaybackUiState,
     val dialogOwnsInput: Boolean = false,
     val isIptv: Boolean = false,
+    val isVod: Boolean = false,
 )
 
 /** Chooses the single UI layer that owns a remote event. */
@@ -54,6 +57,9 @@ class RemoteActionRouter {
     ): RemoteAction {
         if (context.dialogOwnsInput) return RemoteAction.FORWARD_TO_DIALOG
         if (key == RemoteKey.SETTINGS) return RemoteAction.HANDLE_SETTINGS_PRESS
+        if (context.isVod && key in setOf(RemoteKey.CHANNEL, RemoteKey.NUMBER, RemoteKey.LAST_CHANNEL)) {
+            return RemoteAction.IGNORE_CHANNEL_NAVIGATION
+        }
         if (context.playbackUiState.primaryOsd == PrimaryOsd.CHANNEL_PANEL) return RemoteAction.HANDLE_CHANNEL_PANEL
 
         when (context.playbackUiState.playbackMode) {
@@ -86,6 +92,8 @@ class RemoteActionRouter {
     ): RemoteAction = when {
         key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN &&
             context.playbackUiState.infoBarVisible -> RemoteAction.HIDE_INFO_BAR
+        context.isVod && key in setOf(RemoteKey.OK, RemoteKey.MENU, RemoteKey.GUIDE) -> RemoteAction.OPEN_VOD_LIBRARY
+        key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN && context.isVod -> RemoteAction.OPEN_VOD_LIBRARY
         key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN -> RemoteAction.SHOW_RECENT_CHANNELS
         key == RemoteKey.LAST_CHANNEL -> RemoteAction.HANDLE_LAST_CHANNEL_PRESS
         key == RemoteKey.MEDIA && context.isIptv -> RemoteAction.HANDLE_IPTV_MEDIA

@@ -3,9 +3,9 @@ package com.tvapp.livetv.playback
 import android.content.Context
 import org.json.JSONArray
 
-class PlaybackHistoryStore(context: Context) {
+class PlaybackHistoryStore(context: Context, storeName: String = "playback-history") {
     private val preferences = context.applicationContext.getSharedPreferences(
-        "playback-history",
+        storeName,
         Context.MODE_PRIVATE,
     )
 

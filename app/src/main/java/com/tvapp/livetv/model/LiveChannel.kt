@@ -29,5 +29,7 @@ data class LiveChannel(
     val hidden: Boolean = false,
     val groupId: Long? = null,
 ) {
+    fun isVodContent(): Boolean = source == Source.IPTV && iptvContentType.equals("VOD", ignoreCase = true)
+
     enum class Source { TIF, IPTV }
 }

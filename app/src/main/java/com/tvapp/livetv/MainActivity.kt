@@ -132,6 +132,11 @@ import java.util.Locale
 class MainActivity : TvRemoteActivity() {
     companion object {
         const val EXTRA_VOD_SOURCE_KEY = "com.tvapp.livetv.extra.VOD_SOURCE_KEY"
+        const val EXTRA_VOD_START_OVER = "com.tvapp.livetv.extra.VOD_START_OVER"
+        const val EXTRA_LIVE_MODE = "com.tvapp.livetv.extra.LIVE_MODE"
+        const val MODE_PREFS = "playback-mode"
+        const val LAST_VOD_KEY = "last-vod-key"
+        private const val LAST_LIVE_KEY = "last-live-key"
         private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
         private const val MAX_CHANNEL_DIGITS = 5
         private const val NUMBER_ENTRY_TIMEOUT_MS = 1_500L
@@ -196,6 +201,9 @@ class MainActivity : TvRemoteActivity() {
     private lateinit var iptvPlayback: IptvPlaybackController
     private lateinit var secondaryIptvPlayback: IptvPlaybackController
     private lateinit var playbackHistory: PlaybackHistoryStore
+    private val vodHistory by lazy { PlaybackHistoryStore(this, "vod-playback-history") }
+    private val modePreferences by lazy { getSharedPreferences(MODE_PREFS, MODE_PRIVATE) }
+    private var vodMode = false
     private lateinit var displayPreferencesStore: DisplayPreferencesStore
     private lateinit var channelTrackPreferenceStore: ChannelTrackPreferenceStore
     private lateinit var channelListFilterStore: ChannelListFilterStore
@@ -420,6 +428,7 @@ class MainActivity : TvRemoteActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         restoredMultiViewKeys = savedInstanceState?.getStringArrayList("multiview-draft")
+        vodMode = savedInstanceState?.getBoolean("vod-mode") == true
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         osdCoordinator = OsdCoordinator(::renderPlaybackUiState)
@@ -807,7 +816,7 @@ class MainActivity : TvRemoteActivity() {
                 repository.channels(includeTif = includeTif)
             }
             result.fold(
-                onSuccess = { loaded ->
+                onSuccess = success@ { loaded ->
                     debugLog.recordDebug("CHANNEL_LOAD_SUCCESS | count=${loaded.size}")
                     recordPerformance(
                         "channel_load",
@@ -818,15 +827,20 @@ class MainActivity : TvRemoteActivity() {
                     val playingChannel = currentChannel
                     channels = loaded
                     currentChannel = loaded.firstOrNull { it.sourceKey == currentKey }
-                        ?: playingChannel.takeIf { preserveCurrentPlayback }
+                        ?: playingChannel.takeIf { preserveCurrentPlayback || vodMode }
                     applyChannelFilter(requestFocus = false)
                     startEpgRefresh()
                     checkAndScheduleEpgAutoRefresh()
-                    if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
+                    if (!vodMode) {
+                        if (loaded.isEmpty()) showEmptyState(inputs) else showChannels(loaded)
+                    } else {
+                        osdCoordinator.hideStatus()
+                    }
                     lifecycleScope.launch(Dispatchers.IO) {
                         homeRecentChannelsPublisher.ensurePreviewChannel(loaded)
                         homeRecentChannelsPublisher.syncResumeVods(iptvRepository, iptvResumeStore)
                     }
+                    if (vodMode) return@success
                     val editorChannelKey = pendingEditorChannelKey
                     pendingEditorChannelKey = null
                     val requestedKey = pendingHomeChannelKey ?: editorChannelKey
@@ -843,7 +857,7 @@ class MainActivity : TvRemoteActivity() {
                         restoredInitialChannel = true
                         selectChannel(editorChannel)
                     } else if (requestedKey != null && requestedKey.startsWith("iptv:")) {
-                        val startupChannels = panelChannels().ifEmpty { loaded }
+                        val startupChannels = panelChannels().ifEmpty { loaded.filterNot { it.isVodContent() } }
                         lifecycleScope.launch {
                             val resolved = withContext(Dispatchers.IO) {
                                 iptvRepository.channel(requestedKey)
@@ -863,7 +877,7 @@ class MainActivity : TvRemoteActivity() {
                                     val fallbackResolved = withContext(Dispatchers.IO) {
                                         iptvRepository.channel(lastKey)
                                     }
-                                    if (fallbackResolved != null) {
+                                    if (fallbackResolved != null && !fallbackResolved.isVodContent()) {
                                         selectChannel(fallbackResolved)
                                     } else if (startupChannels.isNotEmpty()) {
                                         selectChannel(startupChannels.first())
@@ -875,7 +889,7 @@ class MainActivity : TvRemoteActivity() {
                         }
                     } else if (!restoredInitialChannel) {
                         restoredInitialChannel = true
-                        val startupChannels = panelChannels().ifEmpty { loaded }
+                        val startupChannels = panelChannels().ifEmpty { loaded.filterNot { it.isVodContent() } }
                         val lastKey = playbackHistory.keys().firstOrNull()
                         val matchedChannel = lastKey?.let { key ->
                             startupChannels.firstOrNull { it.sourceKey == key }
@@ -887,7 +901,7 @@ class MainActivity : TvRemoteActivity() {
                                 val resolved = withContext(Dispatchers.IO) {
                                     iptvRepository.channel(lastKey)
                                 }
-                                if (resolved != null) {
+                                if (resolved != null && !resolved.isVodContent()) {
                                     selectChannel(resolved)
                                 } else if (startupChannels.isNotEmpty()) {
                                     selectChannel(startupChannels.first())
@@ -969,6 +983,12 @@ class MainActivity : TvRemoteActivity() {
     private fun selectChannel(channel: LiveChannel) = selectChannel(channel, recordHistory = true)
 
     private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
+        if (vodMode && !channel.isVodContent()) return
+        if (channel.sourceKey != currentChannel?.sourceKey) saveCurrentIptvResumePosition()
+        if (channel.isVodContent()) {
+            enterVodMode()
+            modePreferences.edit().putString(LAST_VOD_KEY, channel.sourceKey).apply()
+        }
         val generation = ++channelResolutionGeneration
         if (channel.source == LiveChannel.Source.IPTV) {
             // Give immediate visual feedback before the asynchronous resolution
@@ -1094,6 +1114,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
+        if (vodMode && !channel.isVodContent()) return
         if (channel.source == LiveChannel.Source.IPTV && !hasIptvAccess {
                 playSelectedChannel(channel, recordHistory)
             }
@@ -1135,7 +1156,9 @@ class MainActivity : TvRemoteActivity() {
         iptvLiveHealthJob?.cancel()
         binding.iptvNotice.visibility = View.GONE
         osdCoordinator.hideParentalLock()
-        if (recordHistory) {
+        if (channel.isVodContent()) {
+            vodHistory.record(channel.sourceKey)
+        } else if (recordHistory) {
             playbackHistory.record(channel.sourceKey)
             homeRecentPublishJob?.cancel()
             homeRecentPublishJob = lifecycleScope.launch(Dispatchers.IO) {
@@ -1463,6 +1486,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun zap(offset: Int) {
+        if (vodMode) return
         if (multiViewAdding && binding.channelPanel.visibility == View.VISIBLE) {
             pageChannelList(offset)
             return
@@ -1539,7 +1563,7 @@ class MainActivity : TvRemoteActivity() {
         focusedListSourceKey = channel.sourceKey
         loadFocusedProgram(channel)
         focusedTuneJob?.cancel()
-        if (!displayPreferences.channelFocusAutoTune || alphabetBrowsing || multiViewAdding) return
+        if (!displayPreferences.channelFocusAutoTune || alphabetBrowsing || multiViewAdding || channel.isVodContent()) return
         focusedTuneJob = lifecycleScope.launch {
             delay(displayPreferences.channelFocusTuneDelayMillis.toLong())
             if (
@@ -1666,6 +1690,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun openMobileChannelPanel() {
+        if (vodMode) {
+            openVodLibrary()
+            return
+        }
         if (BuildConfig.MOBILE_UI_ENABLED) openSavedIptvLibrary()
         else showChannelPanel(expanded = false)
     }
@@ -1944,6 +1972,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun saveCurrentIptvResumePosition() {
         val channel = currentChannel ?: return
+        if (!channel.isVodContent() || iptvPlayback.tunedSourceKey() != channel.sourceKey) return
         if (channel.source != LiveChannel.Source.IPTV || currentIptvContentKind != IptvContentKind.VOD) {
             return
         }
@@ -2758,7 +2787,77 @@ class MainActivity : TvRemoteActivity() {
      *  teletext view when it is implemented. */
     private fun showTxtTracks() {
         if (iptvGridActive) return
-        startActivity(android.content.Intent(this, VodHomeActivity::class.java))
+        openVodLibrary()
+    }
+
+    private fun enterVodMode() {
+        if (!vodMode) {
+            currentChannel?.takeUnless { it.isVodContent() }?.let {
+                modePreferences.edit().putString(LAST_LIVE_KEY, it.sourceKey).apply()
+            }
+        }
+        vodMode = true
+        numberInputJob?.cancel()
+        numberInput = ""
+        focusedTuneJob?.cancel()
+    }
+
+    private fun openVodLibrary() {
+        if (!hasIptvAccess(::openVodLibrary)) return
+        saveCurrentIptvResumePosition()
+        enterVodMode()
+        channelResolutionGeneration++
+        if (iptvGridActive) stopIptvGrid(resumePrevious = false)
+        if (iptvOverlayActive) stopIptvOverlay()
+        playback.stop()
+        if (currentChannel?.isVodContent() == true && iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY) {
+            iptvPlayback.pause()
+        } else {
+            iptvPlayback.stop()
+        }
+        hideChannelPanel()
+        hideIptvPlaybackControls()
+        startActivity(Intent(this, VodHomeActivity::class.java).addFlags(
+            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP,
+        ))
+    }
+
+    private fun showPlaybackModeDialog() {
+        val lastVod = modePreferences.getString(LAST_VOD_KEY, null)
+        val labels = mutableListOf(getString(R.string.switch_to_live_tv), getString(R.string.vod_home_title))
+        if (lastVod != null) labels += getString(R.string.continue_watching)
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.playback_mode_title)
+            .setItems(labels.toTypedArray()) { _, which ->
+                when (which) {
+                    0 -> switchToLiveMode()
+                    1 -> openVodLibrary()
+                    2 -> handleVodSourceDeepLink(Intent().putExtra(EXTRA_VOD_SOURCE_KEY, lastVod))
+                }
+            }.setNegativeButton(R.string.close, null).show()
+    }
+
+    private fun switchToLiveMode() {
+        saveCurrentIptvResumePosition()
+        vodMode = false
+        intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
+        channelResolutionGeneration++
+        val requestGeneration = channelResolutionGeneration
+        iptvPlayback.stop()
+        hideIptvPlaybackControls()
+        hideChannelPanel()
+        channelPanelContent = ChannelPanelContent.NORMAL
+        applyChannelFilter(requestFocus = false)
+        val lastKey = modePreferences.getString(LAST_LIVE_KEY, null)
+        lifecycleScope.launch {
+            val last = channels.firstOrNull { it.sourceKey == lastKey } ?: withContext(Dispatchers.IO) {
+                lastKey?.let { iptvRepository.channel(it) }
+            }
+            if (vodMode || requestGeneration != channelResolutionGeneration) return@launch
+            val channel = last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
+            if (channel != null) selectChannel(channel, recordHistory = false)
+            else loadChannels(preserveCurrentPlayback = false)
+        }
     }
 
     private fun showSubtitleTracks() {
@@ -2915,6 +3014,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showPhysicalInputSelector() {
+        if (vodMode) {
+            showPlaybackModeDialog()
+            return
+        }
         val inputs = repository.physicalInputs()
         if (inputs.isEmpty()) {
             Toast.makeText(this, R.string.no_physical_inputs, Toast.LENGTH_SHORT).show()
@@ -3079,6 +3182,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun openProgramGuide() {
+        if (vodMode) {
+            openVodLibrary()
+            return
+        }
         hideChannelPanel()
         infoBarJob?.cancel()
         setInfoBarVisible(false)
@@ -3325,6 +3432,14 @@ class MainActivity : TvRemoteActivity() {
         contentType: IptvLibraryContentType,
         category: String?,
     ) {
+        if (contentType == IptvLibraryContentType.ALL) {
+            applyIptvLibraryFilter(sourceId, sourceName, IptvLibraryContentType.LIVE, category)
+            return
+        }
+        if (contentType != IptvLibraryContentType.LIVE) {
+            openVodLibrary()
+            return
+        }
         alphabetFilterJob?.cancel()
         alphabetLetter = null
         iptvAlphabetInitials = null
@@ -3829,6 +3944,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvGridPicker(initialSelection: List<LiveChannel>? = null) {
+        if (vodMode) {
+            openVodLibrary()
+            return
+        }
         val restored = restoredMultiViewKeys
         if (initialSelection == null && restored != null) {
             restoredMultiViewKeys = null
@@ -5057,6 +5176,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun buildNormalPanelChannels(includeAlphabet: Boolean = true): List<LiveChannel> {
         return channels.asSequence()
+        .filterNot { it.isVodContent() }
         .filter { channel ->
             when (sourceFilter) {
                 ChannelSourceFilter.ALL -> true
@@ -5139,6 +5259,12 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
+        if (!iptvControlsInteractive && catchUpReturnChannel == null) {
+            binding.infoColorActions.addView(TvUiComponents.colorAction(
+                this, R.drawable.key_red, getString(R.string.playback_mode_short),
+                interactive = BuildConfig.MOBILE_UI_ENABLED, clicked = ::showPlaybackModeDialog,
+            ))
+        }
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
             catchUpReturnChannel?.let { liveChannel ->
                 binding.infoColorActions.addView(
@@ -5163,7 +5289,7 @@ class MainActivity : TvRemoteActivity() {
                 )
             } else {
                 intArrayOf(
-                    R.string.iptv_controls_up_down_channel_hint,
+                    if (vodMode) R.string.vod_library_key_hint else R.string.iptv_controls_up_down_channel_hint,
                     R.string.iptv_controls_media_hint,
                 )
             }
@@ -5208,7 +5334,8 @@ class MainActivity : TvRemoteActivity() {
                 ),
             )
         }
-        action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvGridPicker)
+        if (vodMode) action(R.color.remote_green, R.string.vod_home_title, ::openVodLibrary)
+        else action(R.color.remote_green, R.string.iptv_pip_grid_short_long, ::showIptvGridPicker)
         action(R.color.remote_blue, R.string.settings_short, ::openDisplaySettings)
         // TXT hint inside the technical row, far right, next to the badges.
         binding.infoColorActions.addView(TextView(this).apply {
@@ -5304,6 +5431,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showChannelPanel(expanded: Boolean) {
+        if (vodMode) {
+            openVodLibrary()
+            return
+        }
         android.os.Trace.beginSection("channel_panel_open")
         val openedAt = SystemClock.elapsedRealtime()
         try {
@@ -5863,6 +5994,7 @@ class MainActivity : TvRemoteActivity() {
                 PlaybackSurfaceMode.INTERNAL_MINI_PLAYER -> toggleInternalMiniPlayer()
                 else -> showRecentChannels()
             }
+            RemoteAction.OPEN_VOD_LIBRARY -> openVodLibrary()
             RemoteAction.HANDLE_PARENTAL_LOCK -> showRecentChannels()
             else -> Unit
         }
@@ -5873,12 +6005,14 @@ class MainActivity : TvRemoteActivity() {
         dialogOwnsInput = currentFocus?.rootView != null &&
             currentFocus?.rootView !== binding.root.rootView,
         isIptv = currentChannel?.source == LiveChannel.Source.IPTV,
+        isVod = vodMode,
     )
 
     private fun showRecentChannels() {
         val recent = playbackHistory.keys().asSequence()
             .filter { it != currentChannel?.sourceKey }
             .mapNotNull { key -> channels.firstOrNull { it.sourceKey == key } }
+            .filterNot { it.isVodContent() }
             .take(5)
             .toList()
         if (recent.isEmpty()) return
@@ -5940,6 +6074,11 @@ class MainActivity : TvRemoteActivity() {
         )
         if (routedAction == RemoteAction.FORWARD_TO_DIALOG) {
             return super.dispatchKeyEvent(event)
+        }
+        if (routedAction == RemoteAction.IGNORE_CHANNEL_NAVIGATION) return true
+        if (routedAction == RemoteAction.OPEN_VOD_LIBRARY) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) openVodLibrary()
+            return true
         }
         if (multiViewAdding && binding.channelPanel.visibility == View.VISIBLE &&
             event.keyCode == KeyEvent.KEYCODE_BACK
@@ -6339,6 +6478,8 @@ class MainActivity : TvRemoteActivity() {
                     } else {
                         openChannelEditor()
                     }
+                } else {
+                    showPlaybackModeDialog()
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> showIptvGridPicker()
                 KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility != View.VISIBLE) {
@@ -6445,7 +6586,7 @@ class MainActivity : TvRemoteActivity() {
     override fun onStart() {
         super.onStart()
         endBlackout("ACTIVITY_START")
-        if (!resumeTifPlayback) return
+        if (vodMode || !resumeTifPlayback) return
         resumeTifPlayback = false
         val passthroughInputId = activePassthroughInputId
         binding.tvView.postDelayed({
@@ -6468,7 +6609,7 @@ class MainActivity : TvRemoteActivity() {
         alphabetRail?.close()
         binding.blackoutAnimation.pauseAnimation()
         saveCurrentIptvResumePosition()
-        if (!isChangingConfigurations &&
+        if (!vodMode && !isChangingConfigurations &&
             (activePassthroughInputId != null || currentChannel?.source == LiveChannel.Source.TIF)
         ) {
             resumeTifPlayback = true
@@ -6481,6 +6622,7 @@ class MainActivity : TvRemoteActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putStringArrayList("multiview-draft", ArrayList(multiViewDraft.keys))
+        outState.putBoolean("vod-mode", vodMode)
     }
 
     override fun onDestroy() {
@@ -6530,10 +6672,35 @@ class MainActivity : TvRemoteActivity() {
     /** Handles the VOD_SOURCE_KEY deep link from VodHomeActivity on both cold
      *  start (onCreate) and warm delivery (onNewIntent, singleTop). */
     private fun handleVodSourceDeepLink(intent: Intent?) {
-        val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY) ?: return
-        if (currentChannel?.sourceKey == sourceKey) return
+        if (intent?.getBooleanExtra(EXTRA_LIVE_MODE, false) == true) {
+            intent.removeExtra(EXTRA_LIVE_MODE)
+            switchToLiveMode()
+            return
+        }
+        val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY)
+            ?: (if (vodMode && currentChannel == null) modePreferences.getString(LAST_VOD_KEY, null) else null)
+            ?: run {
+                if (vodMode && currentChannel == null) openVodLibrary()
+                return
+            }
+        enterVodMode()
+        val requestGeneration = ++channelResolutionGeneration
+        val startOver = intent?.getBooleanExtra(EXTRA_VOD_START_OVER, false) == true
+        intent?.removeExtra(EXTRA_VOD_START_OVER)
+        if (startOver) {
+            saveCurrentIptvResumePosition()
+            iptvPlayback.stop()
+            iptvResumeStore.clear(sourceKey)
+        }
+        if (currentChannel?.sourceKey == sourceKey && iptvPlayback.tunedSourceKey() == sourceKey &&
+            iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY
+        ) {
+            iptvPlayback.play()
+            showInfoBar()
+            return
+        }
         channels.firstOrNull { it.sourceKey == sourceKey }?.let { channel ->
-            selectChannel(channel, recordHistory = true)
+            if (channel.isVodContent()) selectChannel(channel, recordHistory = true)
             return
         }
         // VOD items usually live outside the main channel list; resolve
@@ -6542,11 +6709,12 @@ class MainActivity : TvRemoteActivity() {
             val channel = withContext(Dispatchers.IO) {
                 runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
             }
-            if (channel != null) {
+            if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
+            if (channel?.isVodContent() == true) {
                 selectChannel(channel, recordHistory = true)
             } else {
-                pendingHomeChannelKey = sourceKey
-                loadChannels(preserveCurrentPlayback = true)
+                showIptvNotice(R.string.channel_not_found)
+                openVodLibrary()
             }
         }
     }
