@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="vod_load_failed">VOD listesi yüklenemedi. Yeniden denemek için seçin.</string>
     <string name="playback_mode_title">Canlı TV / VOD</string>
     <string name="playback_mode_short">Mod</string>
     <string name="switch_to_live_tv">Canlı TV’ye geç</string>

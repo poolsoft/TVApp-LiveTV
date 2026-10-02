@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-02 - Diyalog okunabilirliği ve VOD liste kararlılığı
+
+- Standart OSD diyalogları sistemin gündüz/gece seçiminden bağımsız koyu temayı kullanır. Liste seçenekleri ve alt eylem düğmeleri okunabilir renklerle gösterilir; özel içerik tasarımları değiştirilmez.
+- VOD araması sırasında eski yükleme işi yeni aramanın imlecini değiştiremez veya listeyi beklemede bırakamaz. Boş durum, adapter güncellemesi tamamlandıktan sonra gösterilir; yükleme göstergesi ve hata durumunda yeniden deneme eklendi.
+- Klavye VOD kataloğunun ölçülerini değiştirmez; arama klavyesindeki Tamam klavyeyi kapatır ve odağı kataloğa taşır. Sütun sayısı ekran genişliğine göre belirlenir.
+- Gündüz modunda diyalog metinleri ve VOD arama/klavye yerleşimi için emülatör testleri eklendi. Fiziksel TV kumandasıyla doğrulama ayrıca gereklidir.
+
 ## 2026-10-02 - MultiView tam ekran dönüşü
 
 - TIF yüzeyinde eski vendor dikdörtgeni yeni tam ekran ölçüsünden önce uygulanmaz. Görünür alan değiştiğinde TIF oturumu son yerleşim ölçüsüyle yeniden kurulur; gecikmiş eski yerleşim işleri iptal edilir.

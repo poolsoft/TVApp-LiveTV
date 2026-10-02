@@ -124,6 +124,7 @@
 
         <TextView
             android:id="@+id/vod_empty"
+            android:background="@drawable/bg_focusable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
@@ -131,6 +132,13 @@
             android:text="@string/vod_empty"
             android:textColor="@color/text_secondary"
             android:textSize="15sp"
+            android:visibility="gone" />
+        <ProgressBar
+            android:id="@+id/vod_loading"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center_horizontal"
+            android:contentDescription="@string/loading"
             android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

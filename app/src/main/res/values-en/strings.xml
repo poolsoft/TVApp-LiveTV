@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="vod_load_failed">Unable to load VOD. Select to retry.</string>
     <string name="playback_mode_title">Live TV / VOD</string>
     <string name="playback_mode_short">Mode</string>
     <string name="switch_to_live_tv">Switch to Live TV</string>

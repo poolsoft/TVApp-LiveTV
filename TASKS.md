@@ -40,6 +40,9 @@ Canlı TV ve sade VOD ayrı kullanım modlarıdır; büyük Netflix benzeri keş
   Sayfa sorgusu kaynak/index değerlerini yerel kopyalarda taşımalı; eski sorgu yeni aramanın
   cursor değerlerini değiştirmemeli. Hatalar boş katalog gibi gösterilmemeli; tekrar dene olmalı.
   **Kabul:** Yükleme sürerken art arda arama, boş sonuç ve ağ/veritabanı hatası ekranı kilitlemez.
+  **Durum (2026-10-02):** İş iptali, yerel sorgu imleçleri, adapter tamamlanma kontrolü,
+  yükleme göstergesi ve yeniden deneme uygulandı. Arama klavyesi katalog ölçülerini değiştirmez.
+  Verili büyük katalog ve hata enjeksiyonu ile kabul doğrulaması ayrıca yapılmalı.
 - [ ] **VODUI-002 (P1): Tek kaynak ve kategori seçimi**
   Üstte kayıtlı IPTV listesi, ardından kategori; son seçilen kaynak/kategori hatırlanır.
   Binlerce film farklı kaynaklardan tek görünümde karıştırılmaz. Mavi arama, sarı filtre dialogu;

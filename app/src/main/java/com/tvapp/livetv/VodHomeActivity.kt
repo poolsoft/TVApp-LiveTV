@@ -6,10 +6,11 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.KeyEvent
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.tvapp.livetv.data.IptvLibraryPage
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.image.ChannelLogoLoader
@@ -24,6 +25,9 @@ import com.tvapp.livetv.ui.VodHomeAdapter
 import com.tvapp.livetv.TvRemoteActivity
 import androidx.appcompat.app.AlertDialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -51,7 +55,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private var loadGeneration = 0
 
     // Sequential paging cursor across sources: index into sourceIds plus the
-    // per-source offset. The full catalog is never held in memory.
+    // per-source keyset. Each database request is bounded to one page.
     private var sourceIds: List<Long> = emptyList()
     private var nextSourceIndex = 0
     /** Keyset cursor: the next originalIndex to fetch for [nextSourceIndex]. */
@@ -61,6 +65,8 @@ class VodHomeActivity : TvRemoteActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         binding = ActivityVodHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
         repository = IptvRepository(this)
@@ -86,16 +92,27 @@ class VodHomeActivity : TvRemoteActivity() {
             LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.continueWatchingRow.adapter = continueAdapter
         binding.vodGrid.adapter = gridAdapter
-        binding.vodGrid.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 4)
+        binding.vodGrid.layoutManager = androidx.recyclerview.widget.GridLayoutManager(
+            this, (resources.configuration.screenWidthDp / 290).coerceIn(1, 4),
+        )
+        binding.vodSearch.setOnEditorActionListener { _, action, _ ->
+            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                hideKeyboard()
+                binding.vodGrid.requestFocus()
+                true
+            } else false
+        }
+        binding.vodEmpty.setOnClickListener { reloadGrid() }
 
         binding.vodSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString().orEmpty().trim()
                 searchJob?.cancel()
                 searchJob = lifecycleScope.launch {
                     delay(SEARCH_DEBOUNCE_MS)
-                    searchQuery = s?.toString().orEmpty().trim()
+                    searchQuery = query
                     reloadGrid()
                 }
             }
@@ -151,11 +168,15 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun reloadGrid() {
         loadGeneration++
+        loadJob?.cancel()
+        loadingPage = false
         nextSourceIndex = 0
         nextSourceFromIndex = 0
         exhausted = false
-        gridAdapter.submitList(emptyList())
-        loadNextGridPage()
+        val generation = loadGeneration
+        gridAdapter.submitList(emptyList()) {
+            if (generation == loadGeneration) loadNextGridPage()
+        }
     }
 
     private fun loadNextGridPage() {
@@ -163,40 +184,67 @@ class VodHomeActivity : TvRemoteActivity() {
         loadingPage = true
         val generation = loadGeneration
         val query = searchQuery
+        val sources = sourceIds.toList()
+        val sourceIndex = nextSourceIndex
+        val fromIndex = nextSourceFromIndex
+        binding.vodEmpty.visibility = View.GONE
+        binding.vodLoading.visibility = View.VISIBLE
         loadJob?.cancel()
         loadJob = lifecycleScope.launch {
-            val page = withContext(Dispatchers.IO) { fetchNextGridPage(query) }
-            if (generation != loadGeneration) return@launch
-            loadingPage = false
-            if (page.isEmpty()) {
-                exhausted = true
-            } else {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    fetchNextGridPage(query, sources, sourceIndex, fromIndex)
+                }
+                if (generation != loadGeneration) return@launch
+                nextSourceIndex = result.sourceIndex
+                nextSourceFromIndex = result.fromIndex
+                exhausted = result.sourceIndex >= sources.size
                 val existing = gridAdapter.currentList
                 val existingKeys = existing.mapTo(mutableSetOf()) { it.channel.sourceKey }
                 gridAdapter.submitList(
-                    existing + page.filter { it.channel.sourceKey !in existingKeys },
-                )
+                    existing + result.items.filter { it.channel.sourceKey !in existingKeys },
+                ) {
+                    if (generation == loadGeneration) {
+                        loadingPage = false
+                        binding.vodLoading.visibility = View.GONE
+                        updateEmptyState()
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (generation == loadGeneration) {
+                    loadingPage = false
+                    binding.vodLoading.visibility = View.GONE
+                    binding.vodEmpty.setText(R.string.vod_load_failed)
+                    binding.vodEmpty.isFocusable = true
+                    binding.vodEmpty.isClickable = true
+                    binding.vodEmpty.visibility = View.VISIBLE
+                    debugLog.recordDebug("VOD_PAGE_FAILED | ${error.javaClass.simpleName}")
+                }
             }
-            updateEmptyState()
         }
     }
 
     /** Fetches one bounded page, walking across sources when one runs out. */
-    private suspend fun fetchNextGridPage(query: String): List<ContinueWatchingItem> {
+    private suspend fun fetchNextGridPage(
+        query: String, sources: List<Long>, sourceIndex: Int, fromIndex: Int,
+    ): GridPage {
+        var nextSourceIndex = sourceIndex
+        var nextSourceFromIndex = fromIndex
         val collected = mutableListOf<LiveChannel>()
-        while (nextSourceIndex < sourceIds.size && collected.size < PAGE_SIZE) {
-            val sourceId = sourceIds[nextSourceIndex]
+        while (nextSourceIndex < sources.size && collected.size < PAGE_SIZE) {
+            currentCoroutineContext().ensureActive()
+            val sourceId = sources[nextSourceIndex]
             val remaining = PAGE_SIZE - collected.size
-            val page = runCatching {
-                repository.libraryLiveChannelsPageFrom(
-                    sourceId = sourceId,
-                    category = null,
-                    contentType = CONTENT_TYPE_VOD,
-                    limit = remaining,
-                    fromIndex = nextSourceFromIndex,
-                    query = query,
-                )
-            }.getOrDefault(IptvLibraryPage(emptyList(), null, null))
+            val page = repository.libraryLiveChannelsPageFrom(
+                sourceId = sourceId,
+                category = null,
+                contentType = CONTENT_TYPE_VOD,
+                limit = remaining,
+                fromIndex = nextSourceFromIndex,
+                query = query,
+            )
             if (page.channels.isEmpty()) {
                 nextSourceIndex++
                 nextSourceFromIndex = 0
@@ -210,10 +258,18 @@ class VodHomeActivity : TvRemoteActivity() {
                 nextSourceFromIndex = (page.lastAnchor?.originalIndex ?: 0) + 1
             }
         }
-        return collected.map { ContinueWatchingItem(channel = it, resumeEntry = null) }
+        return GridPage(collected.map { ContinueWatchingItem(channel = it, resumeEntry = null) },
+            nextSourceIndex, nextSourceFromIndex)
     }
 
+    private data class GridPage(
+        val items: List<ContinueWatchingItem>, val sourceIndex: Int, val fromIndex: Int,
+    )
+
     private fun updateEmptyState() {
+        binding.vodEmpty.setText(R.string.vod_empty)
+        binding.vodEmpty.isFocusable = false
+        binding.vodEmpty.isClickable = false
         val empty = gridAdapter.itemCount == 0 &&
             binding.continueWatchingRow.visibility != View.VISIBLE
         binding.vodEmpty.visibility = if (empty) View.VISIBLE else View.GONE
@@ -222,6 +278,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun openItem(item: ContinueWatchingItem) = openItem(item, startOver = false)
 
     private fun openItem(item: ContinueWatchingItem, startOver: Boolean) {
+        hideKeyboard()
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.channel.sourceKey)
             putExtra(MainActivity.EXTRA_VOD_START_OVER, startOver)
@@ -255,6 +312,7 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     override fun onBackPressed() {
+        hideKeyboard()
         if (binding.vodSearch.text.isNotBlank()) {
             binding.vodSearch.setText("")
             return
@@ -273,9 +331,15 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun openLiveTv() {
+        hideKeyboard()
         startActivity(Intent(this, MainActivity::class.java)
             .putExtra(MainActivity.EXTRA_LIVE_MODE, true)
             .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    }
+
+    private fun hideKeyboard() {
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(binding.vodSearch.windowToken, 0)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

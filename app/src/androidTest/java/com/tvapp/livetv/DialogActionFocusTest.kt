@@ -16,6 +16,33 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class DialogActionFocusTest {
     @Test
+    fun listAndChoiceItemsStayWhiteInDayMode() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val base = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val config = android.content.res.Configuration(base.resources.configuration).apply {
+                uiMode = (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                    android.content.res.Configuration.UI_MODE_NIGHT_NO
+            }
+            val context = ContextThemeWrapper(base.createConfigurationContext(config), R.style.Theme_TVApp_Dialog)
+            for (choices in listOf(false, true)) {
+                val builder = AlertDialog.Builder(context, R.style.Theme_TVApp_Dialog)
+                if (choices) builder.setSingleChoiceItems(arrayOf("Live TV", "VOD"), 0, null)
+                else builder.setItems(arrayOf("Live TV", "VOD"), null)
+                val dialog = builder.create()
+                dialog.create()
+                try {
+                    val list = dialog.listView
+                    val row = list.adapter.getView(0, null, list)
+                    val text = row.findViewById<android.widget.TextView>(android.R.id.text1)
+                    assertEquals(Color.WHITE, text.currentTextColor)
+                } finally {
+                    dialog.dismiss()
+                }
+            }
+        }
+    }
+
+    @Test
     fun everyFooterActionHasDistinctFocusAndReadableText() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val context = ContextThemeWrapper(ApplicationProvider.getApplicationContext(), R.style.Theme_TVApp_Dialog)
