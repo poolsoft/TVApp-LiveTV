@@ -394,6 +394,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         val source = summary.source
         var options = com.tvapp.livetv.settings.IptvSourcePlaybackOptions(
             source.liveBufferSeconds, source.vodBufferSeconds, source.maximumVideoHeight, source.automaticRecovery,
+            source.continuousLiveReconnect,
         )
         val global = com.tvapp.livetv.settings.IptvPlaybackPreferencesStore(this).load()
         val padding = (16 * resources.displayMetrics.density).toInt()
@@ -448,6 +449,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
             listOf(inherited(getString(if (global.automaticRecovery) R.string.on else R.string.off)), getString(R.string.on), getString(R.string.off)),
             { options.automaticRecovery }) { options = options.copy(automaticRecovery = it) }
         val scroll = android.widget.ScrollView(this).apply { addView(content) }
+        addChoice(R.string.iptv_continuous_live_reconnect, listOf<Boolean?>(false, true),
+            listOf(getString(R.string.off), getString(R.string.on)),
+            { options.continuousLiveReconnect }) { options = options.copy(continuousLiveReconnect = it == true) }
         val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(getString(R.string.iptv_source_playback_options_title, source.name))
             .setView(scroll)

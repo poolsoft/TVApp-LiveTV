@@ -5,6 +5,8 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 
 ## Türkçe
 
+- Süreli canlı IPTV akışları için liste bazlı erken yeniden bağlantı ve sonraki parçayı hazırlama seçeneği; varsayılan kapalı, VOD ve arşivden bağımsız. Akışlar arasındaki kesintisizlik sağlayıcıya bağlıdır.
+
 - Ayrı Canlı TV ve VOD modları: film izlerken canlı kanallara yanlışlıkla geçmeden kütüphaneye dönüş, son filme devam ve son canlı kanala açık geçiş.
 - Kaynak ve kategori bazlı Sinema/Dizi kütüphanesi; favoriler, son izlenenler, isimli devam alanı, arama ve sıralama. Xtream kaynaklarında gerçek sezon/bölüm seçimi; sınırlı görsel önbelleği ve sayfalı katalog.
 - Kumanda odaklı VOD gezinmesi: içerik/üst sekmeler arasında kısa geçiş, filtreleri koruyan geri dönüş ve doğrudan oynatma eylemine odaklanan detaylar.

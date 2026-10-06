@@ -3,6 +3,7 @@
 Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
+- Süreli canlı IPTV akışları için listeye özel erken bağlantı: IPTV yönetiminde listeye uzun OK > Kaynağa özel oynatma ayarları > Süreli canlı akış. Varsayılan kapalıdır. Tamamı indirilmiş canlı parçanın son 3 saniyesinde sonraki akış sıraya alınır; VOD/arşiv hariçtir. En fazla bir sonraki parça tutulur, duraklatınca kaldırılır. Sağlayıcıya bağlı görüntü atlama/tekrarları olabilir.
 
 ### Canlı TV / VOD modları
 

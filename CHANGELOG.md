@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-07 - Liste bazlı canlı akış devamı
+
+- Süreli canlı akış ayarı kaynak oynatma seçeneklerine eklendi; varsayılan kapalıdır, yenileme ve yedeklemede korunur. Room 27 → 28 migration mevcut listeleri silmeden alanı ekler.
+- Tamamen indirilmiş canlı parçanın son 3 saniyesinde yeni MediaSource sıraya alınır ve Media3 playlist preloading ile hazırlanır. Tek oynatıcıda en fazla iki parça tutulur; oynanan parça geçiş sonrası bırakılır.
+- VOD, catch-up, duraklatılmış yayınlar ve dinamik HLS/DASH akışları hariçtir. Çok kısa parçaların tekrarında sınır uygulanır. Kanal değişimi/çıkış eski kuyruğu bırakır. Sağlayıcı akışlarının zaman damgaları farklıysa atlama/tekrar olabilir.
+
 ## 2026-10-03 - VOD kumanda gezinmesi
 
 - VOD ilk açılışta içerik odağına geçer. Üst sekme/kategoriden Aşağı son karta, ilk satırdan Yukarı veya katalogda Back aktif sekmeye döner; Back arama/kategori filtresini silmez.

@@ -38,7 +38,7 @@
     <string name="multiview_add_channels">Kanal ekle / seçimleri düzenle</string>
     <string name="multiview_to_pip">PiP görünümüne geç</string>
     <string name="iptv_profile_load_error">Kaynağın oynatma ayarları okunamadı</string>
-    <string name="user_guide_source_playback">KAYNAK OYNATMA AYARLARI\nIPTV yönetiminde kaynağa uzun OK basıp Oynatma ayarlarını açın. Canlı ve VOD buffer, azami çözünürlük ve otomatik kurtarma ayrı ayarlanabilir; Genel ayarı kullan seçeneği kaynağın ilgili tercihini kaldırır. Kaydet sonrası kanal yeniden açıldığında uygulanır. Kaynağa özel buffer varsa oynatma çubuğu o kaynağın buffer değerini değiştirir, yoksa genel ayarı değiştirir. Kalite bir üst sınırdır, mevcut olmayan çözünürlük oluşturmaz ve MultiView cihaz sınırını aşmaz. Otomatik kurtarma kapalıyken elle yeniden deneyebilirsiniz.</string>
+    <string name="user_guide_source_playback">KAYNAK OYNATMA AYARLARI\nIPTV yönetiminde kaynağa uzun OK basıp Oynatma ayarlarını açın. Canlı ve VOD buffer, azami çözünürlük ve otomatik kurtarma ayrı ayarlanabilir; Genel ayarı kullan seçeneği kaynağın ilgili tercihini kaldırır. Kaydet sonrası kanal yeniden açıldığında uygulanır. Kaynağa özel buffer varsa oynatma çubuğu o kaynağın buffer değerini değiştirir, yoksa genel ayarı değiştirir. Kalite bir üst sınırdır, mevcut olmayan çözünürlük oluşturmaz ve MultiView cihaz sınırını aşmaz. Otomatik kurtarma kapalıyken elle yeniden deneyebilirsiniz. Süreli canlı akış seçeneği varsayılan kapalıdır: tamamen indirilmiş canlı parçanın son 3 saniyesinde sonraki bağlantıyı sıraya alır. Film ve arşiv yayınlarını etkilemez. Duraklatınca bekleyen parça kaldırılır; kanal değişince eski bağlantılar bırakılır. Çok kısa parçalar art arda gelirse denemeler durur. Sağlayıcının zaman damgaları uyumsuzsa görüntü atlaması/tekrarı olabilir; kesintisizliği garanti etmez.</string>
     <string name="iptv_source_playback_options">Kaynağa özel oynatma ayarları</string>
     <string name="iptv_source_playback_options_title">Oynatma ayarları · %1$s</string>
     <string name="iptv_source_live_buffer">Canlı yayın buffer hedefi</string>
@@ -46,6 +46,7 @@
     <string name="iptv_maximum_video_height">Azami yayın çözünürlüğü</string>
     <string name="iptv_maximum_video_height_value">En fazla %1$d satır</string>
     <string name="iptv_automatic_recovery">Otomatik yayın kurtarma</string>
+    <string name="iptv_continuous_live_reconnect">Süreli canlı akışlarda erken bağlantı (3 sn)</string>
     <string name="inherit_playback_setting_value">Genel ayarı kullan (%1$s)</string>
     <string name="reset_source_playback_options">Genel ayarlara dön</string>
     <string name="iptv_source_playback_options_saved">Kaynak oynatma ayarları kaydedildi. Bir sonraki kanal açılışında uygulanır.</string>

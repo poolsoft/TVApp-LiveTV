@@ -23,4 +23,5 @@ data class IptvSourceEntity(
     val vodBufferSeconds: Int? = null,
     val maximumVideoHeight: Int? = null,
     val automaticRecovery: Boolean? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val continuousLiveReconnect: Boolean = false,
 )

@@ -5,6 +5,7 @@ data class IptvSourcePlaybackOptions(
     val vodBufferSeconds: Int? = null,
     val maximumVideoHeight: Int? = null,
     val automaticRecovery: Boolean? = null,
+    val continuousLiveReconnect: Boolean = false,
 ) {
     fun resolve(global: IptvPlaybackPreferences, isVod: Boolean): EffectiveIptvPlaybackOptions =
         EffectiveIptvPlaybackOptions(

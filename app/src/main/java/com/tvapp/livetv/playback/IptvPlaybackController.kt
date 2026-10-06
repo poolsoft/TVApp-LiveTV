@@ -87,6 +87,8 @@ class IptvPlaybackController(
     private var sourcePlaybackOptions = IptvSourcePlaybackOptions()
     private var automaticRecovery = true
     private var maximumVideoHeight = 0
+    private var shortLiveParts = 0
+    private var continuationExhausted = false
 
     /** Incremented on every play()/stop()/release(). Everything queued on
      *  retryHandler and every player callback carries the generation it was
@@ -126,13 +128,14 @@ class IptvPlaybackController(
         override fun run() {
             val generation = tuneGeneration
             if (released || currentChannel == null || generation != tuneGeneration) return
+            queueLiveContinuation(generation)
             evaluateWatchdog(SystemClock.elapsedRealtime())?.let { reason ->
                 if (generation == tuneGeneration && !released) {
                     recoverFromWatchdog(reason, generation)
                 }
             }
             if (generation == tuneGeneration && !released) {
-                retryHandler.postDelayed(this, WATCHDOG_INTERVAL_MS)
+                retryHandler.postDelayed(this, if (continuousLiveEnabled()) 500L else WATCHDOG_INTERVAL_MS)
             }
         }
     }
@@ -233,6 +236,8 @@ class IptvPlaybackController(
         val previousBufferSeconds = targetBufferSeconds
         playbackPreferences = playbackPreferencesStore.load()
         sourcePlaybackOptions = options
+        shortLiveParts = 0
+        continuationExhausted = false
         val effective = options.resolve(playbackPreferences, channel.iptvContentType.equals("VOD", true))
         targetBufferSeconds = effective.bufferSeconds
         automaticRecovery = effective.automaticRecovery
@@ -336,14 +341,19 @@ class IptvPlaybackController(
                             )
                             onBuffering?.invoke(IptvBufferingState.NONE)
                             if (playbackState == Player.STATE_ENDED) {
+                                if (continuousLiveEnabled()) {
+                                    queueLiveContinuation(tuneGeneration)
+                                    return
+                                }
                                 onPlaybackEnded?.invoke()
                             }
                             if (
                                 playbackState == Player.STATE_ENDED &&
                                 !currentChannel?.iptvContentType.equals("VOD", ignoreCase = true)
                             ) {
+                                val generation = tuneGeneration
                                 retryHandler.post {
-                                    if (!released && currentChannel != null) {
+                                    if (!released && currentChannel != null && generation == tuneGeneration) {
                                         recoverFromWatchdog(IptvRecoveryReason.LIVE_STREAM_ENDED)
                                     }
                                 }
@@ -377,6 +387,27 @@ class IptvPlaybackController(
                     }
                 }
 
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    if (released || !continuousLiveEnabled() || reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) return
+                    val generation = tuneGeneration
+                    retryHandler.post {
+                        if (generation != tuneGeneration || released) return@post
+                        val current = player ?: return@post
+                        if (current.currentMediaItemIndex > 0) {
+                            current.removeMediaItems(0, current.currentMediaItemIndex)
+                            resetProgressObservation()
+                            CrashReportStore(appContext).recordDebug("IPTV_LIVE_CONTINUATION | transitioned")
+                        }
+                    }
+                }
+
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    if (playWhenReady || released || !continuousLiveEnabled()) return
+                    val current = player ?: return
+                    val next = current.currentMediaItemIndex + 1
+                    if (next < current.mediaItemCount) current.removeMediaItems(next, current.mediaItemCount)
+                }
+
                 override fun onTracksChanged(tracks: Tracks) {
                     onTracksChanged?.invoke()
                 }
@@ -408,6 +439,9 @@ class IptvPlaybackController(
             .setMaxVideoBitrate(profile.maximumBitrate)
             .build()
         exoPlayer.volume = if (muted) 0f else 1f
+        playerView.setKeepContentOnPlayerReset(continuousLiveEnabled())
+        exoPlayer.setPreloadConfiguration(if (continuousLiveEnabled())
+            ExoPlayer.PreloadConfiguration(3_000_000L) else ExoPlayer.PreloadConfiguration.DEFAULT)
         val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer)
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
@@ -446,7 +480,7 @@ class IptvPlaybackController(
         exoPlayer.prepare()
         exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
-        if (automaticRecovery) retryHandler.postDelayed(watchdogRunnable, WATCHDOG_INTERVAL_MS)
+        if (automaticRecovery || continuousLiveEnabled()) retryHandler.postDelayed(watchdogRunnable, 500L)
         onHealthChanged?.invoke(healthSnapshot())
     }
 
@@ -482,6 +516,7 @@ class IptvPlaybackController(
     fun contentKind(): IptvContentKind {
         val current = player ?: return IptvContentKind.UNKNOWN
         return when {
+            continuousLiveEnabled() -> IptvContentKind.LIVE
             current.isCurrentMediaItemLive -> IptvContentKind.LIVE
             current.duration != C.TIME_UNSET && current.duration > 0L -> IptvContentKind.VOD
             else -> IptvContentKind.UNKNOWN
@@ -550,6 +585,9 @@ class IptvPlaybackController(
     }
 
     fun retry(): Boolean {
+        if (continuousLiveEnabled()) {
+            currentChannel?.let { play(it); return true }
+        }
         if (released) {
             currentChannel?.let { play(it); return true }
             return false
@@ -888,6 +926,38 @@ class IptvPlaybackController(
     private fun resetProgressObservation() {
         lastObservedPosition = C.TIME_UNSET
         lastProgressAt = SystemClock.elapsedRealtime()
+    }
+
+    private fun continuousLiveEnabled(): Boolean = sourcePlaybackOptions.continuousLiveReconnect &&
+        currentChannel?.iptvContentType.equals("LIVE", true)
+
+    private fun queueLiveContinuation(generation: Long) {
+        if (released || generation != tuneGeneration || continuationExhausted) return
+        val current = player ?: return
+        if (current.playbackState != Player.STATE_READY && current.playbackState != Player.STATE_ENDED) return
+        if (current.currentMediaItemIndex != 0) return
+        if (!shouldQueueLiveContinuation(sourcePlaybackOptions.continuousLiveReconnect,
+                currentChannel?.iptvContentType, current.playWhenReady, current.isCurrentMediaItemDynamic,
+                current.isLoading, current.duration, current.currentPosition, current.bufferedPosition,
+                current.currentMediaItemIndex + 1 < current.mediaItemCount)) return
+        val item = current.currentMediaItem ?: return
+        val factory = mediaSourceFactory ?: return
+        shortLiveParts = consecutiveShortLiveParts(shortLiveParts, current.duration)
+        if (shortLiveParts > MAX_RETRY_COUNT) {
+            continuationExhausted = true
+            updateHealthPhase(IptvPlaybackPhase.FAILED)
+            CrashReportStore(appContext).recordDebug("IPTV_LIVE_CONTINUATION | short_parts_exhausted")
+            onPlaybackError?.invoke(PlaybackException(appContext.getString(com.tvapp.livetv.R.string.iptv_error_generic),
+                null, PlaybackException.ERROR_CODE_IO_UNSPECIFIED))
+            return
+        }
+        // Keep the current period and decoder alive; only one following part is retained.
+        current.addMediaSource(factory.createMediaSource(item))
+        CrashReportStore(appContext).recordDebug("IPTV_LIVE_CONTINUATION | queued | remainingMs=${(current.duration - current.currentPosition).coerceAtLeast(0)}")
+        if (current.playbackState == Player.STATE_ENDED) {
+            current.seekToNextMediaItem()
+            current.prepare()
+        }
     }
 
     private fun evaluateWatchdog(now: Long): IptvRecoveryReason? {
