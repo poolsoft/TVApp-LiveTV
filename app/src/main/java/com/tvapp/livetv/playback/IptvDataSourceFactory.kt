@@ -15,12 +15,13 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 object IptvDataSourceFactory {
-    fun create(userAgent: String?, referrer: String?): DataSource.Factory {
+    fun create(userAgent: String?, referrer: String?, origin: String? = null): DataSource.Factory {
         val http = OkHttpDataSource.Factory(HTTP_CLIENT)
             .setUserAgent(userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
-        referrer?.takeIf(String::isNotBlank)?.let {
-            http.setDefaultRequestProperties(mapOf("Referer" to it))
-        }
+        http.setDefaultRequestProperties(buildMap {
+            referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
+            origin?.takeIf(String::isNotBlank)?.let { put("Origin", it) }
+        })
         return ResolvingDataSource.Factory(http) { dataSpec ->
             val resolved = StalkerStreamUri.resolve(dataSpec.uri)
             if (resolved == null) dataSpec else dataSpec.withUri(Uri.parse(resolved))

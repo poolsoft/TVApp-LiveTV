@@ -323,6 +323,8 @@ class IptvSourcesActivity : TvRemoteActivity() {
             }
             add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
             add(SourceAction.PLAYBACK_OPTIONS to getString(R.string.iptv_source_playback_options))
+            add(SourceAction.NETWORK_OPTIONS to getString(R.string.iptv_source_network_options))
+            if (summary.source.kind == IptvRepository.KIND_XTREAM) add(SourceAction.ACCOUNT to getString(R.string.xtream_account_info))
             add(SourceAction.DELETE to getString(R.string.delete))
         }
         val padding = (20 * resources.displayMetrics.density).toInt()
@@ -361,7 +363,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(summary.source.name)
-            .setView(content)
+            .setView(android.widget.ScrollView(this).apply { addView(content) })
             .setNegativeButton(R.string.close, null)
             .create()
         actionViews.forEach { view ->
@@ -387,7 +389,93 @@ class IptvSourcesActivity : TvRemoteActivity() {
             SourceAction.EDIT_URL -> promptSourceUrl(summary)
             SourceAction.DELETE -> confirmDeleteSource(summary)
             SourceAction.PLAYBACK_OPTIONS -> showSourcePlaybackOptions(summary)
+            SourceAction.NETWORK_OPTIONS -> showSourceNetworkOptions(summary)
+            SourceAction.ACCOUNT -> showXtreamAccount(summary)
         }
+    }
+
+    private fun showXtreamAccount(summary: IptvSourceSummary) {
+        val info = TextView(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 16f
+            val padding = (24 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding)
+            setText(R.string.loading)
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(getString(R.string.xtream_account_info) + " · " + summary.source.name)
+            .setView(info).setNegativeButton(R.string.close, null).create()
+        val job = lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { repository.xtreamAccount(summary.source.id) } }
+            result.onSuccess { account ->
+                val unknown = getString(R.string.xtream_unknown)
+                val expiry = account.expiresAtMillis?.let {
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                } ?: unknown
+                info.text = getString(R.string.xtream_account_details, account.status ?: unknown, expiry,
+                    account.activeConnections?.toString() ?: unknown, account.maximumConnections?.toString() ?: unknown)
+                loadSources()
+            }.onFailure { info.setText(R.string.xtream_account_load_failed) }
+        }
+        dialog.setOnDismissListener { job.cancel() }
+        dialog.show()
+    }
+
+    private fun showSourceNetworkOptions(summary: IptvSourceSummary) {
+        val source = summary.source
+        val fields = listOf(
+            credentialField(R.string.iptv_default_user_agent).apply { setText(source.defaultUserAgent) },
+            credentialField(R.string.iptv_default_referrer).apply { setText(source.defaultReferrer) },
+            credentialField(R.string.iptv_default_origin).apply { setText(source.defaultOrigin) },
+            credentialField(R.string.iptv_source_max_connections).apply {
+                inputType = InputType.TYPE_CLASS_NUMBER
+                setText(source.maximumConnections?.toString())
+            },
+        )
+        val padding = (20 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
+            addView(TextView(this@IptvSourcesActivity).apply {
+                setTextColor(getColor(R.color.text_secondary))
+                text = getString(R.string.iptv_source_network_hint,
+                    source.reportedMaximumConnections?.toString() ?: getString(R.string.xtream_unknown))
+            })
+            fields.forEach { field ->
+                addView(TextView(this@IptvSourcesActivity).apply {
+                    text = field.hint
+                    setTextColor(getColor(R.color.text_primary))
+                    setPadding(0, padding / 2, 0, 0)
+                })
+                addView(field)
+            }
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(getString(R.string.iptv_source_network_options) + " · " + source.name)
+            .setView(android.widget.ScrollView(this).apply { addView(content) })
+            .setPositiveButton(R.string.save, null).setNegativeButton(R.string.cancel, null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val values = fields.map { it.text.toString() }
+                val maximumText = values[3].trim()
+                val maximum = maximumText.toIntOrNull()
+                if (maximumText.isNotEmpty() && (maximum == null || maximum <= 0)) {
+                    fields[3].error = getString(R.string.iptv_invalid_connection_limit)
+                    fields[3].requestFocus()
+                    return@setOnClickListener
+                }
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { repository.saveSourceNetworkOptions(source.id, values[0], values[1], values[2], maximum) }
+                    }
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    result.onSuccess { dialog.dismiss(); setResult(RESULT_OK); loadSources() }.onFailure(::showError)
+                }
+            }
+            fields.first().requestFocus()
+        }
+        dialog.show()
     }
 
     private fun showSourcePlaybackOptions(summary: IptvSourceSummary) {
@@ -772,7 +860,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             .show()
     }
 
-    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE, PLAYBACK_OPTIONS }
+    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE, PLAYBACK_OPTIONS, NETWORK_OPTIONS, ACCOUNT }
 
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()

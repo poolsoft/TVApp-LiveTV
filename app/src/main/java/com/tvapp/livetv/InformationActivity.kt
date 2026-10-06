@@ -29,6 +29,7 @@ class InformationActivity : TvRemoteActivity() {
                 getString(R.string.user_guide_search_archive) + "\n\n" +
                 getString(R.string.user_guide_alphabet_navigation) + "\n\n" +
                 getString(R.string.user_guide_source_playback) + "\n\n" +
+                getString(R.string.user_guide_source_network) + "\n\n" +
                 getString(R.string.user_guide_playback_modes) + "\n\n" +
                 getString(R.string.user_guide_vod_library) + "\n\n" +
                 getString(R.string.user_guide_multiview_selection)

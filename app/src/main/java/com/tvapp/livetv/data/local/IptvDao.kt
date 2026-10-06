@@ -11,6 +11,10 @@ import com.tvapp.livetv.tifinput.SharedIptvInputChannel
 
 @Dao
 interface IptvDao {
+    @Query("UPDATE iptv_sources SET reportedMaximumConnections = :maximum WHERE id = :id")
+    suspend fun updateReportedMaximumConnections(id: Long, maximum: Int?)
+    @Query("UPDATE iptv_sources SET defaultUserAgent = :agent, defaultReferrer = :referrer, defaultOrigin = :origin, maximumConnections = :maximum WHERE id = :id")
+    suspend fun updateSourceNetworkOptions(id: Long, agent: String?, referrer: String?, origin: String?, maximum: Int?)
     @Query("UPDATE iptv_sources SET name = :name WHERE id = :sourceId")
     suspend fun renameSource(sourceId: Long, name: String)
     @Query("SELECT liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery, continuousLiveReconnect, liveReconnectLeadMillis FROM iptv_sources WHERE id = :sourceId")
@@ -49,7 +53,8 @@ interface IptvDao {
             "COALESCE(u.customName, c.displayName) AS displayName, " +
             "c.streamUrl AS streamUrl, c.logoUrl AS logoUrl, " +
             "c.groupTitle AS groupTitle, c.tvgId AS epgId, " +
-            "c.userAgent AS userAgent, c.referrer AS referrer " +
+            "COALESCE(c.userAgent, s.defaultUserAgent) AS userAgent, " +
+            "COALESCE(c.referrer, s.defaultReferrer) AS referrer, COALESCE(c.origin, s.defaultOrigin) AS origin " +
             "FROM iptv_channels c " +
             "INNER JOIN iptv_sources s ON s.id = c.sourceId " +
             "LEFT JOIN user_channels u ON u.sourceKey = c.sourceKey " +
@@ -510,11 +515,11 @@ interface IptvDao {
     @Query(
         "INSERT INTO iptv_channels " +
             "(sourceKey, sourceId, tvgId, tvgName, displayName, streamUrl, logoUrl, " +
-            "groupTitle, userAgent, referrer, subtitleUrl, originalIndex, contentType, " +
+            "groupTitle, userAgent, referrer, origin, subtitleUrl, originalIndex, contentType, " +
             "selected, lastSeenAt, matchKey, catchUpMode, catchUpSource, catchUpDays) " +
             "SELECT staged.resolvedSourceKey, :sourceId, staged.tvgId, staged.tvgName, " +
             "staged.displayName, staged.streamUrl, staged.logoUrl, staged.groupTitle, " +
-            "staged.userAgent, staged.referrer, staged.subtitleUrl, staged.originalIndex, " +
+            "staged.userAgent, staged.referrer, staged.origin, staged.subtitleUrl, staged.originalIndex, " +
             "staged.contentType, staged.selected, :lastSeenAt, staged.matchKey, staged.catchUpMode, " +
             "staged.catchUpSource, staged.catchUpDays " +
             "FROM iptv_channel_staging staged WHERE staged.sessionId = :sessionId " +

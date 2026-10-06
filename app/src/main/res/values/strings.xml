@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="user_guide_source_network">KAYNAK BAĞLANTI AYARLARI\nIPTV yönetiminde listeye uzun OK > Bağlantı ayarları ile User-Agent, Referer, Origin ve eşzamanlı yayın sınırı ayarlanır. Boş alan kaynak tercihini kaldırır; M3U kanal header’ları önceliklidir. Yeniden açılan kanala uygulanır. PiP/Multi-View, kaynağın kullanıcı/sunucu sınırlarının küçüğünü kullanır; başka cihaz oturumları sayılmaz. Bilinmeyen limit tahmin edilmez. Xtream listelerinde uzun OK > Hesap bilgisi sunucunun bildirdiği durum, bitiş tarihi ve bağlantı sayılarını gösterir. Bildirilmeyen bilgiler açıkça belirtilir.</string>
+    <string name="iptv_source_network_options">Bağlantı ayarları</string>
+    <string name="iptv_default_user_agent">Varsayılan User-Agent</string>
+    <string name="iptv_default_referrer">Varsayılan Referer</string>
+    <string name="iptv_default_origin">Varsayılan Origin</string>
+    <string name="iptv_source_max_connections">Eşzamanlı yayın sınırı (boş: belirtilmemiş)</string>
+    <string name="iptv_source_network_hint">Kanal header’ı varsa önceliklidir. Boş header genel değeri kullanır. Sunucunun yayın sınırı: %1$s. Sınır PiP/Multi-View için geçerlidir; diğer cihazlardaki oturumlar sayılmaz.</string>
+    <string name="iptv_invalid_connection_limit">Pozitif bir sayı girin veya boş bırakın.</string>
+    <string name="iptv_source_connection_limit_reached">%1$s kaynağında en fazla %2$d eşzamanlı yayın açılabilir. Seçimi azaltın veya farklı bir kaynak seçin.</string>
+    <string name="xtream_account_info">Xtream hesap bilgisi</string>
+    <string name="xtream_unknown">Bildirilmedi</string>
+    <string name="xtream_account_load_failed">Hesap bilgisi alınamadı. Bağlantıyı kontrol edip tekrar deneyin.</string>
+    <string name="xtream_account_details">Durum: %1$s\nBitiş tarihi: %2$s\nSunucudaki etkin bağlantı: %3$s\nEşzamanlı yayın sınırı: %4$s</string>
     <string name="vod_movies">Sinema</string>
     <string name="vod_series">Dizi</string>
     <string name="vod_search_filters">Arama / Filtre</string>

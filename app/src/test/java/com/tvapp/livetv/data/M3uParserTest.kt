@@ -48,8 +48,9 @@ class M3uParserTest {
             #EXTGRP:Spor
             #EXTVLCOPT:http-user-agent=Playlist Agent
             #EXTVLCOPT:http-referrer=https://playlist.example/
+            #EXTVLCOPT:http-origin=https://playlist.example
             #EXTVLCOPT:sub-file=https://example.com/subtitles/tr.vtt
-            https://example.com/live.m3u8|User-Agent=Channel%20Agent&Referer=https%3A%2F%2Fchannel.example%2F
+            https://example.com/live.m3u8|User-Agent=Channel%20Agent&Referer=https%3A%2F%2Fchannel.example%2F&Origin=https%3A%2F%2Fchannel.example
         """.trimIndent()
 
         val channel = M3uParser.parse(StringReader(playlist)).single()
@@ -58,7 +59,22 @@ class M3uParserTest {
         assertEquals("Spor", channel.groupTitle)
         assertEquals("Channel Agent", channel.userAgent)
         assertEquals("https://channel.example/", channel.referrer)
+        assertEquals("https://channel.example", channel.origin)
         assertEquals("https://example.com/subtitles/tr.vtt", channel.subtitleUrl)
+    }
+
+    @Test
+    fun originDoesNotLeakIntoFollowingChannel() {
+        val channels = M3uParser.parse(StringReader("""
+            #EXTM3U
+            #EXTINF:-1,First
+            #EXTVLCOPT:http-origin=https://origin.example
+            https://example.invalid/1.ts
+            #EXTINF:-1,Second
+            https://example.invalid/2.ts
+        """.trimIndent()))
+        assertEquals("https://origin.example", channels[0].origin)
+        assertNull(channels[1].origin)
     }
 
     @Test

@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="user_guide_source_network">SOURCE CONNECTION SETTINGS\nLong-press OK on a list in IPTV management > Connection settings to set User-Agent, Referer, Origin and a concurrent stream limit. Blank fields remove source overrides; M3U channel headers take priority. Applies when a channel is reopened. PiP/Multi-View uses the smaller user/provider limit; sessions on other devices are not counted. Unknown limits are not guessed. On Xtream lists, long OK > Account information shows status, expiry and connection counts reported by the provider. Missing information is explicitly marked.</string>
+    <string name="iptv_source_network_options">Connection settings</string>
+    <string name="iptv_default_user_agent">Default User-Agent</string>
+    <string name="iptv_default_referrer">Default Referer</string>
+    <string name="iptv_default_origin">Default Origin</string>
+    <string name="iptv_source_max_connections">Concurrent stream limit (blank: unspecified)</string>
+    <string name="iptv_source_network_hint">Channel headers take priority. Blank headers use the general default. Provider stream limit: %1$s. Limit applies to PiP/Multi-View; sessions on other devices are not counted.</string>
+    <string name="iptv_invalid_connection_limit">Enter a positive number or leave blank.</string>
+    <string name="iptv_source_connection_limit_reached">%1$s allows up to %2$d concurrent streams. Reduce the selection or choose another source.</string>
+    <string name="xtream_account_info">Xtream account information</string>
+    <string name="xtream_unknown">Not reported</string>
+    <string name="xtream_account_load_failed">Could not retrieve account information. Check the connection and try again.</string>
+    <string name="xtream_account_details">Status: %1$s\nExpiry: %2$s\nActive server connections: %3$s\nConcurrent stream limit: %4$s</string>
     <string name="vod_movies">Movies</string>
     <string name="vod_series">Series</string>
     <string name="vod_search_filters">Search / Filter</string>

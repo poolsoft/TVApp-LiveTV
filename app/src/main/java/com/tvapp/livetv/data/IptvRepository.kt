@@ -109,6 +109,42 @@ class IptvRepository(context: Context) {
     suspend fun sourceCategories(sourceId: Long): List<String> =
         dao.getCategoriesForSource(sourceId)
 
+    suspend fun xtreamAccount(sourceId: Long): XtreamAccountInfo {
+        val source = requireNotNull(dao.getSource(sourceId))
+        require(source.kind == KIND_XTREAM)
+        val account = XtreamClient(requireNotNull(source.serverUrl), requireNotNull(source.username),
+            requireNotNull(source.password)).accountInfo()
+        dao.updateReportedMaximumConnections(sourceId, account.maximumConnections)
+        return account
+    }
+
+    suspend fun saveSourceNetworkOptions(sourceId: Long, agent: String?, referrer: String?, origin: String?, maximum: Int?) {
+        require(maximum == null || maximum > 0)
+        fun header(value: String?): String? = value?.trim()?.takeIf(String::isNotBlank)?.also {
+            require(it.none { character -> character == '\r' || character == '\n' })
+        }
+        dao.updateSourceNetworkOptions(sourceId, header(agent), header(referrer), header(origin), maximum)
+        notifySharedChannelsChanged()
+    }
+
+    suspend fun connectionLimitViolation(channels: List<LiveChannel>): Pair<String, Int>? {
+        val counts = channels.filter { it.source == LiveChannel.Source.IPTV }
+            .mapNotNull { it.inputId.removePrefix("iptv:").toLongOrNull() }.groupingBy { it }.eachCount()
+        for ((id, count) in counts) {
+            val source = dao.getSource(id) ?: continue
+            val limit = source.connectionLimit() ?: continue
+            if (count > limit) return source.name to limit
+        }
+        return null
+    }
+
+    suspend fun withSourceHeaders(channel: LiveChannel): LiveChannel {
+        val id = channel.inputId.takeIf { it.startsWith("iptv:") }?.removePrefix("iptv:")?.toLongOrNull()
+        val source = id?.let { dao.getSource(it) } ?: return channel
+        return channel.copy(userAgent = channel.userAgent ?: source.defaultUserAgent,
+            referrer = channel.referrer ?: source.defaultReferrer, origin = channel.origin ?: source.defaultOrigin)
+    }
+
     suspend fun selectionPage(
         sourceId: Long,
         category: String?,
@@ -337,6 +373,7 @@ class IptvRepository(context: Context) {
                 ?: tvgName?.takeIf(String::isNotBlank),
             userAgent = userAgent,
             referrer = referrer,
+            origin = origin,
             subtitleUrl = subtitleUrl,
             iptvContentType = contentType,
             catchUpMode = catchUpMode,
@@ -529,7 +566,7 @@ class IptvRepository(context: Context) {
             "Xtream kullanıcı adı ve parola gereklidir."
         }
         val client = XtreamClient(serverUrl, username.trim(), password)
-        client.verifyAccount()
+        val account = client.verifyAccount()
         val result = importGenerated(
             location = "xtream:${client.baseUrl}|${username.trim()}",
             kind = KIND_XTREAM,
@@ -538,6 +575,7 @@ class IptvRepository(context: Context) {
             username = username.trim(),
             password = password,
             replacementSource = replacementSource,
+            reportedMaximumConnections = account.maximumConnections,
             onProgress = onProgress,
         ) { client.channels().asIterable() }
         xmlTvRepository.ensurePeriodicRefresh()
@@ -619,6 +657,7 @@ class IptvRepository(context: Context) {
         username: String? = null,
         password: String? = null,
         macAddress: String? = null,
+        reportedMaximumConnections: Int? = null,
         replacementSource: IptvSourceEntity? = null,
         onProgress: (IptvImportProgress) -> Unit = {},
         produce: () -> Iterable<ParsedIptvChannel>,
@@ -652,6 +691,7 @@ class IptvRepository(context: Context) {
                         groupTitle = item.groupTitle?.trim()?.takeIf(String::isNotBlank),
                         userAgent = item.userAgent,
                         referrer = item.referrer,
+                        origin = item.origin,
                         subtitleUrl = item.subtitleUrl,
                         contentType = item.contentType,
                         matchKey = matchKey,
@@ -709,6 +749,7 @@ class IptvRepository(context: Context) {
                         username = username,
                         password = password,
                         macAddress = macAddress,
+                        reportedMaximumConnections = reportedMaximumConnections,
                     )
                     dao.updateSource(source)
                     dao.resolveStagedSourceKeys(sessionId, sourceId)

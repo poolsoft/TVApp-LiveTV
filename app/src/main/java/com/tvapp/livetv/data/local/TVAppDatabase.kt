@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XtreamEpgProgramEntity::class,
         VodMetadataEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -69,11 +69,24 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_26_27,
                 MIGRATION_27_28,
                 MIGRATION_28_29,
+                MIGRATION_29_30,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_29_30 = object : Migration(29, 30) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE iptv_channels ADD COLUMN origin TEXT")
+                db.execSQL("ALTER TABLE iptv_channel_staging ADD COLUMN origin TEXT")
+                for (column in listOf("defaultUserAgent", "defaultReferrer", "defaultOrigin")) {
+                    db.execSQL("ALTER TABLE iptv_sources ADD COLUMN $column TEXT")
+                }
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN maximumConnections INTEGER")
+                db.execSQL("ALTER TABLE iptv_sources ADD COLUMN reportedMaximumConnections INTEGER")
+            }
         }
 
         internal val MIGRATION_28_29 = object : Migration(28, 29) {

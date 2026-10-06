@@ -45,6 +45,7 @@ data class IptvChannelEntity(
     val groupTitle: String?,
     val userAgent: String?,
     val referrer: String?,
+    val origin: String? = null,
     val subtitleUrl: String? = null,
     val originalIndex: Int,
     val contentType: String = "LIVE",

@@ -37,7 +37,7 @@ class IptvTvInputService : TvInputService() {
                 return false
             }
             releasePlayer()
-            val httpFactory = IptvDataSourceFactory.create(metadata.userAgent, metadata.referrer)
+            val httpFactory = IptvDataSourceFactory.create(metadata.userAgent, metadata.referrer, metadata.origin)
             val mediaSourceFactory = DefaultMediaSourceFactory(
                 httpFactory,
                 IptvDataSourceFactory.createExtractors(),

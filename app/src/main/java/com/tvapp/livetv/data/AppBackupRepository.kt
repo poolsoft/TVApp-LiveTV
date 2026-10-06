@@ -469,6 +469,11 @@ class AppBackupRepository(context: Context) {
             source.automaticRecovery?.let { value(it) } ?: nullValue()
             name("continuousLiveReconnect").value(source.continuousLiveReconnect)
             name("liveReconnectLeadMillis").value(source.liveReconnectLeadMillis.toLong())
+            name("defaultUserAgent").nullableValue(source.defaultUserAgent)
+            name("defaultReferrer").nullableValue(source.defaultReferrer)
+            name("defaultOrigin").nullableValue(source.defaultOrigin)
+            name("maximumConnections").value(source.maximumConnections?.toLong())
+            name("reportedMaximumConnections").value(source.reportedMaximumConnections?.toLong())
         }
 
         fun JsonWriter.write(channel: IptvChannelEntity) = apply {
@@ -482,6 +487,7 @@ class AppBackupRepository(context: Context) {
             name("groupTitle").nullableValue(channel.groupTitle)
             name("userAgent").nullableValue(channel.userAgent)
             name("referrer").nullableValue(channel.referrer)
+            name("origin").nullableValue(channel.origin)
             name("subtitleUrl").nullableValue(channel.subtitleUrl)
             name("originalIndex").value(channel.originalIndex.toLong())
             name("contentType").value(channel.contentType)
@@ -544,6 +550,11 @@ class AppBackupRepository(context: Context) {
             maximumVideoHeight = nullableInt("maximumVideoHeight"),
             automaticRecovery = if (isNull("automaticRecovery")) null else getBoolean("automaticRecovery"),
             continuousLiveReconnect = optBoolean("continuousLiveReconnect", false),
+            defaultUserAgent = nullableString("defaultUserAgent"),
+            defaultReferrer = nullableString("defaultReferrer"),
+            defaultOrigin = nullableString("defaultOrigin"),
+            maximumConnections = nullableInt("maximumConnections")?.takeIf { it > 0 },
+            reportedMaximumConnections = nullableInt("reportedMaximumConnections")?.takeIf { it > 0 },
             liveReconnectLeadMillis = optInt("liveReconnectLeadMillis", 3_000)
                 .takeIf { it in 250..5_000 && it % 250 == 0 } ?: 3_000,
         )
@@ -554,6 +565,7 @@ class AppBackupRepository(context: Context) {
             streamUrl = requireString("streamUrl"), logoUrl = nullableString("logoUrl"),
             groupTitle = nullableString("groupTitle"), userAgent = nullableString("userAgent"),
             referrer = nullableString("referrer"), subtitleUrl = nullableString("subtitleUrl"),
+            origin = nullableString("origin"),
             originalIndex = requireInt("originalIndex"),
             contentType = optString("contentType", "LIVE"),
             selected = optBoolean("selected", false), lastSeenAt = optLong("lastSeenAt", 0L),

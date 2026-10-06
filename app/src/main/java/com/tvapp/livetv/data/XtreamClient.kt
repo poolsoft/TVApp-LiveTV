@@ -11,6 +11,8 @@ import java.text.SimpleDateFormat
 import java.util.Base64
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutionException
 import com.tvapp.livetv.data.local.VodMetadataEntity
 
 data class XtreamEpgListing(
@@ -20,6 +22,13 @@ data class XtreamEpgListing(
     val endTimeMillis: Long,
 )
 
+data class XtreamAccountInfo(
+    val status: String?,
+    val expiresAtMillis: Long?,
+    val activeConnections: Int?,
+    val maximumConnections: Int?,
+)
+
 internal class XtreamClient(
     serverUrl: String,
     private val username: String,
@@ -27,19 +36,32 @@ internal class XtreamClient(
 ) {
     val baseUrl = normalizeBaseUrl(serverUrl)
 
-    fun verifyAccount() {
+    fun verifyAccount(): XtreamAccountInfo {
+        val account = accountInfo()
+        require(account.status == null || account.status.equals("Active", ignoreCase = true)) {
+            "Xtream hesabı etkin değil: ${account.status}"
+        }
+        return account
+    }
+
+    fun accountInfo(): XtreamAccountInfo {
         val response = requestText(null)
         val user = JSONObject(response).optJSONObject("user_info")
             ?: error("Xtream sunucusu hesap bilgisi döndürmedi.")
         require(user.optInt("auth", 0) == 1) { "Xtream kullanıcı adı veya parola hatalı." }
-        val status = user.optString("status")
-        require(status.isBlank() || status.equals("Active", ignoreCase = true)) {
-            "Xtream hesabı etkin değil: $status"
-        }
+        val status = if (user.isNull("status")) "" else user.optString("status")
+        return XtreamAccountInfo(
+            status.takeIf(String::isNotBlank),
+            user.optString("exp_date").toLongOrNull()?.takeIf { it > 0 && it <= Long.MAX_VALUE / 1_000 }?.times(1_000),
+            user.optString("active_cons").toIntOrNull()?.takeIf { it >= 0 },
+            user.optString("max_connections").toIntOrNull()?.takeIf { it > 0 },
+        )
     }
 
     fun channels(): Sequence<ParsedIptvChannel> = sequence {
-        val liveCategories = categories("get_live_categories")
+        // Only small category maps run concurrently; stream catalogs remain sequential and streamed.
+        val categoryMaps = channelCategories()
+        val liveCategories = categoryMaps.first
         for (item in streams("get_live_streams")) {
             val id = item.id ?: continue
             yield(
@@ -57,7 +79,7 @@ internal class XtreamClient(
             )
         }
 
-        val vodCategories = categories("get_vod_categories")
+        val vodCategories = categoryMaps.second
         for (item in streams("get_vod_streams")) {
             val id = item.id ?: continue
             val extension = item.extension?.trim()?.trimStart('.')?.takeIf(String::isNotBlank) ?: "mp4"
@@ -97,6 +119,21 @@ internal class XtreamClient(
             }
         }
         return result
+    }
+
+    private fun channelCategories(): Pair<Map<String, String>, Map<String, String>> {
+        val executor = Executors.newFixedThreadPool(2)
+        val live = executor.submit<Map<String, String>> { categories("get_live_categories") }
+        val vod = executor.submit<Map<String, String>> { categories("get_vod_categories") }
+        return try {
+            live.get() to vod.get()
+        } catch (error: ExecutionException) {
+            throw (error.cause ?: error)
+        } finally {
+            live.cancel(true)
+            vod.cancel(true)
+            executor.shutdownNow()
+        }
     }
 
     fun series(sourceId: Long, now: Long): Sequence<VodMetadataEntity> = sequence {

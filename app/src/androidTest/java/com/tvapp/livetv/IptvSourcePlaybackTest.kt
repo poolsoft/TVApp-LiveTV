@@ -34,7 +34,9 @@ class IptvSourcePlaybackTest {
         }
         val source = IptvSourceEntity(id = 7, name = "Test", location = "test", kind = "file",
             liveBufferSeconds = 5, vodBufferSeconds = 30, maximumVideoHeight = 0, automaticRecovery = false,
-            continuousLiveReconnect = true, liveReconnectLeadMillis = 4_750)
+            continuousLiveReconnect = true, liveReconnectLeadMillis = 4_750,
+            defaultUserAgent = "Fixture Agent", defaultReferrer = "https://fixture.invalid/",
+            defaultOrigin = "https://fixture.invalid", maximumConnections = 2, reportedMaximumConnections = 3)
         val output = StringWriter()
         JsonWriter(output).use { writer ->
             writer.beginObject()
@@ -59,6 +61,10 @@ class IptvSourcePlaybackTest {
             assertEquals(IptvSourcePlaybackOptions(5, 30, 720, false, true, 5_000), dao.sourcePlaybackOptions(id))
             dao.updateVodBuffer(id, 45)
             dao.renameSource(id, "Renamed")
+            dao.updateSourceNetworkOptions(id, "Agent", "https://ref.invalid/", "https://origin.invalid", 2)
+            dao.updateReportedMaximumConnections(id, 1)
+            assertEquals(1, dao.getSource(id)!!.connectionLimit())
+            assertEquals("https://origin.invalid", dao.getSource(id)!!.defaultOrigin)
             assertEquals(IptvSourcePlaybackOptions(5, 45, 720, false, true, 5_000), dao.sourcePlaybackOptions(id))
             dao.updateSourcePlaybackOptions(id, null, null, null, null)
             assertEquals(IptvSourcePlaybackOptions(), dao.sourcePlaybackOptions(id))
@@ -75,6 +81,9 @@ class IptvSourcePlaybackTest {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE iptv_sources (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
                         db.execSQL("INSERT INTO iptv_sources VALUES (7, 'Existing source')")
+                        db.execSQL("CREATE TABLE iptv_channels (sourceKey TEXT PRIMARY KEY, selected INTEGER)")
+                        db.execSQL("INSERT INTO iptv_channels VALUES ('fixture:7', 1)")
+                        db.execSQL("CREATE TABLE iptv_channel_staging (sessionId TEXT)")
                     }
                     override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
                 }).build(),
@@ -84,6 +93,17 @@ class IptvSourcePlaybackTest {
             TVAppDatabase.MIGRATION_24_26.migrate(db)
             TVAppDatabase.MIGRATION_27_28.migrate(db)
             TVAppDatabase.MIGRATION_28_29.migrate(db)
+            TVAppDatabase.MIGRATION_29_30.migrate(db)
+            db.query("SELECT sourceKey, selected, origin FROM iptv_channels").use {
+                check(it.moveToFirst())
+                assertEquals("fixture:7", it.getString(0))
+                assertEquals(1, it.getInt(1))
+                assertNull(it.getString(2))
+            }
+            db.query("SELECT defaultUserAgent, defaultReferrer, defaultOrigin, maximumConnections, reportedMaximumConnections FROM iptv_sources").use {
+                check(it.moveToFirst())
+                for (column in 0..4) check(it.isNull(column))
+            }
             db.query("SELECT id, name, liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery FROM iptv_sources").use {
                 check(it.moveToFirst())
                 assertEquals(7, it.getInt(0))

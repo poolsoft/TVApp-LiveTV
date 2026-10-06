@@ -85,6 +85,8 @@ android {
         buildConfig = true
     }
 
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+
     signingConfigs {
         if (
             releaseKeystorePath != null &&

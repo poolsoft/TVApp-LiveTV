@@ -4,6 +4,7 @@ Bu belge Google Play ve benzeri Android TV mağazalarında kullanılacak açıkl
 yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın öncesinde doldurulmalıdır.
 
 ## Türkçe
+- Kaynak bazlı HTTP header ayarları (User-Agent, Referer, Origin), PiP/Multi-View için kaynak bağlantı sınırı ve Xtream hesap bilgileri. Sunucunun bildirmediği bilgiler tahmin edilmez; gerçek sağlayıcı koşulları geçerlidir.
 
 - Süreli canlı IPTV akışları için liste bazlı erken yeniden bağlantı ve sonraki parçayı hazırlama seçeneği; varsayılan kapalı, VOD ve arşivden bağımsız. Erken bağlantı süresi 250 ms adımlarla 5 saniyeye kadar ayarlanabilir; arabelleğe alma sağ üstte transparan küçük simgeyle gösterilir. Akışlar arasındaki kesintisizlik sağlayıcıya bağlıdır.
 
@@ -100,6 +101,7 @@ desteğine göre değişebilir.
 `TVApp'in ilk mağaza sürümü: canlı TV ve IPTV oynatma, kanal yönetimi, program rehberi, kumanda kontrolleri ve kişiselleştirilebilir TV arayüzü.`
 
 ## English
+- Per-source HTTP headers (User-Agent, Referer, Origin), source connection limits for PiP/Multi-View and Xtream account information. Missing provider information is not guessed; provider restrictions still apply.
 
 ### App name
 

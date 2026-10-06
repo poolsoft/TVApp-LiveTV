@@ -9,4 +9,5 @@ data class SharedIptvInputChannel(
     val epgId: String?,
     val userAgent: String?,
     val referrer: String?,
+    val origin: String? = null,
 )

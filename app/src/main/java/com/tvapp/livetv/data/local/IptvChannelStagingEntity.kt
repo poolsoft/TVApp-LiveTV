@@ -24,6 +24,7 @@ data class IptvChannelStagingEntity(
     val groupTitle: String?,
     val userAgent: String?,
     val referrer: String?,
+    val origin: String? = null,
     val subtitleUrl: String?,
     val contentType: String,
     val matchKey: String,

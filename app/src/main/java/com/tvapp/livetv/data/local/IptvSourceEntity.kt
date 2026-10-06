@@ -25,4 +25,12 @@ data class IptvSourceEntity(
     val automaticRecovery: Boolean? = null,
     @androidx.room.ColumnInfo(defaultValue = "0") val continuousLiveReconnect: Boolean = false,
     @androidx.room.ColumnInfo(defaultValue = "3000") val liveReconnectLeadMillis: Int = 3_000,
-)
+    val defaultUserAgent: String? = null,
+    val defaultReferrer: String? = null,
+    val defaultOrigin: String? = null,
+    val maximumConnections: Int? = null,
+    val reportedMaximumConnections: Int? = null,
+) {
+    fun connectionLimit(): Int? = listOfNotNull(maximumConnections, reportedMaximumConnections)
+        .filter { it > 0 }.minOrNull()
+}

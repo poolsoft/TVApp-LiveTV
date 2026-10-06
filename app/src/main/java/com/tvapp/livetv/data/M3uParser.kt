@@ -13,6 +13,7 @@ data class ParsedIptvChannel(
     val groupTitle: String? = null,
     val userAgent: String? = null,
     val referrer: String? = null,
+    val origin: String? = null,
     val subtitleUrl: String? = null,
     val contentType: String = "LIVE",
     val catchUpMode: String? = null,
@@ -45,6 +46,9 @@ object M3uParser {
                     line.startsWith("#EXTVLCOPT:http-referrer=", ignoreCase = true) -> {
                         pending = pending?.copy(referrer = line.substringAfter('=').trim())
                     }
+                    line.startsWith("#EXTVLCOPT:http-origin=", ignoreCase = true) -> {
+                        pending = pending?.copy(origin = line.substringAfter('=').trim())
+                    }
                     line.startsWith("#EXTVLCOPT:sub-file=", ignoreCase = true) -> {
                         pending = pending?.copy(subtitleUrl = line.substringAfter('=').trim())
                     }
@@ -62,6 +66,7 @@ object M3uParser {
                             groupTitle = metadata.groupTitle.nullIfBlank(),
                             userAgent = stream.userAgent ?: metadata.userAgent.nullIfBlank(),
                             referrer = stream.referrer ?: metadata.referrer.nullIfBlank(),
+                            origin = stream.origin ?: metadata.origin.nullIfBlank(),
                             subtitleUrl = metadata.subtitleUrl.nullIfBlank(),
                             contentType = contentType(metadata.durationSeconds, stream.url, metadata.groupTitle),
                             catchUpMode = metadata.catchUpMode.nullIfBlank(),
@@ -138,6 +143,7 @@ object M3uParser {
             url = url,
             userAgent = options["user-agent"] ?: options["useragent"],
             referrer = options["referer"] ?: options["referrer"],
+            origin = options["origin"],
         )
     }
 
@@ -151,6 +157,7 @@ object M3uParser {
         val groupTitle: String? = null,
         val userAgent: String? = null,
         val referrer: String? = null,
+        val origin: String? = null,
         val subtitleUrl: String? = null,
         val durationSeconds: Long? = null,
         val catchUpMode: String? = null,
@@ -162,6 +169,7 @@ object M3uParser {
         val url: String,
         val userAgent: String?,
         val referrer: String?,
+        val origin: String?,
     )
 
     private val VOD_MARKERS = listOf(

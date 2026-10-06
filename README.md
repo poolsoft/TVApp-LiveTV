@@ -3,6 +3,8 @@
 Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
+- IPTV kaynaklarında uzun OK > Bağlantı ayarları: varsayılan User-Agent/Referer/Origin ve eşzamanlı yayın sınırı. Kanalın M3U header'ı kaynak varsayılanını geçersiz kılar. Kanal yeniden açıldığında uygulanır; M3U `http-origin` ve URL `|Origin=...` desteklenir. PiP/Multi-View açılırken ve kanal değiştirilirken kaynak sınırı kontrol edilir; bilinmeyen sınır tahmin edilmez, sunucunun bildirdiği sınır yükseltilmez. Başka cihazlardaki oturumlar yerel sayıya dahil değildir.
+- Xtream kaynağında uzun OK > Hesap bilgisi: sunucunun bildirdiği durum, bitiş tarihi, etkin ve azami bağlantı. Bildirilmeyen alanlar açıkça belirtilir. Yalnız küçük canlı/VOD kategori yanıtları iki istekle paralel alınır; büyük kataloglar akışlı okunur. Room/staging, FTS ve kanal eşleştirme modeli korunmuştur.
 - Süreli canlı IPTV akışları için listeye özel erken bağlantı: IPTV yönetiminde listeye uzun OK > Kaynağa özel oynatma ayarları > Süreli canlı akış. Varsayılan kapalıdır. Erken bağlantı süresi 250 ms adımlarla 250–5000 ms arasında seçilebilir (varsayılan 3000 ms). Tamamı indirilmiş canlı parçanın bitimine bu süre kala sonraki akış sıraya alınır; VOD/arşiv hariçtir. En fazla bir sonraki parça tutulur, duraklatınca kaldırılır. Sağlayıcıya bağlı görüntü atlama/tekrarları olabilir.
 
 ### Canlı TV / VOD modları

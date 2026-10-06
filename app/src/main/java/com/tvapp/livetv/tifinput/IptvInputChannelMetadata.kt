@@ -10,6 +10,7 @@ data class IptvInputChannelMetadata(
     val epgId: String?,
     val userAgent: String?,
     val referrer: String?,
+    val origin: String? = null,
 ) {
     fun encode(): ByteArray = JSONObject().apply {
         put(KEY_OWNER, OWNER)
@@ -20,6 +21,7 @@ data class IptvInputChannelMetadata(
         putNullable(KEY_EPG, epgId)
         putNullable(KEY_AGENT, userAgent)
         putNullable(KEY_REFERRER, referrer)
+        putNullable("origin", origin)
     }.toString().toByteArray(Charsets.UTF_8)
 
     companion object {
@@ -42,6 +44,7 @@ data class IptvInputChannelMetadata(
             channel.epgId,
             channel.userAgent,
             channel.referrer,
+            channel.origin,
         )
 
         fun decode(data: ByteArray?): IptvInputChannelMetadata? = runCatching {
@@ -55,6 +58,7 @@ data class IptvInputChannelMetadata(
                 epgId = json.optNullable(KEY_EPG),
                 userAgent = json.optNullable(KEY_AGENT),
                 referrer = json.optNullable(KEY_REFERRER),
+                origin = json.optNullable("origin"),
             )
         }.getOrNull()
 

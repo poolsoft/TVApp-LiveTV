@@ -191,10 +191,18 @@ class IptvPlaybackController(
         automaticRecovery = false
         healthPhase = IptvPlaybackPhase.PREPARING
         preparationJob = preparationScope.launch {
+            var preparedChannel = channel
             val options = try {
                 withContext(Dispatchers.IO) {
-                    sourceId(channel)?.let { database.iptvDao().sourcePlaybackOptions(it) }
-                        ?: IptvSourcePlaybackOptions()
+                    val source = sourceId(channel)?.let { database.iptvDao().getSource(it) }
+                    preparedChannel = channel.copy(
+                        userAgent = channel.userAgent ?: source?.defaultUserAgent,
+                        referrer = channel.referrer ?: source?.defaultReferrer,
+                        origin = channel.origin ?: source?.defaultOrigin,
+                    )
+                    source?.let { IptvSourcePlaybackOptions(it.liveBufferSeconds, it.vodBufferSeconds,
+                        it.maximumVideoHeight, it.automaticRecovery, it.continuousLiveReconnect,
+                        it.liveReconnectLeadMillis) } ?: IptvSourcePlaybackOptions()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -209,7 +217,7 @@ class IptvPlaybackController(
             }
             if (generation != tuneGeneration) return@launch
             try {
-                playPrepared(channel, startPositionMillis, options)
+                playPrepared(preparedChannel, startPositionMillis, options)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -443,7 +451,7 @@ class IptvPlaybackController(
         exoPlayer.setPreloadConfiguration(if (continuousLiveEnabled())
             ExoPlayer.PreloadConfiguration(sourcePlaybackOptions.reconnectLeadMillis() * 1_000L)
             else ExoPlayer.PreloadConfiguration.DEFAULT)
-        val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer)
+        val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer, channel.origin)
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)

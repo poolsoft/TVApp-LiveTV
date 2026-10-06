@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-07 - IPTV kaynak bağlantıları ve Xtream bilgileri
+
+- M3U `http-origin` ve URL header'ı, kaynak varsayılan User-Agent/Referer/Origin ayarları, ana/çoklu oynatıcı ve TVApp TIF aktarımında desteklenir. Kanal header'ı önceliklidir; harici oynatıcıya header gönderilir (destek harici uygulamaya bağlıdır).
+- Xtream hesap ekranı durum, bitiş tarihi, etkin bağlantı ve azami bağlantıyı gerçek sunucu yanıtından gösterir. Sunucu limiti ve isteğe bağlı kullanıcı limiti PiP/Multi-View başlangıcında/değiştirmede kontrol edilir; başka cihaz oturumları yerel sayıya katılmaz.
+- Xtream yalnız küçük kategori isteklerini en fazla iki bağlantıyla paralel alır; büyük canlı/VOD katalogları akışlı okumaya devam eder. Atomik staging aktarımı, sourceKey eşleştirmesi ve FTS/sayfalama değiştirilmedi.
+- Room 29 → 30 yalnız nullable alanlar ekler; liste ve tercihleri silmez. Yedekler yeni alanları taşır; eski yedekler varsayılan davranışı korur. Kayıt/restream bağımlılığı eklenmedi.
+
 ## 2026-10-07 - Liste bazlı canlı akış devamı
 
 - Erken bağlantı süresi liste bazında 250 ms adımlarla 250–5000 ms arasında ayarlanabilir (varsayılan 3000 ms); aynı süre Media3 ön yüklemesinde kullanılır. Room 28 → 29 migration ve yedek desteği eklendi.

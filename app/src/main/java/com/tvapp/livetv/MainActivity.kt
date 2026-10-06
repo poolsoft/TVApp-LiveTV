@@ -1335,8 +1335,10 @@ class MainActivity : TvRemoteActivity() {
                 iptvPlayback.play(
                     channel.copy(
                         uri = alternative.uri,
+                        inputId = alternative.inputId,
                         userAgent = alternative.userAgent,
                         referrer = alternative.referrer,
+                        origin = alternative.origin,
                         subtitleUrl = alternative.subtitleUrl,
                     ),
                     startPosition,
@@ -3870,7 +3872,20 @@ class MainActivity : TvRemoteActivity() {
         .distinctBy { it.sourceKey }
         .toList()
 
-    private fun startIptvOverlay(channel: LiveChannel) {
+    private fun checkSourceConnections(selected: List<LiveChannel>, proceed: () -> Unit) {
+        val background = currentChannel?.sourceKey
+        val grid = gridChannels.map { it.sourceKey }
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { iptvRepository.connectionLimitViolation(selected) } }
+            if (background != currentChannel?.sourceKey || grid != gridChannels.map { it.sourceKey }) return@launch
+            result.onSuccess { violation ->
+                if (violation == null) proceed() else Toast.makeText(this@MainActivity,
+                    getString(R.string.iptv_source_connection_limit_reached, violation.first, violation.second), Toast.LENGTH_LONG).show()
+            }.onFailure { debugLog.recordDebug("IPTV_CONNECTION_LIMIT_FAILURE | ${it.javaClass.simpleName}") }
+        }
+    }
+
+    private fun startIptvOverlay(channel: LiveChannel, connectionsChecked: Boolean = false) {
         if (!hasIptvAccess { startIptvOverlay(channel) }) return
         val background = if (iptvGridActive) {
             gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } ?: gridReturnChannel
@@ -3882,6 +3897,10 @@ class MainActivity : TvRemoteActivity() {
         }
         if (channel.sourceKey == background.sourceKey) {
             Toast.makeText(this, R.string.iptv_pip_requires_different_channel, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!connectionsChecked) {
+            checkSourceConnections(listOf(background, channel)) { startIptvOverlay(channel, connectionsChecked = true) }
             return
         }
         if (iptvGridActive) {
@@ -3946,7 +3965,15 @@ class MainActivity : TvRemoteActivity() {
                     Toast.makeText(this@MainActivity, getString(R.string.iptv_grid_maximum, deviceResourcePolicy.maximumGridStreams), Toast.LENGTH_SHORT).show()
                 resolved.source == LiveChannel.Source.TIF && multiViewDraft.values.any { it.source == LiveChannel.Source.TIF } ->
                     Toast.makeText(this@MainActivity, R.string.multiview_requires_single_tuner, Toast.LENGTH_SHORT).show()
-                else -> multiViewDraft[resolved.sourceKey] = resolved
+                else -> {
+                    val violation = withContext(Dispatchers.IO) {
+                        iptvRepository.connectionLimitViolation(multiViewDraft.values.toList() + resolved)
+                    }
+                    if (selectingFromList && !multiViewAdding) return@launch
+                    if (violation == null) multiViewDraft[resolved.sourceKey] = resolved
+                    else Toast.makeText(this@MainActivity,
+                        getString(R.string.iptv_source_connection_limit_reached, violation.first, violation.second), Toast.LENGTH_LONG).show()
+                }
             }
             if (multiViewAdding) updateChannelActionLabels()
         }
@@ -4050,7 +4077,7 @@ class MainActivity : TvRemoteActivity() {
         dialog.show()
     }
 
-    private fun startIptvGrid(selected: List<LiveChannel>) {
+    private fun startIptvGrid(selected: List<LiveChannel>, connectionsChecked: Boolean = false) {
         val distinct = selected.distinctBy { it.sourceKey }
         if (distinct.isEmpty()) return
         if (distinct.size > deviceResourcePolicy.maximumGridStreams) {
@@ -4064,6 +4091,10 @@ class MainActivity : TvRemoteActivity() {
         if (distinct.any { it.source == LiveChannel.Source.IPTV } &&
             !hasIptvAccess { startIptvGrid(distinct) }
         ) return
+        if (!connectionsChecked) {
+            checkSourceConnections(distinct) { startIptvGrid(distinct, connectionsChecked = true) }
+            return
+        }
         prepareIptvGrid()
         stopIptvOverlay()
         val previousActiveKey = gridChannels.getOrNull(gridActiveIndex)?.sourceKey
@@ -4317,11 +4348,17 @@ class MainActivity : TvRemoteActivity() {
         )
     }
 
-    private fun replaceIptvGridChannel(index: Int, replacement: LiveChannel) {
+    private fun replaceIptvGridChannel(index: Int, replacement: LiveChannel, connectionsChecked: Boolean = false) {
         if (index !in gridChannels.indices) return
         if (replacement.source == LiveChannel.Source.TIF &&
             gridChannels.withIndex().any { it.index != index && it.value.source == LiveChannel.Source.TIF }
         ) return
+        if (!connectionsChecked) {
+            checkSourceConnections(gridChannels.toMutableList().apply { this[index] = replacement }) {
+                if (iptvGridActive) replaceIptvGridChannel(index, replacement, connectionsChecked = true)
+            }
+            return
+        }
         gridChannels = gridChannels.toMutableList().apply { this[index] = replacement }
         gridSelectedKeys.clear()
         gridSelectedKeys += gridChannels.map { it.sourceKey }
@@ -4853,8 +4890,11 @@ class MainActivity : TvRemoteActivity() {
 
     private fun openExternalPlayer(channel: LiveChannel) {
         val preference = ExternalPlayerPreferencesStore(this).load()
-        if (!ExternalPlayerLauncher.launch(this, channel, preference)) {
-            Toast.makeText(this, R.string.external_player_not_found, Toast.LENGTH_LONG).show()
+        lifecycleScope.launch {
+            val resolved = withContext(Dispatchers.IO) { iptvRepository.withSourceHeaders(channel) }
+            if (!ExternalPlayerLauncher.launch(this@MainActivity, resolved, preference)) {
+                Toast.makeText(this@MainActivity, R.string.external_player_not_found, Toast.LENGTH_LONG).show()
+            }
         }
     }
 

@@ -20,6 +20,7 @@ object ExternalPlayerLauncher {
             val headers = buildList {
                 channel.userAgent?.let { add("User-Agent"); add(it) }
                 channel.referrer?.let { add("Referer"); add(it) }
+                channel.origin?.let { add("Origin"); add(it) }
             }.toTypedArray()
             if (headers.isNotEmpty()) putExtra("headers", headers)
         }
