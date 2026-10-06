@@ -34,7 +34,7 @@ class IptvSourcePlaybackTest {
         }
         val source = IptvSourceEntity(id = 7, name = "Test", location = "test", kind = "file",
             liveBufferSeconds = 5, vodBufferSeconds = 30, maximumVideoHeight = 0, automaticRecovery = false,
-            continuousLiveReconnect = true)
+            continuousLiveReconnect = true, liveReconnectLeadMillis = 4_750)
         val output = StringWriter()
         JsonWriter(output).use { writer ->
             writer.beginObject()
@@ -43,9 +43,10 @@ class IptvSourcePlaybackTest {
         }
         val json = JSONObject(output.toString())
         assertEquals(source, read.invoke(companion, json))
-        listOf("liveBufferSeconds", "vodBufferSeconds", "maximumVideoHeight", "automaticRecovery", "continuousLiveReconnect").forEach(json::remove)
+        listOf("liveBufferSeconds", "vodBufferSeconds", "maximumVideoHeight", "automaticRecovery", "continuousLiveReconnect", "liveReconnectLeadMillis").forEach(json::remove)
         assertEquals(source.copy(liveBufferSeconds = null, vodBufferSeconds = null,
-            maximumVideoHeight = null, automaticRecovery = null, continuousLiveReconnect = false), read.invoke(companion, json))
+            maximumVideoHeight = null, automaticRecovery = null, continuousLiveReconnect = false,
+            liveReconnectLeadMillis = 3_000), read.invoke(companion, json))
     }
     @Test fun sourceOptionsSurviveMetadataRefreshAndBufferUpdates() = runBlocking {
         val database = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), TVAppDatabase::class.java).build()
@@ -53,12 +54,12 @@ class IptvSourcePlaybackTest {
             val dao = database.iptvDao()
             val id = dao.insertSource(IptvSourceEntity(name = "Test", location = "test", kind = "file"))
             assertEquals(IptvSourcePlaybackOptions(), dao.sourcePlaybackOptions(id))
-            dao.updateSourcePlaybackOptions(id, 5, 30, 720, false, true)
+            dao.updateSourcePlaybackOptions(id, 5, 30, 720, false, true, 5_000)
             dao.updateSource(requireNotNull(dao.getSource(id)).copy(name = "Updated", lastUpdatedAt = 100))
-            assertEquals(IptvSourcePlaybackOptions(5, 30, 720, false, true), dao.sourcePlaybackOptions(id))
+            assertEquals(IptvSourcePlaybackOptions(5, 30, 720, false, true, 5_000), dao.sourcePlaybackOptions(id))
             dao.updateVodBuffer(id, 45)
             dao.renameSource(id, "Renamed")
-            assertEquals(IptvSourcePlaybackOptions(5, 45, 720, false, true), dao.sourcePlaybackOptions(id))
+            assertEquals(IptvSourcePlaybackOptions(5, 45, 720, false, true, 5_000), dao.sourcePlaybackOptions(id))
             dao.updateSourcePlaybackOptions(id, null, null, null, null)
             assertEquals(IptvSourcePlaybackOptions(), dao.sourcePlaybackOptions(id))
             assertNull(dao.sourcePlaybackOptions(id + 1))
@@ -82,6 +83,7 @@ class IptvSourcePlaybackTest {
             val db = helper.writableDatabase
             TVAppDatabase.MIGRATION_24_26.migrate(db)
             TVAppDatabase.MIGRATION_27_28.migrate(db)
+            TVAppDatabase.MIGRATION_28_29.migrate(db)
             db.query("SELECT id, name, liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery FROM iptv_sources").use {
                 check(it.moveToFirst())
                 assertEquals(7, it.getInt(0))
@@ -91,6 +93,10 @@ class IptvSourcePlaybackTest {
             db.query("SELECT continuousLiveReconnect FROM iptv_sources WHERE id = 7").use {
                 check(it.moveToFirst())
                 assertEquals(0, it.getInt(0))
+            }
+            db.query("SELECT liveReconnectLeadMillis FROM iptv_sources WHERE id = 7").use {
+                check(it.moveToFirst())
+                assertEquals(3_000, it.getInt(0))
             }
         } finally {
             helper.close()

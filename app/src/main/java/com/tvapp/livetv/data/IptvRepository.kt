@@ -102,7 +102,8 @@ class IptvRepository(context: Context) {
         require(options.vodBufferSeconds == null || options.vodBufferSeconds in com.tvapp.livetv.settings.IptvPlaybackPreferences.BUFFER_OPTIONS)
         require(options.maximumVideoHeight == null || options.maximumVideoHeight in com.tvapp.livetv.settings.IptvPlaybackPreferences.QUALITY_HEIGHT_OPTIONS)
         dao.updateSourcePlaybackOptions(sourceId, options.liveBufferSeconds, options.vodBufferSeconds,
-            options.maximumVideoHeight, options.automaticRecovery, options.continuousLiveReconnect)
+            options.maximumVideoHeight, options.automaticRecovery, options.continuousLiveReconnect,
+            options.reconnectLeadMillis())
     }
 
     suspend fun sourceCategories(sourceId: Long): List<String> =

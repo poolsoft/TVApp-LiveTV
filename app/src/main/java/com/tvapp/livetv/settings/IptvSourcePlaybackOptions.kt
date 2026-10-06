@@ -6,7 +6,11 @@ data class IptvSourcePlaybackOptions(
     val maximumVideoHeight: Int? = null,
     val automaticRecovery: Boolean? = null,
     val continuousLiveReconnect: Boolean = false,
+    val liveReconnectLeadMillis: Int = 3_000,
 ) {
+    fun reconnectLeadMillis(): Int = liveReconnectLeadMillis
+        .takeIf { it in 250..5_000 && it % 250 == 0 } ?: 3_000
+
     fun resolve(global: IptvPlaybackPreferences, isVod: Boolean): EffectiveIptvPlaybackOptions =
         EffectiveIptvPlaybackOptions(
             bufferSeconds = (if (isVod) vodBufferSeconds else liveBufferSeconds)

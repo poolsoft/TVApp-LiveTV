@@ -135,7 +135,7 @@ class IptvPlaybackController(
                 }
             }
             if (generation == tuneGeneration && !released) {
-                retryHandler.postDelayed(this, if (continuousLiveEnabled()) 500L else WATCHDOG_INTERVAL_MS)
+                retryHandler.postDelayed(this, if (continuousLiveEnabled()) 250L else WATCHDOG_INTERVAL_MS)
             }
         }
     }
@@ -441,7 +441,8 @@ class IptvPlaybackController(
         exoPlayer.volume = if (muted) 0f else 1f
         playerView.setKeepContentOnPlayerReset(continuousLiveEnabled())
         exoPlayer.setPreloadConfiguration(if (continuousLiveEnabled())
-            ExoPlayer.PreloadConfiguration(3_000_000L) else ExoPlayer.PreloadConfiguration.DEFAULT)
+            ExoPlayer.PreloadConfiguration(sourcePlaybackOptions.reconnectLeadMillis() * 1_000L)
+            else ExoPlayer.PreloadConfiguration.DEFAULT)
         val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer)
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
@@ -939,7 +940,8 @@ class IptvPlaybackController(
         if (!shouldQueueLiveContinuation(sourcePlaybackOptions.continuousLiveReconnect,
                 currentChannel?.iptvContentType, current.playWhenReady, current.isCurrentMediaItemDynamic,
                 current.isLoading, current.duration, current.currentPosition, current.bufferedPosition,
-                current.currentMediaItemIndex + 1 < current.mediaItemCount)) return
+                current.currentMediaItemIndex + 1 < current.mediaItemCount,
+                sourcePlaybackOptions.reconnectLeadMillis())) return
         val item = current.currentMediaItem ?: return
         val factory = mediaSourceFactory ?: return
         shortLiveParts = consecutiveShortLiveParts(shortLiveParts, current.duration)

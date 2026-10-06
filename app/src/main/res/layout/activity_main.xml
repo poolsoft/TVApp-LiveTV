@@ -17,7 +17,7 @@
         android:layout_height="match_parent"
         android:keepScreenOn="true"
         android:visibility="gone"
-        app:show_buffering="when_playing"
+        app:show_buffering="never"
         app:use_controller="false" />
 
     <androidx.media3.ui.PlayerView
@@ -247,6 +247,20 @@
             android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/iptv_buffering_corner"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="24dp"
+        android:background="@android:color/transparent"
+        android:elevation="32dp"
+        android:focusable="false"
+        android:indeterminateTint="@color/accent"
+        android:contentDescription="@string/iptv_buffering"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/channel_panel"

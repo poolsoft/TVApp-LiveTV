@@ -591,8 +591,7 @@ class MainActivity : TvRemoteActivity() {
                         setIptvBufferingVisible(true)
                     }
                     IptvBufferingState.BUFFERING -> {
-                        updateIptvBufferingStatus(R.string.iptv_buffering)
-                        setIptvBufferingVisible(true)
+                        setIptvBufferingVisible(true, compact = true)
                     }
                 }
             } else {
@@ -1234,8 +1233,13 @@ class MainActivity : TvRemoteActivity() {
     /** Shows or hides the IPTV spinner, but never lets a stale callback from a
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
-    private fun setIptvBufferingVisible(visible: Boolean) {
+    private fun setIptvBufferingVisible(visible: Boolean, compact: Boolean = false) {
         val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
+        binding.iptvBufferingCorner.visibility = if (shouldShow && compact) View.VISIBLE else View.GONE
+        if (compact) {
+            binding.iptvBufferingContainer.visibility = View.GONE
+            return
+        }
         if (shouldShow) {
             binding.iptvBufferingSpinner.visibility = View.VISIBLE
             binding.iptvBufferingContainer.visibility = View.VISIBLE

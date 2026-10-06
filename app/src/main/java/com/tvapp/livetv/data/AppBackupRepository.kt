@@ -468,6 +468,7 @@ class AppBackupRepository(context: Context) {
             name("automaticRecovery")
             source.automaticRecovery?.let { value(it) } ?: nullValue()
             name("continuousLiveReconnect").value(source.continuousLiveReconnect)
+            name("liveReconnectLeadMillis").value(source.liveReconnectLeadMillis.toLong())
         }
 
         fun JsonWriter.write(channel: IptvChannelEntity) = apply {
@@ -543,6 +544,8 @@ class AppBackupRepository(context: Context) {
             maximumVideoHeight = nullableInt("maximumVideoHeight"),
             automaticRecovery = if (isNull("automaticRecovery")) null else getBoolean("automaticRecovery"),
             continuousLiveReconnect = optBoolean("continuousLiveReconnect", false),
+            liveReconnectLeadMillis = optInt("liveReconnectLeadMillis", 3_000)
+                .takeIf { it in 250..5_000 && it % 250 == 0 } ?: 3_000,
         )
 
         fun JSONObject.toIptvChannel(sourceId: Long) = IptvChannelEntity(

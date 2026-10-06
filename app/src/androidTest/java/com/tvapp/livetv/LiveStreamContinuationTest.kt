@@ -1,6 +1,10 @@
 package com.tvapp.livetv
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.view.View
+import androidx.test.core.app.ActivityScenario
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.MediaItem
@@ -27,12 +31,46 @@ import kotlin.concurrent.thread
 
 @RunWith(AndroidJUnit4::class)
 class LiveStreamContinuationTest {
+    @Test fun rebufferIndicatorIsTransparentAndSeparateFromInitialLoading() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val channelField = MainActivity::class.java.getDeclaredField("currentChannel").apply { isAccessible = true }
+                val blackField = MainActivity::class.java.getDeclaredField("blackScreenActive").apply { isAccessible = true }
+                val originalChannel = channelField.get(activity)
+                val originalBlack = blackField.getBoolean(activity)
+                val method = MainActivity::class.java.getDeclaredMethod("setIptvBufferingVisible",
+                    Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType).apply { isAccessible = true }
+                val corner = activity.findViewById<View>(R.id.iptv_buffering_corner)
+                val center = activity.findViewById<View>(R.id.iptv_buffering_container)
+                try {
+                    channelField.set(activity, LiveChannel(1, "fixture:indicator", "iptv:0", "1",
+                        "Indicator test fixture", "fixture:indicator", source = LiveChannel.Source.IPTV))
+                    blackField.setBoolean(activity, false)
+                    method.invoke(activity, true, true)
+                    assertEquals(View.VISIBLE, corner.visibility)
+                    assertEquals(View.GONE, center.visibility)
+                    assertEquals(Color.TRANSPARENT, (corner.background as ColorDrawable).color)
+                    assertFalse(corner.isFocusable)
+                    method.invoke(activity, true, false)
+                    assertEquals(View.GONE, corner.visibility)
+                    assertEquals(View.VISIBLE, center.visibility)
+                    method.invoke(activity, false, false)
+                    assertEquals(View.GONE, corner.visibility)
+                    assertEquals(View.GONE, center.visibility)
+                } finally {
+                    channelField.set(activity, originalChannel)
+                    blackField.setBoolean(activity, originalBlack)
+                }
+            }
+        }
+    }
+
     @Test fun finiteLivePartsArePreloadedAndTransitionWithoutRetuning() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dao = TVAppDatabase.getInstance(context).iptvDao()
         val source = dao.insertSource(IptvSourceEntity(name = "Continuation test fixture",
             location = "fixture:continuation:${System.nanoTime()}", kind = "FILE",
-            continuousLiveReconnect = true, automaticRecovery = false))
+            continuousLiveReconnect = true, automaticRecovery = false, liveReconnectLeadMillis = 5_000))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val transitions = CountDownLatch(2)
         val queued = CountDownLatch(1)
@@ -95,7 +133,7 @@ class LiveStreamContinuationTest {
                     }
                 }
                 assertTrue("No early queue; failure=$failure", queued.await(15, TimeUnit.SECONDS))
-                assertTrue("Queued at $queuedPosition", queuedPosition in 4900..7999)
+                assertTrue("Queued at $queuedPosition", queuedPosition in 2900..4499)
                 assertTrue("No repeated transitions; failure=$failure", transitions.await(20, TimeUnit.SECONDS))
                 assertNull(failure)
                 instrumentation.runOnMainSync {

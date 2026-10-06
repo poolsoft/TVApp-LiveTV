@@ -2,6 +2,9 @@
 
 ## 2026-10-07 - Liste bazlı canlı akış devamı
 
+- Erken bağlantı süresi liste bazında 250 ms adımlarla 250–5000 ms arasında ayarlanabilir (varsayılan 3000 ms); aynı süre Media3 ön yüklemesinde kullanılır. Room 28 → 29 migration ve yedek desteği eklendi.
+- İlk yüklemeden sonraki arabelleğe alma ortada yazı yerine sağ üstte transparan zeminli küçük bir simgeyle gösterilir; ana PlayerView'in ikinci merkez göstergesi kapatıldı.
+
 - Süreli canlı akış ayarı kaynak oynatma seçeneklerine eklendi; varsayılan kapalıdır, yenileme ve yedeklemede korunur. Room 27 → 28 migration mevcut listeleri silmeden alanı ekler.
 - Tamamen indirilmiş canlı parçanın son 3 saniyesinde yeni MediaSource sıraya alınır ve Media3 playlist preloading ile hazırlanır. Tek oynatıcıda en fazla iki parça tutulur; oynanan parça geçiş sonrası bırakılır.
 - VOD, catch-up, duraklatılmış yayınlar ve dinamik HLS/DASH akışları hariçtir. Çok kısa parçaların tekrarında sınır uygulanır. Kanal değişimi/çıkış eski kuyruğu bırakır. Sağlayıcı akışlarının zaman damgaları farklıysa atlama/tekrar olabilir.

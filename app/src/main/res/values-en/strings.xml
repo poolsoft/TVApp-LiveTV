@@ -38,7 +38,7 @@
     <string name="multiview_add_channels">Add channels / edit selection</string>
     <string name="multiview_to_pip">Switch to PiP view</string>
     <string name="iptv_profile_load_error">Source playback settings could not be read</string>
-    <string name="user_guide_source_playback">SOURCE PLAYBACK SETTINGS\nLong-press OK on a source in IPTV management and open Playback settings. Live and VOD buffer, maximum resolution and automatic recovery can be configured separately; Use global setting clears that source preference. Saved settings apply when the channel is reopened. With a source buffer override, the playback bar changes that source buffer; otherwise it changes the global preference. Quality is an upper limit: it cannot create unavailable resolutions or exceed MultiView device limits. Manual retry remains available when automatic recovery is off. Finite live stream continuation is off by default: it queues the next connection during the last 3 seconds of a fully downloaded live part. Movies and archives are excluded. Pausing removes the queued part; switching channels discards old connections. Repeated very short parts stop retries. Provider timestamp mismatches can cause skips or repeats; seamless playback is not guaranteed.</string>
+    <string name="user_guide_source_playback">SOURCE PLAYBACK SETTINGS\nLong-press OK on a source in IPTV management and open Playback settings. Live and VOD buffer, maximum resolution and automatic recovery can be configured separately; Use global setting clears that source preference. Saved settings apply when the channel is reopened. With a source buffer override, the playback bar changes that source buffer; otherwise it changes the global preference. Quality is an upper limit: it cannot create unavailable resolutions or exceed MultiView device limits. Manual retry remains available when automatic recovery is off. Finite live stream continuation is off by default: it queues the next connection before a fully downloaded live part ends. Lead time is adjustable from 250 to 5000 ms in 250 ms steps (default 3000 ms). Rebuffering uses a small top-right indicator on a transparent background. Movies and archives are excluded. Pausing removes the queued part; switching channels discards old connections. Repeated very short parts stop retries. Provider timestamp mismatches can cause skips or repeats; seamless playback is not guaranteed.</string>
     <string name="iptv_source_playback_options">Source playback settings</string>
     <string name="iptv_source_playback_options_title">Playback settings · %1$s</string>
     <string name="iptv_source_live_buffer">Live buffer target</string>
@@ -46,7 +46,8 @@
     <string name="iptv_maximum_video_height">Maximum video resolution</string>
     <string name="iptv_maximum_video_height_value">Up to %1$d lines</string>
     <string name="iptv_automatic_recovery">Automatic stream recovery</string>
-    <string name="iptv_continuous_live_reconnect">Early reconnect for finite live streams (3 s)</string>
+    <string name="iptv_continuous_live_reconnect">Early reconnect for finite live streams</string>
+    <string name="iptv_live_reconnect_lead">Reconnect lead time</string>
     <string name="inherit_playback_setting_value">Use global setting (%1$s)</string>
     <string name="reset_source_playback_options">Reset to global settings</string>
     <string name="iptv_source_playback_options_saved">Source playback settings saved. Applied the next time a channel is opened.</string>

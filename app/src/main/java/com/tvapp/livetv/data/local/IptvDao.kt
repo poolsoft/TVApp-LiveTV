@@ -13,11 +13,11 @@ import com.tvapp.livetv.tifinput.SharedIptvInputChannel
 interface IptvDao {
     @Query("UPDATE iptv_sources SET name = :name WHERE id = :sourceId")
     suspend fun renameSource(sourceId: Long, name: String)
-    @Query("SELECT liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery, continuousLiveReconnect FROM iptv_sources WHERE id = :sourceId")
+    @Query("SELECT liveBufferSeconds, vodBufferSeconds, maximumVideoHeight, automaticRecovery, continuousLiveReconnect, liveReconnectLeadMillis FROM iptv_sources WHERE id = :sourceId")
     suspend fun sourcePlaybackOptions(sourceId: Long): com.tvapp.livetv.settings.IptvSourcePlaybackOptions?
 
-    @Query("UPDATE iptv_sources SET liveBufferSeconds = :liveBuffer, vodBufferSeconds = :vodBuffer, maximumVideoHeight = :height, automaticRecovery = :recovery, continuousLiveReconnect = :continuous WHERE id = :sourceId")
-    suspend fun updateSourcePlaybackOptions(sourceId: Long, liveBuffer: Int?, vodBuffer: Int?, height: Int?, recovery: Boolean?, continuous: Boolean = false)
+    @Query("UPDATE iptv_sources SET liveBufferSeconds = :liveBuffer, vodBufferSeconds = :vodBuffer, maximumVideoHeight = :height, automaticRecovery = :recovery, continuousLiveReconnect = :continuous, liveReconnectLeadMillis = :leadMillis WHERE id = :sourceId")
+    suspend fun updateSourcePlaybackOptions(sourceId: Long, liveBuffer: Int?, vodBuffer: Int?, height: Int?, recovery: Boolean?, continuous: Boolean = false, leadMillis: Int = 3_000)
 
     @Query("UPDATE iptv_sources SET liveBufferSeconds = :seconds WHERE id = :sourceId")
     suspend fun updateLiveBuffer(sourceId: Long, seconds: Int)
