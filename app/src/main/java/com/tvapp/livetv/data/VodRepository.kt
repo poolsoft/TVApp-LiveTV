@@ -9,8 +9,7 @@ import com.tvapp.livetv.model.LiveChannel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-class VodRepository(context: Context) {
-    private val database = TVAppDatabase.getInstance(context)
+class VodRepository(context: Context, private val database: TVAppDatabase = TVAppDatabase.getInstance(context)) {
     private val dao = database.vodDao()
     private val preferences = context.getSharedPreferences("vod-cache", Context.MODE_PRIVATE)
 
@@ -58,6 +57,14 @@ class VodRepository(context: Context) {
     }
 
     suspend fun seasons(key: String): List<Int> = dao.seasons(key)
+    suspend fun nextEpisode(key: String): VodCatalogItem? = dao.nextEpisode(key)?.let { item(it.sourceKey) }
+
+    suspend fun continueItems(sourceId: Long, section: String, keys: List<String>): List<VodCatalogItem> {
+        val rows = dao.page(VodCatalogQuery.resumeItems(keys)).associateBy { it.sourceKey }
+        return keys.take(100).mapNotNull(rows::get).filter {
+            it.sourceId == sourceId && if (section == "SERIES") it.kind == "EPISODE" else it.kind == "MOVIE"
+        }.distinctBy { it.parentKey ?: it.sourceKey }
+    }
 
     suspend fun details(item: VodCatalogItem): VodCatalogItem {
         if (item.kind != "MOVIE") return item

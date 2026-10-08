@@ -1,5 +1,11 @@
 # TVApp Mağaza Metinleri
 
+- Dizi başına en son bölümden devam, sezonlar arasında sonraki bölüm seçimi ve kategori/seçili liste kapsamında VOD araması.
+- IPTV altyazıları için isteğe bağlı boyut, renk, konum, arka plan ve kenarlık ayarları; tuner altyazıları etkilenmez.
+- Yanlış HLS formatı bildiren adreslerde aynı bağlantıyla sınırlı progressive fallback; ek oynatıcı bağımlılığı yoktur.
+
+English: Resume the latest episode per series, choose the next episode across seasons, and search within a category or the selected playlist. Optional IPTV subtitle appearance controls do not affect tuner captions. A bounded same-URL progressive fallback handles selected HLS format errors without another player dependency.
+
 Bu belge Google Play ve benzeri Android TV mağazalarında kullanılacak açıklama, özellik ve
 yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın öncesinde doldurulmalıdır.
 

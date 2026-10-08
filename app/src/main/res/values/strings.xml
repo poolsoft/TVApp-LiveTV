@@ -723,5 +723,22 @@
     <string name="vod_remove_from_continue">Devam Et listesinden kaldır</string>
     <string name="vod_home_sidebar">VOD Ana Sayfa</string>
     <string name="txt_key_hint">TXT: Altyazı/Teletext</string>
-    <string name="user_guide_vod_library">VOD KÜTÜPHANESİ\nSinema/Dizi sekmesini, üstten listeyi ve kategoriyi seçin. Sarı liste seçer; Mavi arama/filtre açar. Filtre ve sıralama satırında OK seçeneklerin tamamını gösterir. Kırmızı Canlı TV’ye geçer, Yeşil son içeriğe döner. Ekran içerik odağıyla açılır. Sekme/kategoriden Aşağı kataloğa döner; ilk satırdan Yukarı veya katalogda Back üst sekmeye döner. Son satırdan Aşağı sayfa düğmelerine gider; CH+/CH- sayfa değiştirir. Filtre uygulandıktan sonra içerik odağına dönülür. OK detayları açar ve Oynat/Devam et üzerinde başlar; Yukarı açıklamaya geçer. Back önce pencereyi, ardından bölüm görünümünü kapatır; arama ve kategori korunur. Üst bölümde Back Canlı TV eylemine odaklanır, kendiliğinden yayına geçmez. Filtreleri Mavi menüsündeki Temizle ile kaldırın. Xtream gerçek bilgi verirse sezon/bölüm seçilebilir; M3U başlıklarından sezon tahmini yapılmaz. Görseller sınırlı önbelleği kullanır.</string>
+    <string name="user_guide_vod_library">VOD KÜTÜPHANESİ\nSinema/Dizi sekmesini, üstten listeyi ve kategoriyi seçin. Sarı liste seçer; Mavi arama/filtre açar. Arama kapsamını mevcut kategori veya seçili listenin tamamı olarak seçebilirsiniz; kategori tercihi korunur. Filtre ve sıralama satırında OK seçeneklerin tamamını gösterir. Kırmızı Canlı TV’ye geçer, Yeşil son içeriğe döner. Ekran içerik odağıyla açılır. Sekme/kategoriden Aşağı kataloğa döner; ilk satırdan Yukarı veya katalogda Back üst sekmeye döner. Son satırdan Aşağı sayfa düğmelerine gider; CH+/CH- sayfa değiştirir. Filtre uygulandıktan sonra içerik odağına dönülür. OK detayları açar ve Oynat/Devam et üzerinde başlar; Yukarı açıklamaya geçer. Back önce pencereyi, ardından bölüm görünümünü kapatır; arama ve kategori korunur. Üst bölümde Back Canlı TV eylemine odaklanır, kendiliğinden yayına geçmez. Filtreleri Mavi menüsündeki Temizle ile kaldırın. Xtream gerçek bilgi verirse sezon/bölüm seçilebilir; M3U başlıklarından sezon tahmini yapılmaz. Devam listesinde her dizi en son izlenen bölümüyle tek karttır. Oynatma kontrollerinin Ses/Altyazı/Kalite menüsünde varsa Sonraki bölüm görünür ve sezonlar arasında geçebilir. IPTV altyazı görünümü aynı menüden veya Oynatma ayarlarından özelleştirilebilir; TIF altyazılarına uygulanmaz. Görseller sınırlı önbelleği kullanır.</string>
+    <string name="vod_search_source">Arama: Bu listedeki tüm kategoriler</string>
+    <string name="vod_search_category">Arama: Geçerli kategori</string>
+    <string name="vod_next_episode">Sonraki bölüm: %1$s</string>
+    <string name="iptv_subtitle_appearance">IPTV altyazı görünümü</string>
+    <string name="iptv_subtitle_custom">Özel görünüm kullan</string>
+    <string name="iptv_subtitle_size">Yazı boyutu</string>
+    <string name="iptv_subtitle_color">Yazı rengi</string>
+    <string name="iptv_subtitle_background">Koyu arka plan</string>
+    <string name="iptv_subtitle_outline">Yazı kenarlığı</string>
+    <string name="iptv_subtitle_position">Konum</string>
+    <string name="iptv_subtitle_monospace">Eş aralıklı yazı tipi</string>
+    <string name="iptv_subtitle_white">Beyaz</string>
+    <string name="iptv_subtitle_yellow">Sarı</string>
+    <string name="iptv_subtitle_cyan">Camgöbeği</string>
+    <string name="iptv_subtitle_bottom">Alt</string>
+    <string name="iptv_subtitle_center">Orta</string>
+    <string name="iptv_subtitle_top">Üst</string>
 </resources>

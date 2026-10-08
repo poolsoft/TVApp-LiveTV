@@ -394,6 +394,7 @@ class MainActivity : TvRemoteActivity() {
             forceFourGridStreams = multiViewPreferencesStore.forceFourStreams(),
         )
         applyDisplayPreferences()
+        iptvPlayback.applySubtitleAppearance()
         scheduleSleepTimer()
         val previousMode = experienceMode
         applyExperienceMode()
@@ -2374,22 +2375,37 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showIptvMoreChoices() {
-        val labels = arrayOf(
-            getString(R.string.iptv_action_video),
-            getString(R.string.iptv_action_audio),
-            getString(R.string.iptv_action_subtitle),
-        )
-        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(R.string.iptv_more_controls)
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> showIptvVideoOptions()
-                    1 -> showAudioTracks()
-                    2 -> showSubtitleTracks()
-                }
+        val channelKey = currentChannel?.sourceKey ?: return
+        lifecycleScope.launch {
+            val nextEpisode = withContext(Dispatchers.IO) {
+                com.tvapp.livetv.data.VodRepository(this@MainActivity).nextEpisode(channelKey)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            if (currentChannel?.sourceKey != channelKey || isFinishing) return@launch
+            val labels = mutableListOf(
+                getString(R.string.iptv_action_video),
+                getString(R.string.iptv_action_audio),
+                getString(R.string.iptv_action_subtitle),
+                getString(R.string.iptv_subtitle_appearance),
+            )
+            if (nextEpisode != null) labels += getString(R.string.vod_next_episode, nextEpisode.name)
+            AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(R.string.iptv_more_controls)
+                .setItems(labels.toTypedArray()) { _, which ->
+                    when (which) {
+                        0 -> showIptvVideoOptions()
+                        1 -> showAudioTracks()
+                        2 -> showSubtitleTracks()
+                        3 -> com.tvapp.livetv.ui.IptvSubtitleAppearanceDialog.show(this@MainActivity) {
+                            iptvPlayback.applySubtitleAppearance()
+                        }
+                        4 -> nextEpisode?.let {
+                            handleVodSourceDeepLink(Intent().putExtra(EXTRA_VOD_SOURCE_KEY, it.sourceKey))
+                        }
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
     }
 
     private fun bufferTargetLabel(seconds: Int): String = if (seconds == 0) {

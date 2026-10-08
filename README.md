@@ -9,6 +9,11 @@ Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ### Canlı TV / VOD modları
 
+- Dizi devam listesi aynı dizinin en son izlenen bölümünü tek kartta gösterir. Oynatma kontrolleri > Ses/Altyazı/Kalite menüsündeki **Sonraki bölüm** mevcut sezonun veya sonraki sezonun ilk uygun bölümünü açar; son bölümde görünmez. Yalnız sağlayıcının bildirdiği sezon/bölüm verisi kullanılır.
+- VOD arama/filtre penceresinde arama kapsamı mevcut kategori veya seçili listenin tamamı olarak seçilir. Kategori tercihi silinmez; boş aramada tekrar uygulanır. Başka kaynaklar aranmaz.
+- **Ayarlar > Oynatma > IPTV altyazı görünümü** ve oynatma kontrollerindeki aynı menü yazı boyutu, renk, arka plan, kenarlık, konum ve yazı tipini ayarlar. Özelleştirme varsayılan kapalıdır; yalnız Media3 altyazılarına uygulanır, tuner altyazılarını değiştirmez.
+- HLS uzantılı adresin manifest/format hatasında aynı URL bir kez progressive olarak denenir. URL/header değiştirilmez; ağ, codec veya DRM hataları bu fallback'i tetiklemez. Harici altyazılar korunur.
+
 - Canlı kanal listesi filmleri içermez. VOD izlerken OK/MENU filmi duraklatıp VOD kütüphanesini açar; Back önce oynatma kontrollerini veya infobarı kapatır, ardından kütüphaneye döner.
 - VOD modunda kanal numaraları, CH+/CH- ve LAST canlı yayına geçirmez. Medya kontrolleri ve ileri/geri sarma kullanılabilir.
 - Yayın ekranında kırmızı **Mod** menüsünden Canlı TV, VOD veya son filme devam seçilir. Oynatma kontrollerindeki kırmızı tuşun mevcut tekrar dene görevi korunur.

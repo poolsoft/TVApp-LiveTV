@@ -155,7 +155,8 @@ class VodHomeActivity : TvRemoteActivity() {
             view = preferences.getString(prefix + "view", "ALL").orEmpty().takeIf { it in VIEWS } ?: "ALL",
             order = preferences.getString(prefix + "order", "SOURCE").orEmpty().takeIf { it in listOf("SOURCE", "NAME") } ?: "SOURCE",
             parentKey = preferences.getString(prefix + "parent", null),
-            season = preferences.getInt(prefix + "season", -1).takeIf { it >= 0 })
+            season = preferences.getInt(prefix + "season", -1).takeIf { it >= 0 },
+            searchWholeSource = preferences.getBoolean(prefix + "search-whole-source", false))
         pageIndex = preferences.getInt(prefix + "page", 0).coerceAtLeast(0)
         focusedKey = preferences.getString(prefix + "focus", null)
         focusedPosition = preferences.getInt(prefix + "position", 0).coerceIn(0, PAGE_SIZE - 1)
@@ -168,6 +169,7 @@ class VodHomeActivity : TvRemoteActivity() {
             .putString(prefix + "category", filter.category).putString(prefix + "query", filter.query)
             .putString(prefix + "section", filter.section).putString(prefix + "view", filter.view)
             .putString(prefix + "order", filter.order).putString(prefix + "parent", filter.parentKey)
+            .putBoolean(prefix + "search-whole-source", filter.searchWholeSource)
             .putInt(prefix + "season", filter.season ?: -1).putInt(prefix + "page", pageIndex)
             .putString(prefix + "focus", focusedKey).putInt(prefix + "position", focusedPosition).apply()
     }
@@ -201,14 +203,15 @@ class VodHomeActivity : TvRemoteActivity() {
                         catch (cancelled: CancellationException) { throw cancelled }
                         catch (error: Exception) { cacheFailure = error }
                     }
-                    val count = repository.count(source, snapshot, keys)
+                    val continueRows = repository.continueItems(source, snapshot.section, resumes.keys.toList())
+                    val effectiveKeys = if (snapshot.view == "CONTINUE" && snapshot.parentKey == null)
+                        continueRows.map { it.sourceKey } else keys
+                    val count = repository.count(source, snapshot, effectiveKeys)
                     val actualPage = requestedPage.coerceAtMost(((count - 1).coerceAtLeast(0)) / PAGE_SIZE)
-                    val rows = repository.page(source, snapshot, keys, actualPage)
-                    val continueRows = repository.page(source, VodFilter(section = snapshot.section, view = "CONTINUE"),
-                        resumes.keys.toList(), 0).take(8)
+                    val rows = repository.page(source, snapshot, effectiveKeys, actualPage)
                     val last = lastVodKey()?.let { repository.item(it) }
                     val parent = snapshot.parentKey?.let { repository.item(it) }
-                    PageResult(rows, count, actualPage, continueRows, last, parent?.name)
+                    PageResult(rows, count, actualPage, continueRows.take(8), last, parent?.name)
                 }
                 if (generation != loadGeneration) return@launch
                 total = result.count
@@ -366,12 +369,21 @@ class VodHomeActivity : TvRemoteActivity() {
         val form = DialogVodFiltersBinding.inflate(android.view.LayoutInflater.from(builder.context))
         var view = filter.view
         var order = filter.order
+        var wholeSource = filter.searchWholeSource
         form.vodSearch.setText(filter.query)
         fun labels() {
             form.vodViewFilter.text = viewLabel(view)
             form.vodOrderFilter.setText(if (order == "NAME") R.string.vod_sort_name else R.string.vod_sort_source)
+            form.vodSearchScope.setText(if (wholeSource) R.string.vod_search_source else R.string.vod_search_category)
         }
         labels()
+        form.vodSearchScope.setOnClickListener {
+            PopupMenu(builder.context, form.vodSearchScope).apply {
+                menu.add(0, 0, 0, R.string.vod_search_category)
+                menu.add(0, 1, 1, R.string.vod_search_source)
+                setOnMenuItemClickListener { selected -> wholeSource = selected.itemId == 1; labels(); true }
+            }.show()
+        }
         form.vodViewFilter.setOnClickListener {
             PopupMenu(builder.context, form.vodViewFilter).apply {
                 VIEWS.forEachIndexed { index, value -> menu.add(0, index, index, viewLabel(value)) }
@@ -388,7 +400,8 @@ class VodHomeActivity : TvRemoteActivity() {
         val d = builder.setTitle(R.string.vod_search_filters).setView(form.root)
             .setPositiveButton(R.string.apply) { _, _ ->
                 hideKeyboard(form.vodSearch)
-                changeFilter(filter.copy(query = form.vodSearch.text.toString().trim(), view = view, order = order))
+                changeFilter(filter.copy(query = form.vodSearch.text.toString().trim(), view = view, order = order,
+                    searchWholeSource = wholeSource))
             }.setNeutralButton(R.string.clear_search) { _, _ ->
                 hideKeyboard(form.vodSearch)
                 changeFilter(filter.copy(query = "", view = "ALL", category = null, order = "SOURCE"))

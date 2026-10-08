@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tvapp.livetv.data.VodCatalogQuery
 import com.tvapp.livetv.data.VodFilter
+import com.tvapp.livetv.data.VodRepository
 import com.tvapp.livetv.data.local.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -54,6 +55,8 @@ class VodCatalogTest {
             assertEquals(60, last.size)
             assertEquals("fixture:14940", last.first().sourceKey)
             assertEquals(7500, dao.count(VodCatalogQuery.build(source, VodFilter(category = "Even"), count = true)))
+            val categoryCount = dao.count(VodCatalogQuery.build(source, VodFilter(category = "Even", query = "Movie 1"), count = true))
+            assertTrue(dao.count(VodCatalogQuery.build(source, VodFilter(category = "Even", query = "Movie 1", searchWholeSource = true), count = true)) > categoryCount)
             assertEquals(0, dao.count(VodCatalogQuery.build(source + 1, VodFilter(), count = true)))
             assertEquals(0, dao.count(VodCatalogQuery.build(source, VodFilter(query = "%"), count = true)))
             assertEquals(0, dao.count(VodCatalogQuery.build(source, VodFilter(view = "CONTINUE"), count = true)))
@@ -68,6 +71,17 @@ class VodCatalogTest {
             assertEquals(listOf(2), dao.seasons(series.sourceKey))
             assertEquals("SERIES", dao.page(VodCatalogQuery.build(source, VodFilter(section = "SERIES"))).single().kind)
             assertEquals("EPISODE", dao.page(VodCatalogQuery.build(source, VodFilter(parentKey = series.sourceKey, season = 2))).single().kind)
+            dao.upsert(listOf(
+                VodMetadataEntity("fixture:later", source, "EPISODE", "9", parentKey = series.sourceKey,
+                    seasonNumber = 3, episodeNumber = 1, name = "Next season", streamUrl = "https://example.invalid/9.mkv", updatedAt = 1),
+                VodMetadataEntity("fixture:earlier", source, "EPISODE", "6", parentKey = series.sourceKey,
+                    seasonNumber = 2, episodeNumber = 2, name = "Earlier", streamUrl = "https://example.invalid/6.mkv", updatedAt = 1)))
+            val repository = VodRepository(context, db)
+            assertEquals("fixture:later", repository.nextEpisode("fixture:episode")?.sourceKey)
+            assertNull(repository.nextEpisode("fixture:later"))
+            assertEquals(listOf("fixture:episode"), repository.continueItems(source, "SERIES",
+                listOf("fixture:episode", "fixture:earlier", "fixture:42")).map { it.sourceKey })
+            assertTrue(repository.continueItems(source + 1, "SERIES", listOf("fixture:episode")).isEmpty())
         } finally { db.close() }
     }
 }

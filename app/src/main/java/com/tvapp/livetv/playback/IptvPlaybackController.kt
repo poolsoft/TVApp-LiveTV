@@ -15,11 +15,15 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
@@ -52,6 +56,8 @@ class IptvPlaybackController(
     private var trackSelector: DefaultTrackSelector? = null
     private var player: ExoPlayer? = null
     private var mediaSourceFactory: MediaSource.Factory? = null
+    private var fallbackDataSourceFactory: DataSource.Factory? = null
+    private var formatFallbackAttempted = false
     private var retryCount = 0
     private var selectedVideoTrackId: String? = null
     private var released = false
@@ -239,6 +245,7 @@ class IptvPlaybackController(
     private fun playPrepared(channel: LiveChannel, startPositionMillis: Long, options: IptvSourcePlaybackOptions) {
         released = false
         retryCount = 0
+        formatFallbackAttempted = false
         selectedVideoTrackId = null
         currentChannel = channel
         val previousBufferSeconds = targetBufferSeconds
@@ -371,6 +378,8 @@ class IptvPlaybackController(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
+                    if (released) return
+                    if (tryProgressiveFallback(error)) return
                     lastErrorCode = error.errorCodeName
                     lastFailureClass = classifyIptvPlaybackFailure(error.errorCodeName)
                     updateHealthPhase(IptvPlaybackPhase.FAILED)
@@ -475,8 +484,10 @@ class IptvPlaybackController(
             )
         }
         val mediaItem = mediaItemBuilder.build()
+        val defaultDataSource = DefaultDataSource.Factory(appContext, dataSource).setTransferListener(bandwidthMeter)
+        fallbackDataSourceFactory = defaultDataSource
         val sourceFactory = DefaultMediaSourceFactory(
-            DefaultDataSource.Factory(appContext, dataSource).setTransferListener(bandwidthMeter),
+            defaultDataSource,
             IptvDataSourceFactory.createExtractors(),
         )
         mediaSourceFactory = sourceFactory
@@ -489,8 +500,44 @@ class IptvPlaybackController(
         exoPlayer.prepare()
         exoPlayer.setPlaybackSpeed(if (channel.iptvContentType.equals("VOD", true)) vodPlaybackSpeed else 1f)
         exoPlayer.playWhenReady = true
+        applySubtitleAppearance()
         if (automaticRecovery || continuousLiveEnabled()) retryHandler.postDelayed(watchdogRunnable, 500L)
         onHealthChanged?.invoke(healthSnapshot())
+    }
+
+    fun applySubtitleAppearance() {
+        com.tvapp.livetv.settings.IptvSubtitleAppearanceStore(appContext).apply(playerView)
+    }
+
+    private fun tryProgressiveFallback(error: PlaybackException): Boolean {
+        val current = player ?: return false
+        val item = current.currentMediaItem ?: return false
+        val config = item.localConfiguration ?: return false
+        val factory = fallbackDataSourceFactory ?: return false
+        if (!IptvFormatFallback.allowed(error.errorCode, config.uri.path, formatFallbackAttempted,
+                config.drmConfiguration != null)) return false
+        formatFallbackAttempted = true
+        retryHandler.removeCallbacks(retryRunnable)
+        val position = current.currentPosition.coerceAtLeast(0L)
+        val playWhenReady = current.playWhenReady
+        val progressiveFactory = ProgressiveMediaSource.Factory(factory, IptvDataSourceFactory.createExtractors())
+        mediaSourceFactory = progressiveFactory
+        val source = createPlaybackSource(progressiveFactory, item)
+        CrashReportStore(appContext).recordDebug("IPTV_FORMAT_FALLBACK | progressive_same_url")
+        current.setMediaSource(source, if (currentChannel?.iptvContentType.equals("VOD", true)) position else 0L)
+        current.prepare()
+        current.playWhenReady = playWhenReady
+        return true
+    }
+
+    private fun createPlaybackSource(factory: MediaSource.Factory, item: MediaItem): MediaSource {
+        val video = factory.createMediaSource(item)
+        if (factory !is ProgressiveMediaSource.Factory) return video
+        val dataSource = fallbackDataSourceFactory ?: return video
+        val subtitles = item.localConfiguration?.subtitleConfigurations.orEmpty().map {
+            SingleSampleMediaSource.Factory(dataSource).createMediaSource(it, C.TIME_UNSET)
+        }
+        return if (subtitles.isEmpty()) video else MergingMediaSource(video, *subtitles.toTypedArray())
     }
 
     fun stop() {
@@ -821,7 +868,7 @@ class IptvPlaybackController(
         val updatedItem = currentItem.buildUpon()
             .setSubtitleConfigurations(subtitles.distinctBy { it.uri })
             .build()
-        current.setMediaSource(sourceFactory.createMediaSource(updatedItem), position)
+        current.setMediaSource(createPlaybackSource(sourceFactory, updatedItem), position)
         current.prepare()
         current.playWhenReady = shouldPlay
         return true
@@ -962,7 +1009,7 @@ class IptvPlaybackController(
             return
         }
         // Keep the current period and decoder alive; only one following part is retained.
-        current.addMediaSource(factory.createMediaSource(item))
+        current.addMediaSource(createPlaybackSource(factory, item))
         CrashReportStore(appContext).recordDebug("IPTV_LIVE_CONTINUATION | queued | remainingMs=${(current.duration - current.currentPosition).coerceAtLeast(0)}")
         if (current.playbackState == Player.STATE_ENDED) {
             current.seekToNextMediaItem()

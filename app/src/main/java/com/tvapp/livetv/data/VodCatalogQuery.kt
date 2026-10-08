@@ -10,6 +10,7 @@ data class VodFilter(
     val order: String = "SOURCE",
     val parentKey: String? = null,
     val season: Int? = null,
+    val searchWholeSource: Boolean = false,
 )
 
 /** Queries stay bounded; favorites live in user_channels, not in duplicated VOD flags. */
@@ -33,6 +34,12 @@ object VodCatalogQuery {
 
     fun item(key: String) = SimpleSQLiteQuery("SELECT * FROM ($CATALOG) WHERE sourceKey=? LIMIT 1", arrayOf(key))
 
+    fun resumeItems(keys: List<String>): SimpleSQLiteQuery {
+        val bounded = keys.distinct().take(100)
+        return SimpleSQLiteQuery("SELECT * FROM ($CATALOG) WHERE sourceKey IN " +
+            "(${bounded.joinToString(",") { "?" }.ifEmpty { "NULL" }}) LIMIT 100", bounded.toTypedArray())
+    }
+
     fun build(sourceId: Long, filter: VodFilter, keys: List<String> = emptyList(),
         offset: Int = 0, limit: Int = 60, count: Boolean = false, categories: Boolean = false): SimpleSQLiteQuery {
         val args = mutableListOf<Any>(sourceId)
@@ -44,7 +51,9 @@ object VodCatalogQuery {
             where.append(if (filter.section == "SERIES") " AND kind IN ('SERIES','EPISODE')" else " AND kind='MOVIE'")
             if (filter.view == "ALL") where.append(" AND (kind!='EPISODE' OR parentKey IS NULL)")
         }
-        if (!categories && filter.category != null) { where.append(" AND category=?"); args += filter.category }
+        if (!categories && filter.category != null && !(filter.searchWholeSource && filter.query.isNotBlank())) {
+            where.append(" AND category=?"); args += filter.category
+        }
         if (filter.query.isNotBlank() && !categories) {
             where.append(" AND name LIKE ? ESCAPE '\\'")
             args += "%${filter.query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")}%"

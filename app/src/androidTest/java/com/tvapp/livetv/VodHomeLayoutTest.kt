@@ -41,6 +41,8 @@ class VodHomeLayoutTest {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
             ActivityScenario.launch<VodHomeActivity>(Intent(context, VodHomeActivity::class.java)).use { scenario ->
+                var favoritesLabel = ""
+                scenario.onActivity { favoritesLabel = it.getString(R.string.vod_favorites) }
                 assertTrue(device.wait(Until.hasObject(By.text("Fixture movie 0")), 10000))
                 device.waitForIdle()
                 scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
@@ -56,7 +58,9 @@ class VodHomeLayoutTest {
                 device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-filter-focus-test.png"))
                 assertTrue(device.wait(Until.hasObject(By.res("com.tvapp.livetv", "vod_view_filter").focused(true)), 5000))
                 device.pressDPadCenter()
-                assertTrue(device.wait(Until.hasObject(By.text(context.getString(R.string.vod_favorites))), 5000))
+                device.waitForIdle()
+                device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-filter-options-test.png"))
+                assertTrue(device.wait(Until.hasObject(By.text(favoritesLabel)), 5000))
                 device.pressBack()
                 device.pressBack()
                 device.waitForIdle()

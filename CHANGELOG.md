@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-08 - VOD devamı ve IPTV uyumluluğu
+
+- Dizi devam kayıtları en son izlenen bölümle tek karta indirilir; oynatma menüsünden sezon sınırını da geçen sonraki bölüm açılabilir.
+- VOD arama kapsamı kategori veya seçili kaynak olarak ayarlanır; kategori tercihi korunur. Sorgular sayfalı ve sınırlı kalır.
+- IPTV altyazı boyutu, renk, arka plan, kenarlık, konum ve yazı tipi için kumandayla kullanılabilir pencere eklendi. Varsayılan sistem/kaynak görünümü ve TIF altyazıları korunur.
+- HLS uzantılı ama progressive içerik veren adresler belirli manifest/format hatalarında aynı URL ile bir kez denenir; header ve harici altyazılar korunur. Ağ/codec/DRM hatalarında format fallback'i yapılmaz.
+
 ## 2026-10-08 - Infobar video bitrate
 
 - IPTV infobarı yalnız oynatıcının video formatında bildirdiği bitrate değerini gösterir; bilgi yoksa alan gizlenir. Tahmini ağ indirme hızı video bitrate'i yerine kullanılmaz; diagnostikte ayrı kalır.

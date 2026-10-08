@@ -13,6 +13,12 @@ interface VodDao {
     @RawQuery suspend fun categories(query: SupportSQLiteQuery): List<String>
     @Query("SELECT * FROM vod_metadata WHERE sourceKey = :key")
     suspend fun metadata(key: String): VodMetadataEntity?
+    @Query("SELECT next.* FROM vod_metadata next JOIN vod_metadata origin ON origin.sourceKey=:key " +
+        "WHERE next.parentKey=origin.parentKey AND next.kind='EPISODE' AND next.streamUrl IS NOT NULL " +
+        "AND (next.seasonNumber>origin.seasonNumber OR " +
+        "(next.seasonNumber=origin.seasonNumber AND next.episodeNumber>origin.episodeNumber)) " +
+        "ORDER BY next.seasonNumber,next.episodeNumber,next.sourceKey LIMIT 1")
+    suspend fun nextEpisode(key: String): VodMetadataEntity?
     @Query("SELECT DISTINCT seasonNumber FROM vod_metadata WHERE parentKey = :key AND seasonNumber IS NOT NULL ORDER BY seasonNumber")
     suspend fun seasons(key: String): List<Int>
     @Query("SELECT MIN(updatedAt) FROM vod_metadata WHERE parentKey = :key")
