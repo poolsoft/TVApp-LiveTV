@@ -18,22 +18,54 @@ $script:adb = Find-Adb
 $script:deviceSerial = $Serial
 $script:statusLabel = $null
 $script:longPress = $null
+$script:devicePicker = $null
 
 function Refresh-Device {
-    if (-not $script:deviceSerial) {
-        $line = & $script:adb devices |
-            Where-Object { $_ -match '^emulator-\d+\s+device' } |
-            Select-Object -First 1
-        if ($line) {
-            $script:deviceSerial = ([regex]::Match($line, '^(emulator-\d+)')).Groups[1].Value
+    $previousSerial = $script:deviceSerial
+    $devices = @(
+        & $script:adb devices | ForEach-Object {
+            if ($_ -match '^(emulator-\d+)\s+device\s*$') {
+                $serial = $Matches[1]
+                $name = & $script:adb -s $serial emu avd name 2>$null |
+                    Where-Object { $_.Trim() -and $_.Trim() -ne 'OK' } |
+                    Select-Object -First 1
+                [pscustomobject]@{
+                    Serial = $serial
+                    Label = if ($name) { "$($name.Trim()) ($serial)" } else { $serial }
+                }
+            }
         }
+    )
+    $script:devicePicker.BeginUpdate()
+    try {
+        $script:devicePicker.Items.Clear()
+        foreach ($device in $devices) { [void]$script:devicePicker.Items.Add($device) }
+        $script:devicePicker.SelectedIndex = -1
+        for ($index = 0; $index -lt $devices.Count; $index++) {
+            if ($devices[$index].Serial -eq $previousSerial) {
+                $script:devicePicker.SelectedIndex = $index
+                break
+            }
+        }
+        if (-not $previousSerial -and $devices.Count -eq 1) {
+            $script:devicePicker.SelectedIndex = 0
+        }
+    } finally {
+        $script:devicePicker.EndUpdate()
     }
+    $script:deviceSerial = if ($script:devicePicker.SelectedItem) {
+        $script:devicePicker.SelectedItem.Serial
+    } else { '' }
+    Update-DeviceStatus
+}
+
+function Update-DeviceStatus {
     if ($script:statusLabel) {
         $connected = [bool]$script:deviceSerial
         $script:statusLabel.Text = if ($connected) {
             "Bagli: $script:deviceSerial"
         } else {
-            "Emulator bulunamadi"
+            "Emulator secin (gerekirse Yenile)"
         }
         $script:statusLabel.ForeColor = if ($connected) {
             [System.Drawing.Color]::FromArgb(38, 217, 127)
@@ -44,14 +76,13 @@ function Refresh-Device {
 }
 
 function Send-TvKey([int]$KeyCode) {
-    Refresh-Device
-    if (-not $script:deviceSerial) { return }
+    if (-not $script:deviceSerial) { Update-DeviceStatus; return }
     $arguments = @('-s', $script:deviceSerial, 'shell', 'input', 'keyevent')
     if ($script:longPress.Checked) { $arguments += '--longpress' }
     $arguments += $KeyCode
     & $script:adb @arguments | Out-Null
     $script:statusLabel.Text = if ($LASTEXITCODE -eq 0) {
-        "Gonderildi: $KeyCode"
+        "${script:deviceSerial}: $KeyCode"
     } else {
         "Tus gonderilemedi: $KeyCode"
     }
@@ -119,7 +150,7 @@ $form.Controls.Add($main)
 
 $header = New-Object System.Windows.Forms.Panel
 $header.Width = 320
-$header.Height = 55
+$header.Height = 94
 $header.Margin = New-Object System.Windows.Forms.Padding(10, 0, 10, 4)
 $script:statusLabel = New-Object System.Windows.Forms.Label
 $script:statusLabel.Location = New-Object System.Drawing.Point(8, 7)
@@ -132,11 +163,23 @@ $refresh.Location = New-Object System.Drawing.Point(230, 3)
 $refresh.Size = New-Object System.Drawing.Size(82, 31)
 $refresh.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $refresh.ForeColor = [System.Drawing.Color]::White
-$refresh.Add_Click({ $script:deviceSerial = ''; Refresh-Device })
+$refresh.Add_Click({ Refresh-Device })
 $header.Controls.Add($refresh)
+$script:devicePicker = New-Object System.Windows.Forms.ComboBox
+$script:devicePicker.Location = New-Object System.Drawing.Point(8, 38)
+$script:devicePicker.Size = New-Object System.Drawing.Size(304, 26)
+$script:devicePicker.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+$script:devicePicker.DisplayMember = 'Label'
+$script:devicePicker.Add_SelectedIndexChanged({
+    $script:deviceSerial = if ($script:devicePicker.SelectedItem) {
+        $script:devicePicker.SelectedItem.Serial
+    } else { '' }
+    Update-DeviceStatus
+})
+$header.Controls.Add($script:devicePicker)
 $script:longPress = New-Object System.Windows.Forms.CheckBox
 $script:longPress.Text = 'Sonraki tusa uzun bas'
-$script:longPress.Location = New-Object System.Drawing.Point(8, 32)
+$script:longPress.Location = New-Object System.Drawing.Point(8, 69)
 $script:longPress.Size = New-Object System.Drawing.Size(190, 22)
 $script:longPress.ForeColor = [System.Drawing.Color]::FromArgb(183, 187, 196)
 $header.Controls.Add($script:longPress)
@@ -197,6 +240,7 @@ $main.Controls.Add($hint)
 
 $form.Add_KeyDown({
     param($sender, $event)
+    if ($script:devicePicker.ContainsFocus) { return }
     $mapping = @{
         ([System.Windows.Forms.Keys]::Up) = 19
         ([System.Windows.Forms.Keys]::Down) = 20

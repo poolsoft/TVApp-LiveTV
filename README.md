@@ -251,6 +251,8 @@ revizyonu `version.json` içinde ayrıca tutulur; Android sürüm koduna dönü�
 arayüz/fokus testlerinde kullanılabilir. Emülatör çalışırken `tools/TVAppRemote.cmd` dosyası
 masaüstü kumanda panelini açar. Panel; renk, medya, TV, kanal, sayı ve gezinme tuşlarını ADB
 üzerinden gönderir. `Sonraki tusa uzun bas` seçeneği bağlamsal menüleri sınamak içindir.
+Panelin üstündeki listeden açık emülatör adı/ADB kimliği seçilir. `Yenile` bağlantıları tekrar
+listeler ve mevcut seçimi korur; seçilen cihaz kapanırsa başka cihaza otomatik tuş gönderilmez.
 
 Uygulama veya panel odaktayken yön tuşları, Enter ve Esc gezinme kumandasıdır. F1-F4 sırasıyla
 Info, Rehber, Menü ve Ayarlar; F5-F8 kırmızı, yeşil, sarı ve mavi; F9 Giriş, F10 Son Kanal,
