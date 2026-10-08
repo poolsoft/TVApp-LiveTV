@@ -64,6 +64,10 @@ class VodHomeActivity : TvRemoteActivity() {
     private var loading = false
     private var initialized = false
     private var pendingFocus = false
+    private var categories: List<String?> = emptyList()
+    private var categoryJob: Job? = null
+    private var categorySource = -1L
+    private var categorySection = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,25 +89,26 @@ class VodHomeActivity : TvRemoteActivity() {
         })
         continueAdapter = VodHomeAdapter(::showDetail, ::showItemActions, { _, _ -> }, compact = true)
         binding.vodGrid.layoutManager = GridLayoutManager(this,
-            (resources.configuration.screenWidthDp / 190).coerceIn(2, 5))
+            (resources.configuration.screenWidthDp * .76f / 180).toInt().coerceIn(1, 5))
         binding.vodGrid.adapter = gridAdapter
         binding.continueWatchingRow.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.continueWatchingRow.adapter = continueAdapter
         binding.vodLiveAction.setOnClickListener { openLiveTv() }
         binding.vodResumeAction.setOnClickListener { resumeLast() }
-        binding.vodContinueAction.setOnClickListener { resumeLast() }
+        binding.vodContinueAction.setOnClickListener { showContinue() }
         binding.vodSourceAction.setOnClickListener { showSources() }
         binding.vodListAction.setOnClickListener { showSources() }
         binding.vodFilterAction.setOnClickListener { showFilters() }
         binding.vodSearchAction.setOnClickListener { showFilters() }
         val colorSize = (TvUiMetrics.COLOR_KEY_DP * resources.displayMetrics.density).toInt()
-        listOf(binding.vodLiveAction, binding.vodContinueAction, binding.vodListAction, binding.vodSearchAction).forEach { action ->
+        listOf(binding.vodLiveAction, binding.vodContinueAction, binding.vodSourceAction, binding.vodFilterAction,
+            binding.vodListAction, binding.vodSearchAction).forEach { action ->
             action.compoundDrawablesRelative[0]?.let { marker ->
                 marker.setBounds(0, 0, colorSize, colorSize)
                 action.setCompoundDrawablesRelative(marker, null, null, null)
             }
         }
-        binding.vodCategoryAction.setOnClickListener { showCategories() }
+        binding.vodCategories.setOnItemClickListener { _, _, position, _ -> selectCategory(position) }
         binding.vodMovies.setOnClickListener { selectSection("MOVIE") }
         binding.vodSeries.setOnClickListener { selectSection("SERIES") }
         binding.vodPrevious.setOnClickListener { changePage(-1) }
@@ -182,6 +187,7 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun loadPage(restoreFocus: Boolean = false, refreshSeries: Boolean = false) {
         if (sourceId < 0) return
+        loadCategories()
         loadJob?.cancel()
         detailJob?.cancel()
         val generation = ++loadGeneration
@@ -203,7 +209,7 @@ class VodHomeActivity : TvRemoteActivity() {
                         catch (cancelled: CancellationException) { throw cancelled }
                         catch (error: Exception) { cacheFailure = error }
                     }
-                    val continueRows = repository.continueItems(source, snapshot.section, resumes.keys.toList())
+                    val continueRows = repository.continueItems(source, "ALL", resumes.keys.toList())
                     val effectiveKeys = if (snapshot.view == "CONTINUE" && snapshot.parentKey == null)
                         continueRows.map { it.sourceKey } else keys
                     val count = repository.count(source, snapshot, effectiveKeys)
@@ -219,10 +225,10 @@ class VodHomeActivity : TvRemoteActivity() {
                 parentTitle = result.parentTitle
                 lastItem = result.last
                 updateLast(resumes)
-                continueAdapter.submitList(result.continueRows.filter { it.sourceKey != result.last?.sourceKey }
-                    .map { VodCard(it, resumes[it.sourceKey]) })
-                val showContinue = result.continueRows.any { it.sourceKey != result.last?.sourceKey } &&
-                    snapshot.parentKey == null && resources.configuration.screenHeightDp >= 600
+                continueAdapter.submitList(result.continueRows.map { VodCard(it, resumes[it.sourceKey]) })
+                val showContinue = result.continueRows.isNotEmpty() && snapshot.parentKey == null &&
+                    snapshot.view == "ALL"
+                if (showContinue) binding.vodLastRow.visibility = View.GONE
                 binding.continueWatchingRow.visibility = if (showContinue) View.VISIBLE else View.GONE
                 binding.continueWatchingLabel.visibility = binding.continueWatchingRow.visibility
                 gridAdapter.submitList(result.rows.map { VodCard(it, resumes[it.sourceKey]) }) {
@@ -267,11 +273,11 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun updateHeader() {
         binding.vodSourceAction.text = sources.firstOrNull { it.source.id == sourceId }?.source?.name
             ?: getString(R.string.iptv_library_sources)
-        binding.vodMovies.isSelected = filter.section == "MOVIE"
-        binding.vodSeries.isSelected = filter.section == "SERIES"
-        binding.vodCategoryAction.text = parentTitle?.let { getString(R.string.vod_season_title, it, filter.season ?: 0) }
-            ?: filter.category ?: getString(R.string.vod_all_categories)
-        binding.vodSummary.text = listOfNotNull(viewLabel(filter.view), filter.query.takeIf(String::isNotBlank),
+        binding.vodMovies.isSelected = filter.section == "MOVIE" && filter.view == "ALL"
+        binding.vodSeries.isSelected = filter.section == "SERIES" && filter.view == "ALL"
+        binding.vodContinueAction.isSelected = filter.view == "CONTINUE"
+        binding.vodSummary.text = listOfNotNull(parentTitle?.let { getString(R.string.vod_season_title, it, filter.season ?: 0) },
+            filter.category, viewLabel(filter.view), filter.query.takeIf(String::isNotBlank),
             getString(R.string.vod_count, total)).joinToString(" · ")
         binding.vodPage.text = getString(R.string.vod_page_count, pageIndex + 1,
             ((total + PAGE_SIZE - 1) / PAGE_SIZE).coerceAtLeast(1))
@@ -280,7 +286,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun updateLast(resumes: Map<String, IptvResumeEntry>) {
         val last = lastItem
         binding.vodLastRow.visibility = if (last == null) View.GONE else View.VISIBLE
-        binding.vodContinueAction.isEnabled = last != null
+        binding.vodContinueAction.isEnabled = sourceId >= 0
         if (last == null) return
         binding.vodLastName.text = last.name
         val resume = resumes[last.sourceKey]
@@ -323,9 +329,12 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun selectSection(section: String) {
-        if (filter.section == section && filter.parentKey == null) return
-        changeFilter(filter.copy(section = section, category = null, parentKey = null, season = null))
+        if (filter.section == section && filter.parentKey == null && filter.view == "ALL") { focusCatalog(); return }
+        changeFilter(filter.copy(section = section, category = null, parentKey = null, season = null, view = "ALL", query = ""))
     }
+
+    private fun showContinue() = changeFilter(filter.copy(view = "CONTINUE", category = null,
+        parentKey = null, season = null, query = ""))
 
     private fun showSources() {
         if (sources.isEmpty()) {
@@ -345,23 +354,40 @@ class VodHomeActivity : TvRemoteActivity() {
             }.setNegativeButton(R.string.close, null).create())
     }
 
-    private fun showCategories() {
-        if (filter.parentKey != null) { showSeasons(filter.parentKey!!); return }
+    private fun loadCategories() {
+        if (categorySource == sourceId && categorySection == filter.section) return
         val source = sourceId
         val section = filter.section
-        detailJob?.cancel()
-        detailJob = lifecycleScope.launch {
+        categoryJob?.cancel()
+        categoryJob = lifecycleScope.launch {
             try {
-                val categories = withContext(Dispatchers.IO) { repository.categories(source, section) }
+                val names = withContext(Dispatchers.IO) { repository.categories(source, section) }
                 if (source != sourceId || section != filter.section) return@launch
-                val labels = arrayOf(getString(R.string.vod_all_categories), *categories.toTypedArray())
-                showDialog(AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog).setTitle(R.string.iptv_category_filter)
-                    .setSingleChoiceItems(labels, categories.indexOf(filter.category) + 1) { d, i ->
-                        d.dismiss(); changeFilter(filter.copy(category = categories.getOrNull(i - 1)))
-                    }.setNegativeButton(R.string.close, null).create())
+                categorySource = source; categorySection = section
+                categories = listOf(null) + names
+                binding.vodCategories.adapter = object : android.widget.ArrayAdapter<String>(this@VodHomeActivity,
+                    android.R.layout.simple_list_item_activated_1, listOf(getString(R.string.vod_all_categories)) + names) {
+                    override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                        (super.getView(position, convertView, parent) as android.widget.TextView).apply {
+                            setTextColor(getColor(if (categories[position] == this@VodHomeActivity.filter.category) R.color.accent else R.color.text_primary))
+                            textSize = 13f; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
+                            minHeight = (40 * resources.displayMetrics.density).toInt()
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        }
+                }
+                binding.vodCategories.setItemChecked(categories.indexOf(filter.category).coerceAtLeast(0), true)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { showFailure(error) }
+            catch (error: Exception) { debugLog.recordDebug("VOD_CATEGORIES_FAILED | ${error.javaClass.simpleName}") }
         }
+    }
+
+    private fun selectCategory(position: Int) {
+        if (position !in categories.indices) return
+        val category = categories[position]
+        binding.vodCategories.setItemChecked(position, true)
+        if (filter.category == category && filter.view == "ALL" && filter.parentKey == null) { focusCatalog(); return }
+        changeFilter(filter.copy(category = category, view = "ALL", parentKey = null, season = null, query = ""))
+        (binding.vodCategories.adapter as? android.widget.ArrayAdapter<*>)?.notifyDataSetChanged()
     }
 
     private fun showFilters() {
@@ -568,12 +594,10 @@ class VodHomeActivity : TvRemoteActivity() {
     override fun onBackPressed() {
         if (dialog?.isShowing == true) { dialog?.dismiss(); return }
         if (filter.parentKey != null) { changeFilter(filter.copy(parentKey = null, season = null)); return }
-        if (binding.vodGrid.hasFocus() || binding.continueWatchingRow.hasFocus() ||
-            currentFocus in listOf(binding.vodPrevious, binding.vodNext, binding.vodLiveAction,
-                binding.vodContinueAction, binding.vodListAction, binding.vodSearchAction)) {
+        if (!binding.vodSidebar.hasFocus()) {
             focusSection(); return
         }
-        binding.vodLiveAction.requestFocus()
+        focusCatalog()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -583,12 +607,22 @@ class VodHomeActivity : TvRemoteActivity() {
                 KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_SEARCH, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_CHANNEL_UP)) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (key) {
                 KeyEvent.KEYCODE_PROG_RED -> openLiveTv()
-                KeyEvent.KEYCODE_PROG_GREEN -> resumeLast()
+                KeyEvent.KEYCODE_PROG_GREEN -> showContinue()
                 KeyEvent.KEYCODE_PROG_YELLOW -> showSources()
                 KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_SEARCH -> showFilters()
                 KeyEvent.KEYCODE_CHANNEL_DOWN -> changePage(1)
                 KeyEvent.KEYCODE_CHANNEL_UP -> changePage(-1)
             }
+            return true
+        }
+        if (key == KeyEvent.KEYCODE_MENU) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                if (binding.vodSidebar.hasFocus()) focusCatalog() else focusSection()
+            }
+            return true
+        }
+        if (event.action == KeyEvent.ACTION_DOWN && key == KeyEvent.KEYCODE_DPAD_RIGHT && binding.vodSidebar.hasFocus()) {
+            if (binding.vodCategories.hasFocus()) selectCategory(binding.vodCategories.selectedItemPosition) else focusCatalog()
             return true
         }
         if (event.action == KeyEvent.ACTION_DOWN && binding.vodGrid.hasFocus()) {
@@ -602,19 +636,21 @@ class VodHomeActivity : TvRemoteActivity() {
                 }
                 return true
             }
-            if (key == KeyEvent.KEYCODE_DPAD_UP && focusedPosition < columns) { focusSection(); return true }
-            if (key == KeyEvent.KEYCODE_DPAD_LEFT && focusedPosition % columns == 0) return true
+            if (key == KeyEvent.KEYCODE_DPAD_UP && focusedPosition < columns) {
+                if (binding.continueWatchingRow.visibility == View.VISIBLE) binding.continueWatchingRow.requestFocus()
+                else focusSection()
+                return true
+            }
+            if (key == KeyEvent.KEYCODE_DPAD_LEFT && focusedPosition % columns == 0) { focusSection(); return true }
             if (key == KeyEvent.KEYCODE_DPAD_RIGHT && (focusedPosition % columns == columns - 1 ||
                 focusedPosition == gridAdapter.itemCount - 1)) return true
         }
         if (event.action == KeyEvent.ACTION_DOWN) {
             val focus = currentFocus
-            if (key == KeyEvent.KEYCODE_DPAD_DOWN && (focus in listOf(binding.vodMovies, binding.vodSeries,
-                    binding.vodCategoryAction, binding.vodResumeAction) || binding.continueWatchingRow.hasFocus())) {
+            if (key == KeyEvent.KEYCODE_DPAD_DOWN && (focus == binding.vodResumeAction || binding.continueWatchingRow.hasFocus())) {
                 focusCatalog(); return true
             }
-            if (key == KeyEvent.KEYCODE_DPAD_UP && focus in listOf(binding.vodPrevious, binding.vodNext,
-                    binding.vodLiveAction, binding.vodContinueAction, binding.vodListAction, binding.vodSearchAction)) {
+            if (key == KeyEvent.KEYCODE_DPAD_UP && focus in listOf(binding.vodPrevious, binding.vodNext)) {
                 focusCatalog(); return true
             }
         }
@@ -622,10 +658,15 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun focusSection() {
-        (if (filter.section == "SERIES") binding.vodSeries else binding.vodMovies).requestFocus()
+        pendingFocus = false
+        if (categories.isNotEmpty()) {
+            binding.vodCategories.requestFocus()
+            binding.vodCategories.setSelection(categories.indexOf(filter.category).coerceAtLeast(0))
+        } else (if (filter.section == "SERIES") binding.vodSeries else binding.vodMovies).requestFocus()
     }
 
     private fun focusCatalog() {
+        if (loading) { pendingFocus = true; return }
         if (gridAdapter.itemCount == 0) {
             if (binding.vodEmpty.isFocusable) binding.vodEmpty.requestFocus()
             return

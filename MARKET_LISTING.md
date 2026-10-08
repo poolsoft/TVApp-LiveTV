@@ -1,5 +1,9 @@
 # TVApp Mağaza Metinleri
 
+- Kumanda odaklı VOD yan menüsü: doğrudan kategori listesi, tek adımla içerik/kategori geçişi, tüm devam kayıtlarına erişim ve yayın sırasında Sol/Sağ ile sarma.
+
+English: Remote-first VOD sidebar with visible categories, one-step category/content navigation, multiple resume items and direct Left/Right seeking during playback.
+
 - Dizi başına en son bölümden devam, sezonlar arasında sonraki bölüm seçimi ve kategori/seçili liste kapsamında VOD araması.
 - IPTV altyazıları için isteğe bağlı boyut, renk, konum, arka plan ve kenarlık ayarları; tuner altyazıları etkilenmez.
 - Yanlış HLS formatı bildiren adreslerde aynı bağlantıyla sınırlı progressive fallback; ek oynatıcı bağımlılığı yoktur.

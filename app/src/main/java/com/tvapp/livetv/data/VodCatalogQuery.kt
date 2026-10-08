@@ -48,7 +48,11 @@ object VodCatalogQuery {
             where.append(" AND parentKey=?"); args += filter.parentKey
             filter.season?.let { where.append(" AND seasonNumber=?"); args += it }
         } else {
-            where.append(if (filter.section == "SERIES") " AND kind IN ('SERIES','EPISODE')" else " AND kind='MOVIE'")
+            where.append(when {
+                filter.view == "CONTINUE" -> " AND kind IN ('MOVIE','EPISODE')"
+                filter.section == "SERIES" -> " AND kind IN ('SERIES','EPISODE')"
+                else -> " AND kind='MOVIE'"
+            })
             if (filter.view == "ALL") where.append(" AND (kind!='EPISODE' OR parentKey IS NULL)")
         }
         if (!categories && filter.category != null && !(filter.searchWholeSource && filter.query.isNotBlank())) {

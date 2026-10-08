@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-08 - VOD kumanda gezinmesi
+
+- Kategoriler solda doğrudan listelenir; liste, Sinema/Dizi, Devam Et, arama ve Canlı TV eylemleri yan alandadır. Sol kenarda Sol veya içerikte Back kategori alanına, Sağ hatırlanan içerik konumuna döner; MENU alan değiştirir.
+- Yeşil tüm devam kayıtlarını açar; seçili kaynağın filmleri ve bölümleri birlikte gösterilir. Küçük TV ekranlarında gizlenen devam kartları açıldı; son içerik hariç tutulmaz, aynı dizi yine tek karttır.
+- VOD modunda Sol/Sağ sarma, pasif infobar görünürken ve içerik türü henüz çözümlenmemişken de çalışır. Diyaloglar ve etkin işlem düğmeleri önceliğini korur.
+
 ## 2026-10-08 - VOD devamı ve IPTV uyumluluğu
 
 - Dizi devam kayıtları en son izlenen bölümle tek karta indirilir; oynatma menüsünden sezon sınırını da geçen sonraki bölüm açılabilir.

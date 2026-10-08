@@ -27,6 +27,38 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class IptvEnhancementsTest {
+    @Test fun vodArrowsActivateTimelineWithPassiveInfoBarAndUnknownFormat() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                fun field(name: String) = MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }
+                val channel = field("currentChannel")
+                val vod = field("vodMode")
+                val kind = field("currentIptvContentKind")
+                val interactive = field("iptvControlsInteractive")
+                val original = listOf(channel.get(activity), vod.get(activity), kind.get(activity))
+                val ids = listOf(R.id.channel_panel, R.id.status_panel, R.id.recent_channels_panel, R.id.parental_lock_panel)
+                val visibilities = ids.map { activity.findViewById<android.view.View>(it).visibility }
+                try {
+                    channel.set(activity, LiveChannel(1, "fixture:vod-keys", "iptv:0", "", "VOD key test fixture",
+                        "fixture:vod-keys", source = LiveChannel.Source.IPTV, iptvContentType = "VOD"))
+                    vod.setBoolean(activity, true)
+                    kind.set(activity, com.tvapp.livetv.playback.IptvContentKind.UNKNOWN)
+                    ids.forEach { activity.findViewById<android.view.View>(it).visibility = android.view.View.GONE }
+                    activity.findViewById<android.view.View>(R.id.info_bar).visibility = android.view.View.VISIBLE
+                    interactive.setBoolean(activity, false)
+                    activity.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_RIGHT))
+                    assertTrue(interactive.getBoolean(activity))
+                    assertEquals("TIMELINE", field("iptvControlRow").get(activity)?.toString())
+                    assertEquals(android.view.View.GONE, activity.findViewById<android.view.View>(R.id.channel_panel).visibility)
+                } finally {
+                    MainActivity::class.java.getDeclaredMethod("hideIptvPlaybackControls", Boolean::class.javaPrimitiveType)
+                        .apply { isAccessible = true }.invoke(activity, true)
+                    channel.set(activity, original[0]); vod.set(activity, original[1]); kind.set(activity, original[2])
+                    ids.forEachIndexed { i, id -> activity.findViewById<android.view.View>(id).visibility = visibilities[i] }
+                }
+            }
+        }
+    }
     @Test fun subtitleDialogSupportsRemoteAndCancelPreservesPreferences() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = IptvSubtitleAppearanceStore(context)

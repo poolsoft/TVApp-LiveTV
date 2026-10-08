@@ -16,6 +16,7 @@ import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.IptvSourceEntity
 import com.tvapp.livetv.data.local.IptvChannelEntity
 import com.tvapp.livetv.data.local.VodMetadataEntity
+import com.tvapp.livetv.playback.IptvResumeStore
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import org.junit.Assert.*
@@ -24,6 +25,53 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class VodHomeLayoutTest {
+    @Test fun continueShowsMultipleItemsAndSidebarHasRealCategories(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = TVAppDatabase.getInstance(context)
+        val prefs = context.getSharedPreferences("vod-library", Context.MODE_PRIVATE)
+        val oldSource = prefs.getLong("source", -1)
+        val source = db.iptvDao().insertSource(IptvSourceEntity(name = "Resume UI fixture", location = "fixture:resume:${System.nanoTime()}", kind = "FILE"))
+        val keys = (0..2).map { "resume-ui:$source:$it" }
+        val resume = IptvResumeStore(context)
+        try {
+            db.iptvDao().upsertChannels((0..1).map { index -> IptvChannelEntity(keys[index], source, null, null,
+                "Resume fixture movie $index", "https://example.invalid/$index.mp4", null, "Fixture category $index",
+                null, null, originalIndex = index, contentType = "VOD", lastSeenAt = 1) })
+            db.vodDao().upsert(listOf(VodMetadataEntity(keys[2], source, "EPISODE", "2", parentKey = "fixture:series:$source",
+                seasonNumber = 1, episodeNumber = 2, name = "Resume fixture episode", streamUrl = "https://example.invalid/2.mp4", updatedAt = 1)))
+            keys.forEach { resume.save(it, 60_000, 3_600_000) }
+            prefs.edit().putLong("source", source).commit()
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            InstrumentationRegistry.getInstrumentation().setInTouchMode(false)
+            ActivityScenario.launch<VodHomeActivity>(Intent(context, VodHomeActivity::class.java)).use { scenario ->
+                assertTrue(device.wait(Until.hasObject(By.text("Fixture category 0")), 10000))
+                assertTrue(device.hasObject(By.text("Fixture category 1")))
+                scenario.onActivity { assertEquals(View.VISIBLE, it.findViewById<View>(R.id.continue_watching_row).visibility) }
+                device.pressKeyCode(KeyEvent.KEYCODE_PROG_GREEN)
+                assertTrue(device.wait(Until.hasObject(By.text("Resume fixture episode")), 5000))
+                assertTrue(device.hasObject(By.text("Resume fixture movie 0")))
+                assertTrue(device.hasObject(By.text("Resume fixture movie 1")))
+                device.pressBack()
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_categories).hasFocus()) }
+                device.pressDPadDown()
+                device.pressDPadRight()
+                device.waitForIdle()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
+                assertTrue(device.hasObject(By.text("Resume fixture movie 0")))
+                assertTrue(device.wait(Until.gone(By.res("com.tvapp.livetv", "vod_grid")
+                    .hasDescendant(By.text("Resume fixture movie 1"))), 5000))
+                device.takeScreenshot(File(context.getExternalFilesDir(null), "vod-sidebar-test.png"))
+            }
+        } finally {
+            keys.forEach(resume::clear)
+            db.iptvDao().getSource(source)?.let { db.iptvDao().deleteSource(it) }
+            prefs.edit().apply {
+                prefs.all.keys.filter { it.startsWith("$source:") }.forEach(::remove)
+                if (oldSource < 0) remove("source") else putLong("source", oldSource)
+            }.commit()
+        }
+    }
     @Test fun populatedCatalogPagesAndDetailsRemainUsable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = TVAppDatabase.getInstance(context)
@@ -48,8 +96,8 @@ class VodHomeLayoutTest {
                 scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
                 device.pressDPadUp()
                 device.waitForIdle()
-                scenario.onActivity { assertEquals(R.id.vod_movies, it.currentFocus?.id) }
-                device.pressDPadDown()
+                scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_categories).hasFocus()) }
+                device.pressDPadRight()
                 device.waitForIdle()
                 scenario.onActivity { assertTrue(it.findViewById<View>(R.id.vod_grid).hasFocus()) }
                 device.pressKeyCode(KeyEvent.KEYCODE_PROG_BLUE)

@@ -6323,8 +6323,7 @@ class MainActivity : TvRemoteActivity() {
         }
         val isIptv = currentChannel?.source == LiveChannel.Source.IPTV
         val isChannelPanelClosed = binding.channelPanel.visibility != View.VISIBLE
-        val hasNoPlaybackOsd = isChannelPanelClosed &&
-            binding.infoBar.visibility != View.VISIBLE &&
+        val hasNoBlockingPlaybackOsd = isChannelPanelClosed &&
             binding.statusPanel.visibility != View.VISIBLE &&
             binding.recentChannelsPanel.visibility != View.VISIBLE &&
             binding.parentalLockPanel.visibility != View.VISIBLE &&
@@ -6334,8 +6333,8 @@ class MainActivity : TvRemoteActivity() {
             event.action == KeyEvent.ACTION_DOWN &&
             event.repeatCount == 0 &&
             isIptv &&
-            currentIptvContentKind == IptvContentKind.VOD &&
-            hasNoPlaybackOsd &&
+            (vodMode || currentIptvContentKind == IptvContentKind.VOD) &&
+            hasNoBlockingPlaybackOsd && !iptvControlsInteractive &&
             event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
         ) {
             iptvControlRow = IptvControlRow.TIMELINE

@@ -82,6 +82,9 @@ class VodCatalogTest {
             assertEquals(listOf("fixture:episode"), repository.continueItems(source, "SERIES",
                 listOf("fixture:episode", "fixture:earlier", "fixture:42")).map { it.sourceKey })
             assertTrue(repository.continueItems(source + 1, "SERIES", listOf("fixture:episode")).isEmpty())
+            val combined = repository.continueItems(source, "ALL", listOf("fixture:42", "fixture:episode", "fixture:earlier"))
+            assertEquals(listOf("fixture:42", "fixture:episode"), combined.map { it.sourceKey })
+            assertEquals(2, repository.count(source, VodFilter(view = "CONTINUE"), combined.map { it.sourceKey }))
         } finally { db.close() }
     }
 }

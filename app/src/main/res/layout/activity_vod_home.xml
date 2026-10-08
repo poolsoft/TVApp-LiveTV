@@ -1,73 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="20dp" android:background="#15171B">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="44dp" android:gravity="center_vertical">
-        <TextView android:id="@+id/vod_home_title" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_weight="1" android:text="@string/vod_home_title" android:textColor="@color/text_primary"
-            android:textSize="22sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
-        <TextView android:id="@+id/vod_source_action" style="@style/VodAction"
-            android:layout_width="wrap_content" android:layout_height="40dp" android:drawableStart="@drawable/ic_list"
-            android:text="@string/iptv_library_sources" android:maxLines="1" android:ellipsize="end" android:maxWidth="240dp" />
-        <ImageButton android:id="@+id/vod_filter_action" android:layout_width="40dp" android:layout_height="40dp"
-            android:background="@drawable/bg_filter_icon" android:src="@drawable/ic_search" android:padding="8dp"
-            android:contentDescription="@string/vod_search_filters" android:tooltipText="@string/vod_search_filters" />
-    </LinearLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="40dp" android:gravity="center_vertical" android:layout_marginBottom="8dp">
-        <TextView android:id="@+id/vod_movies" style="@style/VodAction" android:layout_width="wrap_content"
-            android:layout_height="36dp" android:text="@string/vod_movies" />
-        <TextView android:id="@+id/vod_series" style="@style/VodAction" android:layout_width="wrap_content"
-            android:layout_height="36dp" android:text="@string/vod_series" android:layout_marginStart="6dp" />
-        <TextView android:id="@+id/vod_category_action" style="@style/VodAction" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1" android:layout_marginStart="12dp"
-            android:drawableStart="@drawable/ic_filter_list" android:text="@string/iptv_category_filter"
-            android:gravity="start|center_vertical" android:maxLines="1" android:ellipsize="end" />
-    </LinearLayout>
-    <LinearLayout android:id="@+id/vod_last_row" android:layout_width="match_parent" android:layout_height="68dp"
-        android:gravity="center_vertical" android:layout_marginBottom="8dp" android:visibility="gone">
-        <ImageView android:id="@+id/vod_last_image" android:layout_width="92dp" android:layout_height="56dp"
-            android:scaleType="fitCenter" android:contentDescription="@null" />
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-            android:layout_marginStart="12dp" android:orientation="vertical">
-            <TextView android:id="@+id/vod_last_name" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:textColor="@color/text_primary" android:textStyle="bold" android:textSize="16sp" android:maxLines="1" android:ellipsize="end" />
-            <TextView android:id="@+id/vod_last_position" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+    android:orientation="vertical" android:padding="16dp" android:background="#15171B">
+    <TextView android:id="@+id/vod_home_title" android:layout_width="match_parent" android:layout_height="40dp"
+        android:text="@string/vod_home_title" android:textColor="@color/text_primary" android:textSize="22sp"
+        android:textStyle="bold" android:gravity="center_vertical" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:id="@+id/vod_sidebar" android:layout_width="0dp" android:layout_weight="2.4"
+            android:layout_height="match_parent" android:orientation="vertical" android:paddingEnd="12dp">
+            <TextView android:id="@+id/vod_source_action" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="40dp" android:gravity="start|center_vertical" android:text="@string/iptv_library_sources" android:drawableStart="@drawable/key_yellow" />
+            <TextView android:id="@+id/vod_movies" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="32dp" android:gravity="start|center_vertical" android:text="@string/vod_movies" />
+            <TextView android:id="@+id/vod_series" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="32dp" android:gravity="start|center_vertical" android:text="@string/vod_series" />
+            <TextView android:id="@+id/vod_continue_action" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="40dp" android:gravity="start|center_vertical" android:text="@string/continue_watching" android:drawableStart="@drawable/key_green" />
+            <TextView android:id="@+id/vod_filter_action" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="40dp" android:gravity="start|center_vertical" android:text="@string/vod_search_filters" android:drawableStart="@drawable/key_blue" />
+            <TextView android:layout_width="match_parent" android:layout_height="28dp" android:gravity="center_vertical"
+                android:text="@string/iptv_category_filter" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            <ListView android:id="@+id/vod_categories" android:layout_width="match_parent" android:layout_height="0dp"
+                android:layout_weight="1" android:choiceMode="singleChoice" android:divider="@null"
+                android:listSelector="@drawable/bg_focusable" android:drawSelectorOnTop="false" />
+            <TextView android:id="@+id/vod_live_action" style="@style/VodAction" android:layout_width="match_parent"
+                android:layout_height="40dp" android:gravity="start|center_vertical" android:text="@string/live_tv" android:drawableStart="@drawable/key_red" />
         </LinearLayout>
-        <TextView android:id="@+id/vod_resume_action" style="@style/VodAction" android:layout_width="wrap_content"
-            android:layout_height="40dp" android:drawableStart="@drawable/ic_play" android:text="@string/continue_watching" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="7.6" android:layout_height="match_parent" android:orientation="vertical">
+            <LinearLayout android:id="@+id/vod_last_row" android:layout_width="match_parent" android:layout_height="60dp"
+                android:gravity="center_vertical" android:visibility="gone">
+                <ImageView android:id="@+id/vod_last_image" android:layout_width="80dp" android:layout_height="52dp" android:scaleType="fitCenter" android:contentDescription="@null" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp" android:orientation="vertical">
+                    <TextView android:id="@+id/vod_last_name" android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary" android:textStyle="bold" android:textSize="16sp" android:maxLines="1" android:ellipsize="end" />
+                    <TextView android:id="@+id/vod_last_position" android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textColor="@color/text_secondary" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+                </LinearLayout>
+                <TextView android:id="@+id/vod_resume_action" style="@style/VodAction" android:layout_width="wrap_content"
+                    android:layout_height="40dp" android:drawableStart="@drawable/ic_play" android:text="@string/continue_watching" />
+            </LinearLayout>
+            <TextView android:id="@+id/continue_watching_label" android:layout_width="match_parent" android:layout_height="24dp"
+                android:text="@string/continue_watching" android:textColor="@color/text_secondary" android:textSize="12sp" android:visibility="gone" />
+            <androidx.recyclerview.widget.RecyclerView android:id="@+id/continue_watching_row"
+                android:layout_width="match_parent" android:layout_height="88dp" android:clipToPadding="false" android:visibility="gone" />
+            <TextView android:id="@+id/vod_summary" android:layout_width="match_parent" android:layout_height="28dp"
+                android:gravity="center_vertical" android:textColor="@color/text_secondary" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+                <androidx.recyclerview.widget.RecyclerView android:id="@+id/vod_grid" android:layout_width="match_parent"
+                    android:layout_height="match_parent" android:clipToPadding="false" />
+                <TextView android:id="@+id/vod_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_gravity="center" android:gravity="center" android:padding="16dp" android:background="@drawable/bg_focusable"
+                    android:text="@string/vod_empty" android:textColor="@color/text_secondary" android:textSize="15sp" android:visibility="gone" />
+                <ProgressBar android:id="@+id/vod_loading" android:layout_width="28dp" android:layout_height="28dp"
+                    android:layout_gravity="top|end" android:contentDescription="@string/loading" android:visibility="gone" />
+            </FrameLayout>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical">
+                <TextView android:id="@+id/vod_previous" style="@style/VodAction" android:layout_width="40dp" android:layout_height="32dp"
+                    android:text="&#8249;" android:textSize="22sp" android:contentDescription="@string/vod_previous_page" />
+                <TextView android:id="@+id/vod_page" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                    android:gravity="center" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                <TextView android:id="@+id/vod_next" style="@style/VodAction" android:layout_width="40dp" android:layout_height="32dp"
+                    android:text="&#8250;" android:textSize="22sp" android:contentDescription="@string/vod_next_page" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
-    <TextView android:id="@+id/continue_watching_label" android:layout_width="match_parent" android:layout_height="24dp"
-        android:text="@string/continue_watching" android:textColor="@color/text_secondary" android:textSize="12sp" android:visibility="gone" />
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/continue_watching_row"
-        android:layout_width="match_parent" android:layout_height="94dp" android:clipToPadding="false" android:visibility="gone" />
-    <TextView android:id="@+id/vod_summary" android:layout_width="match_parent" android:layout_height="28dp"
-        android:gravity="center_vertical" android:textColor="@color/text_secondary" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
-    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-        <androidx.recyclerview.widget.RecyclerView android:id="@+id/vod_grid"
-            android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false" />
-        <TextView android:id="@+id/vod_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_gravity="center" android:gravity="center" android:padding="16dp" android:background="@drawable/bg_focusable"
-            android:text="@string/vod_empty" android:textColor="@color/text_secondary" android:textSize="15sp" android:visibility="gone" />
-        <ProgressBar android:id="@+id/vod_loading" android:layout_width="28dp" android:layout_height="28dp"
-            android:layout_gravity="top|end" android:contentDescription="@string/loading" android:visibility="gone" />
-    </FrameLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="36dp" android:gravity="center_vertical">
-        <TextView android:id="@+id/vod_previous" style="@style/VodAction" android:layout_width="40dp" android:layout_height="32dp"
-            android:text="&#8249;" android:textSize="22sp" android:contentDescription="@string/vod_previous_page" />
-        <TextView android:id="@+id/vod_page" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-            android:gravity="center" android:textColor="@color/text_secondary" android:textSize="12sp" />
-        <TextView android:id="@+id/vod_next" style="@style/VodAction" android:layout_width="40dp" android:layout_height="32dp"
-            android:text="&#8250;" android:textSize="22sp" android:contentDescription="@string/vod_next_page" />
-    </LinearLayout>
-    <LinearLayout android:layout_width="match_parent" android:layout_height="36dp" android:gravity="center_vertical">
-        <TextView android:id="@+id/vod_live_action" style="@style/VodAction" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="36dp" android:drawableStart="@drawable/key_red" android:text="@string/live_tv" android:gravity="start|center_vertical" />
-        <TextView android:id="@+id/vod_continue_action" style="@style/VodAction" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="36dp" android:drawableStart="@drawable/key_green" android:text="@string/continue_watching" android:gravity="start|center_vertical" />
-        <TextView android:id="@+id/vod_list_action" style="@style/VodAction" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="36dp" android:drawableStart="@drawable/key_yellow" android:text="@string/iptv_library_sources" android:gravity="start|center_vertical" />
-        <TextView android:id="@+id/vod_search_action" style="@style/VodAction" android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="36dp" android:drawableStart="@drawable/key_blue" android:text="@string/vod_search_filters" android:gravity="start|center_vertical" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="@string/vod_navigation_hint" android:textSize="11sp" android:textColor="@color/text_secondary" />
+        <TextView android:id="@+id/vod_list_action" style="@style/VodAction" android:layout_width="wrap_content"
+            android:layout_height="32dp" android:drawableStart="@drawable/key_yellow" android:text="@string/iptv_library_sources" android:focusable="false" />
+        <TextView android:id="@+id/vod_search_action" style="@style/VodAction" android:layout_width="wrap_content"
+            android:layout_height="32dp" android:drawableStart="@drawable/key_blue" android:text="@string/vod_search_filters" android:focusable="false" />
     </LinearLayout>
 </LinearLayout>

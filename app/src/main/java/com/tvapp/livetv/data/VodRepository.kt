@@ -62,7 +62,11 @@ class VodRepository(context: Context, private val database: TVAppDatabase = TVAp
     suspend fun continueItems(sourceId: Long, section: String, keys: List<String>): List<VodCatalogItem> {
         val rows = dao.page(VodCatalogQuery.resumeItems(keys)).associateBy { it.sourceKey }
         return keys.take(100).mapNotNull(rows::get).filter {
-            it.sourceId == sourceId && if (section == "SERIES") it.kind == "EPISODE" else it.kind == "MOVIE"
+            it.sourceId == sourceId && when (section) {
+                "ALL" -> it.kind in listOf("MOVIE", "EPISODE")
+                "SERIES" -> it.kind == "EPISODE"
+                else -> it.kind == "MOVIE"
+            }
         }.distinctBy { it.parentKey ?: it.sourceKey }
     }
 
