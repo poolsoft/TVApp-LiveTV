@@ -299,6 +299,7 @@
     <string name="xmltv_clear">XMLTV verisini temizle</string>
     <string name="xmltv_not_configured">Alternatif EPG kaynağı ayarlanmadı.</string>
     <string name="xmltv_no_valid_programs">Kaynakta geçerli program bulunamadı. Mevcut EPG korundu.</string>
+    <string name="xmltv_only_expired_programs">Kaynakta yalnız tarihi geçmiş programlar var. Kaynak tarihlerini ve cihaz saatini kontrol edin. Mevcut EPG korundu.</string>
     <string name="xmltv_importing">XMLTV programları okunuyor…</string>
     <string name="xmltv_import_progress">XMLTV güncelleniyor: %1$s (%2$d program)</string>
     <string name="xmltv_phase_reading">bağlanılıyor</string>

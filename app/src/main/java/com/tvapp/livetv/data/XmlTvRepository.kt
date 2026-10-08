@@ -580,6 +580,7 @@ class XmlTvRepository(
 
         val now = System.currentTimeMillis()
         val importStartedAt = SystemClock.elapsedRealtime()
+        val retentionCutoff = now - EXPIRED_EPG_CUTOFF_MS
         val existing = replacementSource ?: dao.sourceByLocation(location)
         val stagingId = dao.insertSource(
             XmlTvSourceEntity(
@@ -593,6 +594,7 @@ class XmlTvRepository(
 
         val batch = ArrayList<XmlTvProgramEntity>(INSERT_BATCH_SIZE)
         var totalImported = 0
+        var expiredPrograms = 0
         val progress = XmlTvProgressThrottle(onProgress)
 
         /** Çok sayfalı büyük güncellemelerde UI bildirimlerini sınırlar; ayrıntı
@@ -662,6 +664,11 @@ class XmlTvRepository(
                                 }
                             }
                             if (channelId.isNotBlank() && start > 0 && stop > start) {
+                                if (stop < retentionCutoff) {
+                                    expiredPrograms++
+                                    event = parser.next()
+                                    continue
+                                }
                                 reportProgress(XmlTvImportPhase.PARSING)
                                 batch += XmlTvProgramEntity(
                                     channelId = channelId,
@@ -694,7 +701,12 @@ class XmlTvRepository(
                 batch.clear()
             }
 
-            check(totalImported > 0) { appContext.getString(com.tvapp.livetv.R.string.xmltv_no_valid_programs) }
+            check(totalImported > 0) {
+                appContext.getString(
+                    if (expiredPrograms > 0) com.tvapp.livetv.R.string.xmltv_only_expired_programs
+                    else com.tvapp.livetv.R.string.xmltv_no_valid_programs,
+                )
+            }
             var sourceId = 0L
             database.runInTransaction {
                 sourceId = existing?.id ?: dao.insertSource(
@@ -707,7 +719,7 @@ class XmlTvRepository(
 
             EpgSnapshotCache.invalidateAll()
             reportProgress(XmlTvImportPhase.SAVING, force = true)
-            purgeExpiredPrograms()
+            purgeExpiredPrograms(retentionCutoff)
             updateSourceSummary()
             preferences.edit().putLong(KEY_UPDATED, now).remove(KEY_SOURCE).apply()
             legacyCacheFile.delete()

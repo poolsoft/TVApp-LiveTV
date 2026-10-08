@@ -1,5 +1,9 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-08 - XMLTV güncelleme sayıları
+
+- Güncelleme sonucu yalnız saklanan programları sayar. Tamamen eski tarihli XMLTV dosyası mevcut rehberi silmez; kaynak tarihleri ve cihaz saatinin kontrol edilmesini bildirir.
+
 ## 2026-10-07 - IPTV kaynak bağlantıları ve Xtream bilgileri
 
 - M3U `http-origin` ve URL header'ı, kaynak varsayılan User-Agent/Referer/Origin ayarları, ana/çoklu oynatıcı ve TVApp TIF aktarımında desteklenir. Kanal header'ı önceliklidir; harici oynatıcıya header gönderilir (destek harici uygulamaya bağlıdır).

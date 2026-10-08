@@ -55,6 +55,31 @@ class XmlTvAtomicImportTest {
         assertImportFailsAndPreservesOldData("<tv></tv>")
     }
 
+    @Test
+    fun expiredFeedDoesNotEraseExistingGuide() {
+        assertImportFailsAndPreservesOldData(
+            "<tv><programme channel=\"test\" start=\"20000101000000 +0000\" " +
+                "stop=\"20000101010000 +0000\"><title>Expired</title></programme></tv>",
+        )
+    }
+
+    @Test
+    fun successCountMatchesPublishedSourceSummary() {
+        val feed = "<tv><channel id=\"test\"><display-name>Test</display-name></channel>" +
+            "<programme channel=\"test\" start=\"20000101000000 +0000\" " +
+            "stop=\"20000101010000 +0000\"><title>Expired</title></programme>" +
+            "<programme channel=\"test\" start=\"20990101000000 +0000\" " +
+            "stop=\"20990101010000 +0000\"><title>Current</title></programme></tv>"
+        val count = feed.byteInputStream().use {
+            repository.importStream(it, "test-source", "Test", "url")
+        }
+        val summary = repository.sourceSummaries().single()
+        assertEquals(1, count)
+        assertEquals(count, summary.programCount)
+        assertEquals(1, summary.channelCount)
+        assertEquals(listOf("Current"), database.xmlTvDao().allPrograms().map { it.title })
+    }
+
     private fun assertImportFailsAndPreservesOldData(feed: String) {
         val result = runCatching {
             feed.byteInputStream().use {

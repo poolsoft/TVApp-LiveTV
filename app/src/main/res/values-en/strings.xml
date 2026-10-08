@@ -286,6 +286,7 @@
     <string name="xmltv_clear">Clear XMLTV data</string>
     <string name="xmltv_not_configured">No alternative EPG source configured.</string>
     <string name="xmltv_no_valid_programs">No valid programmes found in the source. Existing EPG was preserved.</string>
+    <string name="xmltv_only_expired_programs">The source contains only expired programmes. Check the feed dates and device clock. Existing EPG was preserved.</string>
     <string name="xmltv_importing">Reading XMLTV programs...</string>
     <string name="xmltv_import_progress">Updating XMLTV: %1$s (%2$d programs)</string>
     <string name="xmltv_phase_reading">connecting</string>
