@@ -2689,7 +2689,7 @@ class MainActivity : TvRemoteActivity() {
             if (binding.qualityBadge.visibility != View.GONE) binding.qualityBadge.visibility = View.GONE
         }
         binding.sourceBadgeIcon.setImageResource(R.drawable.ic_source_iptv)
-        val bitrateText = formatBitrate(info.bitrate?.toLong() ?: info.estimatedBandwidthBps)
+        val bitrateText = formatBitrate(info.bitrate)
         val hasBitrate = !radio && bitrateText != "-"
         if (hasBitrate) {
             if (binding.bitrateBadge.text != bitrateText) binding.bitrateBadge.text = bitrateText

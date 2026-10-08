@@ -1,5 +1,9 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-08 - Infobar video bitrate
+
+- IPTV infobarı yalnız oynatıcının video formatında bildirdiği bitrate değerini gösterir; bilgi yoksa alan gizlenir. Tahmini ağ indirme hızı video bitrate'i yerine kullanılmaz; diagnostikte ayrı kalır.
+
 ## 2026-10-08 - XMLTV güncelleme sayıları
 
 - Güncelleme sonucu yalnız saklanan programları sayar. Tamamen eski tarihli XMLTV dosyası mevcut rehberi silmez; kaynak tarihleri ve cihaz saatinin kontrol edilmesini bildirir.
