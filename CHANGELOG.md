@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-11 - Örtüşen canlı TS yanıtlarında tekrar düzeltmesi
+
+- Gerçek kaynak ölçümünde ardışık HTTP yanıtlarının yaklaşık 5–27 saniyelik ses/video bölümünü tekrar gönderdiği doğrulandı. Sadece daha büyük tampon veya sabit yeniden bağlantı gecikmesi bu örtüşmeyi gidermiyor.
+- Sürekli bağlantı modunda her elementary stream için son PES başlangıcı, paket sırası ve son tam TS paketi korunur. Sonraki yanıtta bu sınır birebir doğrulanana kadar tekrar bölümü oynatıcıya verilmez; ses ve video ayrı hizalanır. HTTP sonunda kesilmiş TS paketi teslim edilmez, sonraki yanıttaki tam kopyasından devam edilir.
+- Zaman damgası değiştirilmez ve süre tahminiyle veri kırpılmaz. Sınır bulunamaz/değişirse kör birleştirme yerine Media3 hata kurtarmasına dönülür. Tanılama kaydına atlanan paket sayısı eklendi; URL veya erişim bilgisi kaydedilmez.
+
 ## 2026-10-11 - Sınırlı canlı indirme tamponu
 
 - Liste bazlı sürekli canlı bağlantı seçeneği açıkken progressive MPEG-TS verisi bağımsız üretici kuyruğuna indirilir. Kuyruk ana oynatmada yaklaşık 8 MiB, PiP/Multi-View hücrelerinde 2 MiB ile sınırlıdır; dolu kuyruk indiriciyi bekletir, veri atılmaz.

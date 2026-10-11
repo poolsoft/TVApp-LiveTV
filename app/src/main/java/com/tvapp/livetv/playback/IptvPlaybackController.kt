@@ -27,6 +27,8 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.ui.PlayerView
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.IptvPlaybackPreferencesStore
@@ -56,6 +58,11 @@ class IptvPlaybackController(
     private var trackSelector: DefaultTrackSelector? = null
     private var player: ExoPlayer? = null
     private var mediaSourceFactory: MediaSource.Factory? = null
+    private val loadErrorPolicy = object : DefaultLoadErrorHandlingPolicy() {
+        override fun getRetryDelayMsFor(loadErrorInfo: LoadErrorHandlingPolicy.LoadErrorInfo): Long =
+            if (requiresFreshLiveSource(loadErrorInfo.exception)) C.TIME_UNSET
+            else super.getRetryDelayMsFor(loadErrorInfo)
+    }
     private var fallbackDataSourceFactory: DataSource.Factory? = null
     private var formatFallbackAttempted = false
     private var retryCount = 0
@@ -109,6 +116,11 @@ class IptvPlaybackController(
             tuneStartedAt = SystemClock.elapsedRealtime()
             bufferingStartedAt = null
             updateHealthPhase(IptvPlaybackPhase.PREPARING)
+            if (requiresFreshLiveSource(current.playerError)) {
+                val factory = mediaSourceFactory ?: return@let
+                val item = current.currentMediaItem ?: return@let
+                current.setMediaSource(createPlaybackSource(factory, item), 0L)
+            }
             current.prepare()
             current.playWhenReady = true
         }
@@ -503,7 +515,7 @@ class IptvPlaybackController(
         val sourceFactory = DefaultMediaSourceFactory(
             defaultDataSource,
             IptvDataSourceFactory.createExtractors(),
-        )
+        ).setLoadErrorHandlingPolicy(loadErrorPolicy)
         mediaSourceFactory = sourceFactory
         val mediaSource = sourceFactory.createMediaSource(mediaItem)
         if (startPositionMillis > 0L) {
@@ -535,6 +547,7 @@ class IptvPlaybackController(
         val position = current.currentPosition.coerceAtLeast(0L)
         val playWhenReady = current.playWhenReady
         val progressiveFactory = ProgressiveMediaSource.Factory(factory, IptvDataSourceFactory.createExtractors())
+            .setLoadErrorHandlingPolicy(loadErrorPolicy)
         mediaSourceFactory = progressiveFactory
         val source = createPlaybackSource(progressiveFactory, item)
         CrashReportStore(appContext).recordDebug("IPTV_FORMAT_FALLBACK | progressive_same_url")

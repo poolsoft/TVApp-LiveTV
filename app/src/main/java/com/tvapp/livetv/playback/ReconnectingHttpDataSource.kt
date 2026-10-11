@@ -6,6 +6,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.TransferListener
 import java.io.IOException
+import java.io.InputStream
 
 /** Wraps an HTTP [DataSource] so a source that closes the connection on a
  *  regular cadence (PHP live endpoints often end the response after a fixed
@@ -16,9 +17,10 @@ import java.io.IOException
  *  example Stalker) runs again for schemes that need a fresh link. A
  *  connection that fails or delivers no bytes consumes the reconnect
  *  budget; once the budget is exhausted the original error is rethrown so
- *  ExoPlayer retry and watchdog paths take over. The wrapper itself never
- *  inspects MPEG-TS packets, so no claim of exact duplicate removal is
- *  made: overlap or gaps at the source live edge remain source behavior. */
+ *  ExoPlayer retry and watchdog paths take over. The wrapper
+ *  joins repeated TS responses using exact elementary-stream packet
+ *  boundaries. Missing boundaries fail back to player recovery; source
+ *  gaps cannot be reconstructed and timestamps are never rewritten. */
 @UnstableApi
 class ReconnectingHttpDataSource private constructor(
     private val upstream: DataSource.Factory,
@@ -50,15 +52,20 @@ class ReconnectingHttpDataSource private constructor(
     private var connectionOpenedAt = 0L
     private var consecutiveFailures = 0
     private var reconnects = 0
+    private var continuity = LiveTsContinuity()
+    @Volatile private var filteredInput: InputStream? = null
 
     override fun open(dataSpec: DataSpec): Long {
         closed = false
         spec = dataSpec
         consecutiveFailures = 0
         reconnects = 0
+        reconnectAllowed = false
+        continuity = LiveTsContinuity()
         val available = openConnection()
         val contentType = responseHeaders.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value?.firstOrNull()
         reconnectAllowed = canReconnectLiveRequest(contentType, dataSpec.position, dataSpec.length, dataSpec.httpMethod)
+        if (reconnectAllowed) delegate?.let { filteredInput = continuity.open(asInputStream(it)) }
         if (available == 0L) {
             closeConnection("empty")
             throw IOException("Live source opened with an empty body")
@@ -70,10 +77,13 @@ class ReconnectingHttpDataSource private constructor(
         while (true) {
             val source = delegate ?: throw IOException("ReconnectingHttpDataSource is closed")
             val read = try {
-                source.read(buffer, offset, length)
+                filteredInput?.read(buffer, offset, length) ?: source.read(buffer, offset, length)
             } catch (error: IOException) {
                 closeConnection("error")
                 if (closed) return C.RESULT_END_OF_INPUT
+                // A missing boundary or changed timeline needs a fresh extractor, not more
+                // blind concatenation. Let Media3 recovery recreate the playback source.
+                if (error is LiveTsContinuityException) throw error
                 if (!reconnectAllowed) throw error
                 consecutiveFailures++
                 if (consecutiveFailures >= LIVE_RECONNECT_MAX_CONSECUTIVE_FAILURES) throw error
@@ -165,6 +175,7 @@ class ReconnectingHttpDataSource private constructor(
             synchronized(this) {
                 if (closed) { source.close(); throw IOException("Live connection cancelled") }
                 delegate = source
+                filteredInput = if (reconnectAllowed) continuity.open(asInputStream(source)) else null
             }
             connectionBytes = 0
             connectionOpenedAt = startedAt
@@ -181,13 +192,23 @@ class ReconnectingHttpDataSource private constructor(
     }
 
     private fun closeConnection(reason: String) {
-        val source = synchronized(this) { delegate.also { delegate = null } } ?: return
+        val source = synchronized(this) {
+            delegate.also { delegate = null; filteredInput = null }
+        } ?: return
         val durationMs = if (connectionOpenedAt > 0L) System.currentTimeMillis() - connectionOpenedAt else 0L
         source.close()
-        log("closed reason=$reason bytes=$connectionBytes durationMs=$durationMs reconnects=$reconnects")
+        log("closed reason=$reason bytes=$connectionBytes durationMs=$durationMs reconnects=$reconnects overlapPackets=${continuity.droppedPackets}")
         connectionBytes = 0
         connectionOpenedAt = 0L
     }
 
     private fun log(message: String) = diagnostics("IPTV_LIVE_RECONNECT | $message")
+
+    private fun asInputStream(source: DataSource) = object : InputStream() {
+        override fun read(): Int {
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 255
+        }
+        override fun read(bytes: ByteArray, offset: Int, length: Int) = source.read(bytes, offset, length)
+    }
 }

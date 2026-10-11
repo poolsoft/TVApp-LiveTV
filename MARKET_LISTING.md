@@ -152,6 +152,7 @@ Highlights:
 * Separate Movies/Series library with playlist/category selection, favorites, recently watched, named resume actions and provider-supplied Xtream seasons/episodes
 * Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
+* Opt-in finite MPEG-TS continuation verifies exact audio/video packet boundaries to remove overlapping response data. Unverifiable boundaries fall back to playback recovery, without guessing or rewriting timestamps.
 * Optional source-specific finite-live continuation with a bounded MPEG-TS download queue. Startup reserve can increase live latency; provider gaps cannot be recovered and seamless playback is not guaranteed.
 * TIF/XMLTV guide with now and next program information
 * Existing program guide is preserved when an XMLTV update fails or is empty
