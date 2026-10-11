@@ -1,5 +1,10 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-11 - Canlı TS bağlantı sürekliliği
+
+- Kaynağın sürekli canlı bağlantı ayarı açıkken progressive MPEG-TS yanıtının bitiminde HTTP bağlantısı veri katmanında yeniden açılır. HLS/DASH, VOD, sınırlı byte-range ve altyazı istekleri bu döngüye alınmaz.
+- Ağ hatalarında sınırlı artan bekleme uygulanır; başarısızlık sınırından sonra Media3 kurtarma akışı devreye girer. Tanılama kayıtları URL yolu, kullanıcı bilgisi ve sorgu anahtarlarını içermez. Kaynakta oluşan yayın boşluğu/tekrarı için kesintisizlik garantisi verilmez.
+
 ## 2026-10-11 - Stalker bağlantı açılışı ve canlı yayın timeout'u
 
 - Stalker portal handshake tokenları endpoint+MAC bazında 3 dakika önbelleğlenir; kanal açılışı ve sıraya alınan canlı devam parçaları portal'a tekrar tekrar handshake atmaz. Token reddedilirse bağlantı bir kez yeni token ile tekrar denenir, orijinal hata korunur.

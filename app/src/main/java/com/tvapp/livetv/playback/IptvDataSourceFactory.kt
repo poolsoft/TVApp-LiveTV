@@ -20,20 +20,23 @@ object IptvDataSourceFactory {
         referrer: String?,
         origin: String? = null,
         liveEdge: Boolean = false,
+        reconnectLive: Boolean = false,
+        diagnostics: (String) -> Unit = {},
     ): DataSource.Factory {
         // Live MPEG-TS streams can sit silent longer than VOD between reads
         // (pause filler, source hiccups), so they get a longer read timeout
         // instead of failing the open and waiting for watchdog recovery.
-        val http = OkHttpDataSource.Factory(if (liveEdge) LIVE_HTTP_CLIENT else HTTP_CLIENT)
+        val okHttp = OkHttpDataSource.Factory(if (liveEdge) LIVE_HTTP_CLIENT else HTTP_CLIENT)
             .setUserAgent(userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
-        http.setDefaultRequestProperties(buildMap {
+        okHttp.setDefaultRequestProperties(buildMap {
             referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
             origin?.takeIf(String::isNotBlank)?.let { put("Origin", it) }
         })
-        return ResolvingDataSource.Factory(http) { dataSpec ->
+        val resolved = ResolvingDataSource.Factory(okHttp) { dataSpec ->
             val resolved = StalkerStreamUri.resolve(dataSpec.uri)
             if (resolved == null) dataSpec else dataSpec.withUri(Uri.parse(resolved))
         }
+        return if (liveEdge && reconnectLive) ReconnectingHttpDataSource.factory(resolved, diagnostics) else resolved
     }
 
     fun createExtractors(): ExtractorsFactory = DefaultExtractorsFactory()

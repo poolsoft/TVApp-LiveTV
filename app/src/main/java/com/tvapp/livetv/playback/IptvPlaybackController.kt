@@ -460,11 +460,15 @@ class IptvPlaybackController(
         exoPlayer.setPreloadConfiguration(if (continuousLiveEnabled())
             ExoPlayer.PreloadConfiguration(sourcePlaybackOptions.reconnectLeadMillis() * 1_000L)
             else ExoPlayer.PreloadConfiguration.DEFAULT)
+        val liveEdge = channel.iptvContentType.equals("LIVE", ignoreCase = true)
         val dataSource = IptvDataSourceFactory.create(
             channel.userAgent,
             channel.referrer,
             channel.origin,
-            liveEdge = channel.iptvContentType.equals("LIVE", ignoreCase = true),
+            liveEdge = liveEdge,
+            reconnectLive = continuousLiveEnabled() &&
+                androidx.media3.common.util.Util.inferContentType(Uri.parse(channel.uri)) == C.CONTENT_TYPE_OTHER,
+            diagnostics = CrashReportStore(appContext)::recordDebug,
         )
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
