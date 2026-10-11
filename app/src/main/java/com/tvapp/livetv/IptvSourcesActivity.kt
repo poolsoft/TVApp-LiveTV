@@ -43,6 +43,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private var activeOperationSourceName: String? = null
     private var sourceListLongPressHandled = false
     private var sourceListLongPressJob: Job? = null
+    private var webManager: com.tvapp.livetv.web.IptvWebManager? = null
+    private var webDialog: AlertDialog? = null
+    private var webStartJob: Job? = null
+    private var webSessionText = ""
+    private var operationBusy = false
 
     private val selectChannels = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -78,6 +83,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         binding.importXtreamButton.setOnClickListener(::showXtreamDialog)
         binding.importStalkerButton.setOnClickListener(::showStalkerDialog)
+        binding.webManageButton.setOnClickListener { showWebManagement() }
         binding.closeButton?.setOnClickListener {
             setResult(RESULT_OK)
             finish()
@@ -113,6 +119,59 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         loadSources()
         binding.importUrlButton.requestFocus()
+    }
+
+    private fun showWebManagement() {
+        if (webManager != null || operationBusy) return
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.web_manage)
+            .setMessage(R.string.web_security)
+            .setPositiveButton(R.string.web_start) { _, _ -> startWebManagement() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun startWebManagement() {
+        val manager = com.tvapp.livetv.web.IptvWebManager(this, lifecycleScope,
+            onState = { busy, message, changed ->
+                setBusy(busy)
+                binding.importStatus.text = message
+                webDialog?.setMessage("$webSessionText\n\n$message")
+                if (changed) { setResult(RESULT_OK); loadSources() }
+            },
+            onExpired = { stopWebManagement() },
+        )
+        webManager = manager
+        setBusy(false)
+        webStartJob = lifecycleScope.launch {
+            try {
+                val (address, code) = manager.start()
+                webSessionText = getString(R.string.web_session, address, code, getString(R.string.web_security))
+                webDialog = AlertDialog.Builder(this@IptvSourcesActivity, R.style.Theme_TVApp_Dialog)
+                    .setTitle(R.string.web_manage)
+                    .setMessage(webSessionText)
+                    .setPositiveButton(R.string.web_stop) { _, _ -> stopWebManagement() }
+                    .create().also { dialog ->
+                        dialog.setOnDismissListener { stopWebManagement() }
+                        dialog.show()
+                    }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
+            } catch (error: Exception) {
+                debugLog.recordDebug("IPTV_WEB START_FAILURE | ${error.javaClass.simpleName}")
+                stopWebManagement()
+                binding.importStatus.setText(R.string.web_no_network)
+            }
+        }
+    }
+
+    private fun stopWebManagement() {
+        webManager?.stop()
+        webManager = null
+        val dialog = webDialog
+        webDialog = null
+        dialog?.setOnDismissListener(null)
+        dialog?.dismiss()
+        setBusy(operationBusy)
     }
 
     private fun showM3uUrlDialog() {
@@ -780,12 +839,15 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun setBusy(busy: Boolean) {
-        binding.root.keepScreenOn = busy
-        binding.importUrlButton.isEnabled = !busy
-        binding.importFileButton.isEnabled = !busy
-        binding.importXtreamButton.isEnabled = !busy
-        binding.importStalkerButton.isEnabled = !busy
-        binding.sourceList.isEnabled = !busy
+        operationBusy = busy
+        binding.root.keepScreenOn = busy || webManager != null
+        val editable = !busy && webManager == null
+        binding.importUrlButton.isEnabled = editable
+        binding.importFileButton.isEnabled = editable
+        binding.importXtreamButton.isEnabled = editable
+        binding.importStalkerButton.isEnabled = editable
+        binding.webManageButton.isEnabled = editable
+        binding.sourceList.isEnabled = editable
         binding.importProgress.visibility = if (busy) View.VISIBLE else View.GONE
         binding.importProgress.isIndeterminate = true
     }
@@ -891,8 +953,15 @@ class IptvSourcesActivity : TvRemoteActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    override fun onStop() {
+        webStartJob?.cancel()
+        stopWebManagement()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         sourceListLongPressJob?.cancel()
+        stopWebManagement()
         super.onDestroy()
     }
 

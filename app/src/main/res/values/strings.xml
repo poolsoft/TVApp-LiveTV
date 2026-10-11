@@ -754,4 +754,20 @@
     <string name="iptv_subtitle_center">Orta</string>
     <string name="iptv_subtitle_top">Üst</string>
     <string name="vod_navigation_hint">Sol / Back: Kategoriler · Sağ: İçerikler · Yeşil: Devam Et</string>
+    <string name="web_manage">Web’den yönet</string>
+    <string name="web_start">Sunucuyu başlat</string>
+    <string name="web_stop">Sunucuyu durdur</string>
+    <string name="web_ready">Komut bekleniyor.</string>
+    <string name="web_pair">Eşleştir</string>
+    <string name="web_code">TV’deki 8 haneli eşleştirme kodu</string>
+    <string name="web_security">Yalnız güvendiğiniz yerel ağda kullanın. HTTP bağlantısı şifrelenmez. TV ve tarayıcı aynı ağda olmalı; bu ekran açık kalmalıdır. Oturum 15 dakika sonra kapanır.</string>
+    <string name="web_no_network">Yerel ağ adresi bulunamadı. TV’yi Wi-Fi veya Ethernet ağına bağlayın.</string>
+    <string name="web_session">Adres: %1$s\nEşleştirme kodu: %2$s\n\n%3$s</string>
+    <string name="web_operation_failed">İşlem tamamlanamadı. Kaynak adresini, giriş bilgilerini ve dosya biçimini kontrol edip yeniden deneyin.</string>
+    <string name="web_disconnected">TV bağlantısı kapandı. TV’den sunucuyu yeniden başlatıp tekrar eşleştirin.</string>
+    <string name="web_delete_confirm">Bu IPTV kaynağı ve kanalları silinsin mi?</string>
+    <string name="web_empty">Kayıtlı IPTV kaynağı yok.</string>
+    <string name="web_counts">%1$d içerik · %2$d seçili</string>
+    <string name="web_upload_limit">En fazla 12 MB boyutunda UTF-8 M3U dosyası seçin.</string>
+    <string name="web_guide">WEB ÜZERİNDEN IPTV YÖNETİMİ\nIPTV yönetiminde Web’den yönet > Sunucuyu başlat seçin. Aynı ağdaki telefon veya bilgisayarda TV’deki adresi açıp 8 haneli kodu girin. URL, M3U dosyası, Xtream ve Stalker kaynakları eklenebilir; kayıtlı kaynaklar silinebilir ve URL kaynakları güncellenebilir. İşlemler TV’deki mevcut içe aktarma mekanizmasıyla yapılır; kanallar otomatik olarak ana listeye eklenmez. Dosyalar TV’nin özel alanında saklanır. İşlem sürerken ilerleme iki ekranda gösterilir. Sunucuyu durdur, bu ekrandan çıkma veya 15 dakikalık süre sonu erişimi kapatır. Başlamış veri işlemi ekran açıkken tamamlanmaya devam eder. HTTP şifrelenmediğinden yalnız güvendiğiniz yerel ağda kullanın; internete port açmayın. Her başlatmada yeni kod üretilir.</string>
 </resources>

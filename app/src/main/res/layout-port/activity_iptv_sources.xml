@@ -109,6 +109,18 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/web_manage_button"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:drawableStart="@drawable/ic_server"
+        android:drawablePadding="8dp"
+        android:drawableTint="@color/accent"
+        android:text="@string/web_manage"
+        android:textColor="@color/text_primary" />
+
     <!-- Durum ve İlerleme -->
     <TextView
         android:id="@+id/import_status"

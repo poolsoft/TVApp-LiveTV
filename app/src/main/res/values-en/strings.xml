@@ -754,4 +754,20 @@
     <string name="iptv_subtitle_center">Center</string>
     <string name="iptv_subtitle_top">Top</string>
     <string name="vod_navigation_hint">Left / Back: Categories · Right: Content · Green: Continue Watching</string>
+    <string name="web_manage">Manage from browser</string>
+    <string name="web_start">Start server</string>
+    <string name="web_stop">Stop server</string>
+    <string name="web_ready">Waiting for a command.</string>
+    <string name="web_pair">Pair</string>
+    <string name="web_code">8-digit pairing code shown on TV</string>
+    <string name="web_security">Use only on a trusted local network. HTTP is not encrypted. TV and browser must be on the same network; keep this screen open. The session expires after 15 minutes.</string>
+    <string name="web_no_network">No local network address found. Connect the TV to Wi-Fi or Ethernet.</string>
+    <string name="web_session">Address: %1$s\nPairing code: %2$s\n\n%3$s</string>
+    <string name="web_operation_failed">Operation failed. Check the source address, credentials and file format, then try again.</string>
+    <string name="web_disconnected">TV connection closed. Restart the server on TV and pair again.</string>
+    <string name="web_delete_confirm">Delete this IPTV source and its channels?</string>
+    <string name="web_empty">No saved IPTV sources.</string>
+    <string name="web_counts">%1$d entries · %2$d selected</string>
+    <string name="web_upload_limit">Choose a UTF-8 M3U file up to 12 MB.</string>
+    <string name="web_guide">IPTV MANAGEMENT FROM A BROWSER\nIn IPTV management choose Manage from browser > Start server. Open the TV address on a phone or computer on the same network and enter the 8-digit code. Add URL, M3U file, Xtream and Stalker sources; delete saved sources and update URL sources. Operations use the existing TV import mechanism; channels are not automatically added to the main list. Uploaded files stay in private TV storage. Progress appears on both screens. Stop server, leaving this screen, or the 15-minute session limit closes access. An already started data operation can finish while the screen stays open. HTTP is unencrypted: use only a trusted LAN and never forward the port to the internet. Each start generates a new code.</string>
 </resources>

@@ -629,6 +629,13 @@ class IptvRepository(context: Context) {
 
     suspend fun delete(source: IptvSourceEntity) {
         dao.deleteSource(source)
+        if (source.kind == KIND_DOCUMENT) runCatching {
+            val uri = Uri.parse(source.location)
+            val directory = java.io.File(appContext.filesDir, "web-playlists").canonicalFile
+            if (uri.scheme == "file") uri.path?.let { path ->
+                java.io.File(path).canonicalFile.takeIf { it.parentFile == directory }?.delete()
+            }
+        }.onFailure { debugLog.recordDebug("IPTV_WEB_FILE_CLEANUP | ${it.javaClass.simpleName}") }
         notifySharedChannelsChanged()
     }
 

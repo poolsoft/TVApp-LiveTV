@@ -120,13 +120,32 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <Button
-            android:id="@+id/close_button"
-            android:layout_width="140dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:background="@drawable/bg_focusable"
-            android:text="@string/close"
-            android:textColor="@color/text_primary" />
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/web_manage_button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_focusable"
+                android:drawableStart="@drawable/ic_server"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/accent"
+                android:text="@string/web_manage"
+                android:textColor="@color/text_primary" />
+
+            <Button
+                android:id="@+id/close_button"
+                android:layout_width="100dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_focusable"
+                android:text="@string/close"
+                android:textColor="@color/text_primary" />
+        </LinearLayout>
     </LinearLayout>
 
     <View
