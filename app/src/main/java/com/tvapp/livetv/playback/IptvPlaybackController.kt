@@ -243,6 +243,7 @@ class IptvPlaybackController(
         .takeIf { it.startsWith("iptv:") }?.removePrefix("iptv:")?.toLongOrNull()
 
     private fun playPrepared(channel: LiveChannel, startPositionMillis: Long, options: IptvSourcePlaybackOptions) {
+        val previousBufferedLive = bufferedLiveEnabled()
         released = false
         retryCount = 0
         formatFallbackAttempted = false
@@ -258,7 +259,7 @@ class IptvPlaybackController(
         automaticRecovery = effective.automaticRecovery
         maximumVideoHeight = effective.maximumVideoHeight
         vodPlaybackSpeed = playbackPreferences.vodPlaybackSpeed
-        if (player != null && previousBufferSeconds != targetBufferSeconds) {
+        if (player != null && (previousBufferSeconds != targetBufferSeconds || previousBufferedLive != bufferedLiveEnabled())) {
             playerView.player = null
             player?.release()
             player = null
@@ -292,12 +293,16 @@ class IptvPlaybackController(
         } else {
             SECONDARY_MAX_BUFFER_MS
         }
+        val bufferedPrimary = bufferedLiveEnabled() && profile == IptvPlaybackProfile.PRIMARY
+        val startupBufferMs = if (bufferedPrimary) minOf(LIVE_START_RESERVE_MS, maximumBufferMs)
+            else BUFFER_FOR_PLAYBACK_MS
         val loadControl = DefaultLoadControl.Builder().apply {
             setBufferDurationsMs(
-                MIN_BUFFER_MS.coerceAtMost(maximumBufferMs),
+                maxOf(MIN_BUFFER_MS, startupBufferMs).coerceAtMost(maximumBufferMs),
                 maximumBufferMs,
-                BUFFER_FOR_PLAYBACK_MS,
-                BUFFER_AFTER_REBUFFER_MS,
+                startupBufferMs,
+                if (bufferedPrimary)
+                    minOf(5_000, maximumBufferMs) else BUFFER_AFTER_REBUFFER_MS,
             )
             setBackBuffer(BACK_BUFFER_MS, true)
             setPrioritizeTimeOverSizeThresholds(true)
@@ -466,8 +471,8 @@ class IptvPlaybackController(
             channel.referrer,
             channel.origin,
             liveEdge = liveEdge,
-            reconnectLive = continuousLiveEnabled() &&
-                androidx.media3.common.util.Util.inferContentType(Uri.parse(channel.uri)) == C.CONTENT_TYPE_OTHER,
+            reconnectLive = bufferedLiveEnabled(),
+            livePrefetchBytes = if (profile == IptvPlaybackProfile.PRIMARY) 8 * 1024 * 1024 else 2 * 1024 * 1024,
             diagnostics = CrashReportStore(appContext)::recordDebug,
         )
         val mediaItemBuilder = MediaItem.Builder()
@@ -996,6 +1001,10 @@ class IptvPlaybackController(
     private fun continuousLiveEnabled(): Boolean = sourcePlaybackOptions.continuousLiveReconnect &&
         currentChannel?.iptvContentType.equals("LIVE", true)
 
+    private fun bufferedLiveEnabled(): Boolean = continuousLiveEnabled() && currentChannel?.let {
+        androidx.media3.common.util.Util.inferContentType(Uri.parse(it.uri)) == C.CONTENT_TYPE_OTHER
+    } == true
+
     private fun queueLiveContinuation(generation: Long) {
         if (released || generation != tuneGeneration || continuationExhausted) return
         val current = player ?: return
@@ -1059,7 +1068,8 @@ class IptvPlaybackController(
                 stalledProgressMillis = if (progressAdvanced) 0L else now - lastProgressAt,
                 staleFrameMillis = lastFrameAt?.let { now - maxOf(it, videoSurfaceAttachedAt) },
             ),
-            firstFrameTimeoutMillis = FIRST_FRAME_TIMEOUT_MS,
+            firstFrameTimeoutMillis = FIRST_FRAME_TIMEOUT_MS +
+                if (bufferedLiveEnabled() && profile == IptvPlaybackProfile.PRIMARY) LIVE_START_RESERVE_MS else 0,
             bufferingTimeoutMillis = BUFFERING_TIMEOUT_MS,
             stallTimeoutMillis = STALL_TIMEOUT_MS,
         )
@@ -1120,6 +1130,7 @@ class IptvPlaybackController(
         const val SECONDARY_MAX_BUFFER_MS = 10_000
         const val BUFFER_FOR_PLAYBACK_MS = 800
         const val BUFFER_AFTER_REBUFFER_MS = 2_500
+        const val LIVE_START_RESERVE_MS = 10_000
         const val BACK_BUFFER_MS = 15_000
         const val FRAME_HEALTH_SAMPLE_INTERVAL_MS = 250L
         const val WATCHDOG_INTERVAL_MS = 2_000L

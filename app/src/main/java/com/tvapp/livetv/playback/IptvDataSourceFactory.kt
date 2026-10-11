@@ -21,6 +21,7 @@ object IptvDataSourceFactory {
         origin: String? = null,
         liveEdge: Boolean = false,
         reconnectLive: Boolean = false,
+        livePrefetchBytes: Int = 8 * 1024 * 1024,
         diagnostics: (String) -> Unit = {},
     ): DataSource.Factory {
         // Live MPEG-TS streams can sit silent longer than VOD between reads
@@ -36,7 +37,9 @@ object IptvDataSourceFactory {
             val resolved = StalkerStreamUri.resolve(dataSpec.uri)
             if (resolved == null) dataSpec else dataSpec.withUri(Uri.parse(resolved))
         }
-        return if (liveEdge && reconnectLive) ReconnectingHttpDataSource.factory(resolved, diagnostics) else resolved
+        if (!liveEdge || !reconnectLive) return resolved
+        val reconnecting = ReconnectingHttpDataSource.factory(resolved, diagnostics)
+        return DataSource.Factory { BufferedLiveDataSource(reconnecting, livePrefetchBytes, diagnostics) }
     }
 
     fun createExtractors(): ExtractorsFactory = DefaultExtractorsFactory()

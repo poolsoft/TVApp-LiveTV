@@ -16,7 +16,7 @@ yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın 
 ## Türkçe
 - Kaynak bazlı HTTP header ayarları (User-Agent, Referer, Origin), PiP/Multi-View için kaynak bağlantı sınırı ve Xtream hesap bilgileri. Sunucunun bildirmediği bilgiler tahmin edilmez; gerçek sağlayıcı koşulları geçerlidir.
 
-- Süreli canlı IPTV akışları için liste bazlı erken yeniden bağlantı ve sonraki parçayı hazırlama seçeneği; varsayılan kapalı, VOD ve arşivden bağımsız. Erken bağlantı süresi 250 ms adımlarla 5 saniyeye kadar ayarlanabilir; arabelleğe alma sağ üstte transparan küçük simgeyle gösterilir. Akışlar arasındaki kesintisizlik sağlayıcıya bağlıdır.
+- Süreli canlı IPTV akışları için liste bazlı erken yeniden bağlantı ve sonraki parçayı hazırlama seçeneği; varsayılan kapalı, VOD ve arşivden bağımsız. Uygun MPEG-TS yayınlarında sınırlı bellek kuyruğu ve başlangıç rezervi bağlantı aralarını tolere etmeye yardımcı olur; canlı gecikmesini artırabilir. Diğer süreli parçalarda erken bağlantı süresi 250 ms adımlarla 5 saniyeye kadar ayarlanabilir; arabelleğe alma sağ üstte transparan küçük simgeyle gösterilir. Akışlar arasındaki kesintisizlik sağlayıcıya bağlıdır.
 
 - Ayrı Canlı TV ve VOD modları: film izlerken canlı kanallara yanlışlıkla geçmeden kütüphaneye dönüş, son filme devam ve son canlı kanala açık geçiş.
 - Kaynak ve kategori bazlı Sinema/Dizi kütüphanesi; favoriler, son izlenenler, isimli devam alanı, arama ve sıralama. Xtream kaynaklarında gerçek sezon/bölüm seçimi; sınırlı görsel önbelleği ve sayfalı katalog.
@@ -152,6 +152,7 @@ Highlights:
 * Separate Movies/Series library with playlist/category selection, favorites, recently watched, named resume actions and provider-supplied Xtream seasons/episodes
 * Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
+* Optional source-specific finite-live continuation with a bounded MPEG-TS download queue. Startup reserve can increase live latency; provider gaps cannot be recovered and seamless playback is not guaranteed.
 * TIF/XMLTV guide with now and next program information
 * Existing program guide is preserved when an XMLTV update fails or is empty
 * Audio track and subtitle selection

@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-11 - Sınırlı canlı indirme tamponu
+
+- Liste bazlı sürekli canlı bağlantı seçeneği açıkken progressive MPEG-TS verisi bağımsız üretici kuyruğuna indirilir. Kuyruk ana oynatmada yaklaşık 8 MiB, PiP/Multi-View hücrelerinde 2 MiB ile sınırlıdır; dolu kuyruk indiriciyi bekletir, veri atılmaz.
+- Ana oynatmada başlangıç rezervi buffer üst sınırı içinde en fazla 10 saniyedir; ilk kare watchdog süresi bu rezervi hesaba katar. Kanal değişiminde bekleyen okuyucu ve indirici iptal edilir. HLS/DASH segmentleri, VOD, veritabanı ve kaynak güncelleme akışı değişmez.
+- Kuyruk sırası, dolulukta geri basınç, hata öncesi verinin tüketilmesi ve kapanış davranışı için birim testleri eklendi. Ek sunucu veya bağımlılık gerekmez; sağlayıcıdaki yayın boşlukları için kesintisizlik garantisi verilmez.
+
 ## 2026-10-11 - Canlı TS bağlantı sürekliliği
 
 - Kaynağın sürekli canlı bağlantı ayarı açıkken progressive MPEG-TS yanıtının bitiminde HTTP bağlantısı veri katmanında yeniden açılır. HLS/DASH, VOD, sınırlı byte-range ve altyazı istekleri bu döngüye alınmaz.

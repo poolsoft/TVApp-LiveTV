@@ -40,7 +40,7 @@ class ReconnectingHttpDataSource private constructor(
         ): DataSource.Factory = Factory(upstream, diagnostics)
     }
 
-    private var delegate: DataSource? = null
+    @Volatile private var delegate: DataSource? = null
     private val transferListeners = mutableListOf<TransferListener>()
     private var spec: DataSpec? = null
     @Volatile
@@ -155,13 +155,17 @@ class ReconnectingHttpDataSource private constructor(
         }
     }
     private fun openConnection(): Long {
+        if (closed) throw IOException("Live connection cancelled")
         val request = spec ?: throw IOException("ReconnectingHttpDataSource has no spec")
         val source = upstream.createDataSource()
         transferListeners.forEach(source::addTransferListener)
         val startedAt = System.currentTimeMillis()
         return try {
             val available = source.open(request)
-            delegate = source
+            synchronized(this) {
+                if (closed) { source.close(); throw IOException("Live connection cancelled") }
+                delegate = source
+            }
             connectionBytes = 0
             connectionOpenedAt = startedAt
             reconnects++
@@ -177,8 +181,7 @@ class ReconnectingHttpDataSource private constructor(
     }
 
     private fun closeConnection(reason: String) {
-        val source = delegate ?: return
-        delegate = null
+        val source = synchronized(this) { delegate.also { delegate = null } } ?: return
         val durationMs = if (connectionOpenedAt > 0L) System.currentTimeMillis() - connectionOpenedAt else 0L
         source.close()
         log("closed reason=$reason bytes=$connectionBytes durationMs=$durationMs reconnects=$reconnects")
