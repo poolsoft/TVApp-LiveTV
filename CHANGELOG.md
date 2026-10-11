@@ -1,5 +1,10 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-11 - Stalker bağlantı açılışı ve canlı yayın timeout'u
+
+- Stalker portal handshake tokenları endpoint+MAC bazında 3 dakika önbelleğlenir; kanal açılışı ve sıraya alınan canlı devam parçaları portal'a tekrar tekrar handshake atmaz. Token reddedilirse bağlantı bir kez yeni token ile tekrar denenir, orijinal hata korunur.
+- Canlı IPTV akışlarında OkHttp read timeout 30 saniyeye çıkarıldı; VOD 20 saniyede kalır. Stalker kaynak doğrulama akışı değişmedi.
+
 ## 2026-10-08 - VOD kumanda gezinmesi
 
 - Kategoriler solda doğrudan listelenir; liste, Sinema/Dizi, Devam Et, arama ve Canlı TV eylemleri yan alandadır. Sol kenarda Sol veya içerikte Back kategori alanına, Sağ hatırlanan içerik konumuna döner; MENU alan değiştirir.

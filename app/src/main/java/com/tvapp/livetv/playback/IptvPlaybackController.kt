@@ -460,7 +460,12 @@ class IptvPlaybackController(
         exoPlayer.setPreloadConfiguration(if (continuousLiveEnabled())
             ExoPlayer.PreloadConfiguration(sourcePlaybackOptions.reconnectLeadMillis() * 1_000L)
             else ExoPlayer.PreloadConfiguration.DEFAULT)
-        val dataSource = IptvDataSourceFactory.create(channel.userAgent, channel.referrer, channel.origin)
+        val dataSource = IptvDataSourceFactory.create(
+            channel.userAgent,
+            channel.referrer,
+            channel.origin,
+            liveEdge = channel.iptvContentType.equals("LIVE", ignoreCase = true),
+        )
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)

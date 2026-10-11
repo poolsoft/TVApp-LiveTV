@@ -105,7 +105,21 @@ internal class StalkerClient(
     }
 
     fun resolve(cmd: String): String {
-        val token = handshake()
+        val resolved = runCatching { createLink(cmd, refreshToken = false) }
+            .getOrElse { firstError ->
+                // A cached token can be rejected by the portal; retry once with
+                // a fresh handshake before surfacing the original failure.
+                runCatching { createLink(cmd, refreshToken = true) }
+                    .getOrElse { throw firstError }
+            }
+        require(resolved.startsWith("http://") || resolved.startsWith("https://")) {
+            "Stalker yay\u0131n ba\u011flant\u0131s\u0131 al\u0131namad\u0131."
+        }
+        return resolved
+    }
+
+    private fun createLink(cmd: String, refreshToken: Boolean): String {
+        val token = handshake(refreshToken)
         runCatching { request(token, "stb", "get_profile") }
         val response = request(
             token,
@@ -114,20 +128,20 @@ internal class StalkerClient(
             mapOf("cmd" to "ffmpeg $cmd", "series" to "0", "forced_storage" to "undefined"),
         )
         val js = response.opt("js")
-        val resolved = when (js) {
+        return when (js) {
             is JSONObject -> js.optString("cmd")
             else -> ""
         }.removePrefix("ffmpeg ").trim()
-        require(resolved.startsWith("http://") || resolved.startsWith("https://")) {
-            "Stalker yayın bağlantısı alınamadı."
-        }
-        return resolved
     }
 
-    private fun handshake(): String {
+    private fun handshake(refresh: Boolean = false): String {
+        if (!refresh) {
+            StalkerSessionStore.token(endpoint, macAddress)?.let { return it }
+        }
         val response = request(null, "stb", "handshake", mapOf("token" to ""))
         val token = response.optJSONObject("js")?.optString("token").orEmpty()
-        require(token.isNotBlank()) { "Stalker Portal doğrulaması başarısız." }
+        require(token.isNotBlank()) { "Stalker Portal do\u011frulamas\u0131 ba\u015far\u0131s\u0131z." }
+        StalkerSessionStore.put(endpoint, macAddress, token)
         return token
     }
 

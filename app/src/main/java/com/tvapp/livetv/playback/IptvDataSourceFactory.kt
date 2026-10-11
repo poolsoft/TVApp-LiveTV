@@ -15,8 +15,16 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 object IptvDataSourceFactory {
-    fun create(userAgent: String?, referrer: String?, origin: String? = null): DataSource.Factory {
-        val http = OkHttpDataSource.Factory(HTTP_CLIENT)
+    fun create(
+        userAgent: String?,
+        referrer: String?,
+        origin: String? = null,
+        liveEdge: Boolean = false,
+    ): DataSource.Factory {
+        // Live MPEG-TS streams can sit silent longer than VOD between reads
+        // (pause filler, source hiccups), so they get a longer read timeout
+        // instead of failing the open and waiting for watchdog recovery.
+        val http = OkHttpDataSource.Factory(if (liveEdge) LIVE_HTTP_CLIENT else HTTP_CLIENT)
             .setUserAgent(userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
         http.setDefaultRequestProperties(buildMap {
             referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
@@ -48,14 +56,18 @@ object IptvDataSourceFactory {
 
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 20_000
+    private const val LIVE_READ_TIMEOUT_MS = 30_000
     private const val TS_PACKET_SIZE = 188
     private const val TS_TIMESTAMP_SEARCH_BYTES = 1_500 * TS_PACKET_SIZE
     private const val DEFAULT_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    private val HTTP_CLIENT = OkHttpClient.Builder()
+    private val HTTP_CLIENT = sharedClient(READ_TIMEOUT_MS)
+    private val LIVE_HTTP_CLIENT = sharedClient(LIVE_READ_TIMEOUT_MS)
+
+    private fun sharedClient(readTimeoutMs: Int) = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
-        .readTimeout(READ_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        .readTimeout(readTimeoutMs.toLong(), TimeUnit.MILLISECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .retryOnConnectionFailure(true)
