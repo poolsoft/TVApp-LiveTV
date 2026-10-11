@@ -31,5 +31,6 @@ data class UserChannelEntity(
     val epgIdOverride: String? = null,
     val epgSourceIdOverride: Long? = null,
     val playbackEngineOverride: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val removeLiveOverlap: Boolean = false,
     val lastSeenAt: Long,
 )

@@ -152,7 +152,8 @@ Highlights:
 * Separate Movies/Series library with playlist/category selection, favorites, recently watched, named resume actions and provider-supplied Xtream seasons/episodes
 * Catch-up playback from the programme guide for compatible M3U and Xtream sources
 * Live stream and VOD playback controls
-* Opt-in finite MPEG-TS continuation verifies exact audio/video packet boundaries to remove overlapping response data. Unverifiable boundaries fall back to playback recovery, without guessing or rewriting timestamps.
+* Per-channel live connection method: Standard preserves the previous source connection behavior. Experimental overlap removal enables finite live TS reconnection with exact audio/video packet matching. Disabled by default; incompatible streams may restart or show a black screen. Long-press OK on a live IPTV channel to choose for its next open, or save from the infobar to apply immediately. Included in backups.
+* Live IPTV uses a LIVE action instead of a finite seek timeline. Red indicates playing near the reported live default position; grey means behind, paused or unknown. VOD retains its timeline and speed controls. Buffered time, playback position and speed are read from the player and refreshed every 500 ms while the infobar is visible.
 * Optional source-specific finite-live continuation with a bounded MPEG-TS download queue. Startup reserve can increase live latency; provider gaps cannot be recovered and seamless playback is not guaranteed.
 * TIF/XMLTV guide with now and next program information
 * Existing program guide is preserved when an XMLTV update fails or is empty

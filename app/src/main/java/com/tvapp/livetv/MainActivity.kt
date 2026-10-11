@@ -186,7 +186,7 @@ class MainActivity : TvRemoteActivity() {
     private var multiViewDraftInitialized = false
     private var restoredMultiViewKeys: List<String>? = null
     private enum class IptvControlRow { TIMELINE, BUTTONS }
-    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE }
+    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -323,6 +323,7 @@ class MainActivity : TvRemoteActivity() {
     private var iptvControlsJob: Job? = null
     private var iptvNoticeJob: Job? = null
     private var iptvLiveHealthJob: Job? = null
+    private var iptvInfoTickerJob: Job? = null
     private var homeRecentPublishJob: Job? = null
     private var currentIptvContentKind = IptvContentKind.UNKNOWN
     private var catchUpReturnChannel: LiveChannel? = null
@@ -2063,6 +2064,15 @@ class MainActivity : TvRemoteActivity() {
         updateInfoColorActions()
         updateIptvPlaybackControls()
         updateIptvControlHints()
+        iptvInfoTickerJob?.cancel()
+        iptvInfoTickerJob = lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (binding.infoBar.visibility == View.VISIBLE && currentChannel?.source == LiveChannel.Source.IPTV) {
+                    updateIptvPlaybackControls()
+                    delay(500L)
+                }
+            }
+        }
     }
 
     private fun setupIptvControls() {
@@ -2087,6 +2097,11 @@ class MainActivity : TvRemoteActivity() {
             activateSelectedIptvButton()
             showIptvPlaybackControls()
         }
+        binding.iptvBtnConnection.setOnClickListener {
+            currentChannel?.let { showLiveConnectionMethod(it, applyImmediately = true) }
+        }
+        val connectionIcon = ContextCompat.getDrawable(this, R.drawable.ic_link)?.apply { setBounds(0, 0, dp(14), dp(14)) }
+        binding.iptvBtnConnection.setCompoundDrawablesRelative(connectionIcon, null, null, null)
         binding.iptvSeekbarRow.setOnClickListener {
             iptvControlRow = IptvControlRow.TIMELINE
             if (currentIptvContentKind == IptvContentKind.LIVE) {
@@ -2141,17 +2156,14 @@ class MainActivity : TvRemoteActivity() {
         if (!autoHide) return
 
         iptvControlsJob = lifecycleScope.launch {
-            val startedAt = System.currentTimeMillis()
-            while (System.currentTimeMillis() - startedAt < IPTV_CONTROL_TIMEOUT_MS) {
-                updateIptvPlaybackControls()
-                delay(500L)
-            }
+            delay(IPTV_CONTROL_TIMEOUT_MS)
             hideIptvPlaybackControls()
         }
     }
 
     private fun hideIptvPlaybackControls(hideInfoBar: Boolean = true) {
         iptvControlsJob?.cancel()
+        iptvInfoTickerJob?.cancel()
         iptvControlsInteractive = false
         osdCoordinator.hideIptvControls(hideInfoBar)
         updateInfoBarHeight()
@@ -2164,6 +2176,7 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBtnBuffer.background = controlBg
         binding.iptvBtnSpeed.background = controlBg
         binding.iptvBtnMore.background = controlBg
+        binding.iptvBtnConnection.background = controlBg
 
         if (displayPreferences.showCurrentProgram) binding.programMeta.visibility = View.VISIBLE
         if (displayPreferences.showNextProgram) binding.nextProgram.visibility = View.VISIBLE
@@ -2198,47 +2211,71 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateIptvPlaybackControls() {
         val state = iptvPlayback.playbackSnapshot()
+        val isVod = showsVodTimeline()
+        binding.iptvSeekbarRow.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.iptvBtnSpeed.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.iptvBtnConnection.visibility = if (!isVod) View.VISIBLE else View.GONE
+        if (!isVod && iptvControlRow == IptvControlRow.TIMELINE) iptvControlRow = IptvControlRow.BUTTONS
+        if ((selectedIptvButton == IptvControlButton.SPEED && !isVod) ||
+            (selectedIptvButton == IptvControlButton.CONNECTION && isVod)) {
+            selectedIptvButton = IptvControlButton.PLAY_PAUSE
+        }
         val duration = state.durationMillis.coerceAtLeast(1L)
+        binding.iptvControlProgress.isIndeterminate = state.durationMillis <= 0L
         binding.iptvControlProgress.progress =
             ((state.positionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
         binding.iptvControlProgress.secondaryProgress =
             ((state.bufferedPositionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
-        binding.iptvTimePosition.text = formatPlaybackTime(state.positionMillis)
+        binding.iptvTimePosition.text = if (state.playbackSpeed != null) formatPlaybackTime(state.positionMillis)
+            else getString(R.string.unknown_value)
         binding.iptvTimeDuration.text = if (currentIptvContentKind == IptvContentKind.LIVE) {
             getString(R.string.iptv_live_edge)
         } else {
-            formatPlaybackTime(state.durationMillis)
+            if (state.durationMillis > 0) formatPlaybackTime(state.durationMillis) else getString(R.string.unknown_value)
         }
 
         val isPlaying = state.isPlaying
         binding.iptvBtnPlayPause.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+            if (!isVod) R.drawable.ic_live else if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
             0,
             0,
             0,
         )
         binding.iptvBtnPlayPause.setText(
-            if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label,
+            if (!isVod) R.string.iptv_live_edge else if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label,
         )
+        val atLiveEdge = state.isAtLiveEdge()
+        binding.iptvBtnPlayPause.setTextColor(ContextCompat.getColor(this,
+            if (!isVod && atLiveEdge) R.color.remote_red else if (isVod) R.color.text_primary else R.color.text_secondary))
+        androidx.core.widget.TextViewCompat.setCompoundDrawableTintList(binding.iptvBtnPlayPause,
+            android.content.res.ColorStateList.valueOf(binding.iptvBtnPlayPause.currentTextColor))
+        binding.iptvBtnPlayPause.contentDescription = getString(if (isVod) {
+            if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label
+        } else if (atLiveEdge) R.string.iptv_live_edge else if (state.distanceToLiveDefaultMillis != null) {
+            R.string.iptv_return_to_live
+        } else R.string.iptv_live_status_unknown)
         setIptvControlLabel(
             binding.iptvBtnBuffer,
             getString(R.string.iptv_buffer_label),
-            if (pendingBufferSeconds == 0) {
-                getString(R.string.automatic_abr)
-            } else {
-                getString(R.string.seconds_value, pendingBufferSeconds)
-            },
+            state.bufferedDurationMillis?.let { getString(R.string.iptv_buffer_actual_seconds, it / 1_000f) }
+                ?: getString(R.string.unknown_value),
         )
         setIptvControlLabel(
             binding.iptvBtnSpeed,
             getString(R.string.iptv_speed_label),
-            String.format(Locale.getDefault(), "%.2gx", iptvPlayback.vodPlaybackSpeed()),
+            state.playbackSpeed?.let { String.format(Locale.getDefault(), "%.2gx", it) }
+                ?: getString(R.string.unknown_value),
         )
-        binding.iptvBtnSpeed.visibility = View.VISIBLE
+        binding.iptvBtnConnection.setText(if (iptvPlayback.removesLiveOverlap())
+            R.string.iptv_live_connection_overlap_short else R.string.iptv_live_connection_standard_short)
 
         updateIptvActionBarState()
+        updateInfoBarHeight()
         renderIptvControlSelection()
     }
+
+    private fun showsVodTimeline(): Boolean = vodMode || currentChannel?.isVodContent() == true ||
+        (currentChannel?.iptvContentType.equals("LIVE", true).not() && currentIptvContentKind == IptvContentKind.VOD)
 
     private fun setIptvControlLabel(view: TextView, label: String, value: String) {
         val fullText = "$label  $value"
@@ -2256,8 +2293,9 @@ class MainActivity : TvRemoteActivity() {
         val visibleButtons = buildList {
             add(IptvControlButton.PLAY_PAUSE)
             add(IptvControlButton.BUFFER)
-            add(IptvControlButton.SPEED)
+            if (showsVodTimeline()) add(IptvControlButton.SPEED)
             add(IptvControlButton.MORE)
+            if (!showsVodTimeline()) add(IptvControlButton.CONNECTION)
         }
         val idx = visibleButtons.indexOf(selectedIptvButton).coerceAtLeast(0)
         selectedIptvButton = visibleButtons[(idx + direction + visibleButtons.size) % visibleButtons.size]
@@ -2274,11 +2312,13 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvBtnBuffer.clearFocus()
             binding.iptvBtnSpeed.clearFocus()
             binding.iptvBtnMore.clearFocus()
+            binding.iptvBtnConnection.clearFocus()
             binding.iptvSeekbarRow.background = defaultBg
             binding.iptvBtnPlayPause.background = defaultBg
             binding.iptvBtnBuffer.background = defaultBg
             binding.iptvBtnSpeed.background = defaultBg
             binding.iptvBtnMore.background = defaultBg
+            binding.iptvBtnConnection.background = defaultBg
             return
         }
 
@@ -2301,6 +2341,7 @@ class MainActivity : TvRemoteActivity() {
         updateButton(binding.iptvBtnBuffer, selectedIptvButton == IptvControlButton.BUFFER)
         updateButton(binding.iptvBtnSpeed, selectedIptvButton == IptvControlButton.SPEED)
         updateButton(binding.iptvBtnMore, selectedIptvButton == IptvControlButton.MORE)
+        updateButton(binding.iptvBtnConnection, selectedIptvButton == IptvControlButton.CONNECTION)
     }
 
     private fun updateIptvActionBarState() {
@@ -2322,14 +2363,15 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBtnBuffer.isFocusable = focusable
         binding.iptvBtnSpeed.isFocusable = focusable
         binding.iptvBtnMore.isFocusable = focusable
+        binding.iptvBtnConnection.isFocusable = focusable
     }
 
     private fun activateSelectedIptvButton() {
         when (selectedIptvButton) {
             IptvControlButton.PLAY_PAUSE -> {
-                if (currentIptvContentKind == IptvContentKind.LIVE) {
+                if (!showsVodTimeline()) {
                     iptvManualTimeshift = false
-                    iptvPlayback.goLive()
+                    if (!iptvPlayback.goLive()) currentChannel?.let { iptvPlayback.play(it) }
                 } else {
                     iptvPlayback.togglePlayPause()
                 }
@@ -2341,6 +2383,7 @@ class MainActivity : TvRemoteActivity() {
                 showIptvSpeedChoices()
             }
             IptvControlButton.MORE -> showIptvMoreChoices()
+            IptvControlButton.CONNECTION -> currentChannel?.let { showLiveConnectionMethod(it, applyImmediately = true) }
         }
         updateIptvPlaybackControls()
     }
@@ -4546,6 +4589,9 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         if (channel.source == LiveChannel.Source.IPTV) {
+            if (channel.iptvContentType.equals("LIVE", true)) {
+                action(getString(R.string.iptv_live_connection_method)) { showLiveConnectionMethod(channel) }
+            }
             if (channel.sourceKey == currentChannel?.sourceKey) {
                 action(getString(R.string.iptv_quality_action)) { showIptvVideoQuality() }
             }
@@ -4620,6 +4666,51 @@ class MainActivity : TvRemoteActivity() {
             .setItems(labels.toTypedArray()) { _, which -> handlers[which]() }
             .setNegativeButton(R.string.close, null)
             .show()
+    }
+
+    private fun showLiveConnectionMethod(channel: LiveChannel, applyImmediately: Boolean = false) {
+        lifecycleScope.launch {
+            try {
+                val enabled = withContext(Dispatchers.IO) {
+                    repository.channelPreference(channel.sourceKey)?.removeLiveOverlap == true
+                }
+                if (isFinishing || isDestroyed) return@launch
+                var selected = enabled
+                val dialog = AlertDialog.Builder(this@MainActivity)
+                    .setTitle(getString(R.string.iptv_live_connection_channel, channel.displayName))
+                    .setSingleChoiceItems(arrayOf(
+                        getString(R.string.iptv_live_connection_standard),
+                        getString(R.string.iptv_live_connection_overlap),
+                    ), if (enabled) 1 else 0) { _, which -> selected = which == 1 }
+                    .setPositiveButton(R.string.save, null)
+                    .setNegativeButton(R.string.close, null)
+                    .show()
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { button ->
+                    button.isEnabled = false
+                    lifecycleScope.launch {
+                        try {
+                            withContext(Dispatchers.IO) { repository.setRemoveLiveOverlap(channel, selected) }
+                            dialog.dismiss()
+                            val applied = applyImmediately && currentChannel?.sourceKey == channel.sourceKey
+                            if (applied) iptvPlayback.play(channel)
+                            Toast.makeText(this@MainActivity, if (applied) R.string.iptv_live_connection_applied
+                                else R.string.iptv_live_connection_saved, Toast.LENGTH_LONG).show()
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            debugLog.recordDebug("LIVE_CONNECTION_SAVE_FAILURE | ${error.javaClass.simpleName}")
+                            button.isEnabled = true
+                            Toast.makeText(this@MainActivity, R.string.iptv_live_connection_error, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                debugLog.recordDebug("LIVE_CONNECTION_LOAD_FAILURE | ${error.javaClass.simpleName}")
+                Toast.makeText(this@MainActivity, R.string.iptv_live_connection_error, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun showChannelSystemInformation(channel: LiveChannel) {
@@ -5493,6 +5584,7 @@ class MainActivity : TvRemoteActivity() {
             renderIptvControlSelection()
             updateIptvControlHints()
         }
+        if (!visible) iptvInfoTickerJob?.cancel()
         if (visible) {
             osdCoordinator.showInfoBar(
                 iptvChrome = currentChannel?.source == LiveChannel.Source.IPTV,
@@ -5698,7 +5790,7 @@ class MainActivity : TvRemoteActivity() {
     private fun currentInfoBarHeight(screenHeight: Int): Int =
         (screenHeight * INFO_COMPACT_HEIGHT_FRACTION).toInt() +
             if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
-                dp(IPTV_INFO_EXTRA_HEIGHT_DP)
+                dp(if (showsVodTimeline()) IPTV_INFO_EXTRA_HEIGHT_DP else 37)
             } else {
                 0
             }
@@ -6391,7 +6483,7 @@ class MainActivity : TvRemoteActivity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    iptvControlRow = IptvControlRow.TIMELINE
+                    iptvControlRow = if (showsVodTimeline()) IptvControlRow.TIMELINE else IptvControlRow.BUTTONS
                     renderIptvControlSelection()
                     showIptvPlaybackControls()
                     return true
@@ -6741,6 +6833,7 @@ class MainActivity : TvRemoteActivity() {
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
         greenLongPressJob?.cancel()
+        iptvInfoTickerJob?.cancel()
         settingsLongPressJob?.cancel()
         clockJob?.cancel()
         playback.stop()

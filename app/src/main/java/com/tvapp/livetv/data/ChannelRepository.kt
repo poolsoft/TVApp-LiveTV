@@ -154,6 +154,18 @@ class ChannelRepository(context: Context) {
             channelDao.upsertChannels(listOf(row.copy(playbackEngineOverride = engine)))
         }
 
+    suspend fun setRemoveLiveOverlap(channel: LiveChannel, enabled: Boolean) = database.withTransaction {
+        val row = channelDao.getChannel(channel.sourceKey) ?: UserChannelEntity(
+            sourceKey = channel.sourceKey,
+            sourceType = channel.source.name,
+            originalDisplayNumber = channel.displayNumber,
+            lastKnownName = channel.displayName,
+            sortOrder = (channelDao.maxSortOrder() ?: -1) + 1,
+            lastSeenAt = System.currentTimeMillis(),
+        )
+        channelDao.upsertChannels(listOf(row.copy(removeLiveOverlap = enabled)))
+    }
+
     suspend fun setSortOrder(sourceKey: String, sortOrder: Int) =
         channelDao.setSortOrder(sourceKey, sortOrder)
 

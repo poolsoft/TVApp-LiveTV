@@ -22,6 +22,7 @@ object IptvDataSourceFactory {
         liveEdge: Boolean = false,
         reconnectLive: Boolean = false,
         livePrefetchBytes: Int = 8 * 1024 * 1024,
+        removeLiveOverlap: Boolean = false,
         diagnostics: (String) -> Unit = {},
     ): DataSource.Factory {
         // Live MPEG-TS streams can sit silent longer than VOD between reads
@@ -38,7 +39,7 @@ object IptvDataSourceFactory {
             if (resolved == null) dataSpec else dataSpec.withUri(Uri.parse(resolved))
         }
         if (!liveEdge || !reconnectLive) return resolved
-        val reconnecting = ReconnectingHttpDataSource.factory(resolved, diagnostics)
+        val reconnecting = ReconnectingHttpDataSource.factory(resolved, diagnostics, removeLiveOverlap)
         return DataSource.Factory { BufferedLiveDataSource(reconnecting, livePrefetchBytes, diagnostics) }
     }
 

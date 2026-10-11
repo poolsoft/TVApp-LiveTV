@@ -447,6 +447,7 @@ class AppBackupRepository(context: Context) {
                 channel.epgSourceIdOverride?.let(::value) ?: nullValue()
             }
             name("playbackEngineOverride").nullableValue(channel.playbackEngineOverride)
+            name("removeLiveOverlap").value(channel.removeLiveOverlap)
             name("lastSeenAt").value(channel.lastSeenAt)
             endObject()
         }
@@ -536,6 +537,7 @@ class AppBackupRepository(context: Context) {
             epgIdOverride = nullableString("epgIdOverride"),
             epgSourceIdOverride = nullableLong("epgSourceIdOverride"),
             playbackEngineOverride = nullableString("playbackEngineOverride"),
+            removeLiveOverlap = optBoolean("removeLiveOverlap", false),
             lastSeenAt = optLong("lastSeenAt", 0L),
         )
 

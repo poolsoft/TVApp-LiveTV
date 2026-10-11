@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-11 - Kanal bazlı canlı bağlantı yöntemi
+
+- Son beş commit incelendi: `bcc1083` ile eklenen paket sınırı hatası → temiz MediaSource ile yeniden açılma yolu bazı gerçek TV yayınlarında siyah ekran ve açılış döngüsü oluşturuyor. Önceki veri testleri TV decoder davranışını doğrulamıyordu.
+- Tekrar ayıklama artık tüm sürekli bağlantılı kaynaklara uygulanmaz. Varsayılan Standart seçeneği `5ba0ea8` veri akışını korur; yararlı olduğu kanallarda uzun OK → Canlı bağlantı yöntemi → Tekrar ayıklama (deneysel) seçilebilir. Kayıt sonraki kanal açılışında uygulanır, aktif yayın kesilmez.
+- Room 30 → 31 migration ile kanal tercihi varsayılan kapalı saklanır; kaynak güncellemesinde diğer kullanıcı tercihleriyle birlikte korunur ve yedek aktarımına dahildir. HLS/DASH ve TIF oynatımı değişmez.
+- Infobarda Standart / Tekrar ayıkla seçimi eklenir; buradan Kaydet izlenen kanalı yeni tercihle hemen yeniden açar. Canlı IPTV'de seek çizgisi gizlenir, CANLI düğmesi bildirilen canlı konumuna yakınken kırmızı, geride veya bilinmiyorken gri görünür. VOD'da gerçek konum/süre seekbarı ve hız kontrolü korunur. Buffer düğmesi hedef yerine gerçek hazır süreyi, hız düğmesi gerçek oynatma hızını gösterir; görünür infobarda 500 ms aralıkla güncellenir.
+
 ## 2026-10-11 - Örtüşen canlı TS yanıtlarında tekrar düzeltmesi
 
 - Gerçek kaynak ölçümünde ardışık HTTP yanıtlarının yaklaşık 5–27 saniyelik ses/video bölümünü tekrar gönderdiği doğrulandı. Sadece daha büyük tampon veya sabit yeniden bağlantı gecikmesi bu örtüşmeyi gidermiyor.

@@ -11,6 +11,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.C
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -98,6 +99,7 @@ class IptvPlaybackController(
     private var bufferSaveJob: Job? = null
     private val database by lazy { TVAppDatabase.getInstance(appContext) }
     private var sourcePlaybackOptions = IptvSourcePlaybackOptions()
+    private var removeLiveOverlap = false
     private var automaticRecovery = true
     private var maximumVideoHeight = 0
     private var shortLiveParts = 0
@@ -210,9 +212,11 @@ class IptvPlaybackController(
         healthPhase = IptvPlaybackPhase.PREPARING
         preparationJob = preparationScope.launch {
             var preparedChannel = channel
+            var preparedRemoveLiveOverlap = false
             val options = try {
                 withContext(Dispatchers.IO) {
                     val source = sourceId(channel)?.let { database.iptvDao().getSource(it) }
+                    preparedRemoveLiveOverlap = database.channelDao().getChannel(channel.sourceKey)?.removeLiveOverlap == true
                     preparedChannel = channel.copy(
                         userAgent = channel.userAgent ?: source?.defaultUserAgent,
                         referrer = channel.referrer ?: source?.defaultReferrer,
@@ -235,7 +239,7 @@ class IptvPlaybackController(
             }
             if (generation != tuneGeneration) return@launch
             try {
-                playPrepared(preparedChannel, startPositionMillis, options)
+                playPrepared(preparedChannel, startPositionMillis, options, preparedRemoveLiveOverlap)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -254,8 +258,9 @@ class IptvPlaybackController(
     private fun sourceId(channel: LiveChannel): Long? = channel.inputId
         .takeIf { it.startsWith("iptv:") }?.removePrefix("iptv:")?.toLongOrNull()
 
-    private fun playPrepared(channel: LiveChannel, startPositionMillis: Long, options: IptvSourcePlaybackOptions) {
+    private fun playPrepared(channel: LiveChannel, startPositionMillis: Long, options: IptvSourcePlaybackOptions, removeOverlap: Boolean) {
         val previousBufferedLive = bufferedLiveEnabled()
+        removeLiveOverlap = removeOverlap
         released = false
         retryCount = 0
         formatFallbackAttempted = false
@@ -484,6 +489,7 @@ class IptvPlaybackController(
             channel.origin,
             liveEdge = liveEdge,
             reconnectLive = bufferedLiveEnabled(),
+            removeLiveOverlap = removeLiveOverlap,
             livePrefetchBytes = if (profile == IptvPlaybackProfile.PRIMARY) 8 * 1024 * 1024 else 2 * 1024 * 1024,
             diagnostics = CrashReportStore(appContext)::recordDebug,
         )
@@ -779,6 +785,13 @@ class IptvPlaybackController(
 
     fun playbackSnapshot(): IptvPlaybackSnapshot {
         val current = player
+        val distanceToLiveDefault = current?.takeIf {
+            it.isCurrentMediaItemLive && !it.currentTimeline.isEmpty
+        }?.let {
+            val defaultPosition = it.currentTimeline.getWindow(it.currentMediaItemIndex, Timeline.Window()).defaultPositionMs
+            defaultPosition.takeUnless { value -> value == C.TIME_UNSET }
+                ?.let { value -> (value - it.currentPosition).coerceAtLeast(0L) }
+        }
         return IptvPlaybackSnapshot(
             positionMillis = current?.currentPosition ?: 0L,
             durationMillis = current?.duration?.takeUnless { it == C.TIME_UNSET } ?: 0L,
@@ -786,8 +799,14 @@ class IptvPlaybackController(
             isPlaying = current?.isPlaying == true,
             isSeekable = current?.isCurrentMediaItemSeekable == true,
             kind = contentKind(),
+            bufferedDurationMillis = current?.totalBufferedDuration,
+            playbackSpeed = current?.playbackParameters?.speed,
+            distanceToLiveDefaultMillis = distanceToLiveDefault,
+            ready = current?.playbackState == Player.STATE_READY,
         )
     }
+
+    fun removesLiveOverlap(): Boolean = removeLiveOverlap
 
     fun healthSnapshot(): IptvPlaybackHealthSnapshot {
         val now = SystemClock.elapsedRealtime()
@@ -1011,7 +1030,7 @@ class IptvPlaybackController(
         lastProgressAt = SystemClock.elapsedRealtime()
     }
 
-    private fun continuousLiveEnabled(): Boolean = sourcePlaybackOptions.continuousLiveReconnect &&
+    private fun continuousLiveEnabled(): Boolean = (sourcePlaybackOptions.continuousLiveReconnect || removeLiveOverlap) &&
         currentChannel?.iptvContentType.equals("LIVE", true)
 
     private fun bufferedLiveEnabled(): Boolean = continuousLiveEnabled() && currentChannel?.let {
@@ -1205,7 +1224,14 @@ data class IptvPlaybackSnapshot(
     val isPlaying: Boolean,
     val isSeekable: Boolean,
     val kind: IptvContentKind,
-)
+    val bufferedDurationMillis: Long? = null,
+    val playbackSpeed: Float? = null,
+    val distanceToLiveDefaultMillis: Long? = null,
+    val ready: Boolean = false,
+) {
+    fun isAtLiveEdge(): Boolean = ready && isPlaying &&
+        distanceToLiveDefaultMillis?.let { it in 0L..2_000L } == true
+}
 
 data class IptvTrackOption(
     val id: String,

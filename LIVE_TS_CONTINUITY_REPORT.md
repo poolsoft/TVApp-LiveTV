@@ -1,5 +1,37 @@
 # Canlı TS süreklilik ölçümü - 2026-10-11
 
+## TV Geri Bildirimi Ve Varsayılanın Düzeltilmesi
+
+`bcc1083` sonrası fiziksel TV geri bildiriminde bazı kanallarda 5–10 saniye
+sonra yeniden açılma ve siyah ekran görüldü; bazı kanallar ise iyileşti.
+Aşağıdaki çevrimdışı paket ölçümleri decoder ve gerçek bağlantı sürekliliğini
+doğrulamıyordu. Sınır doğrulaması hata verdiğinde eklenen temiz MediaSource
+kurtarması bu yeniden açılma davranışını tetikleyebilir; güncel cihaz logu
+olmadan hangi sınır hatasının gerçekleştiği kesinleştirilemez.
+
+Standart yöntem artık varsayılandır ve `5ba0ea8` veri akışını kullanır.
+Tekrar ayıklama yalnız kanalın uzun OK menüsünden açıkça seçilirse çalışır.
+Tercih sonraki kanal açılışında uygulanır. Aşağıdaki deneysel sonuçlar tüm
+kanallarda daha iyi veya kesintisiz oynatma garantisi değildir.
+
+Infobardaki aynı seçimden Kaydet, kullanıcı isteğiyle izlenen kanala hemen
+uygulanır. Canlı IPTV zaman çizgisi kaldırılmıştır; VOD çizgisi korunur.
+Buffer değeri `Player.totalBufferedDuration`, hız `playbackParameters.speed`,
+konum/süre oynatıcının mevcut değerleridir. CANLI durumu yalnız gerçek live
+timeline varsayılan konumuna göre belirlenir (2 saniye tolerans). Bu konumu
+bildirmeyen progressive TS kaynakları yanlış şekilde canlı kırmızı gösterilmez.
+Anlık değerler görünür infobarda 500 ms aralıkla yenilenir.
+
+İncelenen son beş commit:
+
+| Commit | İlgili değişiklik | Karar |
+| --- | --- | --- |
+| `bcc1083` | Tam TS paket eşleştirmesi; hata halinde temiz oynatıcı kaynağı | Varsayılan kapalı, kanal bazında deneysel |
+| `5ba0ea8` | Sınırlı indirme kuyruğu ve başlangıç rezervi | Standart bağlantı davranışı olarak korunur |
+| `e31e56a` | Canlı TS bitiminde bağlantıyı veri katmanında sürdürme | Kaynak ayarına bağlı olarak korunur |
+| `a7a960a` | Stalker token cache ve canlı read timeout | Korunur; paket sınırı hatasında yeniden açılma eklemiyor |
+| `ed0a8b1` | VOD kategori ve kumanda arayüzü | Korunur; canlı TS okuma katmanına müdahale etmiyor |
+
 ## Sorun
 
 Kullanıcının verdiği süreli HTTP MPEG-TS yayını, yeni bağlantıda canlı

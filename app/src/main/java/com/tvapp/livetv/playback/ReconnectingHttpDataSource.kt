@@ -25,21 +25,24 @@ import java.io.InputStream
 class ReconnectingHttpDataSource private constructor(
     private val upstream: DataSource.Factory,
     private val diagnostics: (String) -> Unit,
+    private val removeLiveOverlap: Boolean,
 ) : DataSource {
 
     private class Factory(
         private val upstream: DataSource.Factory,
         private val diagnostics: (String) -> Unit,
+        private val removeLiveOverlap: Boolean,
     ) : DataSource.Factory {
         override fun createDataSource(): DataSource =
-            ReconnectingHttpDataSource(upstream, diagnostics)
+            ReconnectingHttpDataSource(upstream, diagnostics, removeLiveOverlap)
     }
 
     companion object {
         fun factory(
             upstream: DataSource.Factory,
             diagnostics: (String) -> Unit,
-        ): DataSource.Factory = Factory(upstream, diagnostics)
+            removeLiveOverlap: Boolean = false,
+        ): DataSource.Factory = Factory(upstream, diagnostics, removeLiveOverlap)
     }
 
     @Volatile private var delegate: DataSource? = null
@@ -65,7 +68,7 @@ class ReconnectingHttpDataSource private constructor(
         val available = openConnection()
         val contentType = responseHeaders.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value?.firstOrNull()
         reconnectAllowed = canReconnectLiveRequest(contentType, dataSpec.position, dataSpec.length, dataSpec.httpMethod)
-        if (reconnectAllowed) delegate?.let { filteredInput = continuity.open(asInputStream(it)) }
+        if (reconnectAllowed && removeLiveOverlap) delegate?.let { filteredInput = continuity.open(asInputStream(it)) }
         if (available == 0L) {
             closeConnection("empty")
             throw IOException("Live source opened with an empty body")
@@ -175,7 +178,7 @@ class ReconnectingHttpDataSource private constructor(
             synchronized(this) {
                 if (closed) { source.close(); throw IOException("Live connection cancelled") }
                 delegate = source
-                filteredInput = if (reconnectAllowed) continuity.open(asInputStream(source)) else null
+                filteredInput = if (reconnectAllowed && removeLiveOverlap) continuity.open(asInputStream(source)) else null
             }
             connectionBytes = 0
             connectionOpenedAt = startedAt

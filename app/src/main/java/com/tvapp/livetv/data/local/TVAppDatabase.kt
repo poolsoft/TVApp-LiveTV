@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XtreamEpgProgramEntity::class,
         VodMetadataEntity::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -70,11 +70,18 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_27_28,
                 MIGRATION_28_29,
                 MIGRATION_29_30,
+                MIGRATION_30_31,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_30_31 = object : Migration(30, 31) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_channels ADD COLUMN removeLiveOverlap INTEGER NOT NULL DEFAULT 0")
+            }
         }
 
         internal val MIGRATION_29_30 = object : Migration(29, 30) {
