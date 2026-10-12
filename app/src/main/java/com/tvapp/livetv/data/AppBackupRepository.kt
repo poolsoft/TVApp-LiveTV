@@ -503,6 +503,7 @@ class AppBackupRepository(context: Context) {
 
         fun JsonWriter.write(display: DisplayPreferences) = apply {
             beginObject()
+            name("osdTheme").value(display.osdTheme.name)
             name("infoBarPosition").value(display.infoBarPosition.name)
             name("showCurrentProgram").value(display.showCurrentProgram)
             name("showNextProgram").value(display.showNextProgram)
@@ -578,6 +579,7 @@ class AppBackupRepository(context: Context) {
         )
 
         fun JSONObject.toDisplayPreferences() = DisplayPreferences(
+            osdTheme = com.tvapp.livetv.settings.OsdTheme.fromName(nullableString("osdTheme")),
             infoBarPosition = enumValue(requireString("infoBarPosition"), InfoBarPosition.TOP),
             showCurrentProgram = optBoolean("showCurrentProgram", true),
             showNextProgram = optBoolean("showNextProgram", true),

@@ -187,7 +187,13 @@ class ChannelAdapter(
     inner class ChannelViewHolder(
         private val binding: ItemChannelBinding,
     ) : RecyclerView.ViewHolder(binding.root) {
+        private var appliedTheme: com.tvapp.livetv.settings.OsdTheme? = null
+
         fun bind(channel: LiveChannel, program: ProgramSummary?) = with(binding) {
+            if (appliedTheme != rowOptions.osdTheme) {
+                root.setBackgroundResource(OsdThemeAppearance.rowBackground(rowOptions.osdTheme))
+                appliedTheme = rowOptions.osdTheme
+            }
             val metrics = root.resources.displayMetrics
             val screenHeight = metrics.heightPixels
             val rowHeight = (screenHeight * ROW_HEIGHT_FRACTION).toInt()
@@ -328,6 +334,7 @@ class ChannelAdapter(
 }
 
 data class ChannelRowOptions(
+    val osdTheme: com.tvapp.livetv.settings.OsdTheme = com.tvapp.livetv.settings.OsdTheme.DEFAULT,
     val showLogo: Boolean = false,
     val showProgram: Boolean = true,
     val showProgress: Boolean = true,

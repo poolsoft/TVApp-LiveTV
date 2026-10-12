@@ -6,6 +6,7 @@ enum class InfoBarPosition { TOP, BOTTOM }
 enum class ChannelPanelSide { LEFT, RIGHT }
 
 data class DisplayPreferences(
+    val osdTheme: OsdTheme = OsdTheme.DEFAULT,
     val infoBarPosition: InfoBarPosition = InfoBarPosition.TOP,
     val showCurrentProgram: Boolean = true,
     val showNextProgram: Boolean = true,
@@ -39,6 +40,7 @@ class DisplayPreferencesStore(context: Context) {
     )
 
     fun load(): DisplayPreferences = DisplayPreferences(
+        osdTheme = OsdTheme.fromName(preferences.getString(KEY_OSD_THEME, null)),
         infoBarPosition = enumValueOrDefault(
             preferences.getString(KEY_INFO_POSITION, null),
             InfoBarPosition.TOP,
@@ -79,6 +81,7 @@ class DisplayPreferencesStore(context: Context) {
 
     fun save(displayPreferences: DisplayPreferences) {
         preferences.edit()
+            .putString(KEY_OSD_THEME, displayPreferences.osdTheme.name)
             .putString(KEY_INFO_POSITION, displayPreferences.infoBarPosition.name)
             .putBoolean(KEY_SHOW_CURRENT, displayPreferences.showCurrentProgram)
             .putBoolean(KEY_SHOW_NEXT, displayPreferences.showNextProgram)
@@ -128,6 +131,7 @@ class DisplayPreferencesStore(context: Context) {
         enumValues<T>().firstOrNull { it.name == value } ?: fallback
 
     private companion object {
+        const val KEY_OSD_THEME = "osd-theme"
         const val KEY_INFO_POSITION = "info-position"
         const val KEY_SHOW_CURRENT = "show-current-program"
         const val KEY_SHOW_NEXT = "show-next-program"

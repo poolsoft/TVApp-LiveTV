@@ -1,5 +1,10 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-12 - TV OSD tema seçenekleri
+
+- Kanal listesi ve infobara ortak tema seçimi eklendi: Varsayılan mevcut görünümü korur; Glass yarı saydam yüzey ve açık odak çerçevesi, Yüksek Kontrast opak siyah yüzey ve belirgin odak sağlar. Ayarlar > Görünüm üzerinden seçilir, dönüşte uygulanır ve yedeğe dahil edilir. Eski yedeklerde Varsayılan kullanılır.
+- Yerleşim, kumanda eşlemeleri, video oynatımı, mobil ve web arayüzü değiştirilmez. Gerçek zamanlı blur, yeni bağımlılık veya veritabanı değişikliği yoktur.
+
 ## 2026-10-12 - Web kaynak adı ve kısa eşleştirme
 
 - Web yönetiminde her kaynak için Yeniden adlandır eklendi. Mevcut adla açılan koyu pencerede Kaydet/İptal kullanılır; boş veya 200 karakteri aşan adlar reddedilir. Mevcut repository ad güncellemesi kullanılır; kanal seçimleri ve tercihler korunur, TV/web işlem kilidi uygulanır.

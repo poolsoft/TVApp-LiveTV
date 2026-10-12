@@ -2471,8 +2471,11 @@ class MainActivity : TvRemoteActivity() {
 
     private fun applyDisplayPreferences() {
         displayPreferences = displayPreferencesStore.load()
+        val osdTheme = if (BuildConfig.MOBILE_UI_ENABLED) com.tvapp.livetv.settings.OsdTheme.DEFAULT
+            else displayPreferences.osdTheme
         adapter.applyRowOptions(
             ChannelRowOptions(
+                osdTheme = osdTheme,
                 showLogo = displayPreferences.showChannelLogo,
                 showProgram = displayPreferences.showChannelProgram,
                 showProgress = displayPreferences.showChannelProgress,
@@ -2481,8 +2484,8 @@ class MainActivity : TvRemoteActivity() {
         )
         binding.infoBar.background.mutate().alpha =
             (displayPreferences.infoBarOpacityPercent * 255 / 100).coerceIn(0, 255)
-        binding.channelPanel.background.mutate().alpha =
-            (displayPreferences.channelPanelOpacityPercent * 255 / 100).coerceIn(0, 255)
+        com.tvapp.livetv.ui.OsdThemeAppearance.apply(osdTheme, binding.channelPanel, binding.infoCard,
+            displayPreferences.channelPanelOpacityPercent, displayPreferences.infoBarOpacityPercent)
 
         (binding.channelPanel.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {

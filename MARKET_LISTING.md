@@ -14,6 +14,9 @@ Bu belge Google Play ve benzeri Android TV mağazalarında kullanılacak açıkl
 yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın öncesinde doldurulmalıdır.
 
 ## Türkçe
+- Kanal listesi ve bilgi çubuğu için mevcut görünüm, hafif Glass ve opak Yüksek Kontrast seçenekleri. Kumanda düzeni değişmez; Glass gerçek zamanlı bulanıklık kullanmaz.
+
+English: Choose the original, lightweight Glass or opaque High Contrast appearance for the TV channel list and info bar, without changing remote navigation. Glass does not use real-time blur.
 - İsteğe bağlı yerel web IPTV yönetimi: TV’den açılan süreli, 4 haneli kodla eşleştirilen oturumda telefon/bilgisayardan URL, M3U, Xtream ve Stalker ekleme, kaynak adını değiştirme, kaynak silme ve URL listesi güncelleme. İşlemler TV’de yapılır. Sunucu boşta iken TV sayfası kullanılabilir; yalnız işlem sırasında iki tarafın işlem kontrolleri kilitlenir. Şifrelenmemiş HTTP yalnız güvenilir yerel ağ içindir; internetten uzaktan yönetim hizmeti değildir.
 
 English: Optional local web IPTV management with a temporary 4-digit pairing-code session started on TV. Add URL, M3U, Xtream and Stalker sources, rename or delete sources and update URL playlists from a phone or computer. Operations run on TV. TV controls stay usable while idle; both sides block conflicting commands only during data operations. Unencrypted HTTP is for trusted local networks only, not internet remote management.

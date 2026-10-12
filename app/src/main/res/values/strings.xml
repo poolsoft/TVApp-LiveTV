@@ -238,6 +238,11 @@
     <string name="settings_title">TV ayarları</string>
     <string name="settings_remote_hint">Sekmeler: ◀/▶ · Satırlar: ▲/▼ · Değer: ◀/▶ veya OK</string>
     <string name="settings_tab_appearance">Görünüm</string>
+    <string name="osd_theme">Kanal listesi ve infobar teması</string>
+    <string name="osd_theme_default">Varsayılan (mevcut görünüm)</string>
+    <string name="osd_theme_glass">Glass (hafif cam görünümü)</string>
+    <string name="osd_theme_high_contrast">Yüksek Kontrast (opak)</string>
+    <string name="osd_theme_guide">TV GÖRÜNÜM TEMALARI\nAyarlar > Görünüm > Kanal listesi ve infobar teması: Varsayılan mevcut görünümü korur. Glass, gerçek bulanıklık veya video kopyalama kullanmadan yarı saydam paneller ve belirgin odak çerçeveleri sunar; mevcut saydamlık ayarları kullanılır. Yüksek Kontrast opak siyah paneller ve açık çerçeveler kullanır. Yerleşim, boyutlar ve kumanda tuşları değişmez. Seçim saklanır ve ayarlardan çıkınca uygulanır; Varsayılan seçilerek eski görünüme dönülür. Diğer ekranlar ve web yönetimi değişmez.</string>
     <string name="settings_tab_channels">Kanallar</string>
     <string name="settings_tab_iptv_epg">IPTV/EPG</string>
     <string name="settings_tab_system">Sistem</string>

@@ -238,6 +238,11 @@
     <string name="settings_title">TV settings</string>
     <string name="settings_remote_hint">Tabs: ◀/▶ · Rows: ▲/▼ · Value: ◀/▶ or OK</string>
     <string name="settings_tab_appearance">Appearance</string>
+    <string name="osd_theme">Channel list and info bar theme</string>
+    <string name="osd_theme_default">Default (current appearance)</string>
+    <string name="osd_theme_glass">Glass (lightweight glass look)</string>
+    <string name="osd_theme_high_contrast">High Contrast (opaque)</string>
+    <string name="osd_theme_guide">TV APPEARANCE THEMES\nSettings > Appearance > Channel list and info bar theme: Default preserves the existing look. Glass uses translucent panels and clear focus borders without real blur or copying video frames; existing opacity settings apply. High Contrast uses opaque black panels and light borders. Layout, sizes and remote mappings stay unchanged. The selection is saved and applied when leaving Settings; choose Default to restore the original appearance. Other screens and web management are unchanged.</string>
     <string name="settings_tab_channels">Channels</string>
     <string name="settings_tab_iptv_epg">IPTV/EPG</string>
     <string name="settings_tab_system">System</string>

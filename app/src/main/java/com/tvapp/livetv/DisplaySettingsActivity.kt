@@ -212,6 +212,15 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun buildAppearanceSettings() {
+        if (!BuildConfig.MOBILE_UI_ENABLED) {
+            section(R.string.osd_theme)
+            choice(
+                R.string.osd_theme,
+                listOf(getString(R.string.osd_theme_default), getString(R.string.osd_theme_glass),
+                    getString(R.string.osd_theme_high_contrast)),
+                current.osdTheme.ordinal,
+            ) { index -> update { copy(osdTheme = com.tvapp.livetv.settings.OsdTheme.entries[index]) } }
+        }
         section(R.string.language_settings)
         val languages = AppLanguage.entries
         choice(
