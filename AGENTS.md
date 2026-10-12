@@ -16,6 +16,11 @@ and `MARKET_LISTING.md`; this file contains implementation and workflow constrai
 - After a requested implementation is verified, commit and push only the files belonging to that
   implementation to `main`, unless the user says not to push. If unrelated uncommitted changes
   make selective staging ambiguous, stop before committing and report it.
+- Delivery is not complete until the verified changes are committed and pushed to `main`.
+  Do this without waiting for a separate push reminder so the TV can receive the update.
+  After pushing, verify that the release workflow started; trigger it if needed and report its
+  link/status. Never claim the APK is available before the release job succeeds. If tests,
+  push, or CI fail, report the exact blocker instead of silently leaving delivery unfinished.
 - Do not amend, force-push, reset, or rewrite published history.
 - `.build` is intentionally stable during development. Do not increment it unless the user
   explicitly changes the versioning policy.

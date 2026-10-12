@@ -762,7 +762,8 @@
     <string name="web_code">8-digit pairing code shown on TV</string>
     <string name="web_security">Use only on a trusted local network. HTTP is not encrypted. TV and browser must be on the same network; keep this screen open. The session expires after 15 minutes.</string>
     <string name="web_no_network">No local network address found. Connect the TV to Wi-Fi or Ethernet.</string>
-    <string name="web_session">Address: %1$s\nPairing code: %2$s\n\n%3$s</string>
+    <string name="web_session">Address: %1$s\nPairing code: %2$s\n\n%3$s\n\nClose or Back does not stop the server. Use the TV page and choose Manage from browser to reopen these details. Both sides block conflicting commands only during data operations.</string>
+    <string name="web_idle_guide">Close or Back in the address/code window does not stop the server. Choose Manage from browser to reopen it. The TV source page remains usable while idle; TV and browser operation controls lock together only during data operations. Opening another screen, including channel selection or the file picker, closes the web session.</string>
     <string name="web_operation_failed">Operation failed. Check the source address, credentials and file format, then try again.</string>
     <string name="web_disconnected">TV connection closed. Restart the server on TV and pair again.</string>
     <string name="web_delete_confirm">Delete this IPTV source and its channels?</string>

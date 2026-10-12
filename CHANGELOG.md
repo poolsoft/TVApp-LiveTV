@@ -2,6 +2,7 @@
 
 ## 2026-10-12 - Yerel ağdan IPTV kaynak yönetimi
 
+- Web sunucusu açıkken TV kaynak yönetimi kullanılabilir. Adres/kod penceresini Kapat veya Back ile kapatmak sunucuyu durdurmaz; Web’den yönet ile yeniden açılır. Yalnız gerçek veri işlemi sırasında TV ve tarayıcı işlem kontrolleri birlikte kilitlenir; eşzamanlı komut reddedilir, işlem bitince açılır.
 - IPTV yönetimine Web’den yönet / Sunucuyu başlat eklendi. Aynı ağdaki tarayıcı TV’deki adres ve her oturumda yenilenen 8 haneli kodla eşleştirilir; ek bağımlılık veya Room şema değişikliği yoktur.
 - Tarayıcıdan URL, UTF-8 M3U dosyası (en fazla 12 MB), Xtream ve Stalker eklenebilir; kaynaklar silinebilir ve URL kaynakları güncellenebilir. Mevcut TV repository/staging akışı kullanılır; seçimler korunur, içe aktarılan kanallar otomatik ana listeye eklenmez. Durum ve gerçek içe aktarma ilerlemesi TV ve tarayıcıda gösterilir.
 - Sunucu yalnız seçilen yerel IPv4 adresini dinler; eşleştirme öncesi kaynak/kimlik bilgisi vermez. Yanlış kod denemeleri sınırlandırılır, çapraz origin/yanlış Host istekleri engellenir ve gövde/istemci/süre sınırları uygulanır. Sunucuyu durdur, ekrandan çıkma veya 15 dakikalık oturum sonu erişimi kapatır. HTTP şifrelenmez; yalnız güvenilir LAN kullanımı içindir.

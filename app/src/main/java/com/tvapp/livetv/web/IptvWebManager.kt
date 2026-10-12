@@ -23,19 +23,27 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.UUID
 
-class IptvWebManager(
+internal class IptvWebManager(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val operationGate: IptvOperationGate,
     private val onState: (busy: Boolean, message: String, changed: Boolean) -> Unit,
     private val onExpired: () -> Unit,
 ) {
     private val repository = IptvRepository(context)
     private var server: IptvWebServer? = null
     private var expiry: Job? = null
-    @Volatile private var busy = false
     private var stopped = false
     @Volatile private var message = context.getString(R.string.web_ready)
     @Volatile private var sources: List<IptvSourceSummary> = emptyList()
+
+    fun updateLocalSources(loaded: List<IptvSourceSummary>) {
+        sources = loaded
+    }
+
+    fun updateLocalProgress(status: String) {
+        message = status
+    }
 
     suspend fun start(): Pair<String, String> {
         val started = withContext(Dispatchers.IO) {
@@ -78,10 +86,10 @@ class IptvWebManager(
                     .put("selected", summary.selectedChannelCount).put("updated", source.lastUpdatedAt)
                     .put("url", if (source.kind == IptvRepository.KIND_URL) source.location else ""))
             }
-            return WebReply(200, JSONObject().put("sources", rows).put("busy", busy).put("message", message).toString())
+            return WebReply(200, JSONObject().put("sources", rows).put("busy", operationGate.isBusy).put("message", message).toString())
         }
         return withContext(Dispatchers.Main.immediate) {
-            if (busy || server == null) return@withContext WebReply(409)
+            if (operationGate.isBusy || server == null) return@withContext WebReply(409)
             val action = data.optString("action")
             val kind = data.optString("kind")
             if (action !in listOf("add", "update", "delete") ||
@@ -89,7 +97,7 @@ class IptvWebManager(
                     data.optString("name").isBlank() || data.optString("name").length > 200))) {
                 return@withContext WebReply(400)
             }
-            busy = true
+            if (!operationGate.tryAcquire()) return@withContext WebReply(409)
             val sourceName = if (action == "add") data.optString("name") else
                 sources.firstOrNull { it.source.id == data.optLong("id") }?.source?.name.orEmpty()
             message = context.getString(R.string.iptv_source_progress, sourceName,
@@ -99,18 +107,22 @@ class IptvWebManager(
                 val progressUi = launch {
                     while (true) { delay(500); onState(true, message, false) }
                 }
+                var changed = false
                 try {
                     val resultMessage = withContext(Dispatchers.IO) {
                         execute(action, kind, data, sourceName).also { sources = repository.sources() }
                     }
                     message = resultMessage
-                    onState(false, message, true)
+                    changed = true
                 } catch (cancelled: CancellationException) { throw cancelled
                 } catch (error: Exception) {
                     CrashReportStore(context).recordDebug("IPTV_WEB FAILURE | ${error.javaClass.simpleName}")
                     message = context.getString(R.string.web_operation_failed)
-                    onState(false, message, false)
-                } finally { progressUi.cancel(); busy = false }
+                } finally {
+                    progressUi.cancel()
+                    operationGate.release()
+                    onState(false, message, changed)
+                }
             }
             WebReply(202)
         }

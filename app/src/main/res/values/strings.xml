@@ -762,7 +762,8 @@
     <string name="web_code">TV’deki 8 haneli eşleştirme kodu</string>
     <string name="web_security">Yalnız güvendiğiniz yerel ağda kullanın. HTTP bağlantısı şifrelenmez. TV ve tarayıcı aynı ağda olmalı; bu ekran açık kalmalıdır. Oturum 15 dakika sonra kapanır.</string>
     <string name="web_no_network">Yerel ağ adresi bulunamadı. TV’yi Wi-Fi veya Ethernet ağına bağlayın.</string>
-    <string name="web_session">Adres: %1$s\nEşleştirme kodu: %2$s\n\n%3$s</string>
+    <string name="web_session">Adres: %1$s\nEşleştirme kodu: %2$s\n\n%3$s\n\nKapat veya Back sunucuyu durdurmaz. TV sayfasını kullanabilir, Web’den yönet ile bu bilgileri tekrar açabilirsiniz. Yalnız veri işlemi sırasında iki tarafın işlem kontrolleri kilitlenir.</string>
+    <string name="web_idle_guide">Adres/kod penceresinde Kapat veya Back sunucuyu durdurmaz. Web’den yönet ile tekrar açılır. TV kaynak sayfası boşta kullanılabilir; yalnız veri işlemi sırasında TV ve tarayıcı işlem kontrolleri birlikte kilitlenir. Kanal seçimi veya dosya seçici dahil başka ekrana geçmek web oturumunu kapatır.</string>
     <string name="web_operation_failed">İşlem tamamlanamadı. Kaynak adresini, giriş bilgilerini ve dosya biçimini kontrol edip yeniden deneyin.</string>
     <string name="web_disconnected">TV bağlantısı kapandı. TV’den sunucuyu yeniden başlatıp tekrar eşleştirin.</string>
     <string name="web_delete_confirm">Bu IPTV kaynağı ve kanalları silinsin mi?</string>

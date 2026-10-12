@@ -48,6 +48,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private var webStartJob: Job? = null
     private var webSessionText = ""
     private var operationBusy = false
+    private val operationGate = com.tvapp.livetv.web.IptvOperationGate()
 
     private val selectChannels = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -122,7 +123,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun showWebManagement() {
-        if (webManager != null || operationBusy) return
+        if (operationGate.isBusy) return
+        if (webManager != null) {
+            if (webSessionText.isNotEmpty()) showWebSession()
+            return
+        }
         AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.web_manage)
             .setMessage(R.string.web_security)
@@ -132,7 +137,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun startWebManagement() {
-        val manager = com.tvapp.livetv.web.IptvWebManager(this, lifecycleScope,
+        val manager = com.tvapp.livetv.web.IptvWebManager(this, lifecycleScope, operationGate,
             onState = { busy, message, changed ->
                 setBusy(busy)
                 binding.importStatus.text = message
@@ -147,14 +152,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             try {
                 val (address, code) = manager.start()
                 webSessionText = getString(R.string.web_session, address, code, getString(R.string.web_security))
-                webDialog = AlertDialog.Builder(this@IptvSourcesActivity, R.style.Theme_TVApp_Dialog)
-                    .setTitle(R.string.web_manage)
-                    .setMessage(webSessionText)
-                    .setPositiveButton(R.string.web_stop) { _, _ -> stopWebManagement() }
-                    .create().also { dialog ->
-                        dialog.setOnDismissListener { stopWebManagement() }
-                        dialog.show()
-                    }
+                showWebSession()
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
             } catch (error: Exception) {
                 debugLog.recordDebug("IPTV_WEB START_FAILURE | ${error.javaClass.simpleName}")
@@ -164,9 +162,23 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
     }
 
+    private fun showWebSession() {
+        if (webDialog?.isShowing == true) return
+        webDialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.web_manage)
+            .setMessage(webSessionText)
+            .setPositiveButton(R.string.web_stop) { _, _ -> stopWebManagement() }
+            .setNegativeButton(R.string.close, null)
+            .create().also { dialog ->
+                dialog.setOnDismissListener { webDialog = null }
+                dialog.show()
+            }
+    }
+
     private fun stopWebManagement() {
         webManager?.stop()
         webManager = null
+        webSessionText = ""
         val dialog = webDialog
         webDialog = null
         dialog?.setOnDismissListener(null)
@@ -213,11 +225,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     enteredUrl.isBlank() -> url.error = getString(R.string.iptv_url_required)
                     enteredName.isBlank() -> name.error = getString(R.string.iptv_source_name_required)
                     else -> {
+                        if (!beginLocalOperation()) return@setOnClickListener
                         submit.isEnabled = false
                         activeOperationSourceName = enteredName
                         status.visibility = View.VISIBLE
                         status.setText(R.string.iptv_importing)
-                        setBusy(true)
                         debugLog.recordDebug("IPTV_URL_IMPORT START")
                         lifecycleScope.launch {
                             val result = withContext(Dispatchers.IO) {
@@ -226,7 +238,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                                 }
                             }
                             result.onSuccess { imported ->
-                                setBusy(false)
+                                finishLocalOperation()
                                 debugLog.recordDebug(
                                     "IPTV_URL_IMPORT SUCCESS | source=${imported.sourceId}, channels=${imported.channelCount}",
                                 )
@@ -242,7 +254,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                                 dialog.dismiss()
                                 openChannelSelection(imported.sourceId, imported.sourceName)
                             }.onFailure { error ->
-                                setBusy(false)
+                                finishLocalOperation()
                                 debugLog.recordDebug(
                                     "IPTV_URL_IMPORT FAILURE | ${error.javaClass.name}: ${error.message}",
                                 )
@@ -370,6 +382,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun showSourceActions(summary: IptvSourceSummary) {
+        if (operationGate.isBusy) return
         val actions = buildList {
             if (!BuildConfig.MOBILE_UI_ENABLED) {
                 add(SourceAction.SELECT to getString(R.string.select_iptv_channels))
@@ -437,6 +450,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
+        if (operationGate.isBusy) return
         when (action) {
             SourceAction.SELECT -> openChannelSelection(summary.source.id, summary.source.name)
             SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.name) {
@@ -523,12 +537,14 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     fields[3].requestFocus()
                     return@setOnClickListener
                 }
+                if (!beginLocalOperation()) return@setOnClickListener
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
                 lifecycleScope.launch {
                     val result = withContext(Dispatchers.IO) {
                         runCatching { repository.saveSourceNetworkOptions(source.id, values[0], values[1], values[2], maximum) }
                     }
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    finishLocalOperation()
                     result.onSuccess { dialog.dismiss(); setResult(RESULT_OK); loadSources() }.onFailure(::showError)
                 }
             }
@@ -618,10 +634,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
             }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                if (!beginLocalOperation()) return@setOnClickListener
                 save.isEnabled = false
                 lifecycleScope.launch {
                     val result = withContext(Dispatchers.IO) { runCatching { repository.saveSourcePlaybackOptions(source.id, options) } }
                     save.isEnabled = true
+                    finishLocalOperation()
                     result.onSuccess {
                         dialog.dismiss()
                         setResult(RESULT_OK)
@@ -665,12 +683,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun renameSource(summary: IptvSourceSummary, name: String) {
-        setBusy(true)
+        if (!beginLocalOperation()) return
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching { repository.rename(summary.source, name) }
             }
-            setBusy(false)
+            finishLocalOperation()
             result.onSuccess {
                 setResult(RESULT_OK)
                 binding.importStatus.setText(R.string.iptv_source_renamed)
@@ -680,12 +698,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun deleteSource(summary: IptvSourceSummary) {
-        setBusy(true)
+        if (!beginLocalOperation()) return
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching { repository.delete(summary.source) }
             }
-            setBusy(false)
+            finishLocalOperation()
             result.onSuccess {
                 debugLog.recordDebug(
                     "IPTV_SOURCE_DELETED | source=${summary.source.id}, kind=${summary.source.kind}",
@@ -703,8 +721,8 @@ class IptvSourcesActivity : TvRemoteActivity() {
         openSelectionAfter: Boolean = false,
         action: suspend ((IptvImportProgress) -> Unit) -> com.tvapp.livetv.data.IptvImportResult,
     ) {
+        if (!beginLocalOperation()) return
         activeOperationSourceName = sourceName
-        setBusy(true)
         binding.importStatus.text = getString(
             R.string.iptv_source_progress,
             sourceName,
@@ -715,7 +733,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             val result = withContext(Dispatchers.IO) {
                 runCatching { action(::showImportProgress) }
             }
-            setBusy(false)
+            finishLocalOperation()
             result.onSuccess { imported ->
                 debugLog.recordDebug(
                     "$event SUCCESS | source=${imported.sourceId}, channels=${imported.channelCount}",
@@ -744,6 +762,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             val result = withContext(Dispatchers.IO) { runCatching { repository.sources() } }
             result.onSuccess { loaded ->
                 sources = loaded
+                webManager?.updateLocalSources(loaded)
                 if (loaded.isEmpty()) {
                     selectedSourcePosition = -1
                 } else {
@@ -806,7 +825,6 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun showError(error: Throwable) {
-        setBusy(false)
         binding.importStatus.text = error.message ?: error.javaClass.simpleName
     }
 
@@ -835,21 +853,42 @@ class IptvSourcesActivity : TvRemoteActivity() {
             binding.importStatus.text = activeOperationSourceName?.let { sourceName ->
                 getString(R.string.iptv_source_progress, sourceName, stage)
             } ?: stage
+            webManager?.updateLocalProgress(binding.importStatus.text.toString())
         }
     }
 
     private fun setBusy(busy: Boolean) {
-        operationBusy = busy
-        binding.root.keepScreenOn = busy || webManager != null
-        val editable = !busy && webManager == null
+        operationBusy = busy || operationGate.isBusy
+        binding.root.keepScreenOn = operationBusy || webManager != null
+        val editable = !operationBusy
         binding.importUrlButton.isEnabled = editable
         binding.importFileButton.isEnabled = editable
         binding.importXtreamButton.isEnabled = editable
         binding.importStalkerButton.isEnabled = editable
         binding.webManageButton.isEnabled = editable
         binding.sourceList.isEnabled = editable
-        binding.importProgress.visibility = if (busy) View.VISIBLE else View.GONE
+        binding.importProgress.visibility = if (operationBusy) View.VISIBLE else View.GONE
         binding.importProgress.isIndeterminate = true
+    }
+
+    private fun beginLocalOperation(): Boolean {
+        if (!operationGate.tryAcquire()) return false
+        webManager?.updateLocalProgress(getString(R.string.iptv_importing))
+        setBusy(true)
+        return true
+    }
+
+    private suspend fun finishLocalOperation() {
+        try {
+            if (webManager != null) {
+                withContext(Dispatchers.IO) { runCatching { repository.sources() } }
+                    .onSuccess { webManager?.updateLocalSources(it) }
+                webManager?.updateLocalProgress(getString(R.string.web_ready))
+            }
+        } finally {
+            operationGate.release()
+            setBusy(false)
+        }
     }
 
     private fun sourceTypeLabel(kind: String): String = getString(
@@ -907,6 +946,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     }
 
     private fun openChannelSelection(sourceId: Long, sourceName: String) {
+        if (operationGate.isBusy) return
         selectChannels.launch(
             Intent(this, IptvChannelSelectionActivity::class.java)
                 .putExtra(IptvChannelSelectionActivity.EXTRA_SOURCE_ID, sourceId)
