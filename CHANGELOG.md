@@ -1,5 +1,10 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-12 - Web kaynak adı ve kısa eşleştirme
+
+- Web yönetiminde her kaynak için Yeniden adlandır eklendi. Mevcut adla açılan koyu pencerede Kaydet/İptal kullanılır; boş veya 200 karakteri aşan adlar reddedilir. Mevcut repository ad güncellemesi kullanılır; kanal seçimleri ve tercihler korunur, TV/web işlem kilidi uygulanır.
+- Eşleştirme kodu 4 haneye indirildi; baştaki sıfırlar korunur. Oturum tokenı, 15 dakikalık oturum ve 5 hatalı denemede 60 saniyelik bekleme korunur. Yalnız güvenilir LAN kullanımına yöneliktir.
+
 ## 2026-10-12 - Yerel ağdan IPTV kaynak yönetimi
 
 - Web sunucusu açıkken TV kaynak yönetimi kullanılabilir. Adres/kod penceresini Kapat veya Back ile kapatmak sunucuyu durdurmaz; Web’den yönet ile yeniden açılır. Yalnız gerçek veri işlemi sırasında TV ve tarayıcı işlem kontrolleri birlikte kilitlenir; eşzamanlı komut reddedilir, işlem bitince açılır.

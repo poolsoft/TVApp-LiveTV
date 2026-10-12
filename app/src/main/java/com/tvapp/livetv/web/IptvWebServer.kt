@@ -24,7 +24,7 @@ class IptvWebServer(
     private val api: suspend (String, JSONObject) -> WebReply,
 ) : Closeable {
     private val random = SecureRandom()
-    val pairingCode = String.format(java.util.Locale.ROOT, "%08d", random.nextInt(100_000_000))
+    val pairingCode = String.format(java.util.Locale.ROOT, "%04d", random.nextInt(10_000))
     private val token = ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
     private val server = ServerSocket(0, 8, address)
     val url = "http://${address.hostAddress}:${server.localPort}"

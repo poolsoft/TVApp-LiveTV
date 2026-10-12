@@ -62,6 +62,13 @@ class IptvWebServerTest {
         assertEquals(401, request("/state").first)
         assertEquals(200, request("/state", token = pair()).first)
     }
+    @Test fun pairingCodeHasExactlyFourDigits() {
+        assertTrue(server.pairingCode.matches(Regex("[0-9]{4}")))
+        assertEquals(200, request("/state", token = pair()).first)
+    }
+    @Test fun partialPairingCodeIsRejected() {
+        assertEquals(401, request("/pair", JSONObject().put("code", server.pairingCode.dropLast(1)).toString()).first)
+    }
     @Test fun commandNeedsValidTokenAndPost() {
         assertEquals(401, request("/command", "{}").first)
         val token = pair()

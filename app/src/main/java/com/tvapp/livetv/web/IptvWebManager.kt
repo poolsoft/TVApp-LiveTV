@@ -92,7 +92,8 @@ internal class IptvWebManager(
             if (operationGate.isBusy || server == null) return@withContext WebReply(409)
             val action = data.optString("action")
             val kind = data.optString("kind")
-            if (action !in listOf("add", "update", "delete") ||
+            if (action !in listOf("add", "update", "delete", "rename") ||
+                (action == "rename" && (data.optString("name").isBlank() || data.optString("name").length > 200)) ||
                 (action == "add" && (kind !in listOf("URL", "DOCUMENT", "XTREAM", "STALKER") ||
                     data.optString("name").isBlank() || data.optString("name").length > 200))) {
                 return@withContext WebReply(400)
@@ -171,6 +172,10 @@ internal class IptvWebManager(
                 repository.delete(source)
                 return context.getString(R.string.iptv_source_deleted)
             }
+            if (action == "rename") {
+                repository.rename(source, data.getString("name"))
+                return context.getString(R.string.iptv_source_renamed)
+            }
             require(source.kind == IptvRepository.KIND_URL)
             repository.refresh(source, progress)
         }
@@ -190,6 +195,7 @@ internal class IptvWebManager(
             "username" to R.string.username_hint, "password" to R.string.password_hint,
             "mac" to R.string.mac_address_hint, "add" to R.string.import_action,
             "saved" to R.string.saved_iptv_sources, "update" to R.string.update,
+            "rename" to R.string.rename_iptv_source, "save" to R.string.save, "cancel" to R.string.cancel,
             "delete" to R.string.delete, "file" to R.string.source_type_m3u_file,
             "URL" to R.string.source_type_m3u_url, "DOCUMENT" to R.string.source_type_m3u_file,
             "XTREAM" to R.string.source_type_xtream, "STALKER" to R.string.source_type_stalker,
