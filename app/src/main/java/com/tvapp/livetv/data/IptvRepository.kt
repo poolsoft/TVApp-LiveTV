@@ -81,6 +81,9 @@ class IptvRepository(context: Context) {
         )
     }
 
+    suspend fun sourceNames(): Map<String, String> =
+        dao.getSources().associate { "iptv:${it.id}" to it.name }
+
     suspend fun statistics(): IptvStatistics {
         val sources = sources()
         return IptvStatistics(
@@ -240,8 +243,10 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun setChannelsSelected(sourceKeys: List<String>, selected: Boolean) {
-        sourceKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
-            if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, selected)
+        database.withTransaction {
+            sourceKeys.chunked(SELECTION_UPDATE_CHUNK_SIZE).forEach { chunk ->
+                if (chunk.isNotEmpty()) dao.setChannelsSelected(chunk, selected)
+            }
         }
         if (sourceKeys.isNotEmpty()) {
             notifySharedChannelsChanged()

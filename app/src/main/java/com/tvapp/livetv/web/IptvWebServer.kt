@@ -21,6 +21,7 @@ import java.util.Collections
 class IptvWebServer(
     address: InetAddress,
     private val page: String,
+    private val onPaired: () -> Unit = {},
     private val api: suspend (String, JSONObject) -> WebReply,
 ) : Closeable {
     private val random = SecureRandom()
@@ -113,6 +114,7 @@ class IptvWebServer(
                     }
                     else -> {
                         badCodes = 0
+                        onPaired()
                         WebReply(200, JSONObject().put("token", token).toString())
                     }
                 }

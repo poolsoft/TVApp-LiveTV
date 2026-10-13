@@ -14,6 +14,12 @@ Bu belge Google Play ve benzeri Android TV mağazalarında kullanılacak açıkl
 yayın notlarının çalışma kopyasıdır. Köşeli parantezli alanlar yayın öncesinde doldurulmalıdır.
 
 ## Türkçe
+- Kanal editöründe IPTV kaynak liste adları, seçili IPTV kanallarını ana listeden topluca çıkarma ve kumanda odağına göre araç açıklamaları. Kaynak içerikleri ve uydu kanalları korunur.
+
+English: IPTV playlist names in the channel editor, bulk removal from the main channel list, and focus-aware sidebar tool descriptions. Source entries and tuner channels are preserved.
+- Web yönetimi uzun veri işlemlerinde açık kalır; sabit oturum süresi yerine 15 dakikalık boşta kalma sınırı uygulanır. Otomatik durum sorguları bu sınırı uzatmaz.
+
+English: Browser management stays available during long data operations, with a 15-minute idle timeout rather than a fixed session limit. Automatic status polling does not extend the timeout.
 - Kanal listesi ve bilgi çubuğu için mevcut görünüm, hafif Glass ve opak Yüksek Kontrast seçenekleri. Kumanda düzeni değişmez; Glass gerçek zamanlı bulanıklık kullanmaz.
 
 English: Choose the original, lightweight Glass or opaque High Contrast appearance for the TV channel list and info bar, without changing remote navigation. Glass does not use real-time blur.

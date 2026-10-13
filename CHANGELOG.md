@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-14 - Kanal editöründe IPTV kaynakları ve toplu çıkarma
+
+- IPTV kanal adının altında kaynak liste adı küçük yazıyla gösterilir. Kaynak adları tek metadata sorgusunda alınır; satır başına veritabanı sorgusu yapılmaz.
+- Çoklu seçimde sol araç çubuğuna ana listeden çıkar eklendi. Onaylanan seçimin yalnız IPTV kanallarında üyelik kaldırılır; kaynak içerikleri, kullanıcı tercihleri ve uydu kanalları korunur. Toplu üyelik değişikliği tek transaction içinde uygulanır.
+- Soldaki araç odaklandığında altta görevi gösterilir. Renk tuşları satırı ve alt alanın toplam yüksekliği korunur. Son kanal çıkarıldığında geçersiz kanal odağı/önizlemesi temizlenir.
+
+## 2026-10-12 - Web oturumu boşta kalma süresi
+
+- Sabit 15 dakikalık oturum yerine 15 dakikalık boşta kalma süresi kullanılır. TV/web veri işlemi sürerken sunucu otomatik kapanmaz. Başarılı eşleştirme, kabul edilen web komutu ve web işleminin bitişi süreyi yeniler; otomatik durum sorguları süreyi uzatmaz. Elle durdurma ve IPTV yönetiminden ayrılma davranışı değişmez.
+
 ## 2026-10-12 - TV OSD tema seçenekleri
 
 - Kanal listesi ve infobara ortak tema seçimi eklendi: Varsayılan mevcut görünümü korur; Glass yarı saydam yüzey ve açık odak çerçevesi, Yüksek Kontrast opak siyah yüzey ve belirgin odak sağlar. Ayarlar > Görünüm üzerinden seçilir, dönüşte uygulanır ve yedeğe dahil edilir. Eski yedeklerde Varsayılan kullanılır.

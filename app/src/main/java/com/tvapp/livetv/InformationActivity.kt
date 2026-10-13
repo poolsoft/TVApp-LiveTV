@@ -31,6 +31,7 @@ class InformationActivity : TvRemoteActivity() {
                 getString(R.string.user_guide_source_playback) + "\n\n" +
                 getString(R.string.user_guide_source_network) + "\n\n" +
                 getString(R.string.osd_theme_guide) + "\n\n" +
+                getString(R.string.user_guide_editor_iptv) + "\n\n" +
                 getString(R.string.web_guide) + "\n\n" + getString(R.string.web_idle_guide) + "\n\n" +
                 getString(R.string.user_guide_playback_modes) + "\n\n" +
                 getString(R.string.user_guide_vod_library) + "\n\n" +

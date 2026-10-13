@@ -225,6 +225,19 @@
     <string name="cancel">İptal</string>
     <string name="sync_tif">TIF eşitle</string>
     <string name="editor_ok_hint">OK Özellikler · BACK Çıkış</string>
+    <string name="editor_remove_selected_iptv">Seçili IPTV kanallarını çıkar</string>
+    <string name="editor_remove_selected_iptv_hint">Seçili IPTV kanallarını ana listeden çıkarır; kaynak içerikleri korunur.</string>
+    <string name="editor_remove_selected_iptv_confirm">%1$d IPTV kanalı ana kanal listesinden çıkarılsın mı? Kaynak listedeki içerikler ve kanal tercihleri korunur. Seçili uydu kanalları etkilenmez.</string>
+    <string name="editor_removed_iptv">%1$d IPTV kanalı ana listeden çıkarıldı.</string>
+    <string name="editor_remove_iptv_failed">IPTV kanalları listeden çıkarılamadı. Yeniden deneyin.</string>
+    <string name="editor_skip_hint">Odaktaki kanalın gezinirken atlanmasını açar veya kapatır.</string>
+    <string name="editor_move_hint">Odaktaki kanalı veya çoklu seçimde seçili kanalları taşır.</string>
+    <string name="editor_save_hint">Yeni kanal sırasını kaydeder.</string>
+    <string name="editor_target_hint">Taşınacak kanalların hedef sıra numarasını seçer.</string>
+    <string name="editor_multi_hint">Birden fazla kanalı OK ile seçme modunu açar.</string>
+    <string name="editor_cancel_hint">Taşımayı iptal edip önceki sıraya döner.</string>
+    <string name="editor_sources_hint">IPTV, XMLTV ve kanal kaynaklarının yönetimini açar.</string>
+    <string name="user_guide_editor_iptv">KANAL EDİTÖRÜ\nIPTV kanal adının altında kaynak liste adı görünür. Sarı ile çoklu seçim moduna geçip OK ile kanalları seçin. Soldaki çıkar simgesi seçili IPTV kanallarını onaydan sonra ana listeden çıkarır; kaynak içerikleri ve kullanıcı tercihleri korunur, uydu kanalları etkilenmez. Soldaki araçlara odaklandığınızda alt açıklama görevini gösterir; renk tuşları satırı korunur.</string>
     <string name="red_key">Kırmızı tuş</string>
     <string name="green_key">Yeşil tuş</string>
     <string name="yellow_key">Sarı tuş</string>
@@ -765,7 +778,7 @@
     <string name="web_ready">Komut bekleniyor.</string>
     <string name="web_pair">Eşleştir</string>
     <string name="web_code">TV’deki 4 haneli eşleştirme kodu</string>
-    <string name="web_security">Yalnız güvendiğiniz yerel ağda kullanın. HTTP bağlantısı şifrelenmez. TV ve tarayıcı aynı ağda olmalı; bu ekran açık kalmalıdır. Oturum 15 dakika sonra kapanır.</string>
+    <string name="web_security">Yalnız güvendiğiniz yerel ağda kullanın. HTTP bağlantısı şifrelenmez. TV ve tarayıcı aynı ağda olmalı; IPTV yönetimi açık kalmalıdır. İşlem sürerken oturum kapanmaz; işlem yapılmadan geçen 15 dakika sonunda kapanır.</string>
     <string name="web_no_network">Yerel ağ adresi bulunamadı. TV’yi Wi-Fi veya Ethernet ağına bağlayın.</string>
     <string name="web_session">Adres: %1$s\nEşleştirme kodu: %2$s\n\n%3$s\n\nKapat veya Back sunucuyu durdurmaz. TV sayfasını kullanabilir, Web’den yönet ile bu bilgileri tekrar açabilirsiniz. Yalnız veri işlemi sırasında iki tarafın işlem kontrolleri kilitlenir.</string>
     <string name="web_idle_guide">Adres/kod penceresinde Kapat veya Back sunucuyu durdurmaz. Web’den yönet ile tekrar açılır. TV kaynak sayfası boşta kullanılabilir; yalnız veri işlemi sırasında TV ve tarayıcı işlem kontrolleri birlikte kilitlenir. Web’de kayıtlı kaynakta Yeniden adlandır ile adı değiştirip Kaydet seçin; seçimler ve kanallar korunur. Kanal seçimi veya dosya seçici dahil başka ekrana geçmek web oturumunu kapatır.</string>
@@ -775,5 +788,5 @@
     <string name="web_empty">Kayıtlı IPTV kaynağı yok.</string>
     <string name="web_counts">%1$d içerik · %2$d seçili</string>
     <string name="web_upload_limit">En fazla 12 MB boyutunda UTF-8 M3U dosyası seçin.</string>
-    <string name="web_guide">WEB ÜZERİNDEN IPTV YÖNETİMİ\nIPTV yönetiminde Web’den yönet > Sunucuyu başlat seçin. Aynı ağdaki telefon veya bilgisayarda TV’deki adresi açıp 4 haneli kodu girin. URL, M3U dosyası, Xtream ve Stalker kaynakları eklenebilir; kayıtlı kaynaklar silinebilir ve URL kaynakları güncellenebilir. İşlemler TV’deki mevcut içe aktarma mekanizmasıyla yapılır; kanallar otomatik olarak ana listeye eklenmez. Dosyalar TV’nin özel alanında saklanır. İşlem sürerken ilerleme iki ekranda gösterilir. Sunucuyu durdur, bu ekrandan çıkma veya 15 dakikalık süre sonu erişimi kapatır. Başlamış veri işlemi ekran açıkken tamamlanmaya devam eder. HTTP şifrelenmediğinden yalnız güvendiğiniz yerel ağda kullanın; internete port açmayın. Her başlatmada yeni kod üretilir.</string>
+    <string name="web_guide">WEB ÜZERİNDEN IPTV YÖNETİMİ\nIPTV yönetiminde Web’den yönet > Sunucuyu başlat seçin. Aynı ağdaki telefon veya bilgisayarda TV’deki adresi açıp 4 haneli kodu girin. URL, M3U dosyası, Xtream ve Stalker kaynakları eklenebilir; kayıtlı kaynaklar silinebilir ve URL kaynakları güncellenebilir. İşlemler TV’deki mevcut içe aktarma mekanizmasıyla yapılır; kanallar otomatik olarak ana listeye eklenmez. Dosyalar TV’nin özel alanında saklanır. İşlem sürerken ilerleme iki ekranda gösterilir. Sunucuyu durdur, bu ekrandan çıkma veya 15 dakika boşta kalma erişimi kapatır; veri işlemi sürerken süre dolmaz. Başlamış veri işlemi ekran açıkken tamamlanmaya devam eder. HTTP şifrelenmediğinden yalnız güvendiğiniz yerel ağda kullanın; internete port açmayın. Her başlatmada yeni kod üretilir.</string>
 </resources>

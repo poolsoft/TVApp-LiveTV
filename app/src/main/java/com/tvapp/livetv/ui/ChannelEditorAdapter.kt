@@ -17,11 +17,16 @@ class ChannelEditorAdapter(
     private val items = mutableListOf<LiveChannel>()
     private var selectedKeys: Set<String> = emptySet()
     private var movingKeys: Set<String> = emptySet()
+    private var sourceNames: Map<String, String> = emptyMap()
     var focusedSourceKey: String? = null
         private set
 
     val currentList: List<LiveChannel>
         get() = items
+
+    fun setSourceNames(names: Map<String, String>) {
+        sourceNames = names
+    }
 
     fun submitList(newItems: List<LiveChannel>, commitCallback: (() -> Unit)? = null) {
         items.clear()
@@ -100,6 +105,8 @@ class ChannelEditorAdapter(
         fun bind(channel: LiveChannel, position: Int) = with(binding) {
             channelNumber.text = (position + 1).toString()
             channelName.text = channel.displayName
+            channelSourceName.text = if (channel.source == LiveChannel.Source.IPTV) sourceNames[channel.inputId] else null
+            channelSourceName.visibility = if (channelSourceName.text.isNullOrBlank()) View.GONE else View.VISIBLE
             updateState(channel)
             editorQuality.text = channel.qualityLabel()
             editorQuality.visibility = if (editorQuality.text.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -148,3 +155,7 @@ class ChannelEditorAdapter(
         const val PAYLOAD_NUMBER = "number"
     }
 }
+
+internal fun selectedIptvKeys(channels: List<LiveChannel>, selectedKeys: Set<String>): List<String> =
+    channels.filter { it.source == LiveChannel.Source.IPTV && it.sourceKey in selectedKeys }
+        .map { it.sourceKey }

@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.tvapp.livetv.data.ChannelRepository
+import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.AppBackupRepository
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.data.TifRepository
@@ -29,6 +30,7 @@ import com.tvapp.livetv.settings.ChannelSourceFilterStore
 import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
+import com.tvapp.livetv.ui.selectedIptvKeys
 import com.tvapp.livetv.ui.ParentalPinDialog
 import com.tvapp.livetv.billing.IptvAccessDialogs
 import com.tvapp.livetv.billing.IptvEntitlementManager
@@ -46,6 +48,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
 
     private lateinit var binding: ActivityChannelEditorBinding
     private lateinit var repository: ChannelRepository
+    private val iptvRepository by lazy { IptvRepository(this) }
     private lateinit var crashReportStore: CrashReportStore
     private lateinit var adapter: ChannelEditorAdapter
     private lateinit var iptvPreview: IptvPlaybackController
@@ -140,7 +143,10 @@ class ChannelEditorActivity : TvRemoteActivity() {
             binding.sidebarBlueButton to EditorColor.BLUE,
         ).forEach { (button, color) ->
             button.setOnClickListener { handleEditorColor(color) }
+            button.setOnFocusChangeListener { _, _ -> updateToolHint() }
         }
+        binding.sidebarRemoveButton.setOnClickListener { confirmRemoveSelectedIptv() }
+        binding.sidebarRemoveButton.setOnFocusChangeListener { _, _ -> updateToolHint() }
     }
 
     private fun setupMobileColorActions() {
@@ -161,6 +167,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun handleEditorColor(color: EditorColor) {
+        if (operationInProgress) return
         clearNavigationNumberInput()
         when (color) {
             EditorColor.RED -> if (mode == Mode.MOVE) showMoveTargetEditor() else toggleSkipped()
@@ -189,9 +196,9 @@ class ChannelEditorActivity : TvRemoteActivity() {
                 repository.channels(
                     includeHidden = true,
                     refreshSources = syncMessage,
-                )
+                ).mapCatching { it to iptvRepository.sourceNames() }
             }
-            result.onSuccess { loaded ->
+            result.onSuccess { (loaded, sourceNames) ->
                 val repositoryFinishedAt = SystemClock.elapsedRealtime()
                 crashReportStore.recordDebug(
                     "EDITOR_CHANNEL_LOAD_SUCCESS | count=${loaded.size}, sync=$syncMessage, " +
@@ -200,6 +207,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
                 val previousCount = channels.size
                 channels.clear()
                 channels.addAll(loaded)
+                adapter.setSourceNames(sourceNames)
                 adapter.submitList(loaded) {
                     crashReportStore.recordDebug(
                         "EDITOR_CHANNEL_RENDER_SUCCESS | count=${loaded.size}, " +
@@ -223,7 +231,19 @@ class ChannelEditorActivity : TvRemoteActivity() {
                     adapter.setSelection(selectedKeys)
                     updateModeLabels()
                 }
-                focusChannel(preferredKey ?: loaded.firstOrNull()?.sourceKey)
+                if (loaded.isEmpty()) {
+                    focusedChannel = null
+                    previewSourceKey = null
+                    previewJob?.cancel()
+                    iptvPreview.stop()
+                    binding.previewTv.reset()
+                    binding.previewName.setText(R.string.no_channels_title)
+                    binding.previewNumber.text = ""
+                    binding.previewState.text = ""
+                    binding.sidebarRedButton.requestFocus()
+                } else {
+                    focusChannel(preferredKey ?: loaded.firstOrNull()?.sourceKey)
+                }
             }.onFailure { error ->
                 crashReportStore.recordDebug(
                     "EDITOR_CHANNEL_LOAD_FAILURE | ${error.javaClass.name}: ${error.message}",
@@ -256,6 +276,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun onChannelFocused(channel: LiveChannel) {
+        updateToolHint()
         focusedChannel = channel
         val index = channels.indexOfFirst { it.sourceKey == channel.sourceKey }
         val displayNumber = if (index >= 0) (index + 1).toString() else channel.displayNumber
@@ -303,6 +324,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun onChannelClicked(channel: LiveChannel) {
+        if (operationInProgress) return
         when (mode) {
             Mode.NORMAL -> showChannelProperties(channel)
             Mode.MULTI_SELECT -> toggleSelection(channel.sourceKey)
@@ -542,17 +564,86 @@ class ChannelEditorActivity : TvRemoteActivity() {
             Mode.MOVE -> getString(R.string.cancel)
         }
 
-        val isMoveMode = mode == Mode.MOVE
-        val blueAlpha = if (isMoveMode) 0.35f else 1.0f
+        val blueEnabled = mode == Mode.NORMAL
+        val blueAlpha = if (blueEnabled) 1.0f else 0.35f
         binding.blueAction.alpha = blueAlpha
         binding.blueActionIcon.alpha = blueAlpha
-        binding.sidebarBlueButton.isEnabled = !isMoveMode
+        binding.sidebarBlueButton.isEnabled = blueEnabled
         binding.sidebarBlueButton.alpha = blueAlpha
 
         binding.sidebarRedButton.contentDescription = binding.redAction.text
         binding.sidebarGreenButton.contentDescription = binding.greenAction.text
         binding.sidebarYellowButton.contentDescription = binding.yellowAction.text
         binding.sidebarBlueButton.contentDescription = binding.blueAction.text
+        binding.sidebarRemoveButton.visibility = if (mode == Mode.MULTI_SELECT) View.VISIBLE else View.GONE
+        binding.sidebarRemoveButton.isEnabled = selectedIptvKeys(channels, selectedKeys).isNotEmpty()
+        binding.sidebarRemoveButton.alpha = if (binding.sidebarRemoveButton.isEnabled) 1f else 0.35f
+        binding.sidebarYellowButton.nextFocusDownId = if (mode == Mode.MULTI_SELECT) {
+            R.id.sidebar_remove_button
+        } else {
+            R.id.sidebar_blue_button
+        }
+        updateToolHint()
+    }
+
+    private fun updateToolHint() {
+        binding.editorToolHint.text = when {
+            binding.sidebarRemoveButton.hasFocus() -> getString(R.string.editor_remove_selected_iptv_hint)
+            binding.sidebarRedButton.hasFocus() -> getString(
+                if (mode == Mode.MOVE) R.string.editor_target_hint else R.string.editor_skip_hint,
+            )
+            binding.sidebarGreenButton.hasFocus() -> getString(
+                if (mode == Mode.MOVE) R.string.editor_save_hint else R.string.editor_move_hint,
+            )
+            binding.sidebarYellowButton.hasFocus() -> getString(
+                when (mode) {
+                    Mode.NORMAL -> R.string.editor_multi_hint
+                    Mode.MULTI_SELECT -> R.string.editor_target_hint
+                    Mode.MOVE -> R.string.editor_cancel_hint
+                },
+            )
+            binding.sidebarBlueButton.hasFocus() -> getString(R.string.editor_sources_hint)
+            else -> getString(R.string.editor_ok_hint)
+        }
+    }
+
+    private fun confirmRemoveSelectedIptv() {
+        if (mode != Mode.MULTI_SELECT || operationInProgress) return
+        val keys = selectedIptvKeys(channels, selectedKeys)
+        if (keys.isEmpty()) return
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.editor_remove_selected_iptv)
+            .setMessage(getString(R.string.editor_remove_selected_iptv_confirm, keys.size))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.remove_from_channel_list) { _, _ ->
+                operationInProgress = true
+                previewJob?.cancel()
+                channelLoadJob?.cancel()
+                if (previewSourceKey in keys) {
+                    iptvPreview.stop()
+                    previewSourceKey = null
+                }
+                val preferredKey = focusedChannel?.sourceKey?.takeUnless { it in keys }
+                    ?: channels.firstOrNull { it.sourceKey !in keys }?.sourceKey
+                lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching { iptvRepository.setChannelsSelected(keys, false) }
+                    }
+                    operationInProgress = false
+                    result.onSuccess {
+                        selectedKeys.removeAll(keys.toSet())
+                        adapter.setSelection(selectedKeys)
+                        updateModeLabels()
+                        binding.syncStatus.text = getString(R.string.editor_removed_iptv, keys.size)
+                        setResult(RESULT_OK)
+                        loadChannels(syncMessage = false, preferredKey = preferredKey)
+                    }.onFailure { error ->
+                        crashReportStore.recordDebug("EDITOR_REMOVE_IPTV_FAILURE | ${error.javaClass.simpleName}")
+                        binding.syncStatus.setText(R.string.editor_remove_iptv_failed)
+                    }
+                }
+            }
+            .show()
     }
 
     private fun showChannelProperties(channel: LiveChannel) {

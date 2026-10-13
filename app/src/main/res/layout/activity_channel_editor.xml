@@ -131,6 +131,7 @@
                 android:clickable="true"
                 android:contentDescription="@string/source_management"
                 android:focusable="true"
+                android:nextFocusDown="@id/sidebar_remove_button"
                 android:nextFocusRight="@id/channel_list"
                 android:nextFocusUp="@id/sidebar_yellow_button">
 
@@ -141,6 +142,26 @@
                     android:contentDescription="@null"
                     android:src="@drawable/ic_list"
                     app:tint="@color/remote_blue" />
+            </FrameLayout>
+            <FrameLayout
+                android:id="@+id/sidebar_remove_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:contentDescription="@string/editor_remove_selected_iptv"
+                android:focusable="true"
+                android:nextFocusUp="@id/sidebar_yellow_button"
+                android:nextFocusRight="@id/channel_list"
+                android:visibility="gone">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_close"
+                    app:tint="@color/text_primary" />
             </FrameLayout>
         </LinearLayout>
 
@@ -247,6 +268,10 @@
         android:layout_width="match_parent"
         android:layout_height="68dp"
         android:background="#1B1E24"
+        android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="28dp">
@@ -315,11 +340,15 @@
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
+    </LinearLayout>
         <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="end"
+            android:id="@+id/editor_tool_hint"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="28dp"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="@string/editor_ok_hint"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />

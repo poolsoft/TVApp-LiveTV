@@ -33,6 +33,7 @@ internal class IptvWebManager(
     private val repository = IptvRepository(context)
     private var server: IptvWebServer? = null
     private var expiry: Job? = null
+    private val sessionTimeout = WebSessionTimeout()
     private var stopped = false
     @Volatile private var message = context.getString(R.string.web_ready)
     @Volatile private var sources: List<IptvSourceSummary> = emptyList()
@@ -58,7 +59,7 @@ internal class IptvWebManager(
             LABELS.forEach { (key, id) -> labels.put(key, context.getString(id)) }
             val page = context.resources.openRawResource(R.raw.iptv_web).bufferedReader().use { it.readText() }
                 .replace("__LABELS__", labels.toString().replace("<", "\\u003c"))
-            IptvWebServer(address, page, ::api).also {
+            IptvWebServer(address, page, onPaired = sessionTimeout::touch, api = ::api).also {
                 synchronized(this@IptvWebManager) {
                     if (stopped) { it.close(); throw CancellationException("Screen closed") }
                     server = it
@@ -66,7 +67,17 @@ internal class IptvWebManager(
             }
         }
         started.start()
-        expiry = scope.launch { delay(15 * 60_000L); stop(); onExpired() }
+        sessionTimeout.touch()
+        expiry = scope.launch {
+            while (true) {
+                delay(1_000)
+                if (sessionTimeout.isExpired(operationGate.isBusy)) {
+                    stop()
+                    onExpired()
+                    break
+                }
+            }
+        }
         return started.url to started.pairingCode
     }
 
@@ -99,6 +110,7 @@ internal class IptvWebManager(
                 return@withContext WebReply(400)
             }
             if (!operationGate.tryAcquire()) return@withContext WebReply(409)
+            sessionTimeout.touch()
             val sourceName = if (action == "add") data.optString("name") else
                 sources.firstOrNull { it.source.id == data.optLong("id") }?.source?.name.orEmpty()
             message = context.getString(R.string.iptv_source_progress, sourceName,
@@ -121,6 +133,7 @@ internal class IptvWebManager(
                     message = context.getString(R.string.web_operation_failed)
                 } finally {
                     progressUi.cancel()
+                    sessionTimeout.touch()
                     operationGate.release()
                     onState(false, message, changed)
                 }

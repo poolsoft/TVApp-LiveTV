@@ -1,5 +1,19 @@
 # IPTV web yönetimi
 
+## 2026-10-12: Oturum süresi düzeltmesi
+
+- Sabit süre yerine 15 dakika boşta kalma: TV/web veri işlemi boyunca sunucu açık kalır. Başarılı eşleştirme, kabul edilen web komutu ve web işlemi sonucu süreyi yeniler. Durum sorguları süreyi uzatmaz; elle durdurma ve yönetim ekranından ayrılma kapanışı korunur.
+- Monotonik saatle sınır, uzun işlem, süre yenileme ve pasif sorgu testleri eklendi. Gerçek TV/LAN doğrulaması gerekir.
+- 2026-10-14 doğrulaması: JDK 17 ile iki varyantın testleri ve debug APK derlemeleri başarılı (8m 15s). Her varyantta 226 test, toplam 452 test; sıfır hata/başarısızlık. Gerçek TV/LAN süre testi bekliyor.
+
+### Sonraki liste iyileştirmeleri (öneri, uygulanmadı)
+
+- Web kaynak listesinde ad/adres araması ve URL/Dosya/Xtream/Stalker tür filtresi.
+- İşlem gören kaynağın kendi satırında aşama, gerçek okunan kayıt sayısı ve geçen süre; bilinmeyen toplam için sahte yüzde yok.
+- Güncelleme sonucunda yeni/kaldırılan/korunan seçili kayıt özeti, gerçek staging eşleşmelerinden hesaplanmalı.
+- Çoklu kaynak güncellemesi için sırayla çalışan kuyruk; aynı anda bir veri işlemi kuralı korunmalı.
+- Webden kaynak içeriğine sayfalı erişim ve ana kanal listesine ekleme/çıkarma; büyük katalog tarayıcıya tek seferde taşınmamalı.
+
 ## İstek ve kapsam
 
 - Web kaynaklarında yeniden adlandırma: mevcut adla açılan koyu düzenleme penceresi, Kaydet/İptal, boş ve 200 karakterden uzun ad kontrolü, ortak işlem kilidi ve mevcut repository güncellemesi. Eşleştirme artık 4 hane; token/rate-limit/oturum süresi değişmedi. Tema sorusu web için değil TV kanal listesi ve infobar içindir: mevcut/Glass/yüksek kontrast seçenekleri yalnız değerlendirme aşamasında; tema veya oynatma kodu değiştirilmedi.
@@ -11,7 +25,7 @@
 
 - `web/IptvWebServer.kt`: bağımlılıksız, sınırlı HTTP sunucusu; seçilen LAN IPv4 adresinde geçici port, 4 haneli kod ve bellekte oturum tokenı; Host/origin kontrolü, 5 hatalı kod sonrası 60 saniye bekleme, 10 saniye istemci timeout’u, 16 MiB JSON sınırı ve sınırlı eşzamanlı istemci.
 - `web/IptvWebManager.kt`: repository komutları, durum/ilerleme ve 15 dakikalık oturum. Dosya yüklemeleri UUID adlı M3U olarak uygulamanın özel alanında saklanır. URL güncellemesi mevcut seçim eşleştirmesini korur.
-- `IptvSourcesActivity.kt` ve iki kaynak layout’u: başlat/durdur, adres/kod, kumandayla kapatma. Adres/kod penceresinin Kapat/Back ile kapanması sunucuyu durdurmaz; Web’den yönet tekrar açar. Sunucu boşta iken TV sayfası kullanılabilir. Ortak atomik işlem kilidi yalnız veri işlemi sırasında TV/web komutlarını karşılıklı engeller; TV değişiklikleri ve ilerleme tarayıcıya iletilir. IPTV yönetiminden ayrılmak (kanal seçimi veya dosya seçiciyi açmak dahil), Home veya 15 dakika erişimi kapatır. Başlamış işlem mevcut activity scope’u yaşarken tamamlanabilir; activity yok edilirse iptal edilir.
+- `IptvSourcesActivity.kt` ve iki kaynak layout’u: başlat/durdur, adres/kod, kumandayla kapatma. Adres/kod penceresinin Kapat/Back ile kapanması sunucuyu durdurmaz; Web’den yönet tekrar açar. Sunucu boşta iken TV sayfası kullanılabilir. Ortak atomik işlem kilidi yalnız veri işlemi sırasında TV/web komutlarını karşılıklı engeller; TV değişiklikleri ve ilerleme tarayıcıya iletilir. IPTV yönetiminden ayrılmak (kanal seçimi veya dosya seçiciyi açmak dahil), Home veya 15 dakika boşta kalma erişimi kapatır; veri işlemi sürerken süre dolmaz. Başlamış işlem mevcut activity scope’u yaşarken tamamlanabilir; activity yok edilirse iptal edilir.
 - `res/raw/iptv_web.html`: bağımsız, dış CDN kullanmayan mobil/masaüstü web arayüzü; kaynak adı/tür/adres/sayı/tarih, onaylı silme, URL güncelleme ve gerçek ilerleme. Kullanıcı metinleri TR/EN kaynaklarından gelir. Hassas bilgiler DOM’a `textContent` ile yazılır; şifreler liste yanıtında verilmez.
 - Kullanım kılavuzu, README, mağaza metni ve değişiklik günlüğü güncellendi.
 
