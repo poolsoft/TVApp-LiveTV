@@ -817,4 +817,6 @@
     <string name="web_select_channels_title">Kanal Seçimi</string>
     <string name="web_select_channels">Kanalları Seç</string>
     <string name="web_channel_editor_title">Kanal Listesi Düzenleyici</string>
+    <string name="vod_back_to_list">VOD Listesi</string>
+    <string name="vod_audio_subtitles">Ses / Altyazı</string>
 </resources>

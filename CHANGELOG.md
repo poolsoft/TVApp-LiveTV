@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-23 - Kumanda odaklı VOD Player Barı ve Geri butonu
+
+- **Kumanda Odaklı VOD Oynatma Deneyimi:** VOD (film/dizi) oynatılırken kumandadan `OK` tuşuna basıldığında filmin aniden kapanıp kütüphaneye dönmesi sorunu çözüldü. Artık film kesilmeden VOD Player kontrolleri açılır ve odak kumanda butonları üzerine gelir.
+- **VOD Oynatıcı Barı (Player Bar):** VOD modunda canlı TV'ye ait gereksiz kanal numarası ve sonraki yayın gibi alanlar gizlenerek sinematik temiz bir görünüm sağlandı.
+- **Kumandayla Gezilebilir Geri Butonu:** Kontrol çubuğunun en başına ve infobarın üst kısmına `[← VOD Listesi]` butonu eklendi. Kumandadan sol ok ile bu butona gidilip `OK` basıldığında veya film ekranındayken kumandadan `BACK` tuşuna basıldığında izleme süresi otomatik kaydedilerek doğrudan ana VOD listesine dönülür.
+- **Hızlı Ses ve Altyazı Kontrolü:** VOD kontrol butonları arasına doğrudan "Ses / Altyazı" butonu eklenerek kumandadan tek tıkla ses ve altyazı seçimi yapılması sağlandı.
+
 ## 2026-10-23 - IPTV kopma koruması, canlı bağlantı iyileştirmeleri ve varsayılan ayar
 
 - **IPTV Kopma Koruması ve Bağlantı İyileştirmeleri:** Canlı yayın yeniden bağlantı (`canReconnectLiveRequest`) mekanizması esnetildi; standart dışı `Content-Type` gönderen IPTV sağlayıcılarında (`application/octet-stream`, `video/ts`, `video/mpeg` veya eksik header) ve canlı TS URL yapılarında otomatik yeniden bağlantı devreye sokularak kopmalar ve siyah ekrana düşmeler önlendi. `LiveTsContinuity` motoruna sync byte (`0x47`) arama/hizalama (resync) yeteneği eklendi.

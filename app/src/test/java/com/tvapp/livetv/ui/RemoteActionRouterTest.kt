@@ -34,9 +34,10 @@ class RemoteActionRouterTest {
 
     @Test
     fun `VOD opens its own library and back dismisses overlays first`() {
-        listOf(RemoteKey.OK, RemoteKey.MENU, RemoteKey.GUIDE, RemoteKey.BACK).forEach { key ->
+        listOf(RemoteKey.MENU, RemoteKey.GUIDE, RemoteKey.BACK).forEach { key ->
             assertEquals(RemoteAction.OPEN_VOD_LIBRARY, route(isVod = true, key = key))
         }
+        assertEquals(RemoteAction.HANDLE_IPTV_CONTROLS, route(isVod = true, key = RemoteKey.OK))
         assertEquals(RemoteAction.HIDE_INFO_BAR, route(isVod = true, infoBar = true))
         assertEquals(RemoteAction.HANDLE_IPTV_CONTROLS,
             route(isVod = true, primary = PrimaryOsd.IPTV_CONTROLS))

@@ -92,7 +92,8 @@ class RemoteActionRouter {
     ): RemoteAction = when {
         key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN &&
             context.playbackUiState.infoBarVisible -> RemoteAction.HIDE_INFO_BAR
-        context.isVod && key in setOf(RemoteKey.OK, RemoteKey.MENU, RemoteKey.GUIDE) -> RemoteAction.OPEN_VOD_LIBRARY
+        context.isVod && key in setOf(RemoteKey.MENU, RemoteKey.GUIDE) -> RemoteAction.OPEN_VOD_LIBRARY
+        context.isVod && key == RemoteKey.OK -> RemoteAction.HANDLE_IPTV_CONTROLS
         key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN && context.isVod -> RemoteAction.OPEN_VOD_LIBRARY
         key == RemoteKey.BACK && phase == RemoteKeyPhase.DOWN -> RemoteAction.SHOW_RECENT_CHANNELS
         key == RemoteKey.LAST_CHANNEL -> RemoteAction.HANDLE_LAST_CHANNEL_PRESS

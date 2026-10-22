@@ -817,4 +817,6 @@
     <string name="web_select_channels_title">Channel Selection</string>
     <string name="web_select_channels">Select Channels</string>
     <string name="web_channel_editor_title">Channel List Editor</string>
+    <string name="vod_back_to_list">VOD Library</string>
+    <string name="vod_audio_subtitles">Audio / Subtitles</string>
 </resources>

@@ -186,7 +186,7 @@ class MainActivity : TvRemoteActivity() {
     private var multiViewDraftInitialized = false
     private var restoredMultiViewKeys: List<String>? = null
     private enum class IptvControlRow { TIMELINE, BUTTONS }
-    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
+    private enum class IptvControlButton { VOD_BACK, PLAY_PAUSE, BUFFER, SPEED, AUDIO_SUB, MORE, CONNECTION }
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -2078,6 +2078,18 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun setupIptvControls() {
+        binding.vodTopBackBtn.setOnClickListener {
+            openVodLibrary()
+        }
+        binding.iptvBtnVodBack.setOnClickListener {
+            selectedIptvButton = IptvControlButton.VOD_BACK
+            activateSelectedIptvButton()
+        }
+        binding.iptvBtnAudioSub.setOnClickListener {
+            selectedIptvButton = IptvControlButton.AUDIO_SUB
+            activateSelectedIptvButton()
+            showIptvPlaybackControls()
+        }
         binding.iptvBtnPlayPause.setOnClickListener {
             selectedIptvButton = IptvControlButton.PLAY_PAUSE
             activateSelectedIptvButton()
@@ -2217,6 +2229,13 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvSeekbarRow.visibility = if (isVod) View.VISIBLE else View.GONE
         binding.iptvBtnSpeed.visibility = if (isVod) View.VISIBLE else View.GONE
         binding.iptvBtnConnection.visibility = if (!isVod) View.VISIBLE else View.GONE
+        binding.iptvBtnVodBack.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.iptvBtnAudioSub.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.vodTopBar.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.nowNumber.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.currentProgram.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.nextProgram.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.programMeta.visibility = if (isVod) View.GONE else View.VISIBLE
         if (!isVod && iptvControlRow == IptvControlRow.TIMELINE) iptvControlRow = IptvControlRow.BUTTONS
         if ((selectedIptvButton == IptvControlButton.SPEED && !isVod) ||
             (selectedIptvButton == IptvControlButton.CONNECTION && isVod)) {
@@ -2293,9 +2312,11 @@ class MainActivity : TvRemoteActivity() {
 
     private fun cycleIptvButton(direction: Int) {
         val visibleButtons = buildList {
+            if (showsVodTimeline()) add(IptvControlButton.VOD_BACK)
             add(IptvControlButton.PLAY_PAUSE)
-            add(IptvControlButton.BUFFER)
+            if (!showsVodTimeline()) add(IptvControlButton.BUFFER)
             if (showsVodTimeline()) add(IptvControlButton.SPEED)
+            if (showsVodTimeline()) add(IptvControlButton.AUDIO_SUB)
             add(IptvControlButton.MORE)
             if (!showsVodTimeline()) add(IptvControlButton.CONNECTION)
         }
@@ -2310,15 +2331,19 @@ class MainActivity : TvRemoteActivity() {
 
         if (!iptvControlsInteractive) {
             binding.iptvSeekbarRow.clearFocus()
+            binding.iptvBtnVodBack.clearFocus()
             binding.iptvBtnPlayPause.clearFocus()
             binding.iptvBtnBuffer.clearFocus()
             binding.iptvBtnSpeed.clearFocus()
+            binding.iptvBtnAudioSub.clearFocus()
             binding.iptvBtnMore.clearFocus()
             binding.iptvBtnConnection.clearFocus()
             binding.iptvSeekbarRow.background = defaultBg
+            binding.iptvBtnVodBack.background = defaultBg
             binding.iptvBtnPlayPause.background = defaultBg
             binding.iptvBtnBuffer.background = defaultBg
             binding.iptvBtnSpeed.background = defaultBg
+            binding.iptvBtnAudioSub.background = defaultBg
             binding.iptvBtnMore.background = defaultBg
             binding.iptvBtnConnection.background = defaultBg
             return
@@ -2339,9 +2364,11 @@ class MainActivity : TvRemoteActivity() {
             }
         }
 
+        updateButton(binding.iptvBtnVodBack, selectedIptvButton == IptvControlButton.VOD_BACK)
         updateButton(binding.iptvBtnPlayPause, selectedIptvButton == IptvControlButton.PLAY_PAUSE)
         updateButton(binding.iptvBtnBuffer, selectedIptvButton == IptvControlButton.BUFFER)
         updateButton(binding.iptvBtnSpeed, selectedIptvButton == IptvControlButton.SPEED)
+        updateButton(binding.iptvBtnAudioSub, selectedIptvButton == IptvControlButton.AUDIO_SUB)
         updateButton(binding.iptvBtnMore, selectedIptvButton == IptvControlButton.MORE)
         updateButton(binding.iptvBtnConnection, selectedIptvButton == IptvControlButton.CONNECTION)
     }
@@ -2361,15 +2388,24 @@ class MainActivity : TvRemoteActivity() {
         }
         binding.iptvSeekbarRow.alpha = if (iptvControlsInteractive) 1.0f else 0.65f
         val focusable = iptvControlsInteractive && !isChannelPanelOpen
+        binding.iptvBtnVodBack.isFocusable = focusable
         binding.iptvBtnPlayPause.isFocusable = focusable
         binding.iptvBtnBuffer.isFocusable = focusable
         binding.iptvBtnSpeed.isFocusable = focusable
+        binding.iptvBtnAudioSub.isFocusable = focusable
         binding.iptvBtnMore.isFocusable = focusable
         binding.iptvBtnConnection.isFocusable = focusable
     }
 
     private fun activateSelectedIptvButton() {
         when (selectedIptvButton) {
+            IptvControlButton.VOD_BACK -> {
+                openVodLibrary()
+                return
+            }
+            IptvControlButton.AUDIO_SUB -> {
+                showAudioTracks()
+            }
             IptvControlButton.PLAY_PAUSE -> {
                 if (!showsVodTimeline()) {
                     iptvManualTimeshift = false
@@ -5170,8 +5206,14 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun updateInfobarChannel(channel: LiveChannel) {
+        val isVod = showsVodTimeline()
         binding.nowChannel.text = channel.displayName
         binding.nowNumber.text = channel.displayNumber
+        binding.nowNumber.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.vodTopBar.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.currentProgram.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.nextProgram.visibility = if (isVod) View.GONE else View.VISIBLE
+        binding.programMeta.visibility = if (isVod) View.GONE else View.VISIBLE
         val sourceName = if (channel.source == LiveChannel.Source.IPTV) iptvSourceNames[channel.inputId] else null
         if (!sourceName.isNullOrBlank()) {
             binding.nowSourceName.text = sourceName
@@ -6660,6 +6702,8 @@ class MainActivity : TvRemoteActivity() {
                     currentChannel != null
                 ) {
                     requestChannelPin(requireNotNull(currentChannel))
+                } else if (vodMode || currentIptvContentKind == IptvContentKind.VOD) {
+                    showIptvPlaybackControls(activateControls = true)
                 } else if (binding.channelPanel.visibility != View.VISIBLE) {
                     toggleChannelPanel()
                 } else {
