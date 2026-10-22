@@ -216,7 +216,9 @@ class IptvPlaybackController(
             val options = try {
                 withContext(Dispatchers.IO) {
                     val source = sourceId(channel)?.let { database.iptvDao().getSource(it) }
-                    preparedRemoveLiveOverlap = database.channelDao().getChannel(channel.sourceKey)?.removeLiveOverlap == true
+                    val defaultMethod = com.tvapp.livetv.settings.IptvPlaybackPreferencesStore(appContext).load().defaultLiveConnectionMethod
+                    val channelOverlap = database.channelDao().getChannel(channel.sourceKey)?.removeLiveOverlap == true
+                    preparedRemoveLiveOverlap = channelOverlap || (defaultMethod == com.tvapp.livetv.settings.IptvPlaybackPreferences.LIVE_CONNECTION_OVERLAP)
                     preparedChannel = channel.copy(
                         userAgent = channel.userAgent ?: source?.defaultUserAgent,
                         referrer = channel.referrer ?: source?.defaultReferrer,

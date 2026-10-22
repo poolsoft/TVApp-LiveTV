@@ -12,6 +12,12 @@ internal const val LIVE_RECONNECT_BASE_DELAY_MS = 300L
 internal const val LIVE_RECONNECT_MAX_DELAY_MS = 4_000L
 internal const val LIVE_RECONNECT_MAX_CONSECUTIVE_FAILURES = 4
 
+private val COMPATIBLE_LIVE_CONTENT_TYPES = setOf(
+    "video/mp2t",
+    "video/ts",
+    "video/mpeg",
+    "application/octet-stream",
+)
 
 internal fun shouldReconnectAfterEndOfInput(
     consecutiveFailures: Int,
@@ -34,5 +40,20 @@ internal fun liveConnectionSummary(value: String): String {
 }
 
 internal fun canReconnectLiveRequest(contentType: String?, position: Long, length: Long, httpMethod: Int): Boolean =
-    contentType?.substringBefore(';')?.trim()?.equals("video/mp2t", ignoreCase = true) == true &&
-        position == 0L && length == -1L && httpMethod == 1
+    canReconnectLiveRequest(contentType, position, length, httpMethod, null)
+
+internal fun canReconnectLiveRequest(
+    contentType: String?,
+    position: Long,
+    length: Long,
+    httpMethod: Int,
+    uriString: String?,
+): Boolean {
+    if (position != 0L || length != -1L || httpMethod != 1) return false
+    val uriLower = uriString?.lowercase().orEmpty()
+    if (uriLower.endsWith(".m3u8") || uriLower.contains(".m3u8?")) return false
+    val cleanType = contentType?.substringBefore(';')?.trim()?.lowercase()
+    if (cleanType == "application/vnd.apple.mpegurl" || cleanType == "video/mp4") return false
+    if (cleanType != null && cleanType in COMPATIBLE_LIVE_CONTENT_TYPES) return true
+    return uriLower.endsWith(".ts") || uriLower.contains("/live/") || uriLower.contains(".ts?") || uriLower.contains("/play/")
+}

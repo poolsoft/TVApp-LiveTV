@@ -67,7 +67,7 @@ class ReconnectingHttpDataSource private constructor(
         continuity = LiveTsContinuity()
         val available = openConnection()
         val contentType = responseHeaders.entries.firstOrNull { it.key.equals("Content-Type", true) }?.value?.firstOrNull()
-        reconnectAllowed = canReconnectLiveRequest(contentType, dataSpec.position, dataSpec.length, dataSpec.httpMethod)
+        reconnectAllowed = canReconnectLiveRequest(contentType, dataSpec.position, dataSpec.length, dataSpec.httpMethod, dataSpec.uri.toString())
         if (reconnectAllowed && removeLiveOverlap) delegate?.let { filteredInput = continuity.open(asInputStream(it)) }
         if (available == 0L) {
             closeConnection("empty")

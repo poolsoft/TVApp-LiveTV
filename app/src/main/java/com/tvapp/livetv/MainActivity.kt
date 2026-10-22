@@ -4677,7 +4677,9 @@ class MainActivity : TvRemoteActivity() {
         lifecycleScope.launch {
             try {
                 val enabled = withContext(Dispatchers.IO) {
-                    repository.channelPreference(channel.sourceKey)?.removeLiveOverlap == true
+                    val defaultMethod = com.tvapp.livetv.settings.IptvPlaybackPreferencesStore(this@MainActivity).load().defaultLiveConnectionMethod
+                    val pref = repository.channelPreference(channel.sourceKey)
+                    pref?.removeLiveOverlap ?: (defaultMethod == com.tvapp.livetv.settings.IptvPlaybackPreferences.LIVE_CONNECTION_OVERLAP)
                 }
                 if (isFinishing || isDestroyed) return@launch
                 var selected = enabled

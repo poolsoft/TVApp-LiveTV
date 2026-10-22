@@ -7,7 +7,14 @@ data class IptvPlaybackPreferences(
     val vodPlaybackSpeed: Float = DEFAULT_VOD_SPEED,
     val maximumVideoHeight: Int = 0,
     val automaticRecovery: Boolean = true,
+    val defaultLiveConnectionMethod: Int = LIVE_CONNECTION_STANDARD,
 ) {
+    constructor(
+        targetBufferSeconds: Int = DEFAULT_BUFFER_SECONDS,
+        vodPlaybackSpeed: Float = DEFAULT_VOD_SPEED,
+        maximumVideoHeight: Int = 0,
+        automaticRecovery: Boolean = true,
+    ) : this(targetBufferSeconds, vodPlaybackSpeed, maximumVideoHeight, automaticRecovery, LIVE_CONNECTION_STANDARD)
     companion object {
         const val AUTO_BUFFER_SECONDS = 0
         const val DEFAULT_BUFFER_SECONDS = 20
@@ -15,6 +22,9 @@ data class IptvPlaybackPreferences(
         val BUFFER_OPTIONS = listOf(0, 5, 10, 15, 20, 30, 45, 60)
         val SPEED_OPTIONS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
         val QUALITY_HEIGHT_OPTIONS = listOf(0, 576, 720, 1080, 2160)
+        const val LIVE_CONNECTION_STANDARD = 0
+        const val LIVE_CONNECTION_OVERLAP = 1
+        val LIVE_CONNECTION_OPTIONS = listOf(LIVE_CONNECTION_STANDARD, LIVE_CONNECTION_OVERLAP)
     }
 }
 
@@ -31,6 +41,7 @@ class IptvPlaybackPreferencesStore(context: Context) {
         maximumVideoHeight = preferences.getInt(KEY_QUALITY_HEIGHT, 0)
             .takeIf { it in IptvPlaybackPreferences.QUALITY_HEIGHT_OPTIONS } ?: 0,
         automaticRecovery = preferences.getBoolean(KEY_AUTOMATIC_RECOVERY, true),
+        defaultLiveConnectionMethod = preferences.getInt(KEY_DEFAULT_LIVE_CONNECTION, IptvPlaybackPreferences.LIVE_CONNECTION_STANDARD),
     )
 
     fun saveTargetBufferSeconds(seconds: Int) {
@@ -52,11 +63,17 @@ class IptvPlaybackPreferencesStore(context: Context) {
         preferences.edit().putBoolean(KEY_AUTOMATIC_RECOVERY, enabled).apply()
     }
 
+    fun saveDefaultLiveConnectionMethod(method: Int) {
+        require(method in IptvPlaybackPreferences.LIVE_CONNECTION_OPTIONS)
+        preferences.edit().putInt(KEY_DEFAULT_LIVE_CONNECTION, method).apply()
+    }
+
     private companion object {
         const val PREFS = "iptv_playback"
         const val KEY_BUFFER = "target_buffer_seconds"
         const val KEY_SPEED = "vod_playback_speed"
         const val KEY_QUALITY_HEIGHT = "maximum_video_height"
         const val KEY_AUTOMATIC_RECOVERY = "automatic_recovery"
+        const val KEY_DEFAULT_LIVE_CONNECTION = "default_live_connection"
     }
 }

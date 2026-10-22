@@ -433,6 +433,18 @@ class DisplaySettingsActivity : TvRemoteActivity() {
             iptvPlaybackStore.saveAutomaticRecovery(it)
             markChanged()
         }
+        val liveConnectionMethods = IptvPlaybackPreferences.LIVE_CONNECTION_OPTIONS
+        choice(
+            R.string.settings_default_live_connection,
+            listOf(
+                getString(R.string.iptv_live_connection_standard),
+                getString(R.string.iptv_live_connection_overlap),
+            ),
+            liveConnectionMethods.indexOf(iptvPlaybackPreferences.defaultLiveConnectionMethod).coerceAtLeast(0),
+        ) { index ->
+            iptvPlaybackStore.saveDefaultLiveConnectionMethod(liveConnectionMethods[index])
+            markChanged()
+        }
         choice(
             R.string.iptv_default_vod_speed,
             speedOptions.map { String.format(java.util.Locale.getDefault(), "%.2gx", it) },

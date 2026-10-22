@@ -50,7 +50,25 @@ internal class LiveTsContinuity {
                             count += read
                         }
                         if (packet[0] != 0x47.toByte()) {
-                            throw LiveTsContinuityException("Live TS response lost packet alignment")
+                            var syncIndex = -1
+                            for (i in 1 until packet.size) {
+                                if (packet[i] == 0x47.toByte()) {
+                                    syncIndex = i
+                                    break
+                                }
+                            }
+                            if (syncIndex > 0) {
+                                val remaining = packet.size - syncIndex
+                                packet.copyInto(packet, 0, syncIndex, packet.size)
+                                var resyncCount = remaining
+                                while (resyncCount < packet.size) {
+                                    val r = input.read(packet, resyncCount, packet.size - resyncCount)
+                                    if (r < 0) throw LiveTsContinuityException("Live TS response lost packet alignment")
+                                    resyncCount += r
+                                }
+                            } else {
+                                throw LiveTsContinuityException("Live TS response lost packet alignment")
+                            }
                         }
                         val pid = ((packet[1].toInt() and 31) shl 8) or (packet[2].toInt() and 255)
                         val anchor = anchors[pid]

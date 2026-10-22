@@ -1,6 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-23 - Infobar IPTV liste adı, Web sabit portları, sayfa boyutu ve toplu seçim
+## 2026-10-23 - IPTV kopma koruması, canlı bağlantı iyileştirmeleri ve varsayılan ayar
+
+- **IPTV Kopma Koruması ve Bağlantı İyileştirmeleri:** Canlı yayın yeniden bağlantı (`canReconnectLiveRequest`) mekanizması esnetildi; standart dışı `Content-Type` gönderen IPTV sağlayıcılarında (`application/octet-stream`, `video/ts`, `video/mpeg` veya eksik header) ve canlı TS URL yapılarında otomatik yeniden bağlantı devreye sokularak kopmalar ve siyah ekrana düşmeler önlendi. `LiveTsContinuity` motoruna sync byte (`0x47`) arama/hizalama (resync) yeteneği eklendi.
+- **Kullanıcı Dostu İsimlendirmeler:** Canlı bağlantı yöntemleri daha anlaşılır şekilde güncellendi: "Standart (Doğrudan Akış)" ve "Kesintisiz Akış (Kopma ve Tekrar Korumalı)".
+- **Ayarlarda Varsayılan Canlı Bağlantı Yöntemi:** Ayarlar > Oynatma sekmesine "Varsayılan Canlı Bağlantı Yöntemi" tercihi eklendi. Kanala özel bir seçim yapılmadığında bu genel ayar otomatik uygulanır.
+
 
 - **Infobarda IPTV Liste Adı:** IPTV kanalları izlenirken infobarda kanal adının hemen altında ait olduğu IPTV listesinin adı (`iptv_sources.name`) gösterilir. TIF/karasal/uydu yayınlarında bu alan otomatik gizlenir.
 - **Web Yönetiminde Öncelikli Sabit Portlar:** Web LAN sunucusu başlatılırken rastgele port ataması yerine sırasıyla `8050`, `8060` ve `8070` sabit portları denenir; tümü meşgul ise otomatik boş porta geçilir.
