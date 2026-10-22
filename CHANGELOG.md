@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-22 - GitHub üzerinden toplu IPTV liste aktarımı
+
+- Hem TV kaynak yönetiminde hem de Web yönetim arayüzünde GitHub üzerinden toplu liste içe aktarma desteği eklendi (`live2.json` ve `vod2.json` uyumlu).
+- TV Arayüzü: `IptvSourcesActivity` içine "Toplu Liste Ekle (GitHub)" seçeneği eklendi. Kullanıcı adı ve dosya seçimi sonrasında paketler logo, açıklama ve onay kutuları içeren TV kumandası uyumlu listede gösterilir; seçilen listeler tek tıkla topluca içe aktarılır.
+- Web Arayüzü: Web yönetim paneline GitHub sekmesi eklendi; tarayıcıdan kullanıcı adı ve canlı/VOD türü seçilerek paketler taranabilir, istenenler seçilip TV'ye tek işlemde eklenebilir.
+- Önceden eklenmiş olan listeler atlanarak mükerrer kayıtlar engellenir; aktarım ilerlemesi anlık olarak izlenebilir.
+
 ## 2026-10-14 - Kanal editöründe IPTV kaynakları ve toplu çıkarma
 
 - IPTV kanal adının altında kaynak liste adı küçük yazıyla gösterilir. Kaynak adları tek metadata sorgusunda alınır; satır başına veritabanı sorgusu yapılmaz.

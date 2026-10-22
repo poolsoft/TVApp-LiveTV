@@ -99,22 +99,54 @@ internal class IptvWebManager(
             }
             return WebReply(200, JSONObject().put("sources", rows).put("busy", operationGate.isBusy).put("message", message).toString())
         }
+        val action = data.optString("action")
+        if (action == "github_manifest") {
+            sessionTimeout.touch()
+            val user = data.optString("username", com.tvapp.livetv.data.GithubManifestRepository.DEFAULT_USER)
+            val file = data.optString("file", com.tvapp.livetv.data.GithubManifestRepository.DEFAULT_FILE)
+            val result = com.tvapp.livetv.data.GithubManifestRepository().fetchManifest(user, file)
+            val itemsArray = JSONArray()
+            result.getOrNull()?.forEach { item ->
+                itemsArray.put(
+                    JSONObject()
+                        .put("name", item.name)
+                        .put("url", item.url)
+                        .put("poster", item.poster.orEmpty())
+                        .put("description", item.description.orEmpty())
+                        .put("format", item.sourceFormat.orEmpty())
+                )
+            }
+            val replyJson = JSONObject()
+                .put("success", result.isSuccess)
+                .put("items", itemsArray)
+            if (result.isFailure) {
+                replyJson.put("error", result.exceptionOrNull()?.message.orEmpty())
+            }
+            return WebReply(200, replyJson.toString())
+        }
         return withContext(Dispatchers.Main.immediate) {
             if (operationGate.isBusy || server == null) return@withContext WebReply(409)
-            val action = data.optString("action")
             val kind = data.optString("kind")
-            if (action !in listOf("add", "update", "delete", "rename") ||
+            if (action !in listOf("add", "update", "delete", "rename", "add_bulk") ||
                 (action == "rename" && (data.optString("name").isBlank() || data.optString("name").length > 200)) ||
                 (action == "add" && (kind !in listOf("URL", "DOCUMENT", "XTREAM", "STALKER") ||
-                    data.optString("name").isBlank() || data.optString("name").length > 200))) {
+                    data.optString("name").isBlank() || data.optString("name").length > 200)) ||
+                (action == "add_bulk" && (data.optJSONArray("items") == null || data.optJSONArray("items")!!.length() == 0))) {
                 return@withContext WebReply(400)
             }
             if (!operationGate.tryAcquire()) return@withContext WebReply(409)
             sessionTimeout.touch()
-            val sourceName = if (action == "add") data.optString("name") else
-                sources.firstOrNull { it.source.id == data.optLong("id") }?.source?.name.orEmpty()
-            message = context.getString(R.string.iptv_source_progress, sourceName,
-                context.getString(R.string.iptv_import_connecting))
+            val bulkItems = data.optJSONArray("items")
+            val sourceName = when (action) {
+                "add" -> data.optString("name")
+                "add_bulk" -> context.getString(R.string.github_bulk_title)
+                else -> sources.firstOrNull { it.source.id == data.optLong("id") }?.source?.name.orEmpty()
+            }
+            message = if (action == "add_bulk") {
+                context.getString(R.string.iptv_source_bulk_progress, 0, bulkItems?.length() ?: 0, context.getString(R.string.iptv_import_connecting))
+            } else {
+                context.getString(R.string.iptv_source_progress, sourceName, context.getString(R.string.iptv_import_connecting))
+            }
             onState(true, message, false)
             scope.launch {
                 val progressUi = launch {
@@ -123,7 +155,11 @@ internal class IptvWebManager(
                 var changed = false
                 try {
                     val resultMessage = withContext(Dispatchers.IO) {
-                        execute(action, kind, data, sourceName).also { sources = repository.sources() }
+                        if (action == "add_bulk" && bulkItems != null) {
+                            executeBulkAdd(bulkItems).also { sources = repository.sources() }
+                        } else {
+                            execute(action, kind, data, sourceName).also { sources = repository.sources() }
+                        }
                     }
                     message = resultMessage
                     changed = true
@@ -195,6 +231,42 @@ internal class IptvWebManager(
         return context.getString(R.string.iptv_source_import_complete, imported.sourceName, imported.channelCount)
     }
 
+    private suspend fun executeBulkAdd(itemsJson: JSONArray): String {
+        val total = itemsJson.length()
+        var successCount = 0
+        for (i in 0 until total) {
+            val item = itemsJson.optJSONObject(i) ?: continue
+            val name = item.optString("name").trim()
+            val url = item.optString("url").trim()
+            if (name.isEmpty() || url.isEmpty()) continue
+
+            // Zaten kayitli olan adresi atla veya guncelle
+            val alreadySaved = repository.sources().any { it.source.location == url }
+            if (alreadySaved) {
+                successCount++
+                continue
+            }
+
+            val progress: (IptvImportProgress) -> Unit = { p ->
+                val stage = when (p.stage) {
+                    IptvImportStage.CONNECTING -> context.getString(R.string.iptv_import_connecting)
+                    IptvImportStage.READING -> context.getString(R.string.iptv_import_reading, p.processedChannels)
+                    IptvImportStage.SAVING -> context.getString(R.string.iptv_import_saving)
+                    IptvImportStage.FINISHING -> context.getString(R.string.iptv_import_finishing)
+                }
+                message = context.getString(R.string.iptv_source_bulk_progress, i + 1, total, "$name ($stage)")
+            }
+            message = context.getString(R.string.iptv_source_bulk_progress, i + 1, total, name)
+            runCatching {
+                repository.importUrl(url, name, progress)
+                successCount++
+            }.onFailure { error ->
+                CrashReportStore(context).recordDebug("BULK_IMPORT FAILURE | $name | ${error.javaClass.simpleName}")
+            }
+        }
+        return context.getString(R.string.iptv_source_bulk_import_complete, successCount)
+    }
+
     private fun httpUrl(data: JSONObject): String = data.getString("url").trim().also {
         val uri = java.net.URI(it)
         require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank())
@@ -215,6 +287,17 @@ internal class IptvWebManager(
             "confirm" to R.string.web_delete_confirm, "failed" to R.string.web_operation_failed,
             "offline" to R.string.web_disconnected, "empty" to R.string.web_empty,
             "counts" to R.string.web_counts, "uploadLimit" to R.string.web_upload_limit,
+            "github" to R.string.import_github_manifest,
+            "githubUser" to R.string.github_username_hint,
+            "githubFetch" to R.string.github_fetch_lists,
+            "githubLive" to R.string.github_live_lists,
+            "githubVod" to R.string.github_vod_lists,
+            "githubAddSelected" to R.string.github_add_selected,
+            "githubSelectAll" to R.string.github_select_all,
+            "githubDeselectAll" to R.string.github_deselect_all,
+            "githubEmpty" to R.string.github_manifest_empty,
+            "githubError" to R.string.github_manifest_error,
+            "githubNote" to R.string.github_guide_note,
         )
     }
 }

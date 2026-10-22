@@ -1,32 +1,183 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TVApp IPTV</title><style>
-*{box-sizing:border-box}body{margin:0;background:#111518;color:#edf1f4;font:15px system-ui,sans-serif}header{border-bottom:1px solid #38434b;padding:20px 24px}h1{font-size:22px;margin:0}main{max-width:1100px;margin:auto;padding:24px}h2{font-size:17px}section{margin-bottom:28px}form{display:grid;gap:14px;max-width:560px}label{display:grid;gap:6px;color:#bfcbd2}input,select,button{font:inherit;border:1px solid #576570;border-radius:5px;padding:10px;background:#222b31;color:#fff;min-height:42px}button{cursor:pointer}button[type=submit]{background:#18705c;border-color:#339f86}button:disabled{opacity:.45;cursor:wait}:focus-visible{outline:3px solid #59baff;outline-offset:2px}[hidden]{display:none!important}#status{position:sticky;top:0;padding:12px 0;background:#111518;white-space:pre-wrap;color:#75d8bf}#status.busy:before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid #75d8bf;border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.source{padding:16px 0;border-bottom:1px solid #38434b;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}.name{font-weight:650}.meta,.address{margin-top:6px;color:#bfcbd2;font-size:13px;overflow-wrap:anywhere}.actions{display:flex;gap:8px;align-items:center}.delete{color:#ffb4b4}p{color:#bfcbd2;line-height:1.5}#pairing{max-width:560px}@media(max-width:600px){main{padding:16px}.source{grid-template-columns:1fr}.actions{justify-content:flex-end}}
-#management{display:grid;grid-template-columns:340px minmax(0,1fr);gap:32px}#management form{max-width:none}@media(max-width:850px){#management{grid-template-columns:1fr;gap:0}}
-dialog{width:440px;max-width:calc(100% - 32px);padding:24px;background:#222b31;color:#edf1f4;border:1px solid #576570;border-radius:6px}dialog::backdrop{background:#0009}dialog h2{margin:0}dialog .actions{justify-content:flex-end}#renameError{margin:0;color:#ffb4b4}.actions{flex-wrap:wrap}
+*{box-sizing:border-box}body{margin:0;background:#111518;color:#edf1f4;font:15px system-ui,sans-serif}
+header{border-bottom:1px solid #38434b;padding:20px 24px}h1{font-size:22px;margin:0}
+main{max-width:1100px;margin:auto;padding:24px}h2{font-size:17px}section{margin-bottom:28px}
+form{display:grid;gap:14px;max-width:560px}label{display:grid;gap:6px;color:#bfcbd2}
+input,select,button{font:inherit;border:1px solid #576570;border-radius:5px;padding:10px;background:#222b31;color:#fff;min-height:42px}
+button{cursor:pointer}button[type=submit],.primary-btn{background:#18705c;border-color:#339f86}
+button:disabled{opacity:.45;cursor:wait}:focus-visible{outline:3px solid #59baff;outline-offset:2px}[hidden]{display:none!important}
+#status{position:sticky;top:0;padding:12px 0;background:#111518;white-space:pre-wrap;color:#75d8bf;z-index:10}
+#status.busy:before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid #75d8bf;border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.source{padding:16px 0;border-bottom:1px solid #38434b;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.name{font-weight:650}.meta,.address{margin-top:6px;color:#bfcbd2;font-size:13px;overflow-wrap:anywhere}
+.actions{display:flex;gap:8px;align-items:center}.delete{color:#ffb4b4}p{color:#bfcbd2;line-height:1.5}#pairing{max-width:560px}
+@media(max-width:600px){main{padding:16px}.source{grid-template-columns:1fr}.actions{justify-content:flex-end}}
+#management{display:grid;grid-template-columns:360px minmax(0,1fr);gap:32px}#management form{max-width:none}
+@media(max-width:850px){#management{grid-template-columns:1fr;gap:0}}
+dialog{width:440px;max-width:calc(100% - 32px);padding:24px;background:#222b31;color:#edf1f4;border:1px solid #576570;border-radius:6px}
+dialog::backdrop{background:#0009}dialog h2{margin:0}dialog .actions{justify-content:flex-end}#renameError{margin:0;color:#ffb4b4}.actions{flex-wrap:wrap}
+
+/* GitHub Manifest Card Styles */
+#githubSection{display:grid;gap:14px;max-width:560px}
+.manifest-toolbar{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.manifest-toolbar button{flex:1;min-height:36px;font-size:13px}
+.manifest-container{max-height:420px;overflow-y:auto;display:grid;gap:10px;padding:4px 2px;border:1px solid #38434b;border-radius:6px;background:#181f24}
+.manifest-card{display:flex;align-items:center;gap:12px;padding:10px;background:#222b31;border:1px solid #38434b;border-radius:5px;cursor:pointer}
+.manifest-card:hover{background:#2a363d;border-color:#576570}
+.manifest-card input[type=checkbox]{width:20px;height:20px;margin:0;cursor:pointer}
+.manifest-poster{width:48px;height:48px;object-fit:cover;border-radius:4px;background:#111518;flex-shrink:0}
+.manifest-info{flex:1;min-width:0}
+.manifest-name{font-weight:600;font-size:14px;color:#edf1f4}
+.manifest-desc{font-size:12px;color:#a0b1bc;margin-top:4px;line-height:1.4}
+.badge-tag{font-size:11px;background:#38434b;color:#a0b1bc;padding:2px 6px;border-radius:3px;margin-left:6px;vertical-align:middle}
 </style></head><body><header><h1 data-label="title"></h1></header><main>
 <section id="pairing"><p data-label="security"></p><form id="pairForm"><label><span data-label="code"></span><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required></label><button type="submit" data-label="pair"></button></form></section>
 <div id="status" role="status" aria-live="polite"></div>
 <div id="management" hidden><section><h2 data-label="add"></h2><form id="addForm">
-<label><select id="kind" aria-label="IPTV"><option value="URL"></option><option value="DOCUMENT"></option><option value="XTREAM"></option><option value="STALKER"></option></select></label>
-<label><span data-label="name"></span><input id="name" maxlength="200" required></label>
+<label><select id="kind" aria-label="IPTV"><option value="URL"></option><option value="DOCUMENT"></option><option value="XTREAM"></option><option value="STALKER"></option><option value="GITHUB"></option></select></label>
+<div id="standardFields">
+<label id="nameRow"><span data-label="name"></span><input id="name" maxlength="200" required></label>
 <label id="urlRow"><span data-label="url"></span><input id="url" type="url" required autocomplete="off"></label>
 <label id="fileRow" hidden><span data-label="file"></span><input id="file" type="file" accept=".m3u,.m3u8,.txt"></label>
 <label id="usernameRow" hidden><span data-label="username"></span><input id="username" autocomplete="off"></label>
 <label id="passwordRow" hidden><span data-label="password"></span><input id="password" type="password" autocomplete="off"></label>
 <label id="macRow" hidden><span data-label="mac"></span><input id="mac" autocomplete="off"></label>
-<button type="submit" data-label="add"></button></form></section>
+<button type="submit" data-label="add" id="submitBtn"></button>
+</div>
+</form>
+
+<div id="githubSection" hidden>
+  <p data-label="githubNote" style="font-size:13px;margin:0 0 6px 0;"></p>
+  <label><span data-label="githubUser"></span><input id="githubUser" value="GeceHub" autocomplete="off" required></label>
+  <label><span data-label="github"></span><select id="githubFile">
+    <option value="live2.json" data-label="githubLive"></option>
+    <option value="vod2.json" data-label="githubVod"></option>
+  </select></label>
+  <button type="button" id="githubFetchBtn" class="primary-btn" data-label="githubFetch"></button>
+  <div id="githubResults" hidden>
+    <div class="manifest-toolbar">
+      <button type="button" id="ghSelectAll" data-label="githubSelectAll"></button>
+      <button type="button" id="ghDeselectAll" data-label="githubDeselectAll"></button>
+    </div>
+    <div id="githubContainer" class="manifest-container"></div>
+    <button type="button" id="githubAddBtn" class="primary-btn" data-label="githubAddSelected" style="margin-top:10px;"></button>
+  </div>
+</div>
+
+</section>
 <section><h2 data-label="saved"></h2><div id="sources"></div></section></div>
 <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle" data-label="rename"></h2><label><span data-label="name"></span><input id="renameName" maxlength="200" required></label><p id="renameError" role="alert"></p><div class="actions"><button type="button" id="renameCancel" data-label="cancel"></button><button type="submit" data-label="save"></button></div></form></dialog>
 <script>
-'use strict';const L=__LABELS__;const $=id=>document.getElementById(id);let token='',busy=false,signature='',polling=false;
-document.documentElement.lang=navigator.language;document.querySelectorAll('[data-label]').forEach(e=>e.textContent=L[e.dataset.label]);
-[...$('kind').options].forEach(o=>o.textContent=L[o.value]);
+'use strict';const L=__LABELS__;const $=id=>document.getElementById(id);let token='',busy=false,signature='',polling=false,currentManifest=[];
+document.documentElement.lang=navigator.language;document.querySelectorAll('[data-label]').forEach(e=>e.textContent=L[e.dataset.label]||e.dataset.label);
+[...$('kind').options].forEach(o=>o.textContent=L[o.value]||o.value);
 async function request(path,data){const r=await fetch(path,{method:data?'POST':'GET',headers:{'Content-Type':'application/json','X-TVApp-Token':token},body:data?JSON.stringify(data):undefined,cache:'no-store'});if(!r.ok)throw Error(r.status===401?L.code:r.status===429?L.failed:L.failed);return r.json()}
 function status(text,working=false){$('status').textContent=text;$('status').classList.toggle('busy',working)}
 $('pairForm').onsubmit=async e=>{e.preventDefault();try{const result=await request('/pair',{code:$('code').value});token=result.token;$('code').value='';$('pairing').hidden=true;$('management').hidden=false;await poll()}catch(e){status(e.message)}};
-$('kind').onchange=()=>{const kind=$('kind').value;for(const [id,visible] of [['url',kind!=='DOCUMENT'],['file',kind==='DOCUMENT'],['username',kind==='XTREAM'],['password',kind==='XTREAM'],['mac',kind==='STALKER']]){$(id+'Row').hidden=!visible;$(id).required=visible}};
+$('kind').onchange=()=>{
+  const kind=$('kind').value;
+  if(kind==='GITHUB'){
+    $('standardFields').hidden=true;
+    $('githubSection').hidden=false;
+    return;
+  }
+  $('standardFields').hidden=false;
+  $('githubSection').hidden=true;
+  for(const [id,visible] of [['url',kind!=='DOCUMENT'],['file',kind==='DOCUMENT'],['username',kind==='XTREAM'],['password',kind==='XTREAM'],['mac',kind==='STALKER']]){
+    $(id+'Row').hidden=!visible;$(id).required=visible;
+  }
+  $('nameRow').hidden=false;$('name').required=true;
+};
 $('addForm').onsubmit=async e=>{e.preventDefault();if(busy)return;try{const data={action:'add',kind:$('kind').value,name:$('name').value,url:$('url').value,username:$('username').value,password:$('password').value,mac:$('mac').value};if(data.kind==='DOCUMENT'){const f=$('file').files[0];if(!f||f.size>12*1024*1024)throw Error(L.uploadLimit);data.content=await f.text()}await command(data);$('password').value=''}catch(e){status(e.message)}};
+
+// GitHub Manifest UI
+$('githubFetchBtn').onclick=async()=>{
+  if(busy)return;
+  const user=$('githubUser').value.trim()||'GeceHub';
+  const file=$('githubFile').value||'live2.json';
+  status(L.githubLoading||'Loading...', true);
+  try{
+    const res=await request('/command',{action:'github_manifest',username:user,file:file});
+    status('');
+    if(!res.success||!res.items||!res.items.length){
+      status(res.error||L.githubEmpty);
+      $('githubResults').hidden=true;
+      return;
+    }
+    currentManifest=res.items;
+    renderManifest(res.items);
+    $('githubResults').hidden=false;
+  }catch(e){
+    status(e.message||L.githubError);
+  }
+};
+function renderManifest(items){
+  const container=$('githubContainer');
+  container.replaceChildren();
+  items.forEach((item,idx)=>{
+    const card=document.createElement('div');
+    card.className='manifest-card';
+    const check=document.createElement('input');
+    check.type='checkbox';
+    check.checked=true;
+    check.dataset.index=idx;
+    card.append(check);
+    if(item.poster){
+      const img=document.createElement('img');
+      img.className='manifest-poster';
+      img.src=item.poster;
+      img.loading='lazy';
+      img.onerror=()=>img.style.display='none';
+      card.append(img);
+    }
+    const info=document.createElement('div');
+    info.className='manifest-info';
+    const name=document.createElement('div');
+    name.className='manifest-name';
+    name.textContent=item.name;
+    if(item.format){
+      const badge=document.createElement('span');
+      badge.className='badge-tag';
+      badge.textContent=item.format;
+      name.append(badge);
+    }
+    info.append(name);
+    if(item.description){
+      const desc=document.createElement('div');
+      desc.className='manifest-desc';
+      desc.textContent=item.description;
+      info.append(desc);
+    }
+    card.append(info);
+    card.onclick=e=>{if(e.target!==check){check.checked=!check.checked}};
+    container.append(card);
+  });
+}
+$('ghSelectAll').onclick=()=>document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>c.checked=true);
+$('ghDeselectAll').onclick=()=>document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>c.checked=false);
+$('githubAddBtn').onclick=async()=>{
+  if(busy)return;
+  const selected=[];
+  document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>{
+    if(c.checked){
+      const item=currentManifest[c.dataset.index];
+      if(item)selected.push({name:item.name,url:item.url});
+    }
+  });
+  if(!selected.length){
+    alert(L.githubEmpty||'No items selected');
+    return;
+  }
+  try{
+    await command({action:'add_bulk',items:selected});
+  }catch(e){
+    status(e.message);
+  }
+};
+
 async function command(data){busy=true;lock();try{await request('/command',data);await poll()}catch(e){busy=false;lock();throw e}}
 function lock(){document.querySelectorAll('#management button,#management input,#management select,#renameForm input,#renameForm button[type=submit]').forEach(e=>e.disabled=busy)}
 let renameId=null;

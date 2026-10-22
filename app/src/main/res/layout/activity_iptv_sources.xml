@@ -96,6 +96,18 @@
                 android:textColor="@color/text_primary" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/import_github_manifest_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_focusable"
+            android:drawableStart="@drawable/ic_link"
+            android:drawablePadding="12dp"
+            android:drawableTint="@color/accent"
+            android:text="@string/import_github_manifest"
+            android:textColor="@color/text_primary" />
+
         <TextView
             android:id="@+id/import_status"
             android:layout_width="match_parent"

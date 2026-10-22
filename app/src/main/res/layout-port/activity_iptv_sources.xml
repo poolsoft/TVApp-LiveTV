@@ -110,6 +110,20 @@
     </LinearLayout>
 
     <Button
+        android:id="@+id/import_github_manifest_button"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_focusable"
+        android:drawableStart="@drawable/ic_link"
+        android:drawablePadding="8dp"
+        android:drawableTint="@color/accent"
+        android:gravity="center"
+        android:text="@string/import_github_manifest"
+        android:textColor="@color/text_primary"
+        android:textSize="12sp" />
+
+    <Button
         android:id="@+id/web_manage_button"
         android:layout_width="match_parent"
         android:layout_height="44dp"

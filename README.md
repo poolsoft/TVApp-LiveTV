@@ -3,6 +3,7 @@
 Android 11 tabanlı Google TV cihazları için özel Live TV uygulaması.
 
 ## Özellikler
+- **GitHub'dan Toplu IPTV Liste Aktarımı:** Hem TV ekranında IPTV kaynak yönetiminde hem de Web yönetim arayüzünde GitHub depolarındaki (`live2.json` Canlı Yayın Paketleri ve `vod2.json` VOD Film/Dizi Paketleri) manifestleri tek tıkla tarama. TV kumandasıyla veya tarayıcıdan önizleme posteri, adı ve açıklamasıyla paketleri seçip TVApp'e topluca aktarma desteği.
 - Kanal Liste Editörü: IPTV satırlarında küçük kaynak liste adı; çoklu seçimde soldaki çıkar simgesiyle seçili IPTV kanallarını ana listeden topluca çıkarma. Kaynak içerikleri ve kullanıcı tercihleri silinmez; uydu kanalları etkilenmez. Sol araç odağının açıklaması alt renk tuşları satırının altında gösterilir.
 - TV kanal listesi ve infobar için Ayarlar > Görünüm altında Varsayılan, Glass ve Yüksek Kontrast temaları bulunur. Varsayılan mevcut görünümü korur. Glass gerçek zamanlı bulanıklık kullanmaz; Yüksek Kontrast opaktır. Seçim kaydedilir ve yedeğe dahildir; diğer ekranlar değişmez.
 - Web yönetiminde kayıtlı her kaynağın adı Yeniden adlandır > Kaydet ile değiştirilebilir. Kanallar ve kullanıcı seçimleri korunur. Eşleştirme kodu 4 hanedir; hatalı kod deneme sınırı ve süreli oturum uygulanır.

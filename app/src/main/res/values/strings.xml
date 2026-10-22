@@ -789,4 +789,21 @@
     <string name="web_counts">%1$d içerik · %2$d seçili</string>
     <string name="web_upload_limit">En fazla 12 MB boyutunda UTF-8 M3U dosyası seçin.</string>
     <string name="web_guide">WEB ÜZERİNDEN IPTV YÖNETİMİ\nIPTV yönetiminde Web’den yönet > Sunucuyu başlat seçin. Aynı ağdaki telefon veya bilgisayarda TV’deki adresi açıp 4 haneli kodu girin. URL, M3U dosyası, Xtream ve Stalker kaynakları eklenebilir; kayıtlı kaynaklar silinebilir ve URL kaynakları güncellenebilir. İşlemler TV’deki mevcut içe aktarma mekanizmasıyla yapılır; kanallar otomatik olarak ana listeye eklenmez. Dosyalar TV’nin özel alanında saklanır. İşlem sürerken ilerleme iki ekranda gösterilir. Sunucuyu durdur, bu ekrandan çıkma veya 15 dakika boşta kalma erişimi kapatır; veri işlemi sürerken süre dolmaz. Başlamış veri işlemi ekran açıkken tamamlanmaya devam eder. HTTP şifrelenmediğinden yalnız güvendiğiniz yerel ağda kullanın; internete port açmayın. Her başlatmada yeni kod üretilir.</string>
+    <string name="import_github_manifest">Toplu Liste Ekle (GitHub)</string>
+    <string name="github_username_hint">GitHub kullanıcı adı</string>
+    <string name="github_manifest_type">Liste Türü</string>
+    <string name="github_live_lists">Canlı Yayın Paketleri (live2.json)</string>
+    <string name="github_vod_lists">VOD Film &amp; Dizi Paketleri (vod2.json)</string>
+    <string name="github_fetch_lists">Listeleri Getir</string>
+    <string name="github_select_lists">Eklenecek Listeleri Seçin</string>
+    <string name="github_add_selected">Seçilenleri Ekle</string>
+    <string name="github_select_all">Tümünü Seç</string>
+    <string name="github_deselect_all">Seçimi Temizle</string>
+    <string name="github_loading_manifest">GitHub listesi yükleniyor…</string>
+    <string name="github_manifest_empty">Belirtilen depoda uygun liste bulunamadı.</string>
+    <string name="github_manifest_error">GitHub listesi alınamadı. Kullanıcı adını ve bağlantınızı kontrol edin.</string>
+    <string name="iptv_source_bulk_progress">Toplu içe aktarma: %1$d / %2$d · %3$s</string>
+    <string name="iptv_source_bulk_import_complete">%1$d IPTV listesi başarıyla eklendi.</string>
+    <string name="github_bulk_title">GitHub Toplu Liste</string>
+    <string name="github_guide_note">Belirtilen kullanıcının \'gunestv\' deposundaki paket listesi taranır.</string>
 </resources>

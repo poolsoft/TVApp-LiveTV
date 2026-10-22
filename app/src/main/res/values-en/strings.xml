@@ -789,4 +789,21 @@
     <string name="web_counts">%1$d entries · %2$d selected</string>
     <string name="web_upload_limit">Choose a UTF-8 M3U file up to 12 MB.</string>
     <string name="web_guide">IPTV MANAGEMENT FROM A BROWSER\nIn IPTV management choose Manage from browser > Start server. Open the TV address on a phone or computer on the same network and enter the 4-digit code. Add URL, M3U file, Xtream and Stalker sources; delete saved sources and update URL sources. Operations use the existing TV import mechanism; channels are not automatically added to the main list. Uploaded files stay in private TV storage. Progress appears on both screens. Stop server, leaving this screen, or 15 minutes of inactivity closes access; data operations keep the session open. An already started data operation can finish while the screen stays open. HTTP is unencrypted: use only a trusted LAN and never forward the port to the internet. Each start generates a new code.</string>
+    <string name="import_github_manifest">Bulk Import (GitHub)</string>
+    <string name="github_username_hint">GitHub username</string>
+    <string name="github_manifest_type">List Type</string>
+    <string name="github_live_lists">Live TV Packages (live2.json)</string>
+    <string name="github_vod_lists">VOD Movie &amp; Series Packages (vod2.json)</string>
+    <string name="github_fetch_lists">Fetch Lists</string>
+    <string name="github_select_lists">Select Lists to Add</string>
+    <string name="github_add_selected">Add Selected</string>
+    <string name="github_select_all">Select All</string>
+    <string name="github_deselect_all">Clear Selection</string>
+    <string name="github_loading_manifest">Loading GitHub lists…</string>
+    <string name="github_manifest_empty">No valid lists found in specified repository.</string>
+    <string name="github_manifest_error">Failed to load GitHub list. Check username and connection.</string>
+    <string name="iptv_source_bulk_progress">Bulk import: %1$d / %2$d · %3$s</string>
+    <string name="iptv_source_bulk_import_complete">%1$d IPTV lists added successfully.</string>
+    <string name="github_bulk_title">GitHub Bulk Lists</string>
+    <string name="github_guide_note">Scans the package manifest from the user\'s \'gunestv\' repository.</string>
 </resources>

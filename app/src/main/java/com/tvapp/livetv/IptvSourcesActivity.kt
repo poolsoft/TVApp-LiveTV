@@ -15,6 +15,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Spinner
 import android.view.Gravity
 import android.view.ContextThemeWrapper
 import androidx.activity.result.contract.ActivityResultContracts
@@ -83,6 +84,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             openPlaylist.launch(arrayOf("audio/x-mpegurl", "application/x-mpegurl", "text/*", "*/*"))
         }
         binding.importXtreamButton.setOnClickListener(::showXtreamDialog)
+        binding.importGithubManifestButton?.setOnClickListener { showGithubManifestDialog() }
         binding.importStalkerButton.setOnClickListener(::showStalkerDialog)
         binding.webManageButton.setOnClickListener { showWebManagement() }
         binding.closeButton?.setOnClickListener {
@@ -343,6 +345,150 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 repository.importStalker(values[1], values[2], values[0])
             }
             true
+        }
+    }
+
+    private fun showGithubManifestDialog() {
+        if (operationGate.isBusy) return
+        val userField = credentialField(R.string.github_username_hint).apply {
+            setText(com.tvapp.livetv.data.GithubManifestRepository.DEFAULT_USER)
+        }
+        val typeSpinner = Spinner(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
+            val options = listOf(
+                getString(R.string.github_live_lists),
+                getString(R.string.github_vod_lists),
+            )
+            adapter = ArrayAdapter(this@IptvSourcesActivity, android.R.layout.simple_spinner_dropdown_item, options)
+        }
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding / 2, padding, 0)
+            addView(TextView(this@IptvSourcesActivity).apply {
+                text = getString(R.string.github_guide_note)
+                setTextColor(getColor(R.color.text_secondary))
+                textSize = 13f
+                setPadding(0, 0, 0, padding / 4)
+            })
+            addView(userField)
+            addView(TextView(this@IptvSourcesActivity).apply {
+                text = getString(R.string.github_manifest_type)
+                setTextColor(getColor(R.color.text_primary))
+                textSize = 14f
+                setPadding(0, padding / 2, 0, padding / 4)
+            })
+            addView(typeSpinner)
+        }
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.import_github_manifest)
+            .setView(content)
+            .setPositiveButton(R.string.github_fetch_lists, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            val submit = dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)
+            submit.setOnClickListener {
+                val enteredUser = userField.text.toString().trim().ifEmpty {
+                    com.tvapp.livetv.data.GithubManifestRepository.DEFAULT_USER
+                }
+                val selectedFile = if (typeSpinner.selectedItemPosition == 1) {
+                    com.tvapp.livetv.data.GithubManifestRepository.VOD_FILE
+                } else {
+                    com.tvapp.livetv.data.GithubManifestRepository.DEFAULT_FILE
+                }
+                dialog.dismiss()
+                fetchAndShowManifest(enteredUser, selectedFile)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun fetchAndShowManifest(username: String, fileName: String) {
+        if (!beginLocalOperation()) return
+        binding.importStatus.text = getString(R.string.github_loading_manifest)
+        webManager?.updateLocalProgress(binding.importStatus.text.toString())
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                com.tvapp.livetv.data.GithubManifestRepository().fetchManifest(username, fileName)
+            }
+            finishLocalOperation()
+            result.onSuccess { items ->
+                if (items.isEmpty()) {
+                    binding.importStatus.setText(R.string.github_manifest_empty)
+                    return@onSuccess
+                }
+                showManifestSelectionDialog(items)
+            }.onFailure { error ->
+                debugLog.recordDebug("IPTV_GITHUB_FETCH FAILURE | ${error.javaClass.simpleName}: ${error.message}")
+                binding.importStatus.setText(R.string.github_manifest_error)
+            }
+        }
+    }
+
+    private fun showManifestSelectionDialog(items: List<com.tvapp.livetv.data.GithubManifestItem>) {
+        val selectionView = layoutInflater.inflate(R.layout.dialog_github_manifest_selection, null)
+        val recycler = selectionView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.manifest_recycler)
+        val btnSelectAll = selectionView.findViewById<android.widget.Button>(R.id.btn_select_all)
+        val btnDeselectAll = selectionView.findViewById<android.widget.Button>(R.id.btn_deselect_all)
+        val btnCancel = selectionView.findViewById<android.widget.Button>(R.id.btn_cancel)
+        val btnAdd = selectionView.findViewById<android.widget.Button>(R.id.btn_add_selected)
+
+        recycler.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        val manifestAdapter = com.tvapp.livetv.ui.GithubManifestAdapter(items) { count ->
+            btnAdd.text = "${getString(R.string.github_add_selected)} ($count)"
+            btnAdd.isEnabled = count > 0
+        }
+        recycler.adapter = manifestAdapter
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setView(selectionView)
+            .create()
+
+        btnSelectAll.setOnClickListener { manifestAdapter.selectAll() }
+        btnDeselectAll.setOnClickListener { manifestAdapter.deselectAll() }
+        btnCancel.setOnClickListener { dialog.dismiss() }
+        btnAdd.setOnClickListener {
+            val selected = manifestAdapter.getSelectedItems()
+            if (selected.isEmpty()) return@setOnClickListener
+            dialog.dismiss()
+            startBulkImport(selected)
+        }
+        dialog.show()
+    }
+
+    private fun startBulkImport(items: List<com.tvapp.livetv.data.GithubManifestItem>) {
+        if (!beginLocalOperation()) return
+        debugLog.recordDebug("IPTV_GITHUB_BULK_IMPORT START count=${items.size}")
+        lifecycleScope.launch {
+            val total = items.size
+            var successCount = 0
+            for ((index, item) in items.withIndex()) {
+                val alreadySaved = withContext(Dispatchers.IO) {
+                    repository.sources().any { it.source.location == item.url }
+                }
+                if (alreadySaved) {
+                    successCount++
+                    continue
+                }
+                activeOperationSourceName = item.name
+                binding.importStatus.text = getString(R.string.iptv_source_bulk_progress, index + 1, total, item.name)
+                webManager?.updateLocalProgress(binding.importStatus.text.toString())
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        repository.importUrl(item.url, item.name, ::showImportProgress)
+                    }.onSuccess {
+                        successCount++
+                    }.onFailure { error ->
+                        debugLog.recordDebug("IPTV_BULK_IMPORT ITEM_FAIL | ${item.name} | ${error.message}")
+                    }
+                }
+            }
+            activeOperationSourceName = null
+            finishLocalOperation()
+            binding.importStatus.text = getString(R.string.iptv_source_bulk_import_complete, successCount)
+            loadSources()
+            setResult(RESULT_OK)
         }
     }
 
@@ -865,6 +1011,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.importFileButton.isEnabled = editable
         binding.importXtreamButton.isEnabled = editable
         binding.importStalkerButton.isEnabled = editable
+        binding.importGithubManifestButton?.isEnabled = editable
         binding.webManageButton.isEnabled = editable
         binding.sourceList.isEnabled = editable
         binding.importProgress.visibility = if (operationBusy) View.VISIBLE else View.GONE
