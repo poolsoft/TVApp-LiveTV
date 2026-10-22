@@ -224,6 +224,7 @@ class MainActivity : TvRemoteActivity() {
     private var lastTifCallbackLogSignature: String? = null
     private var lastIptvHealthLogSignature: String? = null
     private var displayPreferences = DisplayPreferences()
+    private var iptvSourceNames: Map<String, String> = emptyMap()
 
     /** True from channel switch until the new channel's video really renders;
      *  drives the optional black-screen-while-tuning overlay (Ayarlar >
@@ -796,6 +797,7 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug(
             "CHANNEL_LOAD_START | includeTif=$includeTif, preserve=$preserveCurrentPlayback",
         )
+        refreshIptvSourceNames()
         if (channels.isEmpty()) {
             val cached = ChannelRepository.cachedChannels()
             if (cached.isNotEmpty()) {
@@ -1000,8 +1002,8 @@ class MainActivity : TvRemoteActivity() {
             if (channel.sourceKey != currentChannel?.sourceKey) {
                 currentChannel = channel
                 adapter.select(channel.sourceKey)
-                binding.nowChannel.text = channel.displayName
-                binding.nowNumber.text = channel.displayNumber
+                updateInfobarChannel(channel)
+
                 updateTechnicalBadges(channel, emptyList())
                 showInfoBar()
                 loadPrograms(channel)
@@ -1066,8 +1068,8 @@ class MainActivity : TvRemoteActivity() {
         osdCoordinator.hideStatus()
         binding.parentalLockChannel.text = channel.displayName
         osdCoordinator.showParentalLock()
-        binding.nowChannel.text = channel.displayName
-        binding.nowNumber.text = channel.displayNumber
+        updateInfobarChannel(channel)
+
         updateTechnicalBadges(channel, emptyList())
         showInfoBar()
         loadPrograms(channel)
@@ -1176,8 +1178,8 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         adapter.select(channel.sourceKey)
-        binding.nowChannel.text = channel.displayName
-        binding.nowNumber.text = channel.displayNumber
+        updateInfobarChannel(channel)
+
         updateTechnicalBadges(channel, emptyList())
         updateAudioOnlyPanel(channel, channel.isRadioChannel())
         osdCoordinator.hideStatus()
@@ -5165,14 +5167,46 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+    private fun updateInfobarChannel(channel: LiveChannel) {
+        binding.nowChannel.text = channel.displayName
+        binding.nowNumber.text = channel.displayNumber
+        val sourceName = if (channel.source == LiveChannel.Source.IPTV) iptvSourceNames[channel.inputId] else null
+        if (!sourceName.isNullOrBlank()) {
+            binding.nowSourceName.text = sourceName
+            binding.nowSourceName.visibility = View.VISIBLE
+        } else {
+            binding.nowSourceName.visibility = View.GONE
+        }
+    }
+
+    private fun refreshIptvSourceNames() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { iptvRepository.sourceNames() }.onSuccess { names ->
+                iptvSourceNames = names
+                withContext(Dispatchers.Main) {
+                    currentChannel?.let { ch ->
+                        if (ch.source == LiveChannel.Source.IPTV) {
+                            val name = iptvSourceNames[ch.inputId]
+                            if (!name.isNullOrBlank()) {
+                                binding.nowSourceName.text = name
+                                binding.nowSourceName.visibility = View.VISIBLE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun showInfoBarForChannel(channel: LiveChannel) {
-        if (binding.nowChannel.text != channel.displayName) {
-            binding.nowChannel.text = channel.displayName
-        }
-        if (binding.nowNumber.text != channel.displayNumber) {
-            binding.nowNumber.text = channel.displayNumber
-        }
+        updateInfobarChannel(channel)
         showInfoBar()
+
+
+
+
+
+
     }
 
     private fun openChannelEditor() {

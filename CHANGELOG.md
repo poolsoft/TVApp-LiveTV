@@ -1,6 +1,13 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-22 - IPTV listelerini pasife alma, Web kanal seçimi ve Web kanal editörü
+## 2026-10-23 - Infobar IPTV liste adı, Web sabit portları, sayfa boyutu ve toplu seçim
+
+- **Infobarda IPTV Liste Adı:** IPTV kanalları izlenirken infobarda kanal adının hemen altında ait olduğu IPTV listesinin adı (`iptv_sources.name`) gösterilir. TIF/karasal/uydu yayınlarında bu alan otomatik gizlenir.
+- **Web Yönetiminde Öncelikli Sabit Portlar:** Web LAN sunucusu başlatılırken rastgele port ataması yerine sırasıyla `8050`, `8060` ve `8070` sabit portları denenir; tümü meşgul ise otomatik boş porta geçilir.
+- **Web Arayüzünde Sayfa Boyutu Seçimi:** Hem IPTV Kanal Seçim modalına hem de Kanal Düzenleyicisi tablosuna sayfa başına gösterilecek öğe sayısı (50, 100, 250, 500) seçeneği eklendi.
+- **Web Arayüzünde Tümünü Seç (Select All):** Tablo başlıklarına sayfadaki tüm kanalları tek tıkla işaretleyen/kaldıran onay kutusu eklendi.
+- **Web Kanal Düzenleyicide Toplu İşlemler:** Seçilen kanallar için tek işlemde toplu Favori Ekle / Kaldır, Gizle / Gizliliği Kaldır ve Ana Listeden Çıkar araç çubuğu eklendi.
+
 
 - **IPTV Listelerini Pasife Alma / Aktifleştirme:** Hem TV OSD arayüzünden (`IptvSourcesActivity` kaynak işlemleri menüsü) hem de Web arayüzünden kaynaklar tek tıkla pasife alınabilir veya aktifleştirilebilir. Pasife alınan kaynakların kanalları TV ana listesinde ve OSD'de gizlenir, kaynak listesinde durum rozetiyle (`[Pasif]`) ayırt edilir.
 - **Web Kanal Seçim Yöneticisi:** Web yönetim panelinde kayıtlı IPTV listelerinin yanına "Kanalları Seç" butonu eklendi. 15.000+ kanallı devasa kütüphanelerde dahi sıfır donma yaşanacak şekilde 100'lük sayfalı hafif DTO mimarisi, SQLite FTS tabanlı anlık arama, kategori filtresi, tekli veya filtrelenen kanalları toplu seçme/kaldırma özellikleri getirildi.

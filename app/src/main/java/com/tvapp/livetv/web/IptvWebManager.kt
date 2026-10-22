@@ -156,7 +156,7 @@ internal class IptvWebManager(
             val query = data.optString("query").trim()
             val selectedOnly = data.optBoolean("selectedOnly", false)
             val page = data.optInt("page", 0).coerceAtLeast(0)
-            val pageSize = 100
+            val pageSize = data.optInt("pageSize", 100).coerceIn(20, 1000)
 
             val (total, channels) = withContext(Dispatchers.IO) {
                 val count = repository.selectionCount(sourceId, category, query, selectedOnly)
@@ -235,7 +235,7 @@ internal class IptvWebManager(
             val query = data.optString("query").trim().lowercase()
             val filter = data.optString("filter", "all")
             val page = data.optInt("page", 0).coerceAtLeast(0)
-            val pageSize = 100
+            val pageSize = data.optInt("pageSize", 100).coerceIn(20, 1000)
 
             val allChannels = withContext(Dispatchers.IO) {
                 channelRepository.channels(includeHidden = true).getOrElse { emptyList() }
@@ -313,6 +313,39 @@ internal class IptvWebManager(
             }
             onState(false, message, true)
             return WebReply(200, JSONObject().put("success", true).toString())
+        }
+        if (action == "editor_batch_update") {
+            sessionTimeout.touch()
+            val keysJson = data.optJSONArray("keys")
+            val keys = mutableListOf<String>()
+            if (keysJson != null) {
+                for (i in 0 until keysJson.length()) {
+                    val k = keysJson.optString(i)
+                    if (k.isNotBlank()) keys.add(k)
+                }
+            }
+            if (keys.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    if (data.has("favorite")) {
+                        val fav = data.getBoolean("favorite")
+                        keys.forEach { channelRepository.setFavorite(it, fav) }
+                    }
+                    if (data.has("hidden")) {
+                        val hid = data.getBoolean("hidden")
+                        keys.forEach { channelRepository.setHidden(it, hid) }
+                    }
+                    if (data.has("locked")) {
+                        val lck = data.getBoolean("locked")
+                        keys.forEach { parentalControlStore.setLocked(it, lck) }
+                    }
+                    if (data.optBoolean("removeFromMain", false)) {
+                        repository.setChannelsSelected(keys, false)
+                        sources = repository.sources()
+                    }
+                }
+                onState(false, message, true)
+            }
+            return WebReply(200, JSONObject().put("success", true).put("count", keys.size).toString())
         }
         return withContext(Dispatchers.Main.immediate) {
             if (operationGate.isBusy || server == null) return@withContext WebReply(409)

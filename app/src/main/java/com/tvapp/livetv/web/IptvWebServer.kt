@@ -27,7 +27,7 @@ class IptvWebServer(
     private val random = SecureRandom()
     val pairingCode = String.format(java.util.Locale.ROOT, "%04d", random.nextInt(10_000))
     private val token = ByteArray(32).also(random::nextBytes).joinToString("") { "%02x".format(it) }
-    private val server = ServerSocket(0, 8, address)
+    private val server = bindServerSocket(address)
     val url = "http://${address.hostAddress}:${server.localPort}"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val clients = Collections.synchronizedSet(mutableSetOf<Socket>())
@@ -143,7 +143,21 @@ class IptvWebServer(
         scope.cancel()
     }
 
-    companion object { const val MAX_BODY_BYTES = 16 * 1024 * 1024 }
+    companion object {
+        const val MAX_BODY_BYTES = 16 * 1024 * 1024
+        private val PREFERRED_PORTS = intArrayOf(8050, 8060, 8070)
+
+        private fun bindServerSocket(address: InetAddress): ServerSocket {
+            for (port in PREFERRED_PORTS) {
+                try {
+                    return ServerSocket(port, 8, address)
+                } catch (_: IOException) {
+                    // Port already in use, try next
+                }
+            }
+            return ServerSocket(0, 8, address)
+        }
+    }
 }
 
 data class WebReply(val status: Int, val body: String = "{}", val contentType: String = "application/json; charset=utf-8")

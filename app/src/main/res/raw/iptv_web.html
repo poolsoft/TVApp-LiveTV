@@ -170,6 +170,20 @@ tr:hover td{background:#1d252a}
     <div class="toolbar">
       <input type="search" id="editorSearch" placeholder="Kanal adı veya numara ara…">
       <select id="editorCategorySelect"><option value="ALL">Tüm Kategoriler</option></select>
+      <select id="editorPageSize" style="max-width:120px">
+        <option value="50">50 / sayfa</option>
+        <option value="100" selected>100 / sayfa</option>
+        <option value="250">250 / sayfa</option>
+        <option value="500">500 / sayfa</option>
+      </select>
+    </div>
+
+    <div class="manifest-toolbar" id="editorBatchToolbar" style="margin-bottom:12px">
+      <button type="button" id="batchFavBtn">⭐ Favori Yap</button>
+      <button type="button" id="batchUnfavBtn">☆ Favoriden Çıkar</button>
+      <button type="button" id="batchHideBtn">👁️ Gizle</button>
+      <button type="button" id="batchUnhideBtn">👁️ Gizliliği Kaldır</button>
+      <button type="button" id="batchRemoveBtn" class="btn-delete">✕ Ana Listeden Çıkar</button>
     </div>
 
     <div class="pagination">
@@ -182,6 +196,7 @@ tr:hover td{background:#1d252a}
       <table>
         <thead>
           <tr>
+            <th style="width:40px;text-align:center"><input type="checkbox" id="editorSelectAllPage" title="Sayfadaki Tümünü Seç" style="width:16px;height:16px;cursor:pointer"></th>
             <th style="width:70px">No</th>
             <th>Kanal Adı</th>
             <th style="width:140px">Kategori</th>
@@ -218,6 +233,12 @@ tr:hover td{background:#1d252a}
   <div class="toolbar">
     <input type="search" id="selSearch" placeholder="Kanal ara…">
     <select id="selCategory"><option value="ALL">Tüm Kategoriler</option></select>
+    <select id="selPageSize" style="max-width:120px">
+      <option value="50">50 / sayfa</option>
+      <option value="100" selected>100 / sayfa</option>
+      <option value="250">250 / sayfa</option>
+      <option value="500">500 / sayfa</option>
+    </select>
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#bfcbd2;cursor:pointer">
       <input type="checkbox" id="selOnlySelected" style="width:16px;height:16px"> Sadece Seçililer
     </label>
@@ -235,7 +256,7 @@ tr:hover td{background:#1d252a}
     <table>
       <thead>
         <tr>
-          <th style="width:40px;text-align:center">Seç</th>
+          <th style="width:40px;text-align:center"><input type="checkbox" id="selSelectAllPage" title="Sayfadaki Tümünü Seç" style="width:16px;height:16px;cursor:pointer"></th>
           <th>Kanal Adı</th>
           <th style="width:140px">Kategori</th>
         </tr>
@@ -253,11 +274,11 @@ let token = '', busy = false, signature = '', polling = false, currentManifest =
 let activeTab = 'sources';
 
 // Channel Selector state
-let selSourceId = null, selPage = 0, selTotal = 0, selPageSize = 100;
+let selSourceId = null, selPage = 0, selTotal = 0, selPageSize = 100, currentSelChannels = [];
 let selSearchDebounce = null;
 
 // Editor state
-let edPage = 0, edTotal = 0, edFilter = 'all', edDebounce = null;
+let edPage = 0, edTotal = 0, edPageSize = 100, edFilter = 'all', edDebounce = null, edSelectedKeys = new Set(), currentEdChannels = [];
 
 document.documentElement.lang = navigator.language;
 document.querySelectorAll('[data-label]').forEach(e => e.textContent = L[e.dataset.label] || e.dataset.label);
@@ -644,6 +665,7 @@ async function loadSelectionPage() {
   const q = $('selSearch').value.trim();
   const cat = $('selCategory').value;
   const selOnly = $('selOnlySelected').checked;
+  selPageSize = parseInt($('selPageSize').value, 10) || 100;
 
   try {
     const res = await request('/command', {
@@ -652,10 +674,12 @@ async function loadSelectionPage() {
       category: cat,
       query: q,
       selectedOnly: selOnly,
-      page: selPage
+      page: selPage,
+      pageSize: selPageSize
     });
     selTotal = res.total || 0;
-    renderSelectionTable(res.channels || []);
+    currentSelChannels = res.channels || [];
+    renderSelectionTable(currentSelChannels);
   } catch(e) { status(e.message); }
 }
 
@@ -667,6 +691,7 @@ function renderSelectionTable(channels) {
   $('selPageInfo').textContent = `Sayfa ${selPage + 1} / ${totalPages} (Toplam ${selTotal} kanal)`;
   $('selPrevPage').disabled = (selPage <= 0);
   $('selNextPage').disabled = (selPage >= totalPages - 1);
+  $('selSelectAllPage').checked = (channels.length > 0 && channels.every(c => c.selected));
 
   if (!channels.length) {
     const tr = document.createElement('tr');
@@ -694,6 +719,7 @@ function renderSelectionTable(channels) {
           selected: cb.checked
         });
         ch.selected = cb.checked;
+        $('selSelectAllPage').checked = (channels.length > 0 && channels.every(c => c.selected));
       } catch(e) {
         cb.checked = !cb.checked;
         status(e.message);
@@ -714,6 +740,26 @@ function renderSelectionTable(channels) {
     tbody.append(tr);
   });
 }
+
+$('selSelectAllPage').onchange = async () => {
+  if (!currentSelChannels.length) return;
+  const target = $('selSelectAllPage').checked;
+  const keys = currentSelChannels.map(c => c.key);
+  try {
+    await request('/command', {
+      action: 'set_channel_selection',
+      keys: keys,
+      selected: target
+    });
+    currentSelChannels.forEach(c => c.selected = target);
+    renderSelectionTable(currentSelChannels);
+  } catch(e) {
+    status(e.message);
+    loadSelectionPage();
+  }
+};
+
+$('selPageSize').onchange = () => { selPage = 0; loadSelectionPage(); };
 
 $('selPrevPage').onclick = () => { if (selPage > 0) { selPage--; loadSelectionPage(); } };
 $('selNextPage').onclick = () => { selPage++; loadSelectionPage(); };
@@ -777,6 +823,7 @@ async function loadEditorCategories() {
 async function loadEditorChannels() {
   const q = $('editorSearch').value.trim();
   const cat = $('editorCategorySelect').value;
+  edPageSize = parseInt($('editorPageSize').value, 10) || 100;
 
   try {
     const res = await request('/command', {
@@ -784,10 +831,12 @@ async function loadEditorChannels() {
       category: cat,
       query: q,
       filter: edFilter,
-      page: edPage
+      page: edPage,
+      pageSize: edPageSize
     });
     edTotal = res.total || 0;
-    renderEditorTable(res.channels || []);
+    currentEdChannels = res.channels || [];
+    renderEditorTable(currentEdChannels);
   } catch(e) { status(e.message); }
 }
 
@@ -795,20 +844,38 @@ function renderEditorTable(channels) {
   const tbody = $('editorTableBody');
   tbody.replaceChildren();
 
-  const totalPages = Math.max(1, Math.ceil(edTotal / 100));
+  const totalPages = Math.max(1, Math.ceil(edTotal / edPageSize));
   $('editorPageInfo').textContent = `Sayfa ${edPage + 1} / ${totalPages} (Toplam ${edTotal} kanal)`;
   $('editorPrevPage').disabled = (edPage <= 0);
   $('editorNextPage').disabled = (edPage >= totalPages - 1);
+  $('editorSelectAllPage').checked = (channels.length > 0 && channels.every(c => edSelectedKeys.has(c.key)));
 
   if (!channels.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="5" style="text-align:center;padding:24px;color:#a0b1bc">Kanal bulunamadı.</td>';
+    tr.innerHTML = '<td colspan="6" style="text-align:center;padding:24px;color:#a0b1bc">Kanal bulunamadı.</td>';
     tbody.append(tr);
     return;
   }
 
   channels.forEach(ch => {
     const tr = document.createElement('tr');
+
+    // Selection checkbox
+    const tdCheck = document.createElement('td');
+    tdCheck.style.textAlign = 'center';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = edSelectedKeys.has(ch.key);
+    cb.style.width = '16px';
+    cb.style.height = '16px';
+    cb.style.cursor = 'pointer';
+    cb.onchange = () => {
+      if (cb.checked) edSelectedKeys.add(ch.key);
+      else edSelectedKeys.delete(ch.key);
+      $('editorSelectAllPage').checked = (channels.length > 0 && channels.every(c => edSelectedKeys.has(c.key)));
+    };
+    tdCheck.append(cb);
+    tr.append(tdCheck);
 
     // Number edit
     const tdNum = document.createElement('td');
@@ -943,7 +1010,40 @@ $('editorSearch').oninput = () => {
   clearTimeout(edDebounce);
   edDebounce = setTimeout(() => { edPage = 0; loadEditorChannels(); }, 300);
 };
-$('editorCategorySelect').onchange = () => { edPage = 0; loadEditorChannels(); };
+$('editorCategorySelect').onchange = () => { edPage = 0; edSelectedKeys.clear(); loadEditorChannels(); };
+$('editorPageSize').onchange = () => { edPage = 0; edSelectedKeys.clear(); loadEditorChannels(); };
+
+$('editorSelectAllPage').onchange = () => {
+  const target = $('editorSelectAllPage').checked;
+  currentEdChannels.forEach(c => {
+    if (target) edSelectedKeys.add(c.key);
+    else edSelectedKeys.delete(c.key);
+  });
+  renderEditorTable(currentEdChannels);
+};
+
+async function batchEditorAction(payload, confirmMsg) {
+  if (!edSelectedKeys.size) {
+    alert('Lütfen önce işlem yapılacak kanalları seçin.');
+    return;
+  }
+  if (confirmMsg && !confirm(confirmMsg.replace('%d', edSelectedKeys.size))) return;
+  try {
+    await request('/command', {
+      action: 'editor_batch_update',
+      keys: Array.from(edSelectedKeys),
+      ...payload
+    });
+    edSelectedKeys.clear();
+    loadEditorChannels();
+  } catch(e) { status(e.message); }
+}
+
+$('batchFavBtn').onclick = () => batchEditorAction({ favorite: true }, '%d kanal favorilere eklensin mi?');
+$('batchUnfavBtn').onclick = () => batchEditorAction({ favorite: false }, '%d kanal favorilerden çıkarılsın mı?');
+$('batchHideBtn').onclick = () => batchEditorAction({ hidden: true }, '%d kanal gizlensin mi?');
+$('batchUnhideBtn').onclick = () => batchEditorAction({ hidden: false }, '%d kanalın gizliliği kaldırılsın mı?');
+$('batchRemoveBtn').onclick = () => batchEditorAction({ removeFromMain: true }, '%d IPTV kanalı ana listeden çıkarılsın mı?');
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.onclick = () => {
@@ -951,6 +1051,7 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.add('active');
     edFilter = btn.dataset.filter;
     edPage = 0;
+    edSelectedKeys.clear();
     loadEditorChannels();
   };
 });
