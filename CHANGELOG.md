@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-22 - IPTV listelerini pasife alma, Web kanal seçimi ve Web kanal editörü
+
+- **IPTV Listelerini Pasife Alma / Aktifleştirme:** Hem TV OSD arayüzünden (`IptvSourcesActivity` kaynak işlemleri menüsü) hem de Web arayüzünden kaynaklar tek tıkla pasife alınabilir veya aktifleştirilebilir. Pasife alınan kaynakların kanalları TV ana listesinde ve OSD'de gizlenir, kaynak listesinde durum rozetiyle (`[Pasif]`) ayırt edilir.
+- **Web Kanal Seçim Yöneticisi:** Web yönetim panelinde kayıtlı IPTV listelerinin yanına "Kanalları Seç" butonu eklendi. 15.000+ kanallı devasa kütüphanelerde dahi sıfır donma yaşanacak şekilde 100'lük sayfalı hafif DTO mimarisi, SQLite FTS tabanlı anlık arama, kategori filtresi, tekli veya filtrelenen kanalları toplu seçme/kaldırma özellikleri getirildi.
+- **Web Kanal Liste Editörü:** Web arayüzüne eklenen "Kanal Düzenleyici" sekmesiyle TV'deki Kanal Liste Düzenleyici işlevleri tarayıcıya taşındı. TV kanallarının sıra numarası (`customNumber`), kanal adı (`customName`), favori durumu, gizleme/atlama durumu, ebeveyn kilit kontrolü ve IPTV kanallarını ana listeden çıkarma işlemleri sayfalı ve filtrelenebilir tablo üzerinden yönetilebilir hale getirildi.
+
 ## 2026-10-22 - GitHub üzerinden toplu IPTV liste aktarımı
 
 - Hem TV kaynak yönetiminde hem de Web yönetim arayüzünde GitHub üzerinden toplu liste içe aktarma desteği eklendi (`live2.json` ve `vod2.json` uyumlu).

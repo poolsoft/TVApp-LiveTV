@@ -79,6 +79,9 @@ interface IptvDao {
     @Update
     suspend fun updateSource(source: IptvSourceEntity)
 
+    @Query("UPDATE iptv_sources SET enabled = :enabled WHERE id = :sourceId")
+    suspend fun setSourceEnabled(sourceId: Long, enabled: Boolean)
+
     @Upsert
     suspend fun upsertSources(sources: List<IptvSourceEntity>)
 

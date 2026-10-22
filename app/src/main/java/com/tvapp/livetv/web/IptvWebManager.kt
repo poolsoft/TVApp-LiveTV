@@ -31,6 +31,8 @@ internal class IptvWebManager(
     private val onExpired: () -> Unit,
 ) {
     private val repository = IptvRepository(context)
+    private val channelRepository by lazy { com.tvapp.livetv.data.ChannelRepository(context) }
+    private val parentalControlStore by lazy { com.tvapp.livetv.settings.ParentalControlStore(context) }
     private var server: IptvWebServer? = null
     private var expiry: Job? = null
     private val sessionTimeout = WebSessionTimeout()
@@ -93,7 +95,7 @@ internal class IptvWebManager(
             sources.forEach { summary ->
                 val source = summary.source
                 rows.put(JSONObject().put("id", source.id).put("name", source.name)
-                    .put("kind", source.kind).put("channels", summary.channelCount)
+                    .put("kind", source.kind).put("enabled", source.enabled).put("channels", summary.channelCount)
                     .put("selected", summary.selectedChannelCount).put("updated", source.lastUpdatedAt)
                     .put("url", if (source.kind == IptvRepository.KIND_URL) source.location else ""))
             }
@@ -123,6 +125,194 @@ internal class IptvWebManager(
                 replyJson.put("error", result.exceptionOrNull()?.message.orEmpty())
             }
             return WebReply(200, replyJson.toString())
+        }
+        if (action == "toggle_source_enabled") {
+            sessionTimeout.touch()
+            val id = data.optLong("id")
+            val targetSource = repository.sources().firstOrNull { it.source.id == id }?.source
+            if (targetSource != null) {
+                withContext(Dispatchers.IO) {
+                    repository.setSourceEnabled(id, !targetSource.enabled)
+                    sources = repository.sources()
+                }
+                onState(false, message, true)
+                return WebReply(200, JSONObject().put("success", true).put("enabled", !targetSource.enabled).toString())
+            }
+            return WebReply(404, JSONObject().put("error", "Source not found").toString())
+        }
+        if (action == "source_categories") {
+            sessionTimeout.touch()
+            val sourceId = data.optLong("sourceId")
+            val cats = withContext(Dispatchers.IO) { repository.sourceCategories(sourceId) }
+            val catArr = JSONArray()
+            cats.forEach { catArr.put(it) }
+            return WebReply(200, JSONObject().put("categories", catArr).toString())
+        }
+        if (action == "source_channels") {
+            sessionTimeout.touch()
+            val sourceId = data.optLong("sourceId")
+            val rawCategory = data.optString("category")
+            val category = if (rawCategory.isBlank() || rawCategory == "ALL") null else rawCategory
+            val query = data.optString("query").trim()
+            val selectedOnly = data.optBoolean("selectedOnly", false)
+            val page = data.optInt("page", 0).coerceAtLeast(0)
+            val pageSize = 100
+
+            val (total, channels) = withContext(Dispatchers.IO) {
+                val count = repository.selectionCount(sourceId, category, query, selectedOnly)
+                val list = repository.selectionPage(sourceId, category, query, selectedOnly, pageSize, page * pageSize)
+                count to list
+            }
+
+            val arr = JSONArray()
+            channels.forEach { c ->
+                arr.put(
+                    JSONObject()
+                        .put("key", c.sourceKey)
+                        .put("name", c.displayName)
+                        .put("group", c.groupTitle.orEmpty())
+                        .put("selected", c.selected)
+                        .put("logo", c.logoUrl.orEmpty())
+                )
+            }
+            return WebReply(200, JSONObject()
+                .put("total", total)
+                .put("page", page)
+                .put("pageSize", pageSize)
+                .put("channels", arr)
+                .toString())
+        }
+        if (action == "set_channel_selection") {
+            sessionTimeout.touch()
+            val selected = data.optBoolean("selected", true)
+            val keysJson = data.optJSONArray("keys")
+            val keys = mutableListOf<String>()
+            if (keysJson != null) {
+                for (i in 0 until keysJson.length()) {
+                    val k = keysJson.optString(i)
+                    if (k.isNotBlank()) keys.add(k)
+                }
+            }
+            if (keys.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    repository.setChannelsSelected(keys, selected)
+                    sources = repository.sources()
+                }
+                onState(false, message, true)
+            }
+            return WebReply(200, JSONObject().put("success", true).put("count", keys.size).toString())
+        }
+        if (action == "set_filtered_channel_selection") {
+            sessionTimeout.touch()
+            val sourceId = data.optLong("sourceId")
+            val rawCategory = data.optString("category")
+            val category = if (rawCategory.isBlank() || rawCategory == "ALL") null else rawCategory
+            val query = data.optString("query").trim()
+            val selected = data.optBoolean("selected", true)
+            val count = withContext(Dispatchers.IO) {
+                val affected = repository.setFilteredChannelsSelected(sourceId, category, query, selected)
+                sources = repository.sources()
+                affected
+            }
+            onState(false, message, true)
+            return WebReply(200, JSONObject().put("success", true).put("count", count).toString())
+        }
+        if (action == "editor_categories") {
+            sessionTimeout.touch()
+            val allChannels = withContext(Dispatchers.IO) {
+                channelRepository.channels(includeHidden = true).getOrElse { emptyList() }
+            }
+            val cats = allChannels.mapNotNull { it.groupTitle?.takeIf(String::isNotBlank) }
+                .distinct().sortedWith(String.CASE_INSENSITIVE_ORDER)
+            val arr = JSONArray()
+            cats.forEach { arr.put(it) }
+            return WebReply(200, JSONObject().put("categories", arr).toString())
+        }
+        if (action == "editor_channels") {
+            sessionTimeout.touch()
+            val rawCategory = data.optString("category")
+            val category = if (rawCategory.isBlank() || rawCategory == "ALL") null else rawCategory
+            val query = data.optString("query").trim().lowercase()
+            val filter = data.optString("filter", "all")
+            val page = data.optInt("page", 0).coerceAtLeast(0)
+            val pageSize = 100
+
+            val allChannels = withContext(Dispatchers.IO) {
+                channelRepository.channels(includeHidden = true).getOrElse { emptyList() }
+            }
+            val lockedKeys = parentalControlStore.snapshot().lockedSourceKeys
+
+            val filtered = allChannels.filter { ch ->
+                if (category != null && ch.groupTitle != category) return@filter false
+                if (query.isNotEmpty()) {
+                    val inName = ch.displayName.lowercase().contains(query)
+                    val inNum = ch.displayNumber.lowercase().contains(query)
+                    val inGroup = ch.groupTitle?.lowercase()?.contains(query) == true
+                    if (!inName && !inNum && !inGroup) return@filter false
+                }
+                when (filter) {
+                    "fav" -> ch.favorite
+                    "hidden" -> ch.hidden
+                    "locked" -> ch.locked || (ch.sourceKey in lockedKeys)
+                    else -> true
+                }
+            }
+
+            val total = filtered.size
+            val paged = filtered.drop(page * pageSize).take(pageSize)
+            val arr = JSONArray()
+            paged.forEach { ch ->
+                arr.put(
+                    JSONObject()
+                        .put("key", ch.sourceKey)
+                        .put("name", ch.displayName)
+                        .put("number", ch.displayNumber)
+                        .put("group", ch.groupTitle.orEmpty())
+                        .put("source", ch.source.name)
+                        .put("isIptv", ch.source == com.tvapp.livetv.model.LiveChannel.Source.IPTV)
+                        .put("favorite", ch.favorite)
+                        .put("hidden", ch.hidden)
+                        .put("locked", ch.locked || (ch.sourceKey in lockedKeys))
+                        .put("logo", ch.logoUrl.orEmpty())
+                )
+            }
+            return WebReply(200, JSONObject()
+                .put("total", total)
+                .put("page", page)
+                .put("pageSize", pageSize)
+                .put("channels", arr)
+                .toString())
+        }
+        if (action == "editor_update_channel") {
+            sessionTimeout.touch()
+            val key = data.optString("key")
+            if (key.isBlank()) return WebReply(400)
+
+            withContext(Dispatchers.IO) {
+                if (data.has("customName")) {
+                    val newName = data.optString("customName").trim().takeIf { it.isNotBlank() }
+                    channelRepository.setCustomName(key, newName)
+                }
+                if (data.has("customNumber")) {
+                    val num = data.optInt("customNumber", -1).takeIf { it > 0 }
+                    channelRepository.setCustomNumber(key, num)
+                }
+                if (data.has("favorite")) {
+                    channelRepository.setFavorite(key, data.getBoolean("favorite"))
+                }
+                if (data.has("hidden")) {
+                    channelRepository.setHidden(key, data.getBoolean("hidden"))
+                }
+                if (data.has("locked")) {
+                    parentalControlStore.setLocked(key, data.getBoolean("locked"))
+                }
+                if (data.optBoolean("removeFromMain", false)) {
+                    repository.setChannelSelected(key, false)
+                    sources = repository.sources()
+                }
+            }
+            onState(false, message, true)
+            return WebReply(200, JSONObject().put("success", true).toString())
         }
         return withContext(Dispatchers.Main.immediate) {
             if (operationGate.isBusy || server == null) return@withContext WebReply(409)
@@ -298,6 +488,15 @@ internal class IptvWebManager(
             "githubEmpty" to R.string.github_manifest_empty,
             "githubError" to R.string.github_manifest_error,
             "githubNote" to R.string.github_guide_note,
+            "enable" to R.string.enable_iptv_source,
+            "disable" to R.string.disable_iptv_source,
+            "enabled" to R.string.iptv_source_enabled,
+            "disabled" to R.string.iptv_source_disabled,
+            "tabSources" to R.string.web_tab_sources,
+            "tabEditor" to R.string.web_tab_channel_editor,
+            "selectChannels" to R.string.web_select_channels,
+            "selectChannelsTitle" to R.string.web_select_channels_title,
+            "editorTitle" to R.string.web_channel_editor_title,
         )
     }
 }

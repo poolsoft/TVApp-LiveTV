@@ -540,6 +540,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 add(SourceAction.EDIT_URL to getString(R.string.edit_iptv_source_url))
             }
             add(SourceAction.RENAME to getString(R.string.rename_iptv_source))
+            val toggleLabel = if (summary.source.enabled) {
+                getString(R.string.disable_iptv_source)
+            } else {
+                getString(R.string.enable_iptv_source)
+            }
+            add(SourceAction.TOGGLE_ENABLED to toggleLabel)
             add(SourceAction.PLAYBACK_OPTIONS to getString(R.string.iptv_source_playback_options))
             add(SourceAction.NETWORK_OPTIONS to getString(R.string.iptv_source_network_options))
             if (summary.source.kind == IptvRepository.KIND_XTREAM) add(SourceAction.ACCOUNT to getString(R.string.xtream_account_info))
@@ -605,11 +611,27 @@ class IptvSourcesActivity : TvRemoteActivity() {
             SourceAction.RENAME -> promptSourceName(summary.source.name) { name ->
                 renameSource(summary, name)
             }
+            SourceAction.TOGGLE_ENABLED -> toggleSourceEnabled(summary)
             SourceAction.EDIT_URL -> promptSourceUrl(summary)
             SourceAction.DELETE -> confirmDeleteSource(summary)
             SourceAction.PLAYBACK_OPTIONS -> showSourcePlaybackOptions(summary)
             SourceAction.NETWORK_OPTIONS -> showSourceNetworkOptions(summary)
             SourceAction.ACCOUNT -> showXtreamAccount(summary)
+        }
+    }
+
+    private fun toggleSourceEnabled(summary: IptvSourceSummary) {
+        if (!beginLocalOperation()) return
+        lifecycleScope.launch {
+            val nextState = !summary.source.enabled
+            val result = withContext(Dispatchers.IO) {
+                runCatching { repository.setSourceEnabled(summary.source.id, nextState) }
+            }
+            finishLocalOperation()
+            result.onSuccess {
+                setResult(RESULT_OK)
+                loadSources()
+            }.onFailure(::showError)
         }
     }
 
@@ -930,7 +952,8 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         val locationView = view.findViewById<TextView>(R.id.source_item_location)
                         val detailsView = view.findViewById<TextView>(R.id.source_item_details)
 
-                        val title = "${summary.source.name} · ${sourceTypeLabel(summary.source.kind)}"
+                        val disabledBadge = if (!summary.source.enabled) " · [${getString(R.string.iptv_source_disabled)}]" else ""
+                        val title = "${summary.source.name} · ${sourceTypeLabel(summary.source.kind)}$disabledBadge"
                         nameView.text = title
                         nameView.setCompoundDrawablesRelativeWithIntrinsicBounds(
                             sourceIcon(summary.source.kind),
@@ -960,6 +983,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                             summary.selectedChannelCount,
                             updatedAt,
                         )
+                        view.alpha = if (summary.source.enabled) 1.0f else 0.55f
                         return view
                     }
                 }
@@ -1109,7 +1133,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             .show()
     }
 
-    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, DELETE, PLAYBACK_OPTIONS, NETWORK_OPTIONS, ACCOUNT }
+    private enum class SourceAction { SELECT, REFRESH, EDIT_URL, RENAME, TOGGLE_ENABLED, DELETE, PLAYBACK_OPTIONS, NETWORK_OPTIONS, ACCOUNT }
 
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()

@@ -130,6 +130,11 @@ class IptvRepository(context: Context) {
         notifySharedChannelsChanged()
     }
 
+    suspend fun setSourceEnabled(sourceId: Long, enabled: Boolean) {
+        dao.setSourceEnabled(sourceId, enabled)
+        notifySharedChannelsChanged()
+    }
+
     suspend fun connectionLimitViolation(channels: List<LiveChannel>): Pair<String, Int>? {
         val counts = channels.filter { it.source == LiveChannel.Source.IPTV }
             .mapNotNull { it.inputId.removePrefix("iptv:").toLongOrNull() }.groupingBy { it }.eachCount()

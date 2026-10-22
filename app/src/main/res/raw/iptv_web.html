@@ -1,191 +1,957 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TVApp IPTV</title><style>
-*{box-sizing:border-box}body{margin:0;background:#111518;color:#edf1f4;font:15px system-ui,sans-serif}
-header{border-bottom:1px solid #38434b;padding:20px 24px}h1{font-size:22px;margin:0}
-main{max-width:1100px;margin:auto;padding:24px}h2{font-size:17px}section{margin-bottom:28px}
-form{display:grid;gap:14px;max-width:560px}label{display:grid;gap:6px;color:#bfcbd2}
-input,select,button{font:inherit;border:1px solid #576570;border-radius:5px;padding:10px;background:#222b31;color:#fff;min-height:42px}
-button{cursor:pointer}button[type=submit],.primary-btn{background:#18705c;border-color:#339f86}
-button:disabled{opacity:.45;cursor:wait}:focus-visible{outline:3px solid #59baff;outline-offset:2px}[hidden]{display:none!important}
-#status{position:sticky;top:0;padding:12px 0;background:#111518;white-space:pre-wrap;color:#75d8bf;z-index:10}
-#status.busy:before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid #75d8bf;border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
+<title>TVApp</title><style>
+*{box-sizing:border-box}body{margin:0;background:#111518;color:#edf1f4;font:14px system-ui,-apple-system,sans-serif}
+header{border-bottom:1px solid #38434b;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+h1{font-size:20px;margin:0;font-weight:700;color:#fff}
+.nav-tabs{display:flex;gap:8px}
+.nav-tab{background:#222b31;border:1px solid #38434b;color:#bfcbd2;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s ease}
+.nav-tab:hover{background:#2c373f;color:#fff}
+.nav-tab.active{background:#18705c;border-color:#339f86;color:#fff}
+main{max-width:1200px;margin:auto;padding:20px}
+h2{font-size:16px;margin:0 0 14px 0;color:#edf1f4;font-weight:600}
+section{margin-bottom:24px}
+form{display:grid;gap:12px;max-width:560px}label{display:grid;gap:4px;color:#bfcbd2;font-size:13px}
+input,select,button{font:inherit;border:1px solid #576570;border-radius:6px;padding:8px 12px;background:#222b31;color:#fff;min-height:38px}
+input:focus,select:focus{border-color:#59baff;outline:none}
+button{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:500;transition:background .15s}
+button:hover{background:#2e3a42}
+button[type=submit],.primary-btn{background:#18705c;border-color:#339f86;color:#fff}
+button[type=submit]:hover,.primary-btn:hover{background:#1e876f}
+button:disabled{opacity:.45;cursor:not-allowed}:focus-visible{outline:2px solid #59baff;outline-offset:2px}[hidden]{display:none!important}
+#status{position:sticky;top:0;padding:10px 14px;background:#151c20;border-bottom:1px solid #38434b;color:#75d8bf;font-weight:500;z-index:100;border-radius:6px;margin-bottom:16px}
+#status.busy:before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;border:2px solid #75d8bf;border-right-color:transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
-.source{padding:16px 0;border-bottom:1px solid #38434b;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
-.name{font-weight:650}.meta,.address{margin-top:6px;color:#bfcbd2;font-size:13px;overflow-wrap:anywhere}
-.actions{display:flex;gap:8px;align-items:center}.delete{color:#ffb4b4}p{color:#bfcbd2;line-height:1.5}#pairing{max-width:560px}
-@media(max-width:600px){main{padding:16px}.source{grid-template-columns:1fr}.actions{justify-content:flex-end}}
-#management{display:grid;grid-template-columns:360px minmax(0,1fr);gap:32px}#management form{max-width:none}
-@media(max-width:850px){#management{grid-template-columns:1fr;gap:0}}
-dialog{width:440px;max-width:calc(100% - 32px);padding:24px;background:#222b31;color:#edf1f4;border:1px solid #576570;border-radius:6px}
-dialog::backdrop{background:#0009}dialog h2{margin:0}dialog .actions{justify-content:flex-end}#renameError{margin:0;color:#ffb4b4}.actions{flex-wrap:wrap}
+.source{padding:14px;border:1px solid #38434b;border-radius:8px;background:#181f24;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;transition:opacity .2s}
+.source.disabled{opacity:.55;border-style:dashed}
+.source-info{flex:1;min-width:240px}
+.source-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:650;font-size:15px;color:#fff}
+.meta{margin-top:6px;color:#a0b1bc;font-size:12px}
+.address{margin-top:4px;color:#7e93a0;font-size:12px;word-break:break-all}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block}
+.badge-active{background:#18705c;color:#a3f5e0}
+.badge-disabled{background:#4b3838;color:#ffb4b4}
+.badge-type{background:#2a363d;color:#bfcbd2}
+.actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.actions button{padding:6px 10px;font-size:12px;min-height:32px}
+.btn-toggle{background:#222b31;border-color:#576570}
+.btn-select{background:#1d4354;border-color:#2a6a85;color:#92d9f8}
+.btn-select:hover{background:#25556b}
+.btn-delete{color:#ffb4b4;border-color:#733d3d}
+.btn-delete:hover{background:#4d2222}
+#management{display:grid;grid-template-columns:360px minmax(0,1fr);gap:28px}
+#management form{max-width:none}
+@media(max-width:850px){#management{grid-template-columns:1fr;gap:20px}}
 
 /* GitHub Manifest Card Styles */
-#githubSection{display:grid;gap:14px;max-width:560px}
-.manifest-toolbar{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
-.manifest-toolbar button{flex:1;min-height:36px;font-size:13px}
-.manifest-container{max-height:420px;overflow-y:auto;display:grid;gap:10px;padding:4px 2px;border:1px solid #38434b;border-radius:6px;background:#181f24}
-.manifest-card{display:flex;align-items:center;gap:12px;padding:10px;background:#222b31;border:1px solid #38434b;border-radius:5px;cursor:pointer}
+#githubSection{display:grid;gap:12px}
+.manifest-toolbar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.manifest-toolbar button{flex:1;min-height:34px;font-size:12px}
+.manifest-container{max-height:380px;overflow-y:auto;display:grid;gap:8px;padding:6px;border:1px solid #38434b;border-radius:6px;background:#151c20}
+.manifest-card{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#222b31;border:1px solid #38434b;border-radius:5px;cursor:pointer}
 .manifest-card:hover{background:#2a363d;border-color:#576570}
-.manifest-card input[type=checkbox]{width:20px;height:20px;margin:0;cursor:pointer}
-.manifest-poster{width:48px;height:48px;object-fit:cover;border-radius:4px;background:#111518;flex-shrink:0}
+.manifest-card input[type=checkbox]{width:18px;height:18px;margin:0;cursor:pointer}
+.manifest-poster{width:42px;height:42px;object-fit:cover;border-radius:4px;background:#111518;flex-shrink:0}
 .manifest-info{flex:1;min-width:0}
-.manifest-name{font-weight:600;font-size:14px;color:#edf1f4}
-.manifest-desc{font-size:12px;color:#a0b1bc;margin-top:4px;line-height:1.4}
-.badge-tag{font-size:11px;background:#38434b;color:#a0b1bc;padding:2px 6px;border-radius:3px;margin-left:6px;vertical-align:middle}
-</style></head><body><header><h1 data-label="title"></h1></header><main>
-<section id="pairing"><p data-label="security"></p><form id="pairForm"><label><span data-label="code"></span><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required></label><button type="submit" data-label="pair"></button></form></section>
-<div id="status" role="status" aria-live="polite"></div>
-<div id="management" hidden><section><h2 data-label="add"></h2><form id="addForm">
-<label><select id="kind" aria-label="IPTV"><option value="URL"></option><option value="DOCUMENT"></option><option value="XTREAM"></option><option value="STALKER"></option><option value="GITHUB"></option></select></label>
-<div id="standardFields">
-<label id="nameRow"><span data-label="name"></span><input id="name" maxlength="200" required></label>
-<label id="urlRow"><span data-label="url"></span><input id="url" type="url" required autocomplete="off"></label>
-<label id="fileRow" hidden><span data-label="file"></span><input id="file" type="file" accept=".m3u,.m3u8,.txt"></label>
-<label id="usernameRow" hidden><span data-label="username"></span><input id="username" autocomplete="off"></label>
-<label id="passwordRow" hidden><span data-label="password"></span><input id="password" type="password" autocomplete="off"></label>
-<label id="macRow" hidden><span data-label="mac"></span><input id="mac" autocomplete="off"></label>
-<button type="submit" data-label="add" id="submitBtn"></button>
-</div>
-</form>
+.manifest-name{font-weight:600;font-size:13px;color:#edf1f4}
+.manifest-desc{font-size:11px;color:#a0b1bc;margin-top:2px;line-height:1.3}
 
-<div id="githubSection" hidden>
-  <p data-label="githubNote" style="font-size:13px;margin:0 0 6px 0;"></p>
-  <label><span data-label="githubUser"></span><input id="githubUser" value="GeceHub" autocomplete="off" required></label>
-  <label><span data-label="github"></span><select id="githubFile">
-    <option value="live2.json" data-label="githubLive"></option>
-    <option value="vod2.json" data-label="githubVod"></option>
-  </select></label>
-  <button type="button" id="githubFetchBtn" class="primary-btn" data-label="githubFetch"></button>
-  <div id="githubResults" hidden>
-    <div class="manifest-toolbar">
-      <button type="button" id="ghSelectAll" data-label="githubSelectAll"></button>
-      <button type="button" id="ghDeselectAll" data-label="githubDeselectAll"></button>
-    </div>
-    <div id="githubContainer" class="manifest-container"></div>
-    <button type="button" id="githubAddBtn" class="primary-btn" data-label="githubAddSelected" style="margin-top:10px;"></button>
+/* Dialog Styles */
+dialog{width:760px;max-width:calc(100% - 24px);padding:20px;background:#181f24;color:#edf1f4;border:1px solid #576570;border-radius:8px;box-shadow:0 8px 32px #000a}
+dialog::backdrop{background:#000c;backdrop-filter:blur(2px)}
+dialog h2{margin:0 0 12px 0}
+dialog .dialog-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #38434b;padding-bottom:10px}
+dialog .dialog-body{max-height:70vh;overflow-y:auto}
+dialog .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;border-top:1px solid #38434b;padding-top:12px}
+
+/* Table & Filters */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar input[type=search],.toolbar select{flex:1;min-width:160px}
+.filter-group{display:flex;gap:4px}
+.filter-btn{padding:6px 12px;font-size:12px;min-height:34px;background:#222b31;border-color:#38434b}
+.filter-btn.active{background:#18705c;border-color:#339f86;color:#fff}
+.pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;font-size:13px;color:#bfcbd2}
+.table-container{overflow-x:auto;border:1px solid #38434b;border-radius:6px;background:#151c20}
+table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}
+th{background:#1e272d;color:#a0b1bc;font-weight:600;padding:10px;border-bottom:1px solid #38434b;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #28333a;vertical-align:middle}
+tr:hover td{background:#1d252a}
+.table-input{padding:4px 8px;min-height:30px;width:100%;background:#181f24;border:1px solid #38434b;font-size:13px}
+.table-input:focus{background:#222b31;border-color:#59baff}
+.num-input{width:64px;text-align:center}
+.btn-icon{width:32px;height:32px;padding:0;min-height:32px;border-radius:4px;border-color:#38434b;background:#222b31}
+.btn-icon.active-star{background:#594a12;border-color:#997b1a;color:#ffd24d}
+.btn-icon.active-eye{background:#1b445a;border-color:#2e749a;color:#7ee0ff}
+.btn-icon.active-lock{background:#542525;border-color:#8c3e3e;color:#ff9e9e}
+</style></head><body>
+<header>
+  <h1>TVApp IPTV</h1>
+  <div class="nav-tabs" id="navTabs">
+    <button type="button" class="nav-tab active" data-tab="sources" data-label="tabSources"></button>
+    <button type="button" class="nav-tab" data-tab="editor" data-label="tabEditor"></button>
   </div>
+</header>
+<main>
+<div id="status" role="status" aria-live="polite"></div>
+
+<!-- PAIRING SCREEN -->
+<section id="pairing">
+  <p data-label="security"></p>
+  <form id="pairForm">
+    <label><span data-label="code"></span><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required></label>
+    <button type="submit" data-label="pair"></button>
+  </form>
+</section>
+
+<!-- MAIN MANAGEMENT TABS -->
+<div id="management" hidden>
+
+  <!-- TAB 1: IPTV SOURCES -->
+  <div id="tabContentSources" style="display:contents">
+    <section>
+      <h2 data-label="add"></h2>
+      <form id="addForm">
+        <label><select id="kind" aria-label="IPTV">
+          <option value="URL"></option>
+          <option value="DOCUMENT"></option>
+          <option value="XTREAM"></option>
+          <option value="STALKER"></option>
+          <option value="GITHUB"></option>
+        </select></label>
+        <div id="standardFields">
+          <label id="nameRow"><span data-label="name"></span><input id="name" maxlength="200" required></label>
+          <label id="urlRow"><span data-label="url"></span><input id="url" type="url" required autocomplete="off"></label>
+          <label id="fileRow" hidden><span data-label="file"></span><input id="file" type="file" accept=".m3u,.m3u8,.txt"></label>
+          <label id="usernameRow" hidden><span data-label="username"></span><input id="username" autocomplete="off"></label>
+          <label id="passwordRow" hidden><span data-label="password"></span><input id="password" type="password" autocomplete="off"></label>
+          <label id="macRow" hidden><span data-label="mac"></span><input id="mac" autocomplete="off"></label>
+          <button type="submit" data-label="add" id="submitBtn"></button>
+        </div>
+      </form>
+
+      <div id="githubSection" hidden>
+        <p data-label="githubNote" style="font-size:12px;margin:0 0 6px 0;color:#a0b1bc"></p>
+        <label><span data-label="githubUser"></span><input id="githubUser" value="GeceHub" autocomplete="off" required></label>
+        <label><span data-label="github"></span><select id="githubFile">
+          <option value="live2.json" data-label="githubLive"></option>
+          <option value="vod2.json" data-label="githubVod"></option>
+        </select></label>
+        <button type="button" id="githubFetchBtn" class="primary-btn" data-label="githubFetch"></button>
+        <div id="githubResults" hidden>
+          <div class="manifest-toolbar">
+            <button type="button" id="ghSelectAll" data-label="githubSelectAll"></button>
+            <button type="button" id="ghDeselectAll" data-label="githubDeselectAll"></button>
+          </div>
+          <div id="githubContainer" class="manifest-container"></div>
+          <button type="button" id="githubAddBtn" class="primary-btn" data-label="githubAddSelected" style="margin-top:10px;width:100%"></button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-label="saved"></h2>
+      <div id="sources"></div>
+    </section>
+  </div>
+
+  <!-- TAB 2: CHANNEL LIST EDITOR -->
+  <div id="tabContentEditor" hidden style="grid-column:1 / -1">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h2 data-label="editorTitle" style="margin:0"></h2>
+      <div class="filter-group">
+        <button type="button" class="filter-btn active" data-filter="all">Tümü</button>
+        <button type="button" class="filter-btn" data-filter="fav">⭐ Favoriler</button>
+        <button type="button" class="filter-btn" data-filter="hidden">👁️ Gizliler</button>
+        <button type="button" class="filter-btn" data-filter="locked">🔒 Kilitliler</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="editorSearch" placeholder="Kanal adı veya numara ara…">
+      <select id="editorCategorySelect"><option value="ALL">Tüm Kategoriler</option></select>
+    </div>
+
+    <div class="pagination">
+      <button type="button" id="editorPrevPage" disabled>← Önceki</button>
+      <span id="editorPageInfo">Sayfa 1 / 1</span>
+      <button type="button" id="editorNextPage" disabled>Sonraki →</button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:70px">No</th>
+            <th>Kanal Adı</th>
+            <th style="width:140px">Kategori</th>
+            <th style="width:70px">Kaynak</th>
+            <th style="width:160px;text-align:center">İşlemler</th>
+          </tr>
+        </thead>
+        <tbody id="editorTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
-</section>
-<section><h2 data-label="saved"></h2><div id="sources"></div></section></div>
-<dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle" data-label="rename"></h2><label><span data-label="name"></span><input id="renameName" maxlength="200" required></label><p id="renameError" role="alert"></p><div class="actions"><button type="button" id="renameCancel" data-label="cancel"></button><button type="submit" data-label="save"></button></div></form></dialog>
+<!-- DIALOG: RENAME SOURCE -->
+<dialog id="renameDialog" aria-labelledby="renameTitle">
+  <form id="renameForm">
+    <h2 id="renameTitle" data-label="rename"></h2>
+    <label><span data-label="name"></span><input id="renameName" maxlength="200" required></label>
+    <p id="renameError" role="alert" style="margin:4px 0 0;color:#ffb4b4;font-size:12px"></p>
+    <div class="dialog-actions">
+      <button type="button" id="renameCancel" data-label="cancel"></button>
+      <button type="submit" data-label="save"></button>
+    </div>
+  </form>
+</dialog>
+
+<!-- DIALOG: CHANNEL SELECTION -->
+<dialog id="selectChannelsDialog">
+  <div class="dialog-header">
+    <h2 id="selectChannelsTitle" data-label="selectChannelsTitle" style="margin:0"></h2>
+    <button type="button" id="selectChannelsClose" style="padding:4px 8px;min-height:28px">✕</button>
+  </div>
+  <div class="toolbar">
+    <input type="search" id="selSearch" placeholder="Kanal ara…">
+    <select id="selCategory"><option value="ALL">Tüm Kategoriler</option></select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#bfcbd2;cursor:pointer">
+      <input type="checkbox" id="selOnlySelected" style="width:16px;height:16px"> Sadece Seçililer
+    </label>
+  </div>
+  <div class="manifest-toolbar" style="margin-bottom:10px">
+    <button type="button" id="selAllBtn">Filtrelenenleri Ekle</button>
+    <button type="button" id="selNoneBtn">Filtrelenenleri Kaldır</button>
+  </div>
+  <div class="pagination">
+    <button type="button" id="selPrevPage" disabled>← Önceki</button>
+    <span id="selPageInfo">Sayfa 1 / 1</span>
+    <button type="button" id="selNextPage" disabled>Sonraki →</button>
+  </div>
+  <div class="table-container" style="max-height:380px;overflow-y:auto">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px;text-align:center">Seç</th>
+          <th>Kanal Adı</th>
+          <th style="width:140px">Kategori</th>
+        </tr>
+      </thead>
+      <tbody id="selTableBody"></tbody>
+    </table>
+  </div>
+</dialog>
+
 <script>
-'use strict';const L=__LABELS__;const $=id=>document.getElementById(id);let token='',busy=false,signature='',polling=false,currentManifest=[];
-document.documentElement.lang=navigator.language;document.querySelectorAll('[data-label]').forEach(e=>e.textContent=L[e.dataset.label]||e.dataset.label);
-[...$('kind').options].forEach(o=>o.textContent=L[o.value]||o.value);
-async function request(path,data){const r=await fetch(path,{method:data?'POST':'GET',headers:{'Content-Type':'application/json','X-TVApp-Token':token},body:data?JSON.stringify(data):undefined,cache:'no-store'});if(!r.ok)throw Error(r.status===401?L.code:r.status===429?L.failed:L.failed);return r.json()}
-function status(text,working=false){$('status').textContent=text;$('status').classList.toggle('busy',working)}
-$('pairForm').onsubmit=async e=>{e.preventDefault();try{const result=await request('/pair',{code:$('code').value});token=result.token;$('code').value='';$('pairing').hidden=true;$('management').hidden=false;await poll()}catch(e){status(e.message)}};
-$('kind').onchange=()=>{
-  const kind=$('kind').value;
-  if(kind==='GITHUB'){
-    $('standardFields').hidden=true;
-    $('githubSection').hidden=false;
+'use strict';
+const L = __LABELS__;
+const $ = id => document.getElementById(id);
+let token = '', busy = false, signature = '', polling = false, currentManifest = [];
+let activeTab = 'sources';
+
+// Channel Selector state
+let selSourceId = null, selPage = 0, selTotal = 0, selPageSize = 100;
+let selSearchDebounce = null;
+
+// Editor state
+let edPage = 0, edTotal = 0, edFilter = 'all', edDebounce = null;
+
+document.documentElement.lang = navigator.language;
+document.querySelectorAll('[data-label]').forEach(e => e.textContent = L[e.dataset.label] || e.dataset.label);
+[...$('kind').options].forEach(o => o.textContent = L[o.value] || o.value);
+
+async function request(path, data) {
+  const r = await fetch(path, {
+    method: data ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', 'X-TVApp-Token': token },
+    body: data ? JSON.stringify(data) : undefined,
+    cache: 'no-store'
+  });
+  if (!r.ok) throw Error(r.status === 401 ? L.code : (r.status === 429 ? L.failed : L.failed));
+  return r.json();
+}
+
+function status(text, working = false) {
+  $('status').textContent = text;
+  $('status').classList.toggle('busy', working);
+}
+
+// Pairing
+$('pairForm').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const result = await request('/pair', { code: $('code').value });
+    token = result.token;
+    $('code').value = '';
+    $('pairing').hidden = true;
+    $('management').hidden = false;
+    await poll();
+  } catch(e) { status(e.message); }
+};
+
+// Tabs navigation
+$('navTabs').querySelectorAll('.nav-tab').forEach(btn => {
+  btn.onclick = () => {
+    $('navTabs').querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    $('tabContentSources').hidden = (activeTab !== 'sources');
+    $('tabContentEditor').hidden = (activeTab !== 'editor');
+    if (activeTab === 'editor') {
+      loadEditorCategories();
+      loadEditorChannels();
+    }
+  };
+});
+
+// Source kind selection
+$('kind').onchange = () => {
+  const kind = $('kind').value;
+  if (kind === 'GITHUB') {
+    $('standardFields').hidden = true;
+    $('githubSection').hidden = false;
     return;
   }
-  $('standardFields').hidden=false;
-  $('githubSection').hidden=true;
-  for(const [id,visible] of [['url',kind!=='DOCUMENT'],['file',kind==='DOCUMENT'],['username',kind==='XTREAM'],['password',kind==='XTREAM'],['mac',kind==='STALKER']]){
-    $(id+'Row').hidden=!visible;$(id).required=visible;
+  $('standardFields').hidden = false;
+  $('githubSection').hidden = true;
+  for (const [id, visible] of [
+    ['url', kind !== 'DOCUMENT'],
+    ['file', kind === 'DOCUMENT'],
+    ['username', kind === 'XTREAM'],
+    ['password', kind === 'XTREAM'],
+    ['mac', kind === 'STALKER']
+  ]) {
+    $(id + 'Row').hidden = !visible;
+    $(id).required = visible;
   }
-  $('nameRow').hidden=false;$('name').required=true;
+  $('nameRow').hidden = false;
+  $('name').required = true;
 };
-$('addForm').onsubmit=async e=>{e.preventDefault();if(busy)return;try{const data={action:'add',kind:$('kind').value,name:$('name').value,url:$('url').value,username:$('username').value,password:$('password').value,mac:$('mac').value};if(data.kind==='DOCUMENT'){const f=$('file').files[0];if(!f||f.size>12*1024*1024)throw Error(L.uploadLimit);data.content=await f.text()}await command(data);$('password').value=''}catch(e){status(e.message)}};
+
+$('addForm').onsubmit = async e => {
+  e.preventDefault();
+  if (busy) return;
+  try {
+    const data = {
+      action: 'add',
+      kind: $('kind').value,
+      name: $('name').value,
+      url: $('url').value,
+      username: $('username').value,
+      password: $('password').value,
+      mac: $('mac').value
+    };
+    if (data.kind === 'DOCUMENT') {
+      const f = $('file').files[0];
+      if (!f || f.size > 12 * 1024 * 1024) throw Error(L.uploadLimit);
+      data.content = await f.text();
+    }
+    await command(data);
+    $('password').value = '';
+  } catch(e) { status(e.message); }
+};
 
 // GitHub Manifest UI
-$('githubFetchBtn').onclick=async()=>{
-  if(busy)return;
-  const user=$('githubUser').value.trim()||'GeceHub';
-  const file=$('githubFile').value||'live2.json';
-  status(L.githubLoading||'Loading...', true);
-  try{
-    const res=await request('/command',{action:'github_manifest',username:user,file:file});
+$('githubFetchBtn').onclick = async () => {
+  if (busy) return;
+  const user = $('githubUser').value.trim() || 'GeceHub';
+  const file = $('githubFile').value || 'live2.json';
+  status(L.githubLoading || 'Yükleniyor…', true);
+  try {
+    const res = await request('/command', { action: 'github_manifest', username: user, file: file });
     status('');
-    if(!res.success||!res.items||!res.items.length){
-      status(res.error||L.githubEmpty);
-      $('githubResults').hidden=true;
+    if (!res.success || !res.items || !res.items.length) {
+      status(res.error || L.githubEmpty);
+      $('githubResults').hidden = true;
       return;
     }
-    currentManifest=res.items;
+    currentManifest = res.items;
     renderManifest(res.items);
-    $('githubResults').hidden=false;
-  }catch(e){
-    status(e.message||L.githubError);
-  }
+    $('githubResults').hidden = false;
+  } catch(e) { status(e.message || L.githubError); }
 };
-function renderManifest(items){
-  const container=$('githubContainer');
+
+function renderManifest(items) {
+  const container = $('githubContainer');
   container.replaceChildren();
-  items.forEach((item,idx)=>{
-    const card=document.createElement('div');
-    card.className='manifest-card';
-    const check=document.createElement('input');
-    check.type='checkbox';
-    check.checked=true;
-    check.dataset.index=idx;
+  items.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = 'manifest-card';
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = true;
+    check.dataset.index = idx;
     card.append(check);
-    if(item.poster){
-      const img=document.createElement('img');
-      img.className='manifest-poster';
-      img.src=item.poster;
-      img.loading='lazy';
-      img.onerror=()=>img.style.display='none';
+    if (item.poster) {
+      const img = document.createElement('img');
+      img.className = 'manifest-poster';
+      img.src = item.poster;
+      img.loading = 'lazy';
+      img.onerror = () => img.style.display = 'none';
       card.append(img);
     }
-    const info=document.createElement('div');
-    info.className='manifest-info';
-    const name=document.createElement('div');
-    name.className='manifest-name';
-    name.textContent=item.name;
-    if(item.format){
-      const badge=document.createElement('span');
-      badge.className='badge-tag';
-      badge.textContent=item.format;
+    const info = document.createElement('div');
+    info.className = 'manifest-info';
+    const name = document.createElement('div');
+    name.className = 'manifest-name';
+    name.textContent = item.name;
+    if (item.format) {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-type';
+      badge.textContent = item.format;
       name.append(badge);
     }
     info.append(name);
-    if(item.description){
-      const desc=document.createElement('div');
-      desc.className='manifest-desc';
-      desc.textContent=item.description;
+    if (item.description) {
+      const desc = document.createElement('div');
+      desc.className = 'manifest-desc';
+      desc.textContent = item.description;
       info.append(desc);
     }
     card.append(info);
-    card.onclick=e=>{if(e.target!==check){check.checked=!check.checked}};
+    card.onclick = e => { if (e.target !== check) check.checked = !check.checked; };
     container.append(card);
   });
 }
-$('ghSelectAll').onclick=()=>document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>c.checked=true);
-$('ghDeselectAll').onclick=()=>document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>c.checked=false);
-$('githubAddBtn').onclick=async()=>{
-  if(busy)return;
-  const selected=[];
-  document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c=>{
-    if(c.checked){
-      const item=currentManifest[c.dataset.index];
-      if(item)selected.push({name:item.name,url:item.url});
+
+$('ghSelectAll').onclick = () => document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c => c.checked = true);
+$('ghDeselectAll').onclick = () => document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c => c.checked = false);
+$('githubAddBtn').onclick = async () => {
+  if (busy) return;
+  const selected = [];
+  document.querySelectorAll('#githubContainer input[type=checkbox]').forEach(c => {
+    if (c.checked) {
+      const item = currentManifest[c.dataset.index];
+      if (item) selected.push({ name: item.name, url: item.url });
     }
   });
-  if(!selected.length){
-    alert(L.githubEmpty||'No items selected');
+  if (!selected.length) {
+    alert(L.githubEmpty || 'Hiçbir liste seçilmedi.');
     return;
   }
-  try{
-    await command({action:'add_bulk',items:selected});
-  }catch(e){
-    status(e.message);
-  }
+  try {
+    await command({ action: 'add_bulk', items: selected });
+  } catch(e) { status(e.message); }
 };
 
-async function command(data){busy=true;lock();try{await request('/command',data);await poll()}catch(e){busy=false;lock();throw e}}
-function lock(){document.querySelectorAll('#management button,#management input,#management select,#renameForm input,#renameForm button[type=submit]').forEach(e=>e.disabled=busy)}
-let renameId=null;
-$('renameCancel').onclick=()=>$('renameDialog').close();
-$('renameName').oninput=()=>$('renameName').setCustomValidity('');
-$('renameDialog').addEventListener('close',()=>$('renameError').textContent='');
-$('renameForm').onsubmit=async e=>{e.preventDefault();if(busy)return;const name=$('renameName').value.trim();if(!name){$('renameName').setCustomValidity(L.name);$('renameName').reportValidity();return}try{await command({action:'rename',id:renameId,name});$('renameDialog').close()}catch(e){$('renameError').textContent=e.message}};
-function render(sources){const newSignature=JSON.stringify(sources);if(signature===newSignature)return;signature=newSignature;$('sources').replaceChildren();if(!sources.length){$('sources').textContent=L.empty;return}sources.forEach(s=>{const row=document.createElement('div');row.className='source';const info=document.createElement('div');const name=document.createElement('div');name.className='name';name.textContent=s.name;info.append(name);const meta=document.createElement('div');meta.className='meta';meta.textContent=(L[s.kind]||s.kind)+' · '+L.counts.replace('%1$d',s.channels).replace('%2$d',s.selected)+(s.updated?' · '+new Date(s.updated).toLocaleString():'');info.append(meta);if(s.url){const url=document.createElement('div');url.className='address';url.textContent=s.url;info.append(url)}row.append(info);const actions=document.createElement('div');actions.className='actions';const rename=document.createElement('button');rename.textContent=L.rename;rename.onclick=()=>{if(busy)return;renameId=s.id;$('renameName').value=s.name;$('renameName').setCustomValidity('');$('renameDialog').showModal();$('renameName').focus();$('renameName').select()};actions.append(rename);if(s.kind==='URL'){const b=document.createElement('button');b.textContent='↻ '+L.update;b.onclick=()=>command({action:'update',id:s.id}).catch(e=>status(e.message));actions.append(b)}const del=document.createElement('button');del.className='delete';del.textContent='× '+L.delete;del.onclick=()=>{if(confirm(L.confirm+'\n'+s.name))command({action:'delete',id:s.id}).catch(e=>status(e.message))};actions.append(del);row.append(actions);$('sources').append(row)});lock()}
-async function poll(){if(!token||polling)return;polling=true;try{const state=await request('/state');busy=state.busy;render(state.sources);lock();status(state.message,busy)}catch(e){status(L.offline);$('renameDialog').close();$('management').hidden=true;$('pairing').hidden=false;token=''}finally{polling=false}}
-setInterval(poll,1500);
-</script></main></body></html>
+async function command(data) {
+  busy = true;
+  lock();
+  try {
+    await request('/command', data);
+    await poll();
+  } catch(e) {
+    busy = false;
+    lock();
+    throw e;
+  }
+}
+
+function lock() {
+  document.querySelectorAll('#management button,#management input,#management select,#renameForm input,#renameForm button[type=submit]').forEach(e => {
+    if (e.id !== 'editorPrevPage' && e.id !== 'editorNextPage' && e.id !== 'selPrevPage' && e.id !== 'selNextPage') {
+      e.disabled = busy;
+    }
+  });
+}
+
+// Rename
+let renameId = null;
+$('renameCancel').onclick = () => $('renameDialog').close();
+$('renameName').oninput = () => $('renameName').setCustomValidity('');
+$('renameDialog').addEventListener('close', () => $('renameError').textContent = '');
+$('renameForm').onsubmit = async e => {
+  e.preventDefault();
+  if (busy) return;
+  const name = $('renameName').value.trim();
+  if (!name) {
+    $('renameName').setCustomValidity(L.name);
+    $('renameName').reportValidity();
+    return;
+  }
+  try {
+    await command({ action: 'rename', id: renameId, name });
+    $('renameDialog').close();
+  } catch(e) { $('renameError').textContent = e.message; }
+};
+
+// Render Sources List
+function render(sources) {
+  const newSignature = JSON.stringify(sources);
+  if (signature === newSignature) return;
+  signature = newSignature;
+  $('sources').replaceChildren();
+  if (!sources.length) {
+    $('sources').textContent = L.empty;
+    return;
+  }
+  sources.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'source' + (s.enabled ? '' : ' disabled');
+
+    const info = document.createElement('div');
+    info.className = 'source-info';
+
+    const title = document.createElement('div');
+    title.className = 'source-title';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = s.name;
+    title.append(name);
+
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'badge badge-type';
+    typeBadge.textContent = L[s.kind] || s.kind;
+    title.append(typeBadge);
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'badge ' + (s.enabled ? 'badge-active' : 'badge-disabled');
+    statusBadge.textContent = s.enabled ? (L.enabled || 'Aktif') : (L.disabled || 'Pasif');
+    title.append(statusBadge);
+
+    info.append(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = L.counts.replace('%1$d', s.channels).replace('%2$d', s.selected) +
+      (s.updated ? ' · ' + new Date(s.updated).toLocaleString() : '');
+    info.append(meta);
+
+    if (s.url) {
+      const url = document.createElement('div');
+      url.className = 'address';
+      url.textContent = s.url;
+      info.append(url);
+    }
+    row.append(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    // Toggle enabled button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn-toggle';
+    toggleBtn.textContent = s.enabled ? (L.disable || 'Pasife Al') : (L.enable || 'Aktifleştir');
+    toggleBtn.onclick = async () => {
+      if (busy) return;
+      try {
+        await request('/command', { action: 'toggle_source_enabled', id: s.id });
+        await poll();
+      } catch(e) { status(e.message); }
+    };
+    actions.append(toggleBtn);
+
+    // Select Channels button
+    const selBtn = document.createElement('button');
+    selBtn.className = 'btn-select';
+    selBtn.textContent = '📋 ' + (L.selectChannels || 'Kanalları Seç');
+    selBtn.onclick = () => openChannelSelection(s);
+    actions.append(selBtn);
+
+    // Rename button
+    const rename = document.createElement('button');
+    rename.textContent = L.rename;
+    rename.onclick = () => {
+      if (busy) return;
+      renameId = s.id;
+      $('renameName').value = s.name;
+      $('renameName').setCustomValidity('');
+      $('renameDialog').showModal();
+      $('renameName').focus();
+      $('renameName').select();
+    };
+    actions.append(rename);
+
+    if (s.kind === 'URL') {
+      const b = document.createElement('button');
+      b.textContent = '↻ ' + L.update;
+      b.onclick = () => command({ action: 'update', id: s.id }).catch(e => status(e.message));
+      actions.append(b);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'btn-delete';
+    del.textContent = '× ' + L.delete;
+    del.onclick = () => {
+      if (confirm(L.confirm + '\n' + s.name)) command({ action: 'delete', id: s.id }).catch(e => status(e.message));
+    };
+    actions.append(del);
+
+    row.append(actions);
+    $('sources').append(row);
+  });
+  lock();
+}
+
+async function poll() {
+  if (!token || polling) return;
+  polling = true;
+  try {
+    const state = await request('/state');
+    busy = state.busy;
+    render(state.sources);
+    lock();
+    status(state.message, busy);
+  } catch(e) {
+    status(L.offline);
+    $('renameDialog').close();
+    $('selectChannelsDialog').close();
+    $('management').hidden = true;
+    $('pairing').hidden = false;
+    token = '';
+  } finally { polling = false; }
+}
+setInterval(poll, 1500);
+
+// ==================== CHANNEL SELECTION MODAL ====================
+async function openChannelSelection(source) {
+  selSourceId = source.id;
+  selPage = 0;
+  $('selectChannelsTitle').textContent = source.name + ' · ' + (L.selectChannelsTitle || 'Kanal Seçimi');
+  $('selSearch').value = '';
+  $('selOnlySelected').checked = false;
+
+  // Load categories
+  try {
+    const res = await request('/command', { action: 'source_categories', sourceId: selSourceId });
+    const selCat = $('selCategory');
+    selCat.replaceChildren();
+    const optAll = document.createElement('option');
+    optAll.value = 'ALL';
+    optAll.textContent = 'Tüm Kategoriler';
+    selCat.append(optAll);
+    if (res.categories) {
+      res.categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        selCat.append(opt);
+      });
+    }
+  } catch(e) {}
+
+  $('selectChannelsDialog').showModal();
+  loadSelectionPage();
+}
+
+$('selectChannelsClose').onclick = () => $('selectChannelsDialog').close();
+
+async function loadSelectionPage() {
+  if (!selSourceId) return;
+  const q = $('selSearch').value.trim();
+  const cat = $('selCategory').value;
+  const selOnly = $('selOnlySelected').checked;
+
+  try {
+    const res = await request('/command', {
+      action: 'source_channels',
+      sourceId: selSourceId,
+      category: cat,
+      query: q,
+      selectedOnly: selOnly,
+      page: selPage
+    });
+    selTotal = res.total || 0;
+    renderSelectionTable(res.channels || []);
+  } catch(e) { status(e.message); }
+}
+
+function renderSelectionTable(channels) {
+  const tbody = $('selTableBody');
+  tbody.replaceChildren();
+
+  const totalPages = Math.max(1, Math.ceil(selTotal / selPageSize));
+  $('selPageInfo').textContent = `Sayfa ${selPage + 1} / ${totalPages} (Toplam ${selTotal} kanal)`;
+  $('selPrevPage').disabled = (selPage <= 0);
+  $('selNextPage').disabled = (selPage >= totalPages - 1);
+
+  if (!channels.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="3" style="text-align:center;padding:20px;color:#a0b1bc">Kanal bulunamadı.</td>';
+    tbody.append(tr);
+    return;
+  }
+
+  channels.forEach(ch => {
+    const tr = document.createElement('tr');
+
+    const tdCheck = document.createElement('td');
+    tdCheck.style.textAlign = 'center';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = ch.selected;
+    cb.style.width = '18px';
+    cb.style.height = '18px';
+    cb.style.cursor = 'pointer';
+    cb.onchange = async () => {
+      try {
+        await request('/command', {
+          action: 'set_channel_selection',
+          keys: [ch.key],
+          selected: cb.checked
+        });
+        ch.selected = cb.checked;
+      } catch(e) {
+        cb.checked = !cb.checked;
+        status(e.message);
+      }
+    };
+    tdCheck.append(cb);
+    tr.append(tdCheck);
+
+    const tdName = document.createElement('td');
+    tdName.textContent = ch.name;
+    tr.append(tdName);
+
+    const tdGroup = document.createElement('td');
+    tdGroup.textContent = ch.group || '—';
+    tdGroup.style.color = '#a0b1bc';
+    tr.append(tdGroup);
+
+    tbody.append(tr);
+  });
+}
+
+$('selPrevPage').onclick = () => { if (selPage > 0) { selPage--; loadSelectionPage(); } };
+$('selNextPage').onclick = () => { selPage++; loadSelectionPage(); };
+$('selSearch').oninput = () => {
+  clearTimeout(selSearchDebounce);
+  selSearchDebounce = setTimeout(() => { selPage = 0; loadSelectionPage(); }, 300);
+};
+$('selCategory').onchange = () => { selPage = 0; loadSelectionPage(); };
+$('selOnlySelected').onchange = () => { selPage = 0; loadSelectionPage(); };
+
+// Bulk selection on filtered channels
+$('selAllBtn').onclick = async () => {
+  if (!confirm('Filtrelenen tüm kanallar ana listeye eklensin mi?')) return;
+  try {
+    await request('/command', {
+      action: 'set_filtered_channel_selection',
+      sourceId: selSourceId,
+      category: $('selCategory').value,
+      query: $('selSearch').value.trim(),
+      selected: true
+    });
+    loadSelectionPage();
+  } catch(e) { status(e.message); }
+};
+
+$('selNoneBtn').onclick = async () => {
+  if (!confirm('Filtrelenen tüm kanallar ana listeden kaldırılsın mı?')) return;
+  try {
+    await request('/command', {
+      action: 'set_filtered_channel_selection',
+      sourceId: selSourceId,
+      category: $('selCategory').value,
+      query: $('selSearch').value.trim(),
+      selected: false
+    });
+    loadSelectionPage();
+  } catch(e) { status(e.message); }
+};
+
+// ==================== CHANNEL EDITOR TAB ====================
+async function loadEditorCategories() {
+  try {
+    const res = await request('/command', { action: 'editor_categories' });
+    const selCat = $('editorCategorySelect');
+    selCat.replaceChildren();
+    const optAll = document.createElement('option');
+    optAll.value = 'ALL';
+    optAll.textContent = 'Tüm Kategoriler';
+    selCat.append(optAll);
+    if (res.categories) {
+      res.categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        selCat.append(opt);
+      });
+    }
+  } catch(e) {}
+}
+
+async function loadEditorChannels() {
+  const q = $('editorSearch').value.trim();
+  const cat = $('editorCategorySelect').value;
+
+  try {
+    const res = await request('/command', {
+      action: 'editor_channels',
+      category: cat,
+      query: q,
+      filter: edFilter,
+      page: edPage
+    });
+    edTotal = res.total || 0;
+    renderEditorTable(res.channels || []);
+  } catch(e) { status(e.message); }
+}
+
+function renderEditorTable(channels) {
+  const tbody = $('editorTableBody');
+  tbody.replaceChildren();
+
+  const totalPages = Math.max(1, Math.ceil(edTotal / 100));
+  $('editorPageInfo').textContent = `Sayfa ${edPage + 1} / ${totalPages} (Toplam ${edTotal} kanal)`;
+  $('editorPrevPage').disabled = (edPage <= 0);
+  $('editorNextPage').disabled = (edPage >= totalPages - 1);
+
+  if (!channels.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="5" style="text-align:center;padding:24px;color:#a0b1bc">Kanal bulunamadı.</td>';
+    tbody.append(tr);
+    return;
+  }
+
+  channels.forEach(ch => {
+    const tr = document.createElement('tr');
+
+    // Number edit
+    const tdNum = document.createElement('td');
+    const numInput = document.createElement('input');
+    numInput.type = 'number';
+    numInput.className = 'table-input num-input';
+    numInput.value = ch.customNumber > 0 ? ch.customNumber : ch.number;
+    numInput.title = 'Numarayı değiştirmek için düzenleyin';
+    numInput.onchange = async () => {
+      const val = parseInt(numInput.value, 10);
+      if (val > 0) {
+        try {
+          await request('/command', { action: 'editor_update_channel', key: ch.key, customNumber: val });
+        } catch(e) { status(e.message); }
+      }
+    };
+    tdNum.append(numInput);
+    tr.append(tdNum);
+
+    // Name edit
+    const tdName = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'table-input';
+    nameInput.value = ch.customName || ch.name;
+    nameInput.title = 'Kanal adını düzenleyin';
+    nameInput.onchange = async () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        try {
+          await request('/command', { action: 'editor_update_channel', key: ch.key, customName: val });
+        } catch(e) { status(e.message); }
+      }
+    };
+    tdName.append(nameInput);
+    tr.append(tdName);
+
+    // Category
+    const tdCat = document.createElement('td');
+    tdCat.textContent = ch.group || '—';
+    tdCat.style.color = '#a0b1bc';
+    tr.append(tdCat);
+
+    // Source badge
+    const tdSource = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'badge badge-type';
+    badge.textContent = ch.source;
+    tdSource.append(badge);
+    tr.append(tdSource);
+
+    // Actions
+    const tdActions = document.createElement('td');
+    tdActions.style.textAlign = 'center';
+    const actWrap = document.createElement('div');
+    actWrap.style.display = 'inline-flex';
+    actWrap.style.gap = '6px';
+
+    // Favorite toggle
+    const favBtn = document.createElement('button');
+    favBtn.className = 'btn-icon' + (ch.favorite ? ' active-star' : '');
+    favBtn.textContent = '⭐';
+    favBtn.title = ch.favorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle';
+    favBtn.onclick = async () => {
+      const next = !ch.favorite;
+      try {
+        await request('/command', { action: 'editor_update_channel', key: ch.key, favorite: next });
+        ch.favorite = next;
+        favBtn.classList.toggle('active-star', next);
+      } catch(e) { status(e.message); }
+    };
+    actWrap.append(favBtn);
+
+    // Hidden toggle
+    const hideBtn = document.createElement('button');
+    hideBtn.className = 'btn-icon' + (ch.hidden ? ' active-eye' : '');
+    hideBtn.textContent = ch.hidden ? '🙈' : '👁️';
+    hideBtn.title = ch.hidden ? 'Gizlemeyi Kaldır' : 'Kanalı Gizle';
+    hideBtn.onclick = async () => {
+      const next = !ch.hidden;
+      try {
+        await request('/command', { action: 'editor_update_channel', key: ch.key, hidden: next });
+        ch.hidden = next;
+        hideBtn.textContent = next ? '🙈' : '👁️';
+        hideBtn.classList.toggle('active-eye', next);
+      } catch(e) { status(e.message); }
+    };
+    actWrap.append(hideBtn);
+
+    // Locked toggle
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'btn-icon' + (ch.locked ? ' active-lock' : '');
+    lockBtn.textContent = ch.locked ? '🔒' : '🔓';
+    lockBtn.title = ch.locked ? 'Ebeveyn Kilidini Aç' : 'Ebeveyn Kilidi Koy';
+    lockBtn.onclick = async () => {
+      const next = !ch.locked;
+      try {
+        await request('/command', { action: 'editor_update_channel', key: ch.key, locked: next });
+        ch.locked = next;
+        lockBtn.textContent = next ? '🔒' : '🔓';
+        lockBtn.classList.toggle('active-lock', next);
+      } catch(e) { status(e.message); }
+    };
+    actWrap.append(lockBtn);
+
+    // Remove from main list if IPTV
+    if (ch.isIptv) {
+      const remBtn = document.createElement('button');
+      remBtn.className = 'btn-icon btn-delete';
+      remBtn.textContent = '✕';
+      remBtn.title = 'Ana Listeden Çıkar';
+      remBtn.onclick = async () => {
+        if (!confirm(`'${ch.name}' ana kanal listesinden çıkarılsın mı?`)) return;
+        try {
+          await request('/command', { action: 'editor_update_channel', key: ch.key, removeFromMain: true });
+          tr.remove();
+        } catch(e) { status(e.message); }
+      };
+      actWrap.append(remBtn);
+    }
+
+    tdActions.append(actWrap);
+    tr.append(tdActions);
+
+    tbody.append(tr);
+  });
+}
+
+$('editorPrevPage').onclick = () => { if (edPage > 0) { edPage--; loadEditorChannels(); } };
+$('editorNextPage').onclick = () => { edPage++; loadEditorChannels(); };
+$('editorSearch').oninput = () => {
+  clearTimeout(edDebounce);
+  edDebounce = setTimeout(() => { edPage = 0; loadEditorChannels(); }, 300);
+};
+$('editorCategorySelect').onchange = () => { edPage = 0; loadEditorChannels(); };
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    edFilter = btn.dataset.filter;
+    edPage = 0;
+    loadEditorChannels();
+  };
+});
+</script></body></html>

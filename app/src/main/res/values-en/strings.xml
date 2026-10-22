@@ -806,4 +806,13 @@
     <string name="iptv_source_bulk_import_complete">%1$d IPTV lists added successfully.</string>
     <string name="github_bulk_title">GitHub Bulk Lists</string>
     <string name="github_guide_note">Scans the package manifest from the user\'s \'gunestv\' repository.</string>
+    <string name="enable_iptv_source">Enable Source</string>
+    <string name="disable_iptv_source">Disable Source</string>
+    <string name="iptv_source_disabled">Disabled</string>
+    <string name="iptv_source_enabled">Enabled</string>
+    <string name="web_tab_sources">IPTV Sources</string>
+    <string name="web_tab_channel_editor">Channel Editor</string>
+    <string name="web_select_channels_title">Channel Selection</string>
+    <string name="web_select_channels">Select Channels</string>
+    <string name="web_channel_editor_title">Channel List Editor</string>
 </resources>
