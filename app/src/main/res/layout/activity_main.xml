@@ -1060,8 +1060,12 @@
                 android:id="@+id/vod_player_clock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary"
-                android:textSize="16sp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_vod_button"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="6dp"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 

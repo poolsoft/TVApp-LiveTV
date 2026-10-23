@@ -2,8 +2,9 @@
 
 ## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 
-- **Bağımsız Sinematik VOD Player Barı:** VOD (film/dizi) oynatılırken canlı TV infobarı yerine Netflix tarzı modern, şık ve sinematik degrade arkaplana sahip bağımsız bir OSD (`vod_player_overlay`) geliştirildi.
-- **Sol Üstte Geri Butonu & Başlık:** Ekranın sol üst köşesine kumandayla doğrudan odaklanılabilen `[← VOD Listesi]` geri butonu, film başlığı ve liste adı eklendi; sağ üst köşeye ise anlık saat yerleştirildi.
+- **Bağımsız Sinematik VOD Player Barı:** VOD (film/dizi) oynatılırken canlı TV infobarı tamamen devre dışı bırakıldı. Netflix tarzı modern, şık ve sinematik degrade arkaplana sahip bağımsız bir OSD (`vod_player_overlay`) geliştirildi.
+- **Tam OSD İzolasyonu ve Çakışma Önleme:** Canlı TV infobarı ve kontrolleri VOD modunda kesin olarak gizlenerek çift bar binmesi sorunu giderildi; kumanda tuş bırakma (`ACTION_UP`) olayları izole edilerek canlı TV menülerine sızıntı önlendi.
+- **Sol Üstte Geri Butonu & Başlık:** Ekranın sol üst köşesine kumandayla doğrudan odaklanılabilen `[← VOD Listesi]` geri butonu, film başlığı ve liste adı eklendi; sağ üst köşeye ise şık yarı saydam hap rozet içinde anlık saat yerleştirildi.
 - **Kumanda Odaklı Kontrol Çubuğu:** Ekranın alt kısmına geçen/kalan süreyi gösteren ince zaman çizelgesi (timeline) ile birlikte kumanda ile kolayca yönetilebilen `-10s`, `Oynat / Duraklat`, `+10s`, `Hız (0.5x - 2.0x)`, `Ses / Altyazı` ve `Baştan Başlat` butonları eklendi.
 - **Sezgisel D-Pad Gezinimi:** Kumandada D-Pad Yukarı tuşuna basıldığında odak doğrudan sol üstteki `[← VOD Listesi]` butonuna geçer; D-Pad Aşağı tuşuna basıldığında alt kontrollere geri döner. Geri butonuna basıldığında veya film ekranındayken kumandadan `BACK` basıldığında izleme süresi kaydedilerek anında VOD kütüphanesine dönülür.
 - **Tek Tıkla Ses ve Altyazı:** VOD kontrol çubuğu üzerindeki `Ses / Altyazı` butonuyla harici menülere girmeden film ses parçaları ve altyazıları anında seçilebilir.

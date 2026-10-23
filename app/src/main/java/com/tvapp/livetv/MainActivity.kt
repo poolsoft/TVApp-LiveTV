@@ -1957,6 +1957,12 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showInfoBar() {
+        if (isVodPlaybackActive()) {
+            setInfoBarVisible(false)
+            binding.infoBar.visibility = View.GONE
+            showVodPlayerControls()
+            return
+        }
         if (currentChannel?.source == LiveChannel.Source.IPTV) {
             showIptvPlaybackChrome(interactive = false)
         } else {
@@ -2137,6 +2143,12 @@ class MainActivity : TvRemoteActivity() {
         autoHide: Boolean = true,
         activateControls: Boolean = iptvControlsInteractive,
     ) {
+        if (isVodPlaybackActive()) {
+            setInfoBarVisible(false)
+            binding.infoBar.visibility = View.GONE
+            showVodPlayerControls(autoHide = autoHide)
+            return
+        }
         if (binding.channelPanel.visibility == View.VISIBLE || osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
             if (stateText != null && stateText != 0) {
                 showIptvNotice(stateText)
@@ -2270,11 +2282,20 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+    private var isShowingVodControls = false
+
     private fun showVodPlayerControls(autoHide: Boolean = true) {
-        setInfoBarVisible(false)
-        hideChannelPanel()
-        binding.iptvPlaybackContainer.visibility = View.GONE
-        binding.vodPlayerOverlay.visibility = View.VISIBLE
+        if (isShowingVodControls) return
+        isShowingVodControls = true
+        try {
+            setInfoBarVisible(false)
+            infoBarJob?.cancel()
+            binding.infoBar.visibility = View.GONE
+            if (binding.channelPanel.visibility == View.VISIBLE) {
+                binding.channelPanel.visibility = View.GONE
+            }
+            binding.iptvPlaybackContainer.visibility = View.GONE
+            binding.vodPlayerOverlay.visibility = View.VISIBLE
 
         updateVodPlayerControls()
         renderVodControlSelection()
@@ -2292,8 +2313,11 @@ class MainActivity : TvRemoteActivity() {
         vodControlsJob?.cancel()
         if (!autoHide) return
         vodControlsJob = lifecycleScope.launch {
-            delay(5_000L)
+            delay(8_000L)
             hideVodPlayerControls()
+        }
+        } finally {
+            isShowingVodControls = false
         }
     }
 
@@ -2453,6 +2477,10 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showsVodTimeline(): Boolean = vodMode || currentChannel?.isVodContent() == true ||
         (currentChannel?.iptvContentType.equals("LIVE", true).not() && currentIptvContentKind == IptvContentKind.VOD)
+
+    private fun isVodPlaybackActive(): Boolean =
+        (vodMode || currentIptvContentKind == IptvContentKind.VOD || showsVodTimeline() || currentChannel?.isVodContent() == true) &&
+            currentChannel?.source == LiveChannel.Source.IPTV
 
     private fun setIptvControlLabel(view: TextView, label: String, value: String) {
         val fullText = "$label  $value"
@@ -5377,6 +5405,12 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showInfoBarForChannel(channel: LiveChannel) {
+        if (channel.isVodContent() || vodMode) {
+            setInfoBarVisible(false)
+            binding.infoBar.visibility = View.GONE
+            showVodPlayerControls()
+            return
+        }
         updateInfobarChannel(channel)
         showInfoBar()
 
@@ -5766,9 +5800,10 @@ class MainActivity : TvRemoteActivity() {
         } else {
             View.GONE
         }
-        binding.infoBar.visibility = if (state.infoBarVisible) View.VISIBLE else View.GONE
+        val vodActive = isVodPlaybackActive()
+        binding.infoBar.visibility = if (state.infoBarVisible && !vodActive) View.VISIBLE else View.GONE
         binding.iptvPlaybackContainer.visibility = if (
-            state.infoBarVisible && state.iptvChromeVisible
+            state.infoBarVisible && state.iptvChromeVisible && !vodActive
         ) View.VISIBLE else View.GONE
         binding.recentChannelsPanel.visibility = if (
             state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
@@ -5901,7 +5936,9 @@ class MainActivity : TvRemoteActivity() {
         osdCoordinator.hideChannelPanel(keepInfoBar = currentChannel != null)
         binding.advancedFilterRow.visibility = View.GONE
         applyPanelGeometry()
-        currentChannel?.let { showInfoBar() }
+        if (!isVodPlaybackActive()) {
+            currentChannel?.let { showInfoBar() }
+        }
     }
 
     private fun scheduleChannelPanelClose() {
@@ -6468,11 +6505,24 @@ class MainActivity : TvRemoteActivity() {
                     "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",
             )
         }
-        val isVodActive = (vodMode || currentIptvContentKind == IptvContentKind.VOD || showsVodTimeline()) &&
-            currentChannel?.source == LiveChannel.Source.IPTV
+        val isVodActive = isVodPlaybackActive()
 
         if (isVodActive) {
             val isVodOverlayVisible = binding.vodPlayerOverlay.visibility == View.VISIBLE
+            if (event.action == KeyEvent.ACTION_UP) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_BACK,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    KeyEvent.KEYCODE_MEDIA_PLAY,
+                    KeyEvent.KEYCODE_MEDIA_PAUSE -> return true
+                }
+            }
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (!isVodOverlayVisible) {
                     when (event.keyCode) {
@@ -6555,8 +6605,11 @@ class MainActivity : TvRemoteActivity() {
                         }
                         KeyEvent.KEYCODE_DPAD_CENTER,
                         KeyEvent.KEYCODE_ENTER -> {
+                            val wasBack = selectedVodTarget == VodControlTarget.BACK
                             activateSelectedVodTarget()
-                            showVodPlayerControls()
+                            if (!wasBack) {
+                                showVodPlayerControls()
+                            }
                             return true
                         }
                     }
