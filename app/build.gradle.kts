@@ -24,6 +24,15 @@ val releaseStorePassword = System.getenv("TVAPP_STORE_PASSWORD")
     ?: localSigningProperties.getProperty("storePassword")
 val updateManifestUrl = System.getenv("TVAPP_UPDATE_MANIFEST_URL")
     ?: "https://github.com/poolsoft/TVApp-LiveTV/releases/latest/download/version.json"
+val tmdbApiKey = run {
+    val env = rootProject.file(".env")
+    if (env.exists()) {
+        val line = env.readLines().firstOrNull { it.startsWith("TMDB_API=") || it.startsWith("TMDB_API_KEY=") }
+        line?.substringAfter("=")?.trim()?.trim('"', '\'') ?: ""
+    } else {
+        ""
+    }
+}
 val targetAbis = providers.gradleProperty("tvappTargetAbis").orNull
     ?.split(',')
     ?.map(String::trim)
@@ -40,6 +49,7 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "0.1.$buildNumber"
+        buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += targetAbis

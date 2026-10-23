@@ -19,8 +19,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         XmlTvSourceEntity::class,
         XtreamEpgProgramEntity::class,
         VodMetadataEntity::class,
+        VodTmdbEntity::class,
     ],
-    version = 31,
+    version = 32,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -29,6 +30,7 @@ abstract class TVAppDatabase : RoomDatabase() {
     abstract fun xmlTvDao(): XmlTvDao
     abstract fun xtreamEpgDao(): XtreamEpgDao
     abstract fun vodDao(): VodDao
+    abstract fun vodTmdbDao(): VodTmdbDao
 
     companion object {
         @Volatile
@@ -71,11 +73,33 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_28_29,
                 MIGRATION_29_30,
                 MIGRATION_30_31,
+                MIGRATION_31_32,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_31_32 = object : Migration(31, 32) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `vod_tmdb_cache` (" +
+                        "`sourceKey` TEXT NOT NULL, " +
+                        "`tmdbId` INTEGER NOT NULL, " +
+                        "`title` TEXT NOT NULL, " +
+                        "`originalTitle` TEXT, " +
+                        "`overview` TEXT, " +
+                        "`posterUrl` TEXT, " +
+                        "`backdropUrl` TEXT, " +
+                        "`rating` REAL NOT NULL, " +
+                        "`releaseYear` TEXT, " +
+                        "`genres` TEXT, " +
+                        "`updatedAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`sourceKey`)" +
+                        ")"
+                )
+            }
         }
 
         internal val MIGRATION_30_31 = object : Migration(30, 31) {

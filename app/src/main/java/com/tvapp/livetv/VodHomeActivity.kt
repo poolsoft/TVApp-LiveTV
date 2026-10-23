@@ -2,681 +2,409 @@ package com.tvapp.livetv
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
-import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.data.IptvSourceSummary
 import com.tvapp.livetv.data.VodFilter
 import com.tvapp.livetv.data.VodRepository
+import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.VodCatalogItem
+import com.tvapp.livetv.data.local.VodTmdbEntity
 import com.tvapp.livetv.databinding.ActivityVodHomeBinding
-import com.tvapp.livetv.databinding.DialogVodDetailBinding
-import com.tvapp.livetv.databinding.DialogVodFiltersBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
-import com.tvapp.livetv.image.ChannelLogoLoader
-import com.tvapp.livetv.platform.DeviceCapabilitiesSession
-import com.tvapp.livetv.playback.IptvResumeEntry
 import com.tvapp.livetv.playback.IptvResumeStore
 import com.tvapp.livetv.playback.PlaybackHistoryStore
-import com.tvapp.livetv.ui.VodCard
-import com.tvapp.livetv.ui.VodHomeAdapter
-import com.tvapp.livetv.ui.TvUiMetrics
+import com.tvapp.livetv.vod.CleanedVodTitle
+import com.tvapp.livetv.vod.TmdbApiClient
+import com.tvapp.livetv.vod.VodCategoryAdapter
+import com.tvapp.livetv.vod.VodCategoryItem
+import com.tvapp.livetv.vod.VodDisplayItem
+import com.tvapp.livetv.vod.VodPosterAdapter
+import com.tvapp.livetv.vod.VodSourceAdapter
+import com.tvapp.livetv.vod.VodTitleCleaner
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** VOD catalog stays separate from live playback and holds one bounded page. */
+/** Modern 3-column cinematic VOD dashboard with TMDB metadata enrichment. */
 class VodHomeActivity : TvRemoteActivity() {
     private lateinit var binding: ActivityVodHomeBinding
     private lateinit var repository: VodRepository
     private lateinit var iptv: IptvRepository
     private lateinit var debugLog: CrashReportStore
     private lateinit var history: PlaybackHistoryStore
-    private lateinit var legacyHistory: PlaybackHistoryStore
     private lateinit var resumeStore: IptvResumeStore
-    private lateinit var gridAdapter: VodHomeAdapter
-    private lateinit var continueAdapter: VodHomeAdapter
+    private lateinit var database: TVAppDatabase
+
+    private lateinit var popularAdapter: VodPosterAdapter
+    private lateinit var recentAdapter: VodPosterAdapter
+    private lateinit var sourceAdapter: VodSourceAdapter
+    private lateinit var categoryAdapter: VodCategoryAdapter
+
     private val preferences by lazy { getSharedPreferences("vod-library", MODE_PRIVATE) }
     private var sources: List<IptvSourceSummary> = emptyList()
     private var sourceId = -1L
     private var filter = VodFilter()
-    private var pageIndex = 0
-    private var total = 0
-    private var focusedKey: String? = null
-    private var focusedPosition = 0
-    private var parentTitle: String? = null
-    private var lastItem: VodCatalogItem? = null
-    private var loadGeneration = 0
+    private var currentHeroItem: VodDisplayItem? = null
+
     private var loadJob: Job? = null
-    private var detailJob: Job? = null
-    private var dialog: AlertDialog? = null
-    private var loading = false
-    private var initialized = false
-    private var pendingFocus = false
-    private var categories: List<String?> = emptyList()
-    private var categoryJob: Job? = null
-    private var categorySource = -1L
-    private var categorySection = ""
+    private var tmdbJob: Job? = null
+    private val clockHandler = Handler(Looper.getMainLooper())
+    private val clockRunnable = object : Runnable {
+        override fun run() {
+            updateClock()
+            clockHandler.postDelayed(this, 10000)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
-            WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        window.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        )
         binding = ActivityVodHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
         repository = VodRepository(this)
         iptv = IptvRepository(this)
         debugLog = CrashReportStore(this)
         history = PlaybackHistoryStore(this, "vod-playback-history")
-        legacyHistory = PlaybackHistoryStore(this)
         resumeStore = IptvResumeStore(this)
+        database = TVAppDatabase.getInstance(this)
         sourceId = preferences.getLong("source", -1L)
-        gridAdapter = VodHomeAdapter(::showDetail, ::showItemActions, { card, position ->
-            focusedKey = card.item.sourceKey
-            focusedPosition = position
-            saveFilters()
-        })
-        continueAdapter = VodHomeAdapter(::showDetail, ::showItemActions, { _, _ -> }, compact = true)
-        binding.vodGrid.layoutManager = GridLayoutManager(this,
-            (resources.configuration.screenWidthDp * .76f / 180).toInt().coerceIn(1, 5))
-        binding.vodGrid.adapter = gridAdapter
-        binding.continueWatchingRow.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
-        binding.continueWatchingRow.adapter = continueAdapter
-        binding.vodLiveAction.setOnClickListener { openLiveTv() }
-        binding.vodResumeAction.setOnClickListener { resumeLast() }
-        binding.vodContinueAction.setOnClickListener { showContinue() }
-        binding.vodSourceAction.setOnClickListener { showSources() }
-        binding.vodListAction.setOnClickListener { showSources() }
-        binding.vodFilterAction.setOnClickListener { showFilters() }
-        binding.vodSearchAction.setOnClickListener { showFilters() }
-        val colorSize = (TvUiMetrics.COLOR_KEY_DP * resources.displayMetrics.density).toInt()
-        listOf(binding.vodLiveAction, binding.vodContinueAction, binding.vodSourceAction, binding.vodFilterAction,
-            binding.vodListAction, binding.vodSearchAction).forEach { action ->
-            action.compoundDrawablesRelative[0]?.let { marker ->
-                marker.setBounds(0, 0, colorSize, colorSize)
-                action.setCompoundDrawablesRelative(marker, null, null, null)
+
+        setupRecyclerViews()
+        setupSidebarActions()
+        updateClock()
+        loadData()
+        binding.vodNavHome.requestFocus()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        clockHandler.post(clockRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        clockHandler.removeCallbacks(clockRunnable)
+    }
+
+    private fun updateClock() {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        binding.vodClock.text = timeFormat.format(Date())
+    }
+
+    private fun setupRecyclerViews() {
+        // Popüler Filmler Rayı
+        popularAdapter = VodPosterAdapter(
+            onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
+            onItemFocused = { displayItem -> updateHeroBanner(displayItem) },
+        )
+        binding.vodRecyclerPopular.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+        binding.vodRecyclerPopular.adapter = popularAdapter
+
+        // Son Eklenenler Rayı
+        recentAdapter = VodPosterAdapter(
+            onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
+            onItemFocused = { displayItem -> updateHeroBanner(displayItem) },
+        )
+        binding.vodRecyclerRecent.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+        binding.vodRecyclerRecent.adapter = recentAdapter
+
+        // Sağ Panel - Kaynaklar
+        sourceAdapter = VodSourceAdapter { sourceSummary ->
+            sourceId = sourceSummary.source.id
+            preferences.edit().putLong("source", sourceId).apply()
+            loadData()
+        }
+        binding.vodRecyclerSources.layoutManager = LinearLayoutManager(this)
+        binding.vodRecyclerSources.adapter = sourceAdapter
+
+        // Sağ Panel - Kategoriler
+        categoryAdapter = VodCategoryAdapter { catItem ->
+            filter = if (filter.category == catItem.name) {
+                filter.copy(category = null)
+            } else {
+                filter.copy(category = catItem.name)
+            }
+            loadData()
+        }
+        binding.vodRecyclerCategories.layoutManager = LinearLayoutManager(this)
+        binding.vodRecyclerCategories.adapter = categoryAdapter
+    }
+
+    private fun setupSidebarActions() {
+        binding.vodNavHome.setOnClickListener {
+            filter = VodFilter()
+            loadData()
+        }
+        binding.vodNavLive.setOnClickListener { openLiveTv() }
+        binding.vodNavMovies.setOnClickListener {
+            filter = filter.copy(section = "MOVIES")
+            loadData()
+        }
+        binding.vodNavSeries.setOnClickListener {
+            filter = filter.copy(section = "SERIES")
+            loadData()
+        }
+        binding.vodNavContinue.setOnClickListener {
+            filter = filter.copy(view = "CONTINUE")
+            loadData()
+        }
+        binding.vodNavFilter.setOnClickListener {
+            showSearchDialog()
+        }
+        binding.vodSearchBox.setOnClickListener {
+            showSearchDialog()
+        }
+
+        binding.vodHeroBtnPlay.setOnClickListener {
+            currentHeroItem?.let { playItem(it.catalogItem) }
+        }
+        binding.vodHeroBtnDetails.setOnClickListener {
+            currentHeroItem?.let { item ->
+                showHeroDetailsDialog(item)
             }
         }
-        binding.vodCategories.setOnItemClickListener { _, _, position, _ -> selectCategory(position) }
-        binding.vodMovies.setOnClickListener { selectSection("MOVIE") }
-        binding.vodSeries.setOnClickListener { selectSection("SERIES") }
-        binding.vodPrevious.setOnClickListener { changePage(-1) }
-        binding.vodNext.setOnClickListener { changePage(1) }
-        binding.vodEmpty.setOnClickListener { if (sources.isEmpty()) showSources() else loadPage(refreshSeries = true) }
-        binding.root.post { binding.vodMovies.requestFocus() }
     }
 
-    override fun onStart() {
-        super.onStart()
-        ChannelLogoLoader.configure(this, DeviceCapabilitiesSession.get(this))
-        loadSources()
+    private fun updateHeroBanner(displayItem: VodDisplayItem) {
+        currentHeroItem = displayItem
+        val cleaned = if (displayItem.tmdb == null) VodTitleCleaner.clean(displayItem.catalogItem.name) else null
+        val title = displayItem.tmdb?.title ?: cleaned?.cleanTitle ?: displayItem.catalogItem.name
+        binding.vodHeroTitle.text = title
+
+        val rating = displayItem.tmdb?.rating ?: 0.0
+        if (rating > 0.0) {
+            binding.vodHeroRating.visibility = View.VISIBLE
+            binding.vodHeroRating.text = "★ $rating"
+        } else {
+            binding.vodHeroRating.visibility = View.GONE
+        }
+
+        binding.vodHeroYear.text = displayItem.tmdb?.releaseYear ?: cleaned?.year ?: ""
+
+        val genres = displayItem.tmdb?.genres
+        if (!genres.isNullOrBlank()) {
+            binding.vodHeroGenres.visibility = View.VISIBLE
+            binding.vodHeroGenres.text = genres
+        } else {
+            binding.vodHeroGenres.visibility = View.GONE
+        }
+
+        val overview = displayItem.tmdb?.overview ?: displayItem.catalogItem.description
+        binding.vodHeroOverview.text = if (!overview.isNullOrBlank()) overview else "Özet bilgisi bulunmuyor."
+
+        val posterUrl = displayItem.tmdb?.posterUrl ?: displayItem.catalogItem.logoUrl
+        binding.vodHeroPoster.load(posterUrl) {
+            crossfade(true)
+            placeholder(R.drawable.bg_vod_poster_card)
+            error(R.drawable.bg_vod_poster_card)
+        }
+
+        val backdropUrl = displayItem.tmdb?.backdropUrl ?: posterUrl
+        binding.vodHeroBackdrop.load(backdropUrl) {
+            crossfade(true)
+        }
     }
 
-    private fun loadSources() {
+    private fun loadData() {
         loadJob?.cancel()
-        val generation = ++loadGeneration
-        setLoading(true)
         loadJob = lifecycleScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { iptv.sources().filter { it.source.enabled } }
-                if (generation != loadGeneration) return@launch
-                sources = result
-                val selected = sources.firstOrNull { it.source.id == sourceId } ?: sources.lastOrNull()
-                if (selected == null) {
-                    sourceId = -1
-                    setLoading(false)
-                    gridAdapter.submitList(emptyList())
-                    showEmpty(R.string.vod_no_sources, retry = true)
-                    updateHeader()
-                    return@launch
+                // 1. Kaynakları yükle
+                sources = withContext(Dispatchers.IO) { iptv.sources() }
+                if (sourceId <= 0L && sources.isNotEmpty()) {
+                    sourceId = sources.first().source.id
                 }
-                if (!initialized || selected.source.id != sourceId) {
-                    sourceId = selected.source.id
-                    restoreFilters()
-                    initialized = true
+
+                val activeSource = sources.find { it.source.id == sourceId }
+                binding.vodBottomActiveSource.text = activeSource?.source?.name ?: "IPTV"
+
+                sourceAdapter.submitList(sources, sourceId)
+
+                // 2. Kategorileri yükle
+                val catStrings = withContext(Dispatchers.IO) {
+                    repository.categories(sourceId, filter.section)
                 }
-                loadPage(restoreFocus = true)
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { showFailure(error) }
-        }
-    }
-
-    private fun restoreFilters() {
-        val prefix = "$sourceId:"
-        filter = VodFilter(category = preferences.getString(prefix + "category", null),
-            query = preferences.getString(prefix + "query", "").orEmpty(),
-            section = preferences.getString(prefix + "section", "MOVIE").orEmpty().takeIf { it in listOf("MOVIE", "SERIES") } ?: "MOVIE",
-            view = preferences.getString(prefix + "view", "ALL").orEmpty().takeIf { it in VIEWS } ?: "ALL",
-            order = preferences.getString(prefix + "order", "SOURCE").orEmpty().takeIf { it in listOf("SOURCE", "NAME") } ?: "SOURCE",
-            parentKey = preferences.getString(prefix + "parent", null),
-            season = preferences.getInt(prefix + "season", -1).takeIf { it >= 0 },
-            searchWholeSource = preferences.getBoolean(prefix + "search-whole-source", false))
-        pageIndex = preferences.getInt(prefix + "page", 0).coerceAtLeast(0)
-        focusedKey = preferences.getString(prefix + "focus", null)
-        focusedPosition = preferences.getInt(prefix + "position", 0).coerceIn(0, PAGE_SIZE - 1)
-    }
-
-    private fun saveFilters() {
-        if (sourceId < 0) return
-        val prefix = "$sourceId:"
-        preferences.edit().putLong("source", sourceId)
-            .putString(prefix + "category", filter.category).putString(prefix + "query", filter.query)
-            .putString(prefix + "section", filter.section).putString(prefix + "view", filter.view)
-            .putString(prefix + "order", filter.order).putString(prefix + "parent", filter.parentKey)
-            .putBoolean(prefix + "search-whole-source", filter.searchWholeSource)
-            .putInt(prefix + "season", filter.season ?: -1).putInt(prefix + "page", pageIndex)
-            .putString(prefix + "focus", focusedKey).putInt(prefix + "position", focusedPosition).apply()
-    }
-
-    private fun keysFor(view: String): List<String> = when (view) {
-        "CONTINUE" -> resumeStore.entries().map { it.sourceKey }.take(100)
-        "RECENT" -> (history.keys() + legacyHistory.keys()).distinct().take(100)
-        else -> emptyList()
-    }
-
-    private fun loadPage(restoreFocus: Boolean = false, refreshSeries: Boolean = false) {
-        if (sourceId < 0) return
-        loadCategories()
-        loadJob?.cancel()
-        detailJob?.cancel()
-        val generation = ++loadGeneration
-        val source = sourceId
-        val snapshot = filter
-        val requestedPage = pageIndex
-        val resumes = resumeStore.entries().associateBy(IptvResumeEntry::sourceKey)
-        val keys = keysFor(snapshot.view)
-        pendingFocus = restoreFocus
-        setLoading(true)
-        binding.vodEmpty.visibility = View.GONE
-        updateHeader()
-        loadJob = lifecycleScope.launch {
-            try {
-                var cacheFailure: Exception? = null
-                val result = withContext(Dispatchers.IO) {
-                    if (snapshot.section == "SERIES" && snapshot.parentKey == null) {
-                        try { repository.refreshSeries(source, force = refreshSeries) }
-                        catch (cancelled: CancellationException) { throw cancelled }
-                        catch (error: Exception) { cacheFailure = error }
-                    }
-                    val continueRows = repository.continueItems(source, "ALL", resumes.keys.toList())
-                    val effectiveKeys = if (snapshot.view == "CONTINUE" && snapshot.parentKey == null)
-                        continueRows.map { it.sourceKey } else keys
-                    val count = repository.count(source, snapshot, effectiveKeys)
-                    val actualPage = requestedPage.coerceAtMost(((count - 1).coerceAtLeast(0)) / PAGE_SIZE)
-                    val rows = repository.page(source, snapshot, effectiveKeys, actualPage)
-                    val last = lastVodKey()?.let { repository.item(it) }
-                    val parent = snapshot.parentKey?.let { repository.item(it) }
-                    PageResult(rows, count, actualPage, continueRows.take(8), last, parent?.name)
+                val catItems = catStrings.filterNotNull().map {
+                    VodCategoryItem(name = it, count = 0)
                 }
-                if (generation != loadGeneration) return@launch
-                total = result.count
-                pageIndex = result.page
-                parentTitle = result.parentTitle
-                lastItem = result.last
-                updateLast(resumes)
-                continueAdapter.submitList(result.continueRows.map { VodCard(it, resumes[it.sourceKey]) })
-                val showContinue = result.continueRows.isNotEmpty() && snapshot.parentKey == null &&
-                    snapshot.view == "ALL"
-                if (showContinue) binding.vodLastRow.visibility = View.GONE
-                binding.continueWatchingRow.visibility = if (showContinue) View.VISIBLE else View.GONE
-                binding.continueWatchingLabel.visibility = binding.continueWatchingRow.visibility
-                gridAdapter.submitList(result.rows.map { VodCard(it, resumes[it.sourceKey]) }) {
-                    if (generation == loadGeneration) {
-                        setLoading(false)
-                        if (result.rows.isEmpty()) showEmpty(if (cacheFailure != null) R.string.vod_load_failed else R.string.vod_empty,
-                            retry = cacheFailure != null)
-                        updateHeader()
-                        restoreGridFocus()
-                    }
+                categoryAdapter.submitList(catItems, filter.category)
+
+                // 3. İçerikleri yükle (Popüler ve Son Eklenenler)
+                val popularPage = withContext(Dispatchers.IO) {
+                    repository.page(sourceId, filter.copy(order = "SOURCE"), keys = emptyList(), page = 0)
                 }
-                cacheFailure?.let { debugLog.recordDebug("VOD_SERIES_CACHE_FAILED | ${it.javaClass.simpleName}") }
-                saveFilters()
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { if (generation == loadGeneration) showFailure(error) }
-        }
-    }
-
-    private data class PageResult(val rows: List<VodCatalogItem>, val count: Int, val page: Int,
-        val continueRows: List<VodCatalogItem>, val last: VodCatalogItem?, val parentTitle: String?)
-
-    private fun setLoading(value: Boolean) {
-        loading = value
-        binding.vodLoading.visibility = if (value) View.VISIBLE else View.GONE
-        binding.vodPrevious.isEnabled = !value && pageIndex > 0
-        binding.vodNext.isEnabled = !value && (pageIndex + 1) * PAGE_SIZE < total
-    }
-
-    private fun showEmpty(message: Int, retry: Boolean = false) {
-        binding.vodEmpty.setText(message)
-        binding.vodEmpty.isFocusable = retry
-        binding.vodEmpty.isClickable = retry
-        binding.vodEmpty.visibility = View.VISIBLE
-    }
-
-    private fun showFailure(error: Exception) {
-        setLoading(false)
-        showEmpty(R.string.vod_load_failed, retry = true)
-        debugLog.recordDebug("VOD_CATALOG_FAILED | ${error.javaClass.simpleName}")
-    }
-
-    private fun updateHeader() {
-        binding.vodSourceAction.text = sources.firstOrNull { it.source.id == sourceId }?.source?.name
-            ?: getString(R.string.iptv_library_sources)
-        binding.vodMovies.isSelected = filter.section == "MOVIE" && filter.view == "ALL"
-        binding.vodSeries.isSelected = filter.section == "SERIES" && filter.view == "ALL"
-        binding.vodContinueAction.isSelected = filter.view == "CONTINUE"
-        binding.vodSummary.text = listOfNotNull(parentTitle?.let { getString(R.string.vod_season_title, it, filter.season ?: 0) },
-            filter.category, viewLabel(filter.view), filter.query.takeIf(String::isNotBlank),
-            getString(R.string.vod_count, total)).joinToString(" · ")
-        binding.vodPage.text = getString(R.string.vod_page_count, pageIndex + 1,
-            ((total + PAGE_SIZE - 1) / PAGE_SIZE).coerceAtLeast(1))
-    }
-
-    private fun updateLast(resumes: Map<String, IptvResumeEntry>) {
-        val last = lastItem
-        binding.vodLastRow.visibility = if (last == null) View.GONE else View.VISIBLE
-        binding.vodContinueAction.isEnabled = sourceId >= 0
-        if (last == null) return
-        binding.vodLastName.text = last.name
-        val resume = resumes[last.sourceKey]
-        binding.vodLastPosition.text = resume?.let { getString(R.string.vod_saved_position, VodHomeAdapter.formatDuration(it.positionMillis)) }
-            ?: getString(R.string.vod_recent)
-        binding.vodResumeAction.setText(if (resume != null) R.string.vod_continue_item else R.string.vod_return_item)
-        binding.vodResumeAction.contentDescription = getString(R.string.vod_continue_named, last.name)
-        ChannelLogoLoader.load(binding.vodLastImage, last.logoUrl, R.drawable.ic_vod)
-    }
-
-    private fun restoreGridFocus() {
-        if (!pendingFocus || gridAdapter.itemCount == 0 || dialog?.isShowing == true) return
-        pendingFocus = false
-        val position = gridAdapter.currentList.indexOfFirst { it.item.sourceKey == focusedKey }
-            .takeIf { it >= 0 } ?: focusedPosition.coerceAtMost(gridAdapter.itemCount - 1)
-        binding.vodGrid.scrollToPosition(position)
-        binding.vodGrid.doOnLayout {
-            binding.vodGrid.findViewHolderForAdapterPosition(position)?.itemView?.requestFocus()
-        }
-    }
-
-    private fun changePage(delta: Int) {
-        if (loading || total == 0) return
-        val target = (pageIndex + delta).coerceIn(0, (total - 1) / PAGE_SIZE)
-        if (target == pageIndex) return
-        pageIndex = target
-        focusedKey = null
-        focusedPosition = if (delta > 0) 0 else PAGE_SIZE - 1
-        loadPage(restoreFocus = true)
-    }
-
-    private fun changeFilter(value: VodFilter) {
-        filter = value
-        pageIndex = 0
-        focusedKey = null
-        focusedPosition = 0
-        parentTitle = null
-        saveFilters()
-        loadPage(restoreFocus = true)
-    }
-
-    private fun selectSection(section: String) {
-        if (filter.section == section && filter.parentKey == null && filter.view == "ALL") { focusCatalog(); return }
-        changeFilter(filter.copy(section = section, category = null, parentKey = null, season = null, view = "ALL", query = ""))
-    }
-
-    private fun showContinue() = changeFilter(filter.copy(view = "CONTINUE", category = null,
-        parentKey = null, season = null, query = ""))
-
-    private fun showSources() {
-        if (sources.isEmpty()) {
-            showDialog(AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog).setTitle(R.string.iptv_library_sources)
-                .setMessage(R.string.vod_no_sources).setPositiveButton(R.string.manage_iptv_sources) { _, _ ->
-                    startActivity(Intent(this, IptvSourcesActivity::class.java))
-                }.setNegativeButton(R.string.close, null).create())
-            return
-        }
-        showDialog(AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog).setTitle(R.string.iptv_library_sources)
-            .setSingleChoiceItems(sources.map { it.source.name }.toTypedArray(), sources.indexOfFirst { it.source.id == sourceId }) { d, i ->
-                d.dismiss()
-                saveFilters()
-                sourceId = sources[i].source.id
-                restoreFilters()
-                loadPage(restoreFocus = true)
-            }.setNegativeButton(R.string.close, null).create())
-    }
-
-    private fun loadCategories() {
-        if (categorySource == sourceId && categorySection == filter.section) return
-        val source = sourceId
-        val section = filter.section
-        categoryJob?.cancel()
-        categoryJob = lifecycleScope.launch {
-            try {
-                val names = withContext(Dispatchers.IO) { repository.categories(source, section) }
-                if (source != sourceId || section != filter.section) return@launch
-                categorySource = source; categorySection = section
-                categories = listOf(null) + names
-                binding.vodCategories.adapter = object : android.widget.ArrayAdapter<String>(this@VodHomeActivity,
-                    android.R.layout.simple_list_item_activated_1, listOf(getString(R.string.vod_all_categories)) + names) {
-                    override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
-                        (super.getView(position, convertView, parent) as android.widget.TextView).apply {
-                            setTextColor(getColor(if (categories[position] == this@VodHomeActivity.filter.category) R.color.accent else R.color.text_primary))
-                            textSize = 13f; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
-                            minHeight = (40 * resources.displayMetrics.density).toInt()
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        }
+                val recentPage = withContext(Dispatchers.IO) {
+                    repository.page(sourceId, filter.copy(order = "NAME"), keys = emptyList(), page = 0)
                 }
-                binding.vodCategories.setItemChecked(categories.indexOf(filter.category).coerceAtLeast(0), true)
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { debugLog.recordDebug("VOD_CATEGORIES_FAILED | ${error.javaClass.simpleName}") }
+
+                // 4. TMDB önbelleğini sorgula
+                val allKeys = (popularPage + recentPage).map { it.sourceKey }.distinct()
+                val cachedTmdb = withContext(Dispatchers.IO) {
+                    database.vodTmdbDao().getBySourceKeys(allKeys).associateBy { it.sourceKey }
+                }
+
+                val popularDisplay = popularPage.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
+                val recentDisplay = recentPage.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
+
+                popularAdapter.submitList(popularDisplay)
+                recentAdapter.submitList(recentDisplay)
+
+                // İlk öğeyi Hero Banner'a ata
+                if (popularDisplay.isNotEmpty()) {
+                    updateHeroBanner(popularDisplay.first())
+                } else if (recentDisplay.isNotEmpty()) {
+                    updateHeroBanner(recentDisplay.first())
+                }
+
+                // 5. Arka planda eksik TMDB verilerini zenginleştir
+                enrichMissingTmdb(popularPage + recentPage, cachedTmdb)
+
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                debugLog.recordDebug("VOD_HOME_LOAD_FAILED | ${e.javaClass.simpleName}")
+            }
         }
     }
 
-    private fun selectCategory(position: Int) {
-        if (position !in categories.indices) return
-        val category = categories[position]
-        binding.vodCategories.setItemChecked(position, true)
-        if (filter.category == category && filter.view == "ALL" && filter.parentKey == null) { focusCatalog(); return }
-        changeFilter(filter.copy(category = category, view = "ALL", parentKey = null, season = null, query = ""))
-        (binding.vodCategories.adapter as? android.widget.ArrayAdapter<*>)?.notifyDataSetChanged()
-    }
-
-    private fun showFilters() {
-        val builder = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-        val form = DialogVodFiltersBinding.inflate(android.view.LayoutInflater.from(builder.context))
-        var view = filter.view
-        var order = filter.order
-        var wholeSource = filter.searchWholeSource
-        form.vodSearch.setText(filter.query)
-        fun labels() {
-            form.vodViewFilter.text = viewLabel(view)
-            form.vodOrderFilter.setText(if (order == "NAME") R.string.vod_sort_name else R.string.vod_sort_source)
-            form.vodSearchScope.setText(if (wholeSource) R.string.vod_search_source else R.string.vod_search_category)
-        }
-        labels()
-        form.vodSearchScope.setOnClickListener {
-            PopupMenu(builder.context, form.vodSearchScope).apply {
-                menu.add(0, 0, 0, R.string.vod_search_category)
-                menu.add(0, 1, 1, R.string.vod_search_source)
-                setOnMenuItemClickListener { selected -> wholeSource = selected.itemId == 1; labels(); true }
-            }.show()
-        }
-        form.vodViewFilter.setOnClickListener {
-            PopupMenu(builder.context, form.vodViewFilter).apply {
-                VIEWS.forEachIndexed { index, value -> menu.add(0, index, index, viewLabel(value)) }
-                setOnMenuItemClickListener { selected -> view = VIEWS[selected.itemId]; labels(); true }
-            }.show()
-        }
-        form.vodOrderFilter.setOnClickListener {
-            PopupMenu(builder.context, form.vodOrderFilter).apply {
-                menu.add(0, 0, 0, R.string.vod_sort_source)
-                menu.add(0, 1, 1, R.string.vod_sort_name)
-                setOnMenuItemClickListener { selected -> order = if (selected.itemId == 1) "NAME" else "SOURCE"; labels(); true }
-            }.show()
-        }
-        val d = builder.setTitle(R.string.vod_search_filters).setView(form.root)
-            .setPositiveButton(R.string.apply) { _, _ ->
-                hideKeyboard(form.vodSearch)
-                changeFilter(filter.copy(query = form.vodSearch.text.toString().trim(), view = view, order = order,
-                    searchWholeSource = wholeSource))
-            }.setNeutralButton(R.string.clear_search) { _, _ ->
-                hideKeyboard(form.vodSearch)
-                changeFilter(filter.copy(query = "", view = "ALL", category = null, order = "SOURCE"))
-            }.setNegativeButton(R.string.close, null).create()
-        form.vodSearch.setOnEditorActionListener { _, action, _ ->
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
-                hideKeyboard(form.vodSearch); form.vodViewFilter.requestFocus(); true
-            } else false
-        }
-        showDialog(d)
-        d.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        form.vodViewFilter.post { if (d.isShowing) form.vodViewFilter.requestFocus() }
-    }
-
-    private fun viewLabel(view: String): String = getString(when (view) {
-        "FAVORITES" -> R.string.vod_favorites
-        "CONTINUE" -> R.string.continue_watching
-        "RECENT" -> R.string.vod_recent
-        else -> R.string.all_channels
-    })
-
-    private fun showDetail(card: VodCard) {
-        if (loading) return
-        rememberCatalogFocus(card)
-        val builder = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-        val detail = DialogVodDetailBinding.inflate(android.view.LayoutInflater.from(builder.context))
-        var item = card.item
-        var navigating = false
-        val resumes = resumeStore.entries().associateBy(IptvResumeEntry::sourceKey)
-        val resume = resumes[item.sourceKey]
-        fun render() {
-            ChannelLogoLoader.load(detail.vodDetailImage, item.logoUrl, R.drawable.ic_vod)
-            detail.vodDetailInfo.text = listOfNotNull(item.category,
-                item.durationMillis?.takeIf { it > 0 }?.let(VodHomeAdapter::formatDuration),
-                resume?.let { getString(R.string.vod_saved_position, VodHomeAdapter.formatDuration(it.positionMillis)) }).joinToString("\n")
-            detail.vodDetailDescription.text = item.description?.takeIf(String::isNotBlank) ?: getString(R.string.vod_description_unknown)
-            detail.vodDetailFavorite.isSelected = item.favorite
-            detail.vodDetailFavorite.contentDescription = getString(if (item.favorite) R.string.remove_favorite else R.string.add_favorite)
-        }
-        render()
-        val d = builder.setTitle(item.name).setView(detail.root)
-            .setPositiveButton(if (item.kind == "SERIES") R.string.vod_seasons else if (resume != null) R.string.vod_continue_item else R.string.iptv_play_label) { _, _ ->
-                navigating = true
-                if (item.kind == "SERIES") showSeasons(item.sourceKey) else playItem(item)
-            }.setNegativeButton(R.string.close, null)
-        if (resume != null) d.setNeutralButton(R.string.vod_resume_from_start) { _, _ -> navigating = true; playItem(item, startOver = true) }
-        val shown = d.create()
-        detail.vodDetailFavorite.setOnClickListener {
-            val favorite = !item.favorite
-            detail.vodDetailFavorite.isEnabled = false
-            lifecycleScope.launch {
+    private fun enrichMissingTmdb(items: List<VodCatalogItem>, cached: Map<String, VodTmdbEntity>) {
+        tmdbJob?.cancel()
+        tmdbJob = lifecycleScope.launch(Dispatchers.IO) {
+            val missing = items.filter { it.sourceKey !in cached }.distinctBy { it.name }
+            for (item in missing.take(20)) {
                 try {
-                    withContext(Dispatchers.IO) { repository.setFavorite(item, favorite) }
-                    item = item.copy(favorite = favorite); render()
-                    // Refresh this bounded page after dismissing, without moving focus behind the dialog.
-                    saveFilters()
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Exception) { debugLog.recordDebug("VOD_FAVORITE_FAILED | ${error.javaClass.simpleName}") }
-                finally { detail.vodDetailFavorite.isEnabled = true }
+                    val cleaned = VodTitleCleaner.clean(item.name)
+                    val tmdbResult = if (item.kind == "SERIES") {
+                        TmdbApiClient.searchTvShow(cleaned.cleanTitle, cleaned.year)
+                    } else {
+                        TmdbApiClient.searchMovie(cleaned.cleanTitle, cleaned.year)
+                    }
+
+                    if (tmdbResult != null) {
+                        val entity = VodTmdbEntity(
+                            sourceKey = item.sourceKey,
+                            tmdbId = tmdbResult.id,
+                            title = tmdbResult.title,
+                            originalTitle = tmdbResult.originalTitle,
+                            overview = tmdbResult.overview,
+                            posterUrl = tmdbResult.posterUrl,
+                            backdropUrl = tmdbResult.backdropUrl,
+                            rating = tmdbResult.rating,
+                            releaseYear = tmdbResult.releaseYear,
+                            genres = tmdbResult.genres.joinToString(", "),
+                        )
+                        database.vodTmdbDao().upsert(entity)
+
+                        withContext(Dispatchers.Main) {
+                            popularAdapter.updateTmdbItem(item.sourceKey, entity)
+                            recentAdapter.updateTmdbItem(item.sourceKey, entity)
+                            if (currentHeroItem?.catalogItem?.sourceKey == item.sourceKey) {
+                                val updatedHero = currentHeroItem?.copy(tmdb = entity)
+                                if (updatedHero != null) {
+                                    updateHeroBanner(updatedHero)
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Devam et
+                }
             }
         }
-        showDialog(shown, onDismiss = { if (!navigating) loadPage(restoreFocus = true) })
-        shown.getButton(AlertDialog.BUTTON_POSITIVE).post {
-            if (shown.isShowing) shown.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+    }
+
+    private fun playItem(item: VodCatalogItem) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
+            putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
-        shown.getButton(AlertDialog.BUTTON_POSITIVE).nextFocusUpId = detail.vodDetailScroll.id
-        detail.vodDetailScroll.nextFocusDownId = android.R.id.button1
-        detail.vodDetailScroll.layoutParams.height = (resources.displayMetrics.heightPixels * .25f).toInt()
-        detailJob?.cancel()
-        detailJob = lifecycleScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) { repository.details(item) }
-                if (shown.isShowing) { item = result.copy(favorite = item.favorite); render() }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { debugLog.recordDebug("VOD_DETAILS_FAILED | ${error.javaClass.simpleName}") }
-        }
+        startActivity(intent)
     }
 
-    private fun showSeasons(key: String) {
-        detailJob?.cancel()
-        binding.vodLoading.visibility = View.VISIBLE
-        detailJob = lifecycleScope.launch {
-            try {
-                val seasons = withContext(Dispatchers.IO) { repository.refreshEpisodes(key); repository.seasons(key) }
-                binding.vodLoading.visibility = if (loading) View.VISIBLE else View.GONE
-                if (seasons.isEmpty()) {
-                    showDialog(AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog).setTitle(R.string.vod_seasons)
-                        .setMessage(R.string.vod_episodes_unavailable).setPositiveButton(R.string.close, null).create())
-                } else showDialog(AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog).setTitle(R.string.vod_seasons)
-                    .setItems(seasons.map { getString(R.string.vod_season, it) }.toTypedArray()) { _, i ->
-                        changeFilter(filter.copy(parentKey = key, season = seasons[i], section = "SERIES", category = null, query = "", view = "ALL", order = "SOURCE"))
-                    }.setNegativeButton(R.string.close, null).create())
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { showFailure(error) }
-        }
-    }
-
-    private fun showItemActions(card: VodCard) {
-        if (loading) return
-        rememberCatalogFocus(card)
-        val item = card.item
-        val recent = item.sourceKey in keysFor("RECENT")
-        val labels = mutableListOf(getString(if (item.favorite) R.string.remove_favorite else R.string.add_favorite))
-        if (recent) labels += getString(R.string.vod_remove_from_continue)
-        showDialog(AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog).setTitle(item.name)
-            .setItems(labels.toTypedArray()) { _, i ->
-                lifecycleScope.launch {
-                    try {
-                        if (i == 0) withContext(Dispatchers.IO) { repository.setFavorite(item, !item.favorite) }
-                        else {
-                            history.remove(item.sourceKey); legacyHistory.remove(item.sourceKey); resumeStore.clear(item.sourceKey)
-                        }
-                        loadPage(restoreFocus = true)
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (error: Exception) { showFailure(error) }
-                }
-            }.setNegativeButton(R.string.close, null).create())
-    }
-
-    private fun rememberCatalogFocus(card: VodCard) {
-        val position = gridAdapter.currentList.indexOfFirst { it.item.sourceKey == card.item.sourceKey }
-        if (position >= 0) {
-            focusedKey = card.item.sourceKey
-            focusedPosition = position
-            saveFilters()
-        }
-    }
-
-    private fun showDialog(value: AlertDialog, onDismiss: (() -> Unit)? = null) {
-        val returnFocus = currentFocus
-        dialog?.setOnDismissListener(null)
-        dialog?.dismiss()
-        dialog = value
-        value.setOnDismissListener {
-            if (dialog === value) dialog = null
-            hideKeyboard(value.currentFocus)
-            returnFocus?.takeIf { it.isAttachedToWindow && it.isShown }?.requestFocus()
-            onDismiss?.invoke()
-        }
-        value.show()
-    }
-
-    private fun playItem(item: VodCatalogItem, startOver: Boolean = false) {
-        if (item.kind == "SERIES") { showSeasons(item.sourceKey); return }
-        saveFilters()
-        startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
-            .putExtra(MainActivity.EXTRA_VOD_START_OVER, startOver)
-            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-    }
-
-    private fun lastVodKey(): String? = getSharedPreferences(MainActivity.MODE_PREFS, MODE_PRIVATE).getString(MainActivity.LAST_VOD_KEY, null)
-    private fun resumeLast() { lastItem?.let { playItem(it) } }
     private fun openLiveTv() {
-        saveFilters()
-        startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_LIVE_MODE, true)
-            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-    }
-    private fun hideKeyboard(view: View?) {
-        val token = view?.windowToken ?: binding.root.windowToken
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(token, 0)
+        finish()
     }
 
-    override fun onStop() { saveFilters(); super.onStop() }
-    override fun onBackPressed() {
-        if (dialog?.isShowing == true) { dialog?.dismiss(); return }
-        if (filter.parentKey != null) { changeFilter(filter.copy(parentKey = null, season = null)); return }
-        if (!binding.vodSidebar.hasFocus()) {
-            focusSection(); return
+    private fun showHeroDetailsDialog(displayItem: VodDisplayItem) {
+        val title = displayItem.tmdb?.title ?: displayItem.catalogItem.name
+        val overview = displayItem.tmdb?.overview ?: displayItem.catalogItem.description ?: "Özet bulunmuyor."
+        val genres = displayItem.tmdb?.genres ?: "Sinema"
+        val year = displayItem.tmdb?.releaseYear ?: ""
+        val rating = displayItem.tmdb?.rating?.let { "★ $it / 10" } ?: ""
+
+        val message = "$year · $genres\n$rating\n\n$overview"
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Hemen İzle") { _, _ -> playItem(displayItem.catalogItem) }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showSearchDialog() {
+        val input = android.widget.EditText(this).apply {
+            hint = "Film veya dizi adı..."
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
         }
-        focusCatalog()
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle("VOD Arama")
+            .setView(input)
+            .setPositiveButton(R.string.apply) { _, _ ->
+                val query = input.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    filter = filter.copy(query = query)
+                    loadData()
+                }
+            }
+            .setNeutralButton(R.string.clear_search) { _, _ ->
+                filter = filter.copy(query = "")
+                loadData()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (dialog?.isShowing == true) return super.dispatchKeyEvent(event)
-        val key = tvRemoteKeyCode(event.keyCode)
-        if (key in listOf(KeyEvent.KEYCODE_PROG_RED, KeyEvent.KEYCODE_PROG_GREEN, KeyEvent.KEYCODE_PROG_YELLOW,
-                KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_SEARCH, KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_CHANNEL_UP)) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) when (key) {
-                KeyEvent.KEYCODE_PROG_RED -> openLiveTv()
-                KeyEvent.KEYCODE_PROG_GREEN -> showContinue()
-                KeyEvent.KEYCODE_PROG_YELLOW -> showSources()
-                KeyEvent.KEYCODE_PROG_BLUE, KeyEvent.KEYCODE_SEARCH -> showFilters()
-                KeyEvent.KEYCODE_CHANNEL_DOWN -> changePage(1)
-                KeyEvent.KEYCODE_CHANNEL_UP -> changePage(-1)
-            }
-            return true
-        }
-        if (key == KeyEvent.KEYCODE_MENU) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                if (binding.vodSidebar.hasFocus()) focusCatalog() else focusSection()
-            }
-            return true
-        }
-        if (event.action == KeyEvent.ACTION_DOWN && key == KeyEvent.KEYCODE_DPAD_RIGHT && binding.vodSidebar.hasFocus()) {
-            if (binding.vodCategories.hasFocus()) selectCategory(binding.vodCategories.selectedItemPosition) else focusCatalog()
-            return true
-        }
-        if (event.action == KeyEvent.ACTION_DOWN && binding.vodGrid.hasFocus()) {
-            val columns = (binding.vodGrid.layoutManager as GridLayoutManager).spanCount
-            val lastRow = ((gridAdapter.itemCount - 1).coerceAtLeast(0) / columns) * columns
-            if (key == KeyEvent.KEYCODE_DPAD_DOWN && focusedPosition >= lastRow) {
-                when {
-                    binding.vodNext.isEnabled -> binding.vodNext.requestFocus()
-                    binding.vodPrevious.isEnabled -> binding.vodPrevious.requestFocus()
-                    else -> binding.vodLiveAction.requestFocus()
-                }
-                return true
-            }
-            if (key == KeyEvent.KEYCODE_DPAD_UP && focusedPosition < columns) {
-                if (binding.continueWatchingRow.visibility == View.VISIBLE) binding.continueWatchingRow.requestFocus()
-                else focusSection()
-                return true
-            }
-            if (key == KeyEvent.KEYCODE_DPAD_LEFT && focusedPosition % columns == 0) { focusSection(); return true }
-            if (key == KeyEvent.KEYCODE_DPAD_RIGHT && (focusedPosition % columns == columns - 1 ||
-                focusedPosition == gridAdapter.itemCount - 1)) return true
-        }
         if (event.action == KeyEvent.ACTION_DOWN) {
-            val focus = currentFocus
-            if (key == KeyEvent.KEYCODE_DPAD_DOWN && (focus == binding.vodResumeAction || binding.continueWatchingRow.hasFocus())) {
-                focusCatalog(); return true
-            }
-            if (key == KeyEvent.KEYCODE_DPAD_UP && focus in listOf(binding.vodPrevious, binding.vodNext)) {
-                focusCatalog(); return true
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_PROG_RED -> {
+                    openLiveTv()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_GREEN -> {
+                    filter = filter.copy(view = "CONTINUE")
+                    loadData()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_BLUE -> {
+                    showSearchDialog()
+                    return true
+                }
             }
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    private fun focusSection() {
-        pendingFocus = false
-        if (categories.isNotEmpty()) {
-            binding.vodCategories.requestFocus()
-            binding.vodCategories.setSelection(categories.indexOf(filter.category).coerceAtLeast(0))
-        } else (if (filter.section == "SERIES") binding.vodSeries else binding.vodMovies).requestFocus()
-    }
-
-    private fun focusCatalog() {
-        if (loading) { pendingFocus = true; return }
-        if (gridAdapter.itemCount == 0) {
-            if (binding.vodEmpty.isFocusable) binding.vodEmpty.requestFocus()
-            return
-        }
-        pendingFocus = true
-        restoreGridFocus()
-    }
-
-    companion object {
-        const val PAGE_SIZE = VodRepository.PAGE_SIZE
-        private val VIEWS = listOf("ALL", "FAVORITES", "CONTINUE", "RECENT")
     }
 }

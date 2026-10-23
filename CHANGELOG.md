@@ -1,5 +1,17 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-23 - 3 Sütunlu Modern Sinematik VOD Ana Sayfası ve TMDB Meta Veri Entegrasyonu
+
+- **3 Sütunlu Sinematik Smart TV Arayüzü:** VOD ana ekranı Stremio / Apple TV / Netflix standartlarında 3 sütunlu modern bir dashboard'a dönüştürüldü:
+  - **Sol Gezinme Menüsü:** TVApp VOD logosu, canlı saat, "Ana Sayfa", "Canlı TV", "Sinema", "Dizi", "Devam Et" ve "Filtrele" hızlı menüleri.
+  - **Orta Alan (Hero Banner & Sinematik Raylar):** En üstte odaklanılan filmin büyük arka plan görseli, yüksek çözünürlüklü afişi, başlığı, puanı (★), yılı, türleri, konusu ve "Şimdi İzle" ile "Detaylar" eylem butonları; altında "Popüler Filmler" ve "Son Eklenenler" yatay kayan poster rayları.
+  - **Sağ Bilgi Paneli:** Kullanıcının tüm kayıtlı IPTV kütüphanelerini ("Mevcut Listeler") ve seçilen listenin kategorilerini ("Kategoriler") dengeli şekilde listeleyen, tek tıkla liste ve kategori geçişi sağlayan modern panel.
+- **The Movie Database (TMDB) API & Akıllı Başlık Temizleme Motoru:**
+  - IPTV sağlayıcılarından gelen karmaşık ve gürültülü başlıkları (`1080p`, `4K`, `TR DUBLAJ`, `(2024)` vb.) otomatik ayıklayan, film/dizi adını ve yayın yılını tespit eden `VodTitleCleaner` motoru eklendi.
+  - TMDB v3 API entegrasyonu ile eksik IPTV afişleri, yüksek çözünürlüklü arka plan görselleri (backdrop), resmi Türkçe özetler, türler ve TMDB puanları arka planda otomatik çekilip Room veritabanında (`VodTmdbEntity`) önbelleğe alındı.
+  - API anahtarı güvenliği sağlandı (`.env` üzerinden build time enjeksiyonu ve `.gitignore` koruması).
+- **Kumanda Odaklı Kesintisiz D-Pad Gezinimi:** Sol menü, arama çubuğu, Hero butonları, yatay film rayları ve sağ kütüphane paneli arasında pürüzsüz D-Pad yönlendirmeleri sağlandı.
+
 ## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 
 - **Bağımsız Sinematik VOD Player Barı:** VOD (film/dizi) oynatılırken canlı TV infobarı tamamen devre dışı bırakıldı. Netflix tarzı modern, şık ve sinematik degrade arkaplana sahip bağımsız bir OSD (`vod_player_overlay`) geliştirildi.

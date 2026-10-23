@@ -171,7 +171,7 @@
 
         <activity
             android:name=".VodHomeActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/vod_home_title"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.TVApp" />
