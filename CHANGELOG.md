@@ -19,6 +19,18 @@
   - Akış kapatıldığında worker iş parçacığının erken sonlanması ve consumer thread'in beklemeden -1 dönmesi sonucu CI testinde (`BufferedLiveInputStreamTest`) oluşan hata giderildi; `closed` durumu kontrol edilerek `IOException` fırlatılması güvenceye alındı.
 - **Açılışta Doğrudan Çökme (Fatal Crash) Hatasının Giderilmesi:**
   - `MainActivity.onCreate()` aşamasında `restoredMultiViewKeys` alanına henüz `multiViewController` ilklendirilmeden erişilmesi sonucu oluşan `UninitializedPropertyAccessException` hatası giderildi; `restoredMultiViewKeys` doğrudan `MainActivity` içinde saklanıp denetleyici kurulduğunda aktarıldı.
+- **IPTV Listelerinde Güncelleme Sonrası Odak Korunması:**
+  - Tek bir liste güncellendiğinde (`SourceAction.REFRESH`) veya liste durumu değiştirildiğinde, `selectedSourceId` takip edilerek `sourceList.post { requestFocus(); setSelection(pos) }` ile odağın doğrudan güncellenen listenin üzerinde kalması sağlandı.
+- **Seçimli Toplu Liste Güncelleme (Bulk Refresh):**
+  - IPTV Kaynakları ekranına "Listeleri Toplu Güncelle" butonu eklendi.
+  - Açılan çoklu seçim diyaloğu üzerinden seçilen ağ tabanlı (URL, Xtream, Stalker) listelerin sırayla arka planda güncellenmesi ve ilerlemenin canlı izlenmesi sağlandı.
+- **GitHub Manifest Akıllı Senkronizasyonu & Kaldırılan Listeler Onayı:**
+  - GitHub üzerinden eklenen listelerin kullanıcı adı bilgisi (`github:username`) kaynak meta verisine işlendi ve listede `[GitHub: username]` rozetiyle gösterildi.
+  - GitHub manifesti tekrar güncellendiğinde, manifest'ten kaldırılmış olan listeler doğrudan silinmek yerine kullanıcıya onay diyaloğu sunularak onay verilirse silinmesi, onay verilmezse korunması sağlandı.
+- **JSON Formatlı VOD / Dizi ve Film Paketleri Desteği (`JsonVodImporter`):**
+  - `vod2.json` içindeki `"kaynak": "json"` tipindeki dizi arşivleri (`dizitime.json` gibi) için JSON VOD ayrıştırıcı eklendi; dizi, sezon, bölüm ve videoUrl meta verileri doğrudan `vod_metadata` tablosuna aktarılarak oynatılabilir kılındı.
+- **IPTV Listeleri Buton Simgelerinde Kenar Boşluğu (Padding) Düzeltmesi:**
+  - Sol paneldeki tüm butonların (`import_url_button`, `import_file_button`, `import_xtream_button`, `import_stalker_button`, `import_github_manifest_button`, `bulk_refresh_button`, `web_manage_button`, `close_button`) sol kenara yapışık simgeleri `paddingStart="16dp"` ve `paddingEnd="16dp"` ile ferahlatıldı.
 - **VOD Listesinde Pasif Kaynakların ve Gizlenen İçeriklerin Filtrelenmesi:**
   - `VodCatalogQuery.kt`: `CATALOG` SQL birleşimine `iptv_sources` tablosu bağlanarak `s.enabled = 1` (devre dışı bırakılmış IPTV kaynaklarının VOD film ve dizileri listelenmez) ve `COALESCE(u.hidden, 0) = 0` (kullanıcının gizlediği/atladığı içerikler listelenmez) koşulları getirildi.
   - `VodHomeActivity.kt`: Kaynak seçim menüsünde (`vodSourceCombo`) pasif kaynaklar filtrelenerek yalnızca aktif listelerin görünmesi sağlandı; önceden seçilmiş kaynak pasif duruma getirilmişse otomatik olarak "Tüm Liste" (`-1L`) varsayılanına dönülmesi sağlandı.

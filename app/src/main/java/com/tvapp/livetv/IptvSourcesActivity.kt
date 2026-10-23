@@ -41,6 +41,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private lateinit var debugLog: CrashReportStore
     private var sources: List<IptvSourceSummary> = emptyList()
     private var selectedSourcePosition = -1
+    private var selectedSourceId: Long? = null
     private var activeOperationSourceName: String? = null
     private var sourceListLongPressHandled = false
     private var sourceListLongPressJob: Job? = null
@@ -85,6 +86,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         binding.importXtreamButton.setOnClickListener(::showXtreamDialog)
         binding.importGithubManifestButton?.setOnClickListener { showGithubManifestDialog() }
+        binding.bulkRefreshButton?.setOnClickListener { showBulkRefreshDialog() }
         binding.importStalkerButton.setOnClickListener(::showStalkerDialog)
         binding.webManageButton.setOnClickListener { showWebManagement() }
         binding.closeButton?.setOnClickListener {
@@ -98,6 +100,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.sourceList.onItemClickListener = AdapterView.OnItemClickListener {
                 _, _, position, _ ->
             selectedSourcePosition = position
+            selectedSourceId = sources.getOrNull(position)?.source?.id
             sources.getOrNull(position)?.let { summary ->
                 if (summary.source.kind == IptvRepository.KIND_URL || BuildConfig.MOBILE_UI_ENABLED) {
                     showSourceActions(summary)
@@ -114,6 +117,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 id: Long,
             ) {
                 selectedSourcePosition = position
+                selectedSourceId = sources.getOrNull(position)?.source?.id
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
@@ -418,7 +422,20 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     binding.importStatus.setText(R.string.github_manifest_empty)
                     return@onSuccess
                 }
-                showManifestSelectionDialog(items)
+                val manifestUrls = items.map { it.url.trim() }.toSet()
+                val currentGithubSources = sources.filter {
+                    val u = it.source.username.orEmpty()
+                    u.equals("github:$username", ignoreCase = true)
+                }
+                val removedSources = currentGithubSources.filter { it.source.location.trim() !in manifestUrls }
+
+                if (removedSources.isNotEmpty()) {
+                    showRemovedGithubSourcesDialog(removedSources) {
+                        showManifestSelectionDialog(items, username)
+                    }
+                } else {
+                    showManifestSelectionDialog(items, username)
+                }
             }.onFailure { error ->
                 debugLog.recordDebug("IPTV_GITHUB_FETCH FAILURE | ${error.javaClass.simpleName}: ${error.message}")
                 binding.importStatus.setText(R.string.github_manifest_error)
@@ -426,7 +443,34 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
     }
 
-    private fun showManifestSelectionDialog(items: List<com.tvapp.livetv.data.GithubManifestItem>) {
+    private fun showRemovedGithubSourcesDialog(
+        removedSources: List<IptvSourceSummary>,
+        onDone: () -> Unit,
+    ) {
+        val names = removedSources.joinToString("\n") { "• ${it.source.name}" }
+        val message = "${getString(R.string.github_removed_dialog_message)}\n\n$names"
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.github_removed_dialog_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        removedSources.forEach { summary ->
+                            runCatching { repository.delete(summary.source) }
+                        }
+                    }
+                    loadSources()
+                    onDone()
+                }
+            }
+            .setNegativeButton(R.string.cancel) { _, _ ->
+                onDone()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun showManifestSelectionDialog(items: List<com.tvapp.livetv.data.GithubManifestItem>, username: String) {
         val selectionView = layoutInflater.inflate(R.layout.dialog_github_manifest_selection, null)
         val recycler = selectionView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.manifest_recycler)
         val btnSelectAll = selectionView.findViewById<android.widget.Button>(R.id.btn_select_all)
@@ -452,31 +496,33 @@ class IptvSourcesActivity : TvRemoteActivity() {
             val selected = manifestAdapter.getSelectedItems()
             if (selected.isEmpty()) return@setOnClickListener
             dialog.dismiss()
-            startBulkImport(selected)
+            startBulkImport(selected, username)
         }
         dialog.show()
     }
 
-    private fun startBulkImport(items: List<com.tvapp.livetv.data.GithubManifestItem>) {
+    private fun startBulkImport(items: List<com.tvapp.livetv.data.GithubManifestItem>, username: String) {
         if (!beginLocalOperation()) return
-        debugLog.recordDebug("IPTV_GITHUB_BULK_IMPORT START count=${items.size}")
+        debugLog.recordDebug("IPTV_GITHUB_BULK_IMPORT START count=${items.size} user=$username")
         lifecycleScope.launch {
             val total = items.size
             var successCount = 0
             for ((index, item) in items.withIndex()) {
-                val alreadySaved = withContext(Dispatchers.IO) {
-                    repository.sources().any { it.source.location == item.url }
-                }
-                if (alreadySaved) {
-                    successCount++
-                    continue
-                }
                 activeOperationSourceName = item.name
                 binding.importStatus.text = getString(R.string.iptv_source_bulk_progress, index + 1, total, item.name)
                 webManager?.updateLocalProgress(binding.importStatus.text.toString())
+                val existing = withContext(Dispatchers.IO) {
+                    repository.sources().find { it.source.location.trim() == item.url.trim() }
+                }
                 withContext(Dispatchers.IO) {
                     runCatching {
-                        repository.importUrl(item.url, item.name, ::showImportProgress)
+                        if (existing != null) {
+                            // Update existing source
+                            repository.refresh(existing.source, ::showImportProgress)
+                        } else {
+                            // Import new source with github username tag
+                            repository.importUrl(item.url, item.name, ::showImportProgress, username = "github:$username")
+                        }
                     }.onSuccess {
                         successCount++
                     }.onFailure { error ->
@@ -487,6 +533,71 @@ class IptvSourcesActivity : TvRemoteActivity() {
             activeOperationSourceName = null
             finishLocalOperation()
             binding.importStatus.text = getString(R.string.iptv_source_bulk_import_complete, successCount)
+            loadSources()
+            setResult(RESULT_OK)
+        }
+    }
+
+    private fun showBulkRefreshDialog() {
+        if (operationGate.isBusy) return
+        val refreshable = sources.filter {
+            it.source.kind in listOf(
+                IptvRepository.KIND_URL,
+                IptvRepository.KIND_XTREAM,
+                IptvRepository.KIND_STALKER,
+            )
+        }
+        if (refreshable.isEmpty()) {
+            binding.importStatus.setText(R.string.bulk_refresh_none_selected)
+            return
+        }
+        val names = refreshable.map { it.source.name }.toTypedArray()
+        val checked = BooleanArray(refreshable.size) { true }
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.bulk_refresh_title)
+            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(R.string.bulk_refresh_start) { _, _ ->
+                val selected = refreshable.filterIndexed { index, _ -> checked[index] }
+                if (selected.isNotEmpty()) {
+                    startBulkRefresh(selected)
+                } else {
+                    binding.importStatus.setText(R.string.bulk_refresh_none_selected)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun startBulkRefresh(targets: List<IptvSourceSummary>) {
+        if (!beginLocalOperation()) return
+        lifecycleScope.launch {
+            val total = targets.size
+            var successCount = 0
+            for ((index, summary) in targets.withIndex()) {
+                activeOperationSourceName = summary.source.name
+                binding.importStatus.text = getString(
+                    R.string.bulk_refresh_progress,
+                    index + 1,
+                    total,
+                    summary.source.name,
+                )
+                webManager?.updateLocalProgress(binding.importStatus.text.toString())
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        repository.refresh(summary.source, ::showImportProgress)
+                    }.onSuccess {
+                        successCount++
+                    }.onFailure { error ->
+                        debugLog.recordDebug("IPTV_BULK_REFRESH ITEM_FAIL | ${summary.source.name} | ${error.message}")
+                    }
+                }
+            }
+            activeOperationSourceName = null
+            finishLocalOperation()
+            binding.importStatus.text = getString(R.string.bulk_refresh_completed, successCount)
             loadSources()
             setResult(RESULT_OK)
         }
@@ -603,6 +714,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
 
     private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
         if (operationGate.isBusy) return
+        selectedSourceId = summary.source.id
         when (action) {
             SourceAction.SELECT -> openChannelSelection(summary.source.id, summary.source.name)
             SourceAction.REFRESH -> runImport("IPTV_REFRESH", summary.source.name) {
@@ -931,10 +1043,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
             result.onSuccess { loaded ->
                 sources = loaded
                 webManager?.updateLocalSources(loaded)
-                if (loaded.isEmpty()) {
-                    selectedSourcePosition = -1
-                } else {
-                    selectedSourcePosition = selectedSourcePosition.coerceIn(0, loaded.lastIndex)
+                val targetPos = selectedSourceId?.let { id -> loaded.indexOfFirst { it.source.id == id } }?.takeIf { it >= 0 }
+                    ?: if (loaded.isEmpty()) -1 else selectedSourcePosition.coerceIn(0, loaded.lastIndex)
+                selectedSourcePosition = targetPos
+                if (targetPos >= 0) {
+                    selectedSourceId = loaded.getOrNull(targetPos)?.source?.id
                 }
                 binding.sourceList.adapter = object : ArrayAdapter<IptvSourceSummary>(
                     this@IptvSourcesActivity,
@@ -952,8 +1065,11 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         val locationView = view.findViewById<TextView>(R.id.source_item_location)
                         val detailsView = view.findViewById<TextView>(R.id.source_item_details)
 
+                        val githubBadge = if (summary.source.username?.startsWith("github:") == true) {
+                            " · [${getString(R.string.github_badge, summary.source.username.removePrefix("github:"))}]"
+                        } else ""
                         val disabledBadge = if (!summary.source.enabled) " · [${getString(R.string.iptv_source_disabled)}]" else ""
-                        val title = "${summary.source.name} · ${sourceTypeLabel(summary.source.kind)}$disabledBadge"
+                        val title = "${summary.source.name} · ${sourceTypeLabel(summary.source.kind)}$githubBadge$disabledBadge"
                         nameView.text = title
                         nameView.setCompoundDrawablesRelativeWithIntrinsicBounds(
                             sourceIcon(summary.source.kind),
@@ -989,6 +1105,12 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 }
                 if (selectedSourcePosition >= 0) {
                     binding.sourceList.setSelection(selectedSourcePosition)
+                    binding.sourceList.post {
+                        if (!isFinishing && !isDestroyed) {
+                            binding.sourceList.requestFocus()
+                            binding.sourceList.setSelection(selectedSourcePosition)
+                        }
+                    }
                 }
             }.onFailure(::showError)
         }
@@ -1036,6 +1158,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.importXtreamButton.isEnabled = editable
         binding.importStalkerButton.isEnabled = editable
         binding.importGithubManifestButton?.isEnabled = editable
+        binding.bulkRefreshButton?.isEnabled = editable
         binding.webManageButton.isEnabled = editable
         binding.sourceList.isEnabled = editable
         binding.importProgress.visibility = if (operationBusy) View.VISIBLE else View.GONE

@@ -812,6 +812,16 @@
     <string name="iptv_source_bulk_import_complete">%1$d IPTV listesi başarıyla eklendi.</string>
     <string name="github_bulk_title">GitHub Toplu Liste</string>
     <string name="github_guide_note">Belirtilen kullanıcının \'gunestv\' deposundaki paket listesi taranır.</string>
+    <string name="bulk_refresh_sources">Listeleri Toplu Güncelle</string>
+    <string name="bulk_refresh_title">Toplu Güncellenecek Listeleri Seçin</string>
+    <string name="bulk_refresh_start">Güncellemeyi Başlat</string>
+    <string name="bulk_refresh_progress">Toplu güncelleme: %1$d / %2$d · %3$s</string>
+    <string name="bulk_refresh_completed">%1$d liste başarıyla güncellendi.</string>
+    <string name="bulk_refresh_none_selected">Güncellenecek liste seçilmedi.</string>
+    <string name="github_update_sources">GitHub Listelerini Güncelle</string>
+    <string name="github_removed_dialog_title">GitHub\'dan Kaldırılan Listeler</string>
+    <string name="github_removed_dialog_message">Aşağıdaki listeler GitHub paketinde artık yer almıyor. TVApp\'ten silinsin mi?</string>
+    <string name="github_badge">GitHub: %1$s</string>
     <string name="enable_iptv_source">Listeyi Aktifleştir</string>
     <string name="disable_iptv_source">Listeyi Pasife Al</string>
     <string name="iptv_source_disabled">Pasif</string>

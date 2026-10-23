@@ -43,11 +43,13 @@
             android:id="@+id/import_url_button"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="20dp"
             android:background="@drawable/bg_focusable"
             android:drawableStart="@drawable/ic_link"
             android:drawablePadding="12dp"
             android:drawableTint="@color/accent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:text="@string/import_iptv_url"
             android:textColor="@color/text_primary" />
 
@@ -55,30 +57,34 @@
             android:id="@+id/import_file_button"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:background="@drawable/bg_focusable"
             android:drawableStart="@drawable/ic_file"
             android:drawablePadding="12dp"
             android:drawableTint="@color/accent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:text="@string/import_iptv_file"
             android:textColor="@color/text_primary" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/import_xtream_button"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
-                android:layout_marginEnd="5dp"
+                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_focusable"
                 android:drawableStart="@drawable/ic_server"
                 android:drawablePadding="8dp"
                 android:drawableTint="@color/accent"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
                 android:text="@string/add_xtream_source"
                 android:textColor="@color/text_primary" />
 
@@ -86,12 +92,14 @@
                 android:id="@+id/import_stalker_button"
                 android:layout_width="0dp"
                 android:layout_height="52dp"
-                android:layout_marginStart="5dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_focusable"
                 android:drawableStart="@drawable/ic_portal"
                 android:drawablePadding="8dp"
                 android:drawableTint="@color/accent"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
                 android:text="@string/add_stalker_source"
                 android:textColor="@color/text_primary" />
         </LinearLayout>
@@ -100,19 +108,35 @@
             android:id="@+id/import_github_manifest_button"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:background="@drawable/bg_focusable"
             android:drawableStart="@drawable/ic_link"
             android:drawablePadding="12dp"
             android:drawableTint="@color/accent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:text="@string/import_github_manifest"
+            android:textColor="@color/text_primary" />
+
+        <Button
+            android:id="@+id/bulk_refresh_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_focusable"
+            android:drawableStart="@drawable/ic_scan"
+            android:drawablePadding="12dp"
+            android:drawableTint="@color/accent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="@string/bulk_refresh_sources"
             android:textColor="@color/text_primary" />
 
         <TextView
             android:id="@+id/import_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:textColor="@color/accent"
             android:textSize="14sp" />
 
@@ -147,6 +171,8 @@
                 android:drawableStart="@drawable/ic_server"
                 android:drawablePadding="8dp"
                 android:drawableTint="@color/accent"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
                 android:text="@string/web_manage"
                 android:textColor="@color/text_primary" />
 
@@ -155,6 +181,8 @@
                 android:layout_width="100dp"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_focusable"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
                 android:text="@string/close"
                 android:textColor="@color/text_primary" />
         </LinearLayout>

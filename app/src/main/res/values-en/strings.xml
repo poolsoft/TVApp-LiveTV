@@ -812,6 +812,16 @@
     <string name="iptv_source_bulk_import_complete">%1$d IPTV lists added successfully.</string>
     <string name="github_bulk_title">GitHub Bulk Lists</string>
     <string name="github_guide_note">Scans the package manifest from the user\'s \'gunestv\' repository.</string>
+    <string name="bulk_refresh_sources">Bulk Refresh Playlists</string>
+    <string name="bulk_refresh_title">Select Playlists to Refresh</string>
+    <string name="bulk_refresh_start">Start Refresh</string>
+    <string name="bulk_refresh_progress">Bulk refresh: %1$d / %2$d · %3$s</string>
+    <string name="bulk_refresh_completed">%1$d playlists refreshed successfully.</string>
+    <string name="bulk_refresh_none_selected">No playlists selected to refresh.</string>
+    <string name="github_update_sources">Update GitHub Playlists</string>
+    <string name="github_removed_dialog_title">Playlists Removed from GitHub</string>
+    <string name="github_removed_dialog_message">The following playlists are no longer in the GitHub package. Delete from TVApp?</string>
+    <string name="github_badge">GitHub: %1$s</string>
     <string name="enable_iptv_source">Enable Source</string>
     <string name="disable_iptv_source">Disable Source</string>
     <string name="iptv_source_disabled">Disabled</string>

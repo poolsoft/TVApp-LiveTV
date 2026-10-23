@@ -450,8 +450,57 @@ class IptvRepository(context: Context) {
         location: String,
         nameOverride: String? = null,
         onProgress: (IptvImportProgress) -> Unit = {},
+        username: String? = null,
     ): IptvImportResult {
-        return importUrlInternal(location, nameOverride, null, onProgress)
+        if (location.trim().endsWith(".json", ignoreCase = true)) {
+            val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: "JSON VOD"
+            return importJsonVodUrl(location, name, username, onProgress)
+        }
+        return importUrlInternal(location, nameOverride, null, onProgress, username)
+    }
+
+    suspend fun importJsonVodUrl(
+        location: String,
+        name: String,
+        username: String? = null,
+        onProgress: (IptvImportProgress) -> Unit = {},
+    ): IptvImportResult {
+        val normalized = location.trim()
+        require(normalized.startsWith("http://") || normalized.startsWith("https://"))
+        onProgress(IptvImportProgress(IptvImportStage.CONNECTING))
+        val opened = openPlaylistConnection(normalized)
+        val jsonText = try {
+            opened.connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        } finally {
+            opened.connection.disconnect()
+        }
+        val conflicting = dao.getSourceByLocation(normalized)
+        val now = System.currentTimeMillis()
+        val sourceId = conflicting?.id ?: dao.insertSource(
+            IptvSourceEntity(
+                name = name,
+                location = normalized,
+                kind = KIND_URL,
+                username = username,
+                enabled = true,
+                lastUpdatedAt = now,
+            ),
+        )
+        dao.updateSource(
+            (conflicting ?: dao.getSource(sourceId)!!).copy(
+                name = name,
+                location = normalized,
+                username = username ?: conflicting?.username,
+                enabled = true,
+                lastUpdatedAt = now,
+            ),
+        )
+        onProgress(IptvImportProgress(IptvImportStage.SAVING))
+        val count = JsonVodImporter.importJsonVod(sourceId, jsonText, database) { current, _ ->
+            onProgress(IptvImportProgress(IptvImportStage.SAVING, current))
+        }
+        notifySharedChannelsChanged()
+        return IptvImportResult(sourceId, name, count)
     }
 
     suspend fun updateUrl(
@@ -460,7 +509,10 @@ class IptvRepository(context: Context) {
         onProgress: (IptvImportProgress) -> Unit = {},
     ): IptvImportResult {
         require(source.kind == KIND_URL) { "Yalniz URL kaynaklari duzenlenebilir." }
-        return importUrlInternal(location, source.name, source, onProgress)
+        if (location.trim().endsWith(".json", ignoreCase = true)) {
+            return importJsonVodUrl(location, source.name, source.username, onProgress)
+        }
+        return importUrlInternal(location, source.name, source, onProgress, source.username)
     }
 
     private suspend fun importUrlInternal(
@@ -468,6 +520,7 @@ class IptvRepository(context: Context) {
         nameOverride: String?,
         replacementSource: IptvSourceEntity?,
         onProgress: (IptvImportProgress) -> Unit,
+        username: String? = null,
     ): IptvImportResult {
         val normalized = location.trim()
         require(normalized.startsWith("http://") || normalized.startsWith("https://"))
@@ -494,7 +547,7 @@ class IptvRepository(context: Context) {
                 ?: "IPTV"
             val name = nameOverride?.trim()?.takeIf(String::isNotBlank) ?: derivedName
             val imported = input.use {
-                importStream(normalized, KIND_URL, name, it, replacementSource, onProgress)
+                importStream(normalized, KIND_URL, name, it, replacementSource, onProgress, username ?: replacementSource?.username)
             }
             debugLog.recordDebug(
                 "IPTV_HTTP_TIMING | source=${imported.sourceId}, " +
@@ -617,7 +670,13 @@ class IptvRepository(context: Context) {
         source: IptvSourceEntity,
         onProgress: (IptvImportProgress) -> Unit = {},
     ): IptvImportResult = when (source.kind) {
-        KIND_URL -> importUrlInternal(source.location, source.name, source, onProgress)
+        KIND_URL -> {
+            if (source.location.endsWith(".json", ignoreCase = true)) {
+                importJsonVodUrl(source.location, source.name, source.username, onProgress)
+            } else {
+                importUrlInternal(source.location, source.name, source, onProgress, source.username)
+            }
+        }
         KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name, source, onProgress)
         KIND_XTREAM -> importXtream(
             checkNotNull(source.serverUrl),
@@ -656,10 +715,12 @@ class IptvRepository(context: Context) {
         input: InputStream,
         replacementSource: IptvSourceEntity? = null,
         onProgress: (IptvImportProgress) -> Unit = {},
+        username: String? = null,
     ): IptvImportResult = importGenerated(
         location,
         kind,
         name,
+        username = username ?: replacementSource?.username,
         replacementSource = replacementSource,
         onProgress = onProgress,
     ) {
