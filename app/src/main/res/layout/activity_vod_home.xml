@@ -246,6 +246,8 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:paddingStart="4dp">
 
@@ -254,7 +256,9 @@
                 android:id="@+id/vod_continue_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
+                android:layout_marginBottom="8dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical"
                 android:visibility="gone">
 
@@ -269,10 +273,12 @@
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/vod_recycler_continue"
                     android:layout_width="match_parent"
-                    android:layout_height="170dp"
+                    android:layout_height="175dp"
                     android:layout_marginTop="4dp"
                     android:clipChildren="false"
                     android:clipToPadding="false"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
                     android:orientation="horizontal" />
             </LinearLayout>
 
@@ -317,8 +323,10 @@
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="6dp"
-                android:layout_weight="1">
+                android:layout_marginTop="4dp"
+                android:layout_weight="1"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/vod_recycler_grid"
@@ -326,7 +334,10 @@
                     android:layout_height="match_parent"
                     android:clipChildren="false"
                     android:clipToPadding="false"
-                    android:paddingBottom="24dp" />
+                    android:paddingTop="8dp"
+                    android:paddingBottom="24dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp" />
 
                 <TextView
                     android:id="@+id/vod_grid_empty_state"

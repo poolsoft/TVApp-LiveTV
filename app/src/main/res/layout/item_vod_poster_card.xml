@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/vod_card_root"
-    android:layout_width="114dp"
+    android:layout_width="106dp"
     android:layout_height="wrap_content"
     android:layout_marginStart="4dp"
-    android:layout_marginEnd="10dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginBottom="6dp"
+    android:layout_marginEnd="6dp"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="5dp"
     android:background="@drawable/bg_vod_poster_card"
     android:clickable="true"
     android:focusable="true"
@@ -15,7 +15,7 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="148dp"
+        android:layout_height="124dp"
         android:background="#1B2230">
 
         <ImageView
@@ -30,11 +30,11 @@
         android:id="@+id/vod_card_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/text_primary"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:textStyle="bold" />
 
     <LinearLayout
@@ -50,14 +50,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
         <TextView
             android:id="@+id/vod_card_rating"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#FACC15"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>

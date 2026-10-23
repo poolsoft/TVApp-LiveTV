@@ -196,9 +196,7 @@ class MainActivity : TvRemoteActivity() {
     private var multiViewDraftInitialized: Boolean
         get() = multiViewController.multiViewDraftInitialized
         set(value) { multiViewController.multiViewDraftInitialized = value }
-    private var restoredMultiViewKeys: List<String>?
-        get() = multiViewController.restoredMultiViewKeys
-        set(value) { multiViewController.restoredMultiViewKeys = value }
+    private var restoredMultiViewKeys: List<String>? = null
     private enum class IptvControlRow { TIMELINE, BUTTONS }
     private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
     private var vodPlayerOverlayController: VodPlayerOverlayController? = null
@@ -3876,6 +3874,7 @@ class MainActivity : TvRemoteActivity() {
             cancelFocusedTuneJob = { focusedTuneJob?.cancel() },
             cancelChannelPanelJob = { channelPanelJob?.cancel() },
         )
+        multiViewController.restoredMultiViewKeys = restoredMultiViewKeys
     }
 
     private fun showIptvGridPicker(initialSelection: List<LiveChannel>? = null) {
