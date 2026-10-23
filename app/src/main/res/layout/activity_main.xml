@@ -997,24 +997,24 @@
             android:background="@drawable/bg_vod_top_gradient"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="32dp"
-            android:paddingTop="28dp"
+            android:paddingHorizontal="40dp"
+            android:paddingTop="32dp"
             android:paddingBottom="24dp">
 
             <LinearLayout
                 android:id="@+id/vod_btn_back"
                 android:layout_width="wrap_content"
-                android:layout_height="42dp"
+                android:layout_height="44dp"
                 android:background="@drawable/bg_vod_button"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="14dp">
+                android:paddingHorizontal="16dp">
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:src="@drawable/ic_arrow_back"
                     app:tint="@color/text_primary" />
 
@@ -1024,49 +1024,56 @@
                     android:layout_marginStart="8dp"
                     android:text="@string/vod_back_to_list"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
+                android:layout_marginStart="24dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/vod_player_title"
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="@color/text_primary"
-                    android:textSize="19sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/vod_player_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/vod_player_clock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:background="@drawable/bg_vod_button"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/vod_player_subtitle"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="3dp"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="@color/accent"
-                    android:textSize="12sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
-
-            <TextView
-                android:id="@+id/vod_player_clock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/bg_vod_button"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="6dp"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -1076,61 +1083,66 @@
             android:layout_gravity="bottom"
             android:background="@drawable/bg_vod_bottom_gradient"
             android:orientation="vertical"
-            android:paddingHorizontal="32dp"
+            android:paddingHorizontal="40dp"
             android:paddingTop="20dp"
-            android:paddingBottom="28dp">
+            android:paddingBottom="36dp">
 
             <LinearLayout
                 android:id="@+id/vod_timeline_row"
                 android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:background="@drawable/bg_vod_button"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="14dp">
+                android:paddingHorizontal="12dp">
 
                 <TextView
                     android:id="@+id/vod_time_current"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minWidth="54dp"
+                    android:gravity="center"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <ProgressBar
                     android:id="@+id/vod_progress_bar"
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="0dp"
-                    android:layout_height="8dp"
+                    android:layout_height="6dp"
                     android:layout_marginHorizontal="16dp"
                     android:layout_weight="1"
                     android:max="1000"
-                    android:progressBackgroundTint="#52606B"
+                    android:progressBackgroundTint="#40FFFFFF"
                     android:progressTint="@color/accent"
-                    android:secondaryProgressTint="#7A8B99" />
+                    android:secondaryProgressTint="#70FFFFFF" />
 
                 <TextView
                     android:id="@+id/vod_time_duration"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:minWidth="70dp"
+                    android:gravity="center"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
             </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/vod_buttons_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="18dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/vod_btn_rewind"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
+                    android:layout_height="44dp"
+                    android:minWidth="74dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1138,18 +1150,20 @@
                     android:paddingHorizontal="16dp"
                     android:text="-10s"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/vod_btn_play_pause"
                     android:layout_width="wrap_content"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="16dp"
+                    android:layout_height="44dp"
+                    android:minWidth="120dp"
+                    android:layout_marginStart="12dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
+                    android:drawablePadding="8dp"
                     android:paddingHorizontal="22dp"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
@@ -1158,8 +1172,9 @@
                 <TextView
                     android:id="@+id/vod_btn_forward"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="16dp"
+                    android:layout_height="44dp"
+                    android:minWidth="74dp"
+                    android:layout_marginStart="12dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1167,14 +1182,15 @@
                     android:paddingHorizontal="16dp"
                     android:text="+10s"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/vod_btn_speed"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="20dp"
+                    android:layout_height="44dp"
+                    android:minWidth="82dp"
+                    android:layout_marginStart="12dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1183,39 +1199,39 @@
                     android:drawablePadding="6dp"
                     android:paddingHorizontal="14dp"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/vod_btn_audio_sub"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="16dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawableStart="@drawable/ic_subtitle"
-                    android:drawablePadding="6dp"
-                    android:paddingHorizontal="14dp"
+                    android:drawablePadding="8dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/vod_audio_subtitles"
                     android:textColor="@color/text_primary"
-                    android:textSize="12sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/vod_btn_restart"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="16dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawableStart="@drawable/ic_archive"
                     android:drawablePadding="6dp"
-                    android:paddingHorizontal="14dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/vod_restart"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>
