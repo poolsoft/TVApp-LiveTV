@@ -9,8 +9,9 @@
 - **The Movie Database (TMDB) API & Akıllı Başlık Temizleme Motoru:**
   - IPTV sağlayıcılarından gelen karmaşık ve gürültülü başlıkları (`1080p`, `4K`, `TR DUBLAJ`, `(2024)` vb.) otomatik ayıklayan, film/dizi adını ve yayın yılını tespit eden `VodTitleCleaner` motoru eklendi.
   - TMDB v3 API entegrasyonu ile eksik IPTV afişleri, yüksek çözünürlüklü arka plan görselleri (backdrop), resmi Türkçe özetler, türler ve TMDB puanları arka planda otomatik çekilip Room veritabanında (`VodTmdbEntity`) önbelleğe alındı.
-  - API anahtarı güvenliği sağlandı (`.env` üzerinden build time enjeksiyonu ve `.gitignore` koruması).
-- **Kumanda Odaklı Kesintisiz D-Pad Gezinimi:** Sol menü, arama çubuğu, Hero butonları, yatay film rayları ve sağ kütüphane paneli arasında pürüzsüz D-Pad yönlendirmeleri sağlandı.
+- **Kusursuz Seçici Mavi Çerçeve ve Padding İyileştirmesi:** Film kartlarına kumandayla odaklanıldığında mavi neon çerçevenin ebeveyn sınırları tarafından kırpılması/yarım görünmesi sorunu giderildi; RecyclerView ve kapsayıcılara `clipChildren="false"`, `clipToPadding="false"` ve dengeli dikey/yatay margin ve padding verilerek çerçevenin tam ve net görünmesi sağlandı.
+- **Sinematik Default Kapak (Placeholder & Error Drawable):** Afişi henüz yüklenmeyen veya internet/kaynak kaynaklı afişi bulunmayan filmler için şık koyu lacivert degrade ve ortalanmış modern mavi film sembolü içeren `bg_vod_default_poster` oluşturuldu; hem poster raylarında hem de Hero Banner'da devreye alındı.
+- **Gelişmiş Parantez İçi Başlık Temizleme ve Esnek TMDB Araması:** Parantez içindeki tür/oyuncu açıklamaları asıl film adından arındırıldı; yıl uyuşmazlığı durumlarında otomatik ikinci fallback araması eklenerek TMDB eşleşme başarı oranı maksimize edildi.
 
 ## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 

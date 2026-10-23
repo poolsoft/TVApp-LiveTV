@@ -55,8 +55,8 @@ class VodPosterAdapter(
                 binding.root.setBackgroundResource(
                     if (hasFocus) R.drawable.bg_vod_poster_focused else R.drawable.bg_vod_poster_card
                 )
-                binding.root.scaleX = if (hasFocus) 1.05f else 1.0f
-                binding.root.scaleY = if (hasFocus) 1.05f else 1.0f
+                binding.root.scaleX = if (hasFocus) 1.03f else 1.0f
+                binding.root.scaleY = if (hasFocus) 1.03f else 1.0f
 
                 if (hasFocus) {
                     val pos = bindingAdapterPosition
@@ -87,11 +87,11 @@ class VodPosterAdapter(
             if (!posterUrl.isNullOrBlank()) {
                 binding.vodCardPoster.load(posterUrl) {
                     crossfade(true)
-                    placeholder(R.drawable.bg_vod_poster_card)
-                    error(R.drawable.bg_vod_poster_card)
+                    placeholder(R.drawable.bg_vod_default_poster)
+                    error(R.drawable.bg_vod_default_poster)
                 }
             } else {
-                binding.vodCardPoster.setImageResource(R.drawable.ic_play)
+                binding.vodCardPoster.setImageResource(R.drawable.bg_vod_default_poster)
             }
         }
     }

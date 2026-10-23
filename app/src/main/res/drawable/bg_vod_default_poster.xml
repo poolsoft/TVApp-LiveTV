@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="180dp"
+    android:viewportWidth="120"
+    android:viewportHeight="180">
+    <!-- Koyu Sinematik Arka Plan -->
+    <path
+        android:fillColor="#151C28"
+        android:pathData="M8,0 L112,0 A8,8 0 0 1 120,8 L120,172 A8,8 0 0 1 112,180 L8,180 A8,8 0 0 1 0,172 L0,8 A8,8 0 0 1 8,0 Z" />
+    
+    <!-- Film Şeridi / Klaket Sembolü (Ortalanmış) -->
+    <path
+        android:fillColor="#243248"
+        android:pathData="M44,72 h32 c3.3,0 6,2.7 6,6 v24 c0,3.3 -2.7,6 -6,6 H44 c-3.3,0 -6,-2.7 -6,-6 V78 c0,-3.3 2.7,-6 6,-6 Z" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M56,82 v16 l14,-8 Z" />
+</vector>

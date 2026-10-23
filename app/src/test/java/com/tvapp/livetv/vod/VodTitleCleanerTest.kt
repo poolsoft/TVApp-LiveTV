@@ -36,4 +36,12 @@ class VodTitleCleanerTest {
         assertEquals("Deadpool & Wolverine", result.cleanTitle)
         assertEquals("2024", result.year)
     }
+
+    @Test
+    fun cleansCatliWithBracketGenresAndCast() {
+        val input = "Çatli (2026) (Dram-Suç-Biyografi--Vedat Ince-Erhan Ufak-Kadir Coplu)"
+        val result = VodTitleCleaner.clean(input)
+        assertEquals("Çatli", result.cleanTitle)
+        assertEquals("2026", result.year)
+    }
 }

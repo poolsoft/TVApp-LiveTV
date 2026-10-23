@@ -41,12 +41,21 @@ object VodTitleCleaner {
             }
         }
 
-        // 2. Yıl bilgisini temizleme listesine dahil et (bulunduysa)
+        // 2. Parantez ve koseli parantez icindeki aciklamalari (oyuncu, tur, etiket) temizle
+        val textWithoutBrackets = text
+            .replace(Regex("\\([^)]*\\)"), " ")
+            .replace(Regex("\\[[^\\]]*\\]"), " ")
+            .trim()
+        if (textWithoutBrackets.length >= 2) {
+            text = textWithoutBrackets
+        }
+
+        // 3. Yil bilgisini temizle (bulunduysa)
         if (detectedYear != null) {
             text = text.replace(detectedYear, " ")
         }
 
-        // 3. Bilinen tüm gürültü kelimelerini boşlukla değiştir
+        // 3. Bilinen tum gurultu kelimelerini boslukla degistir
         for (pattern in NOISE_PATTERNS) {
             text = pattern.matcher(text).replaceAll(" ")
         }

@@ -214,8 +214,8 @@ class VodHomeActivity : TvRemoteActivity() {
         val posterUrl = displayItem.tmdb?.posterUrl ?: displayItem.catalogItem.logoUrl
         binding.vodHeroPoster.load(posterUrl) {
             crossfade(true)
-            placeholder(R.drawable.bg_vod_poster_card)
-            error(R.drawable.bg_vod_poster_card)
+            placeholder(R.drawable.bg_vod_default_poster)
+            error(R.drawable.bg_vod_default_poster)
         }
 
         val backdropUrl = displayItem.tmdb?.backdropUrl ?: posterUrl
@@ -293,10 +293,20 @@ class VodHomeActivity : TvRemoteActivity() {
             for (item in missing.take(20)) {
                 try {
                     val cleaned = VodTitleCleaner.clean(item.name)
-                    val tmdbResult = if (item.kind == "SERIES") {
+                    val isSeries = item.kind == "SERIES"
+                    var tmdbResult = if (isSeries) {
                         TmdbApiClient.searchTvShow(cleaned.cleanTitle, cleaned.year)
                     } else {
                         TmdbApiClient.searchMovie(cleaned.cleanTitle, cleaned.year)
+                    }
+
+                    // Yıl uyuşmazlığı durumunda sadece temiz başlıkla tekrar dene
+                    if (tmdbResult == null && !cleaned.year.isNullOrBlank()) {
+                        tmdbResult = if (isSeries) {
+                            TmdbApiClient.searchTvShow(cleaned.cleanTitle, null)
+                        } else {
+                            TmdbApiClient.searchMovie(cleaned.cleanTitle, null)
+                        }
                     }
 
                     if (tmdbResult != null) {
