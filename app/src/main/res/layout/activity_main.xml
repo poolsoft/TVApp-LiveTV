@@ -997,8 +997,8 @@
             android:background="@drawable/bg_vod_top_gradient"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="40dp"
-            android:paddingTop="32dp"
+            android:paddingHorizontal="44dp"
+            android:paddingTop="36dp"
             android:paddingBottom="24dp">
 
             <LinearLayout
@@ -1008,9 +1008,8 @@
                 android:background="@drawable/bg_vod_button"
                 android:clickable="true"
                 android:focusable="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:gravity="center"
+                android:paddingHorizontal="18dp">
 
                 <ImageView
                     android:layout_width="20dp"
@@ -1032,37 +1031,19 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
+                android:layout_marginEnd="24dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
-                <LinearLayout
+                <TextView
+                    android:id="@+id/vod_player_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/vod_player_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/vod_player_clock"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:background="@drawable/bg_vod_button"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/vod_player_subtitle"
@@ -1074,6 +1055,15 @@
                     android:textColor="@color/accent"
                     android:textSize="13sp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/vod_player_clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -1083,7 +1073,7 @@
             android:layout_gravity="bottom"
             android:background="@drawable/bg_vod_bottom_gradient"
             android:orientation="vertical"
-            android:paddingHorizontal="40dp"
+            android:paddingHorizontal="44dp"
             android:paddingTop="20dp"
             android:paddingBottom="36dp">
 
@@ -1142,7 +1132,7 @@
                     android:id="@+id/vod_btn_rewind"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:minWidth="74dp"
+                    android:minWidth="76dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1157,14 +1147,15 @@
                     android:id="@+id/vod_btn_play_pause"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:minWidth="120dp"
-                    android:layout_marginStart="12dp"
+                    android:minWidth="116dp"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginEnd="14dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:drawablePadding="8dp"
-                    android:paddingHorizontal="22dp"
+                    android:paddingHorizontal="20dp"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     android:textStyle="bold" />
@@ -1173,8 +1164,7 @@
                     android:id="@+id/vod_btn_forward"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:minWidth="74dp"
-                    android:layout_marginStart="12dp"
+                    android:minWidth="76dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1189,8 +1179,8 @@
                     android:id="@+id/vod_btn_speed"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:minWidth="82dp"
-                    android:layout_marginStart="12dp"
+                    android:minWidth="84dp"
+                    android:layout_marginStart="14dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1205,7 +1195,7 @@
                     android:id="@+id/vod_btn_audio_sub"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="14dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
@@ -1221,7 +1211,7 @@
                     android:id="@+id/vod_btn_restart"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="14dp"
                     android:background="@drawable/bg_vod_button"
                     android:clickable="true"
                     android:focusable="true"
