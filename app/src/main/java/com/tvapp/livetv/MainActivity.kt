@@ -6,6 +6,11 @@ import android.content.pm.PackageManager
 import android.content.ActivityNotFoundException
 import android.content.DialogInterface
 import android.content.Intent
+import com.tvapp.livetv.playback.ChannelZapper
+import com.tvapp.livetv.playback.MultiViewController
+import com.tvapp.livetv.playback.VodPlayerOverlayController
+import com.tvapp.livetv.ui.TrackSelectionHelper
+import com.tvapp.livetv.ui.TvOverlayLayoutHelper
 import com.tvapp.livetv.data.XmlTvRepository
 import android.media.tv.TvContract
 import android.media.tv.TvInputInfo
@@ -182,16 +187,21 @@ class MainActivity : TvRemoteActivity() {
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
     private enum class IptvLibraryContentType { ALL, LIVE, VOD, CONTINUE }
-    private val multiViewDraft = linkedMapOf<String, LiveChannel>()
-    private var multiViewAdding = false
-    private var multiViewDraftInitialized = false
-    private var restoredMultiViewKeys: List<String>? = null
+    private lateinit var multiViewController: MultiViewController
+    private val multiViewDraft: LinkedHashMap<String, LiveChannel>
+        get() = multiViewController.multiViewDraft
+    private var multiViewAdding: Boolean
+        get() = multiViewController.multiViewAdding
+        set(value) { multiViewController.multiViewAdding = value }
+    private var multiViewDraftInitialized: Boolean
+        get() = multiViewController.multiViewDraftInitialized
+        set(value) { multiViewController.multiViewDraftInitialized = value }
+    private var restoredMultiViewKeys: List<String>?
+        get() = multiViewController.restoredMultiViewKeys
+        set(value) { multiViewController.restoredMultiViewKeys = value }
     private enum class IptvControlRow { TIMELINE, BUTTONS }
     private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
-    private enum class VodControlTarget { BACK, TIMELINE, REWIND, PLAY_PAUSE, FORWARD, SPEED, AUDIO_SUB, RESTART }
-    private var selectedVodTarget = VodControlTarget.PLAY_PAUSE
-    private var vodControlsJob: Job? = null
-    private var vodTickerJob: Job? = null
+    private var vodPlayerOverlayController: VodPlayerOverlayController? = null
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -273,12 +283,18 @@ class MainActivity : TvRemoteActivity() {
     private var currentPlaybackUsesIptvLibrary = false
     private var lockedChannelRecordsHistory = true
     private var internalMiniPlayerActive = false
-    private var iptvOverlayActive = false
-    private var iptvOverlayChannel: LiveChannel? = null
-    private var iptvGridActive = false
-    private var gridActiveIndex = 0
-    private var gridLongPressHandled = false
-    private var gridLongPressJob: Job? = null
+    private val iptvOverlayActive: Boolean
+        get() = multiViewController.iptvOverlayActive
+    private val iptvOverlayChannel: LiveChannel?
+        get() = multiViewController.iptvOverlayChannel
+    private val iptvGridActive: Boolean
+        get() = multiViewController.iptvGridActive
+    private val gridActiveIndex: Int
+        get() = multiViewController.gridActiveIndex
+    private val gridFullscreenIndex: Int?
+        get() = multiViewController.gridFullscreenIndex
+    private val gridChannels: List<LiveChannel>
+        get() = multiViewController.gridChannels
     private var yellowLongPressJob: Job? = null
     private var yellowLongPressHandled = false
     private var greenLongPressJob: Job? = null
@@ -287,24 +303,16 @@ class MainActivity : TvRemoteActivity() {
     private var settingsLongPressHandled = false
     private var lastChannelLongPressJob: Job? = null
     private var lastChannelLongPressHandled = false
-    private var gridFullscreenIndex: Int? = null
-    private var gridTifViewportGeneration = 0
-    private var gridReturnChannel: LiveChannel? = null
-    private var gridChannels: List<LiveChannel> = emptyList()
-    private val gridSelectedKeys = mutableListOf<String>()
-    private val gridCells = mutableListOf<FrameLayout>()
-    private val gridPlayerViews = mutableListOf<PlayerView>()
-    private val gridLabels = mutableListOf<TextView>()
-    private val gridControllers = mutableListOf<IptvPlaybackController>()
-    private val renderedGridKeys = mutableListOf<String?>()
-    private var renderedGridTifKey: String? = null
-    private var gridTifSurfaceLayoutListenerAttached = false
     private val unlockedChannels = mutableSetOf<String>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
     private var channelPanelExpanded = false
-    private var numberInput = ""
-    private var numberInputJob: Job? = null
+    private lateinit var channelZapper: ChannelZapper
+    private lateinit var trackSelectionHelper: TrackSelectionHelper
+    private lateinit var tvOverlayLayoutHelper: TvOverlayLayoutHelper
+    private var numberInput: String
+        get() = channelZapper.numberInput
+        set(value) { channelZapper.numberInput = value }
     private var focusedTuneJob: Job? = null
     private var channelResolutionGeneration = 0
     private var infoBarJob: Job? = null
@@ -496,6 +504,10 @@ class MainActivity : TvRemoteActivity() {
         sourceFilter = ChannelSourceFilter.ALL
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
+        setupMultiViewController()
+        setupChannelZapper()
+        setupTrackSelectionHelper()
+        setupTvOverlayLayoutHelper()
         setupIptvControls()
         setupVodPlayerControls()
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
@@ -1513,63 +1525,43 @@ class MainActivity : TvRemoteActivity() {
         hideChannelPanel()
     }
 
+    private fun setupChannelZapper() {
+        channelZapper = ChannelZapper(
+            binding = binding,
+            scope = lifecycleScope,
+            showInfoBar = { showInfoBar() },
+            getNavigationChannels = { playbackNavigationChannels() },
+            getCurrentChannel = { currentChannel },
+            selectChannel = { ch, record -> selectChannel(ch, record) },
+            shouldRecordNavigationHistory = { shouldRecordNavigationHistory() },
+            isMultiViewAdding = { multiViewAdding },
+            toggleMultiViewChannel = { ch -> toggleMultiViewChannel(ch) },
+            isChannelPanelVisible = { binding.channelPanel.visibility == View.VISIBLE },
+            hideChannelPanel = { hideChannelPanel() },
+            focusCurrentListChannel = { focusCurrentListChannel() },
+            pageChannelList = { offset -> pageChannelList(offset) },
+            isIptvLibraryContent = { channelPanelContent == ChannelPanelContent.IPTV_LIBRARY },
+            openIptvLibraryNumber = { num -> openIptvLibraryNumber(num) },
+            isVodMode = { vodMode },
+            isCurrentPlaybackUsesIptvLibrary = { currentPlaybackUsesIptvLibrary },
+            getHistoryKeys = { playbackHistory.keys() },
+        )
+    }
+
     private fun zap(offset: Int) {
-        if (vodMode) return
-        if (multiViewAdding && binding.channelPanel.visibility == View.VISIBLE) {
-            pageChannelList(offset)
-            return
-        }
-        ChannelNavigator.adjacent(playbackNavigationChannels(), currentChannel?.sourceKey, offset)
-            ?.let { channel ->
-                selectChannel(channel, recordHistory = shouldRecordNavigationHistory())
-                if (binding.channelPanel.visibility == View.VISIBLE) {
-                    binding.channelList.post(::focusCurrentListChannel)
-                }
-            }
+        channelZapper.zap(offset)
     }
 
     private fun appendChannelDigit(digit: Int) {
-        if (numberInput.length >= MAX_CHANNEL_DIGITS) numberInput = ""
-        numberInput += digit
-        binding.nowNumber.text = numberInput
-        binding.nowChannel.setText(R.string.channel_number_entry)
-        showInfoBar()
-        numberInputJob?.cancel()
-        numberInputJob = lifecycleScope.launch {
-            delay(NUMBER_ENTRY_TIMEOUT_MS)
-            commitChannelNumber()
-        }
+        channelZapper.appendChannelDigit(digit)
     }
 
     private fun commitChannelNumber() {
-        val entered = numberInput
-        numberInput = ""
-        numberInputJob?.cancel()
-        if (entered.isBlank()) return
-        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-            openIptvLibraryNumber(entered.toIntOrNull())
-            return
-        }
-        ChannelNavigator.byNumber(playbackNavigationChannels(), entered)?.let { channel ->
-            if (multiViewAdding) {
-                toggleMultiViewChannel(channel)
-                return@let
-            }
-            selectChannel(channel, recordHistory = shouldRecordNavigationHistory())
-            if (binding.channelPanel.visibility == View.VISIBLE) hideChannelPanel()
-        } ?: run { binding.nowChannel.setText(R.string.channel_not_found) }
+        channelZapper.commitChannelNumber()
     }
 
     private fun openPreviousChannel() {
-        if (currentPlaybackUsesIptvLibrary) {
-            zap(-1)
-            return
-        }
-        ChannelNavigator.previousDistinct(
-            playbackNavigationChannels(),
-            playbackHistory.keys(),
-            currentChannel?.sourceKey,
-        )?.let(::selectChannel)
+        channelZapper.openPreviousChannel()
     }
 
     private fun playbackNavigationChannels(): List<LiveChannel> {
@@ -2241,176 +2233,41 @@ class MainActivity : TvRemoteActivity() {
 
 
     private fun setupVodPlayerControls() {
-        binding.vodBtnBack.setOnClickListener {
-            openVodLibrary()
-        }
-        binding.vodTimelineRow.setOnClickListener {
-            selectedVodTarget = VodControlTarget.TIMELINE
-            renderVodControlSelection()
-            iptvPlayback.togglePlayPause()
-            updateVodPlayerControls()
-            showVodPlayerControls()
-        }
-        binding.vodBtnRewind.setOnClickListener {
-            selectedVodTarget = VodControlTarget.REWIND
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
-        binding.vodBtnPlayPause.setOnClickListener {
-            selectedVodTarget = VodControlTarget.PLAY_PAUSE
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
-        binding.vodBtnForward.setOnClickListener {
-            selectedVodTarget = VodControlTarget.FORWARD
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
-        binding.vodBtnSpeed.setOnClickListener {
-            selectedVodTarget = VodControlTarget.SPEED
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
-        binding.vodBtnAudioSub.setOnClickListener {
-            selectedVodTarget = VodControlTarget.AUDIO_SUB
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
-        binding.vodBtnRestart.setOnClickListener {
-            selectedVodTarget = VodControlTarget.RESTART
-            activateSelectedVodTarget()
-            showVodPlayerControls()
-        }
+        val controller = VodPlayerOverlayController(
+            binding = binding,
+            iptvPlayback = iptvPlayback,
+            scope = lifecycleScope,
+            onOpenVodLibrary = { openVodLibrary() },
+            onShowSpeedChoices = { showIptvSpeedChoices() },
+            onShowAudioTracks = { showAudioTracks() },
+            onHideInfoBar = {
+                setInfoBarVisible(false)
+                infoBarJob?.cancel()
+                binding.infoBar.visibility = View.GONE
+                if (binding.channelPanel.visibility == View.VISIBLE) {
+                    binding.channelPanel.visibility = View.GONE
+                }
+                binding.iptvPlaybackContainer.visibility = View.GONE
+            },
+            getCurrentChannel = { currentChannel },
+            getSourceName = { ch -> iptvSourceNames[ch.inputId] ?: getString(R.string.iptv_library_vod) },
+            formatPlaybackTime = { ms -> formatPlaybackTime(ms) },
+            getString = { resId -> getString(resId) },
+        )
+        controller.setup()
+        vodPlayerOverlayController = controller
     }
 
-    private var isShowingVodControls = false
-
     private fun showVodPlayerControls(autoHide: Boolean = true) {
-        if (isShowingVodControls) return
-        isShowingVodControls = true
-        try {
-            setInfoBarVisible(false)
-            infoBarJob?.cancel()
-            binding.infoBar.visibility = View.GONE
-            if (binding.channelPanel.visibility == View.VISIBLE) {
-                binding.channelPanel.visibility = View.GONE
-            }
-            binding.iptvPlaybackContainer.visibility = View.GONE
-            binding.vodPlayerOverlay.visibility = View.VISIBLE
-
-        updateVodPlayerControls()
-        renderVodControlSelection()
-
-        vodTickerJob?.cancel()
-        vodTickerJob = lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                while (binding.vodPlayerOverlay.visibility == View.VISIBLE) {
-                    updateVodPlayerControls()
-                    delay(500L)
-                }
-            }
-        }
-
-        vodControlsJob?.cancel()
-        if (!autoHide) return
-        vodControlsJob = lifecycleScope.launch {
-            delay(8_000L)
-            hideVodPlayerControls()
-        }
-        } finally {
-            isShowingVodControls = false
-        }
+        vodPlayerOverlayController?.showControls(autoHide)
     }
 
     private fun hideVodPlayerControls() {
-        vodControlsJob?.cancel()
-        vodTickerJob?.cancel()
-        binding.vodPlayerOverlay.visibility = View.GONE
+        vodPlayerOverlayController?.hideControls()
     }
 
     private fun updateVodPlayerControls() {
-        val state = iptvPlayback.playbackSnapshot()
-        binding.vodPlayerTitle.text = currentChannel?.displayName ?: ""
-        val sourceName = currentChannel?.let { iptvSourceNames[it.inputId] } ?: getString(R.string.iptv_library_vod)
-        binding.vodPlayerSubtitle.text = sourceName
-        binding.vodPlayerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-
-        val duration = state.durationMillis.coerceAtLeast(1L)
-        binding.vodProgressBar.isIndeterminate = state.durationMillis <= 0L
-        binding.vodProgressBar.progress =
-            ((state.positionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
-        binding.vodProgressBar.secondaryProgress =
-            ((state.bufferedPositionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
-
-        binding.vodTimeCurrent.text = if (state.playbackSpeed != null) formatPlaybackTime(state.positionMillis)
-            else getString(R.string.unknown_value)
-        val remaining = (state.durationMillis - state.positionMillis).coerceAtLeast(0L)
-        binding.vodTimeDuration.text = if (state.durationMillis > 0) {
-            "-${formatPlaybackTime(remaining)} / ${formatPlaybackTime(state.durationMillis)}"
-        } else {
-            getString(R.string.unknown_value)
-        }
-
-        val isPlaying = state.isPlaying
-        binding.vodBtnPlayPause.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
-            0,
-            0,
-            0,
-        )
-        binding.vodBtnPlayPause.setText(if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label)
-        binding.vodBtnSpeed.text = state.playbackSpeed?.let { String.format(Locale.getDefault(), "%.2gx", it) }
-            ?: "1.0x"
-    }
-
-    private fun renderVodControlSelection() {
-        fun highlight(view: View, isSelected: Boolean) {
-            val bgRes = if (isSelected) R.drawable.bg_vod_button_selected else R.drawable.bg_vod_button
-            view.setBackgroundResource(bgRes)
-            if (isSelected) view.requestFocus()
-        }
-
-        highlight(binding.vodBtnBack, selectedVodTarget == VodControlTarget.BACK)
-        if (selectedVodTarget == VodControlTarget.TIMELINE) {
-            binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline_selected)
-            binding.vodTimelineRow.requestFocus()
-        } else {
-            binding.vodTimelineRow.background = null
-        }
-        highlight(binding.vodBtnRewind, selectedVodTarget == VodControlTarget.REWIND)
-        highlight(binding.vodBtnPlayPause, selectedVodTarget == VodControlTarget.PLAY_PAUSE)
-        highlight(binding.vodBtnForward, selectedVodTarget == VodControlTarget.FORWARD)
-        highlight(binding.vodBtnSpeed, selectedVodTarget == VodControlTarget.SPEED)
-        highlight(binding.vodBtnAudioSub, selectedVodTarget == VodControlTarget.AUDIO_SUB)
-        highlight(binding.vodBtnRestart, selectedVodTarget == VodControlTarget.RESTART)
-    }
-
-    private fun cycleVodButton(direction: Int) {
-        val buttonRow = listOf(
-            VodControlTarget.REWIND,
-            VodControlTarget.PLAY_PAUSE,
-            VodControlTarget.FORWARD,
-            VodControlTarget.SPEED,
-            VodControlTarget.AUDIO_SUB,
-            VodControlTarget.RESTART,
-        )
-        val idx = buttonRow.indexOf(selectedVodTarget).coerceAtLeast(0)
-        selectedVodTarget = buttonRow[(idx + direction + buttonRow.size) % buttonRow.size]
-        renderVodControlSelection()
-    }
-
-    private fun activateSelectedVodTarget() {
-        when (selectedVodTarget) {
-            VodControlTarget.BACK -> openVodLibrary()
-            VodControlTarget.TIMELINE,
-            VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()
-            VodControlTarget.REWIND -> iptvPlayback.seekBy(-10_000L)
-            VodControlTarget.FORWARD -> iptvPlayback.seekBy(10_000L)
-            VodControlTarget.SPEED -> showIptvSpeedChoices()
-            VodControlTarget.AUDIO_SUB -> showAudioTracks()
-            VodControlTarget.RESTART -> iptvPlayback.restartVod()
-        }
-        updateVodPlayerControls()
+        vodPlayerOverlayController?.updateControls()
     }
 
     private fun updateIptvPlaybackControls() {
@@ -3030,35 +2887,23 @@ class MainActivity : TvRemoteActivity() {
         )
     }
 
-    private fun displayLanguage(code: String): String = Locale.forLanguageTag(code)
-        .getDisplayLanguage(Locale("tr"))
-        .takeIf(String::isNotBlank)
-        ?: code.uppercase(Locale.ROOT)
+    private fun setupTrackSelectionHelper() {
+        trackSelectionHelper = TrackSelectionHelper(
+            activity = this,
+            playback = playback,
+            iptvPlayback = iptvPlayback,
+            getCurrentChannel = { currentChannel },
+            showEditorError = { resId -> showEditorError(resId) },
+            rememberChannelAudioLanguage = { lang -> rememberChannelAudioLanguage(lang) },
+            rememberChannelSubtitle = { lang -> rememberChannelSubtitle(lang) },
+            rememberChannelSubtitlesOff = { rememberChannelSubtitlesOff() },
+        )
+    }
+
+    private fun displayLanguage(code: String): String = trackSelectionHelper.displayLanguage(code)
 
     private fun showAudioTracks() {
-        if (currentChannel?.source == LiveChannel.Source.IPTV) {
-            showIptvAudioTracks()
-            return
-        }
-        val tracks = playback.audioTracks()
-        if (tracks.isEmpty()) {
-            showEditorError(R.string.tracks_not_available)
-            return
-        }
-        val selected = playback.selectedTrackId(TvTrackInfo.TYPE_AUDIO)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.audio_tracks)
-            .setSingleChoiceItems(
-                tracks.map(::trackLabel).toTypedArray(),
-                tracks.indexOfFirst { it.id == selected },
-            ) { dialog, which ->
-                val track = tracks[which]
-                playback.selectAudio(track.id)
-                rememberChannelAudioLanguage(track.language)
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        trackSelectionHelper.showAudioTracks()
     }
 
     /** TXT/Teletext remote key. Temporary behavior until a real teletext
@@ -3076,8 +2921,7 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         vodMode = true
-        numberInputJob?.cancel()
-        numberInput = ""
+        channelZapper.clearNumberInput()
         focusedTuneJob?.cancel()
     }
 
@@ -3145,88 +2989,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun showSubtitleTracks() {
-        if (currentChannel?.source == LiveChannel.Source.IPTV) {
-            showIptvSubtitleTracks()
-            return
-        }
-        val tracks = playback.subtitleTracks()
-        val selected = playback.selectedTrackId(TvTrackInfo.TYPE_SUBTITLE)
-        val labels = buildList {
-            add(getString(R.string.subtitles_off))
-            addAll(tracks.map(::trackLabel))
-        }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.subtitle_tracks)
-            .setSingleChoiceItems(labels, tracks.indexOfFirst { it.id == selected } + 1) {
-                    dialog, which ->
-                if (which == 0) {
-                    playback.selectSubtitle(null)
-                    rememberChannelSubtitlesOff()
-                } else {
-                    val track = tracks[which - 1]
-                    playback.selectSubtitle(track.id)
-                    rememberChannelSubtitle(track.language)
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        trackSelectionHelper.showSubtitleTracks()
     }
 
-    private fun trackLabel(track: TvTrackInfo): String {
-        val language = track.language?.takeIf(String::isNotBlank)?.let { code ->
-            Locale.forLanguageTag(code).getDisplayLanguage(Locale("tr"))
-                .takeIf(String::isNotBlank)
-                ?: code.uppercase(Locale.ROOT)
-        } ?: getString(R.string.unknown_language)
-        val description = track.description?.toString()?.takeIf(String::isNotBlank)
-        return listOfNotNull(language, description).distinct().joinToString(" · ")
-    }
-
-    private fun showIptvAudioTracks() {
-        val tracks = iptvPlayback.audioTracks()
-        if (tracks.isEmpty()) {
-            showEditorError(R.string.tracks_not_available)
-            return
-        }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.audio_tracks)
-            .setSingleChoiceItems(
-                tracks.map(::iptvTrackLabel).toTypedArray(),
-                tracks.indexOfFirst(IptvTrackOption::selected),
-            ) { dialog, which ->
-                val track = tracks[which]
-                iptvPlayback.selectAudioTrack(track.id)
-                rememberChannelAudioLanguage(track.language)
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
-    }
-
-    private fun showIptvSubtitleTracks() {
-        val tracks = iptvPlayback.subtitleTracks()
-        val labels = buildList {
-            add(getString(R.string.subtitles_off))
-            addAll(tracks.map(::iptvTrackLabel))
-        }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.subtitle_tracks)
-            .setSingleChoiceItems(labels, tracks.indexOfFirst(IptvTrackOption::selected) + 1) {
-                    dialog, which ->
-                if (which == 0) {
-                    iptvPlayback.selectSubtitleTrack(null)
-                    rememberChannelSubtitlesOff()
-                } else {
-                    val track = tracks[which - 1]
-                    iptvPlayback.selectSubtitleTrack(track.id)
-                    rememberChannelSubtitle(track.language)
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
-    }
+    private fun trackLabel(track: TvTrackInfo): String = trackSelectionHelper.trackLabel(track)
 
     private fun applyPreferredIptvTracks() {
         displayPreferences = displayPreferencesStore.load()
@@ -3264,12 +3030,7 @@ class MainActivity : TvRemoteActivity() {
         binding.techSlotSubtitle.visibility = if (subtitleTracks.isEmpty()) View.GONE else View.VISIBLE
     }
 
-    private fun iptvTrackLabel(track: IptvTrackOption): String {
-        val language = track.language?.takeIf(String::isNotBlank)?.let(::displayLanguage)
-            ?: getString(R.string.unknown_language)
-        return listOfNotNull(language, track.label?.takeIf(String::isNotBlank))
-            .distinct().joinToString(" · ")
-    }
+    private fun iptvTrackLabel(track: IptvTrackOption): String = trackSelectionHelper.iptvTrackLabel(track)
 
     private fun openDisplaySettings() {
         displaySettings.launch(Intent(this, DisplaySettingsActivity::class.java))
@@ -3439,8 +3200,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun hideChromeForPictureInPicture() {
         infoBarJob?.cancel()
-        numberInputJob?.cancel()
-        numberInput = ""
+        channelZapper.clearNumberInput()
         osdCoordinator.clearOsd()
         binding.audioOnlyPanel.visibility = View.GONE
     }
@@ -4086,666 +3846,66 @@ class MainActivity : TvRemoteActivity() {
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).toInt()
 
-    private fun prepareIptvGrid() {
-        if (gridCells.isNotEmpty()) return
-        repeat(4) { index ->
-            val cell = layoutInflater.inflate(
-                R.layout.view_iptv_grid_cell,
-                binding.iptvGrid,
-                false,
-            ) as FrameLayout
-            val playerView = cell.findViewById<PlayerView>(R.id.grid_player)
-            val label = cell.findViewById<TextView>(R.id.grid_label)
-            cell.layoutParams = GridLayout.LayoutParams(
-                GridLayout.spec(index / 2, 1, GridLayout.FILL, 1f),
-                GridLayout.spec(index % 2, 1, GridLayout.FILL, 1f),
-            ).apply {
-                width = 0
-                height = 0
-                setMargins(3.dp, 3.dp, 3.dp, 3.dp)
-            }
-            cell.setOnClickListener {
-                if (index in gridChannels.indices) {
-                    gridActiveIndex = index
-                    updateIptvGridFocus()
-                    openActiveGridChannel()
-                }
-            }
-            binding.iptvGrid.addView(cell)
-            cell.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                // Cell bounds change on every grid layout transition (2/3/4
-                // cells, fullscreen). Re-position the shared TIF surface then;
-                // a single post() misses later layout passes and leaves the
-                // DVB picture black or misplaced.
-                if (iptvGridActive) positionGridTifSurface()
-            }
-            gridCells += cell
-            gridPlayerViews += playerView
-            gridLabels += label
-            renderedGridKeys += null
-            gridControllers += IptvPlaybackController(context = this, playerView = playerView, profile = gridProfileForCellCount(deviceResourcePolicy.maximumGridStreams)).apply {
-                onHealthChanged = {
-                    if (iptvGridActive && gridFullscreenIndex != null && gridFullscreenIndex != index) pause()
-                }
-                onPlaybackError = { error ->
-                    debugLog.recordDebug(
-                        "IPTV_GRID_FAILURE | cell=$index, ${error.errorCodeName}",
-                    )
-                }
-            }
-        }
-    }
-
-    private fun availableMultiViewChannels(): List<LiveChannel> = buildList {
-        addAll(channels)
-        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) addAll(iptvLibraryChannels)
-    }.asSequence()
-        .filter { it.source == LiveChannel.Source.TIF || it.source == LiveChannel.Source.IPTV }
-        .filter {
-            it.source != LiveChannel.Source.IPTV ||
-                it.iptvContentType != IptvLibraryContentType.VOD.name
-        }
-        .distinctBy { it.sourceKey }
-        .toList()
-
-    private fun checkSourceConnections(selected: List<LiveChannel>, proceed: () -> Unit) {
-        val background = currentChannel?.sourceKey
-        val grid = gridChannels.map { it.sourceKey }
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { iptvRepository.connectionLimitViolation(selected) } }
-            if (background != currentChannel?.sourceKey || grid != gridChannels.map { it.sourceKey }) return@launch
-            result.onSuccess { violation ->
-                if (violation == null) proceed() else Toast.makeText(this@MainActivity,
-                    getString(R.string.iptv_source_connection_limit_reached, violation.first, violation.second), Toast.LENGTH_LONG).show()
-            }.onFailure { debugLog.recordDebug("IPTV_CONNECTION_LIMIT_FAILURE | ${it.javaClass.simpleName}") }
-        }
-    }
-
-    private fun startIptvOverlay(channel: LiveChannel, connectionsChecked: Boolean = false) {
-        if (!hasIptvAccess { startIptvOverlay(channel) }) return
-        val background = if (iptvGridActive) {
-            gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } ?: gridReturnChannel
-        } else currentChannel
-        if (background == null) return
-        if (channel.source != LiveChannel.Source.IPTV) {
-            Toast.makeText(this, R.string.iptv_pip_requires_iptv, Toast.LENGTH_LONG).show()
-            return
-        }
-        if (channel.sourceKey == background.sourceKey) {
-            Toast.makeText(this, R.string.iptv_pip_requires_different_channel, Toast.LENGTH_LONG).show()
-            return
-        }
-        if (!connectionsChecked) {
-            checkSourceConnections(listOf(background, channel)) { startIptvOverlay(channel, connectionsChecked = true) }
-            return
-        }
-        if (iptvGridActive) {
-            stopIptvGrid(resumePrevious = false)
-            playSelectedChannel(background, recordHistory = false)
-        }
-        iptvOverlayActive = true
-        iptvOverlayChannel = channel
-        multiViewDraftInitialized = true
-        multiViewDraft.clear()
-        listOf(background, channel).forEach { multiViewDraft[it.sourceKey] = it }
-        endBlackout("IPTV_OVERLAY")
-        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_OVERLAY)
-        val width = (resources.displayMetrics.widthPixels * 0.32f).toInt()
-        val height = (width * 9f / 16f).toInt()
-        binding.secondaryIptvPlayerView.layoutParams =
-            (binding.secondaryIptvPlayerView.layoutParams as FrameLayout.LayoutParams).apply {
-                this.width = width
-                this.height = height
-                gravity = Gravity.END or Gravity.BOTTOM
-                setMargins(20.dp, 20.dp, 20.dp, 20.dp)
-            }
-        binding.secondaryIptvPlayerView.elevation = 16.dp.toFloat()
-        binding.secondaryIptvPlayerView.visibility = View.VISIBLE
-        secondaryIptvPlayback.setMuted(true)
-        secondaryIptvPlayback.play(channel)
-        hideChannelPanel()
-        debugLog.recordDebug("IPTV_OVERLAY_START | channel=${channel.sourceKey}")
-    }
-
-    private fun stopIptvOverlay() {
-        if (!iptvOverlayActive) return
-        iptvOverlayActive = false
-        iptvOverlayChannel = null
-        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
-        secondaryIptvPlayback.stop()
-        binding.secondaryIptvPlayerView.visibility = View.GONE
-        debugLog.recordDebug("IPTV_OVERLAY_STOP")
-    }
-
-    private fun beginMultiViewChannelSelection() {
-        focusedTuneJob?.cancel()
-        multiViewAdding = true
-        showChannelPanel(expanded = false)
-        updateChannelActionLabels()
-        channelPanelJob?.cancel()
-    }
-
-    private fun toggleMultiViewChannel(channel: LiveChannel) {
-        multiViewDraftInitialized = true
-        val selectingFromList = multiViewAdding
-        lifecycleScope.launch {
-            val resolved = if (channel.source == LiveChannel.Source.IPTV && channel.uri.isBlank()) {
-                withContext(Dispatchers.IO) { iptvRepository.channel(channel.sourceKey) } ?: return@launch
-            } else channel
-            if (selectingFromList && !multiViewAdding) return@launch
-            when {
-                resolved.sourceKey in multiViewDraft -> multiViewDraft.remove(resolved.sourceKey)
-                resolved.iptvContentType == IptvLibraryContentType.VOD.name ->
-                    Toast.makeText(this@MainActivity, R.string.multiview_live_only, Toast.LENGTH_SHORT).show()
-                multiViewDraft.size >= deviceResourcePolicy.maximumGridStreams ->
-                    Toast.makeText(this@MainActivity, getString(R.string.iptv_grid_maximum, deviceResourcePolicy.maximumGridStreams), Toast.LENGTH_SHORT).show()
-                resolved.source == LiveChannel.Source.TIF && multiViewDraft.values.any { it.source == LiveChannel.Source.TIF } ->
-                    Toast.makeText(this@MainActivity, R.string.multiview_requires_single_tuner, Toast.LENGTH_SHORT).show()
-                else -> {
-                    val violation = withContext(Dispatchers.IO) {
-                        iptvRepository.connectionLimitViolation(multiViewDraft.values.toList() + resolved)
-                    }
-                    if (selectingFromList && !multiViewAdding) return@launch
-                    if (violation == null) multiViewDraft[resolved.sourceKey] = resolved
-                    else Toast.makeText(this@MainActivity,
-                        getString(R.string.iptv_source_connection_limit_reached, violation.first, violation.second), Toast.LENGTH_LONG).show()
-                }
-            }
-            if (multiViewAdding) updateChannelActionLabels()
-        }
+    private fun setupMultiViewController() {
+        multiViewController = MultiViewController(
+            activity = this,
+            binding = binding,
+            playback = playback,
+            iptvPlayback = iptvPlayback,
+            secondaryIptvPlayback = secondaryIptvPlayback,
+            iptvRepository = iptvRepository,
+            deviceResourcePolicy = deviceResourcePolicy,
+            osdCoordinator = osdCoordinator,
+            debugLog = debugLog,
+            scope = lifecycleScope,
+            getCurrentChannel = { currentChannel },
+            getAllChannels = { channels },
+            getIptvLibraryChannels = { iptvLibraryChannels },
+            isChannelPanelContentIptvLibrary = { channelPanelContent == ChannelPanelContent.IPTV_LIBRARY },
+            isVodMode = { vodMode },
+            openVodLibrary = { openVodLibrary() },
+            hasIptvAccess = { action -> hasIptvAccess(action) },
+            playSelectedChannel = { channel, recordHistory -> playSelectedChannel(channel, recordHistory) },
+            endBlackout = { reason -> endBlackout(reason) },
+            showChannelPanel = { expanded -> showChannelPanel(expanded) },
+            hideChannelPanel = { hideChannelPanel() },
+            setInfoBarVisible = { visible -> setInfoBarVisible(visible) },
+            updateChannelActionLabels = { updateChannelActionLabels() },
+            cancelFocusedTuneJob = { focusedTuneJob?.cancel() },
+            cancelChannelPanelJob = { channelPanelJob?.cancel() },
+        )
     }
 
     private fun showIptvGridPicker(initialSelection: List<LiveChannel>? = null) {
-        if (vodMode) {
-            openVodLibrary()
-            return
-        }
-        val restored = restoredMultiViewKeys
-        if (initialSelection == null && restored != null) {
-            restoredMultiViewKeys = null
-            val known = channels.associateBy { it.sourceKey }
-            lifecycleScope.launch {
-                val selection = withContext(Dispatchers.IO) {
-                    restored.take(4).mapNotNull { known[it] ?: iptvRepository.channel(it) }
-                }
-                if (!isFinishing && !isDestroyed) showIptvGridPicker(selection)
-            }
-            return
-        }
-        val initial = initialSelection ?: when {
-            multiViewDraftInitialized -> multiViewDraft.values.toList()
-            iptvGridActive -> gridChannels
-            iptvOverlayActive -> listOfNotNull(currentChannel, iptvOverlayChannel)
-            else -> multiViewDraft.values.toList()
-        }
-        multiViewDraftInitialized = true
-        multiViewDraft.clear()
-        initial.forEach { multiViewDraft[it.sourceKey] = it }
-        focusedTuneJob?.cancel()
-        hideChannelPanel()
-        val themedContext = ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)
-        val dialogView = LayoutInflater.from(themedContext).inflate(R.layout.dialog_multiview_picker, null)
-        val selectionLabel: TextView = dialogView.findViewById(R.id.picker_selection_label)
-        val recyclerView: RecyclerView = dialogView.findViewById(R.id.picker_recycler)
-        recyclerView.layoutManager = LinearLayoutManager(themedContext)
-        recyclerView.layoutParams.height = (multiViewDraft.size.coerceIn(1, 4) * 52).dp
-        recyclerView.visibility = if (multiViewDraft.isEmpty()) View.GONE else View.VISIBLE
-        lateinit var dialog: AlertDialog
-        val adapter = MultiViewChannelAdapter { channel, _ ->
-            multiViewDraft.remove(channel.sourceKey)
-            dialog.dismiss()
-            showIptvGridPicker(multiViewDraft.values.toList())
-        }
-        recyclerView.adapter = adapter
-        adapter.submitList(multiViewDraft.values.toList(), multiViewDraft)
-        selectionLabel.text = if (multiViewDraft.isEmpty()) getString(R.string.multiview_picker_none_selected)
-            else getString(R.string.multiview_picker_filter, getString(R.string.multiview_selected_filter), multiViewDraft.size)
-        fun startSelected() {
-            val selected = multiViewDraft.values.toList()
-            if (selected.isEmpty()) return
-            if (selected.size == 1 && selected.single().source == LiveChannel.Source.IPTV &&
-                selected.single().sourceKey != currentChannel?.sourceKey && currentChannel != null
-            ) {
-                AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
-                    .setTitle(R.string.multiview_single_mode)
-                    .setItems(arrayOf(getString(R.string.pip_start_action), getString(R.string.iptv_grid_start))) { _, mode ->
-                        dialog.dismiss()
-                        if (mode == 0) startIptvOverlay(selected.single()) else startIptvGrid(selected)
-                    }.setNegativeButton(R.string.cancel, null).show()
-            } else {
-                dialog.dismiss()
-                startIptvGrid(selected)
-            }
-        }
-        fun addChannels() {
-            dialog.dismiss()
-            beginMultiViewChannelSelection()
-        }
-        dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
-            .setView(dialogView)
-            .setPositiveButton(R.string.iptv_grid_start, null)
-            .setNeutralButton(R.string.multiview_add_channels, null)
-            .setNegativeButton(R.string.close, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).apply {
-                isEnabled = multiViewDraft.isNotEmpty()
-                setOnClickListener { startSelected() }
-            }
-            dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener { addChannels() }
-            if (multiViewDraft.isEmpty()) dialog.getButton(DialogInterface.BUTTON_NEUTRAL).requestFocus()
-            else recyclerView.requestFocus()
-        }
-        dialog.setOnKeyListener { _, code, event ->
-            if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return@setOnKeyListener false
-            when (code) {
-                KeyEvent.KEYCODE_PROG_GREEN -> { startSelected(); true }
-                KeyEvent.KEYCODE_PROG_YELLOW -> { addChannels(); true }
-                KeyEvent.KEYCODE_PROG_RED -> {
-                    multiViewDraft.clear()
-                    dialog.dismiss()
-                    showIptvGridPicker(emptyList())
-                    true
-                }
-                else -> false
-            }
-        }
-        dialog.show()
+        multiViewController.showIptvGridPicker(initialSelection)
     }
 
     private fun startIptvGrid(selected: List<LiveChannel>, connectionsChecked: Boolean = false) {
-        val distinct = selected.distinctBy { it.sourceKey }
-        if (distinct.isEmpty()) return
-        if (distinct.size > deviceResourcePolicy.maximumGridStreams) {
-            Toast.makeText(this, getString(R.string.iptv_grid_maximum, deviceResourcePolicy.maximumGridStreams), Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (distinct.count { it.source == LiveChannel.Source.TIF } > 1) {
-            Toast.makeText(this, R.string.multiview_requires_single_tuner, Toast.LENGTH_LONG).show()
-            return
-        }
-        if (distinct.any { it.source == LiveChannel.Source.IPTV } &&
-            !hasIptvAccess { startIptvGrid(distinct) }
-        ) return
-        if (!connectionsChecked) {
-            checkSourceConnections(distinct) { startIptvGrid(distinct, connectionsChecked = true) }
-            return
-        }
-        prepareIptvGrid()
-        stopIptvOverlay()
-        val previousActiveKey = gridChannels.getOrNull(gridActiveIndex)?.sourceKey
-        if (!iptvGridActive) {
-            gridReturnChannel = currentChannel
-            playback.stop()
-            iptvPlayback.stop()
-        }
-        gridChannels = distinct
-        gridSelectedKeys.clear()
-        gridSelectedKeys += distinct.map { it.sourceKey }
-        gridActiveIndex = distinct.indexOfFirst { it.sourceKey == (previousActiveKey ?: currentChannel?.sourceKey) }
-            .takeIf { it >= 0 } ?: 0
-        gridFullscreenIndex = null
-        iptvGridActive = true
-        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.IPTV_GRID)
-        endBlackout("IPTV_GRID")
-        binding.iptvPlayerView.visibility = View.GONE
-        binding.audioOnlyPanel.visibility = View.GONE
-        hideChannelPanel()
-        setInfoBarVisible(false)
-        renderIptvGrid()
-        debugLog.recordDebug("MULTIVIEW_START | channels=${gridChannels.joinToString { it.sourceKey }}")
-    }
-
-    private fun renderIptvGrid() {
-        multiViewDraftInitialized = true
-        multiViewDraft.clear()
-        gridChannels.forEach { multiViewDraft[it.sourceKey] = it }
-        val tifChannel = gridChannels.firstOrNull { it.source == LiveChannel.Source.TIF }
-        gridControllers.forEachIndexed { index, controller ->
-            val channel = gridChannels.getOrNull(index)
-            gridCells[index].visibility = if (channel == null) View.INVISIBLE else View.VISIBLE
-            gridLabels[index].text = channel?.displayName.orEmpty()
-            if (channel == null || channel.source == LiveChannel.Source.TIF) {
-                if (renderedGridKeys[index] != null) controller.stop()
-                renderedGridKeys[index] = null
-                gridPlayerViews[index].visibility = View.GONE
-            } else {
-                gridPlayerViews[index].visibility = View.VISIBLE
-                if (renderedGridKeys[index] != channel.sourceKey) {
-                    controller.stop()
-                    controller.setMuted(index != gridActiveIndex)
-                    controller.play(channel)
-                    renderedGridKeys[index] = channel.sourceKey
-                }
-            }
-        }
-        if (tifChannel == null) {
-            if (renderedGridTifKey != null) playback.stop()
-            renderedGridTifKey = null
-            binding.tvView.visibility = View.GONE
-        } else {
-            if (renderedGridTifKey != tifChannel.sourceKey) {
-                binding.tvView.visibility = View.GONE
-                playback.stop()
-                binding.tvView.setVideoSize(0, 0)
-                renderedGridTifKey = tifChannel.sourceKey
-            }
-        }
-        applyIptvGridLayout()
-        updateIptvGridFocus()
-        binding.iptvGrid.post(::positionGridTifSurface)
-    }
-
-    private fun applyIptvGridLayout() {
-        val count = gridChannels.size
-        val fullscreen = gridFullscreenIndex
-        gridCells.forEachIndexed { index, cell ->
-            if (index !in gridChannels.indices) {
-                cell.visibility = View.GONE
-                cell.layoutParams = GridLayout.LayoutParams(
-                    GridLayout.spec(index / 2, 1, GridLayout.FILL, 0f),
-                    GridLayout.spec(index % 2, 1, GridLayout.FILL, 0f),
-                ).apply {
-                    width = 0
-                    height = 0
-                }
-                return@forEachIndexed
-            }
-            if (fullscreen != null && fullscreen != index) {
-                gridControllers[index].pause()
-                cell.visibility = View.GONE
-                return@forEachIndexed
-            }
-            cell.visibility = View.VISIBLE
-            val rowSpec: GridLayout.Spec
-            val columnSpec: GridLayout.Spec
-            when {
-                fullscreen == index || count == 1 -> {
-                    rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
-                    columnSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
-                }
-                count <= 2 -> {
-                    rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
-                    columnSpec = GridLayout.spec(index.coerceIn(0, 1), 1, GridLayout.FILL, 1f)
-                }
-                count == 3 && index == 0 -> {
-                    rowSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f)
-                    columnSpec = GridLayout.spec(0, 1, GridLayout.FILL, 1f)
-                }
-                count == 3 -> {
-                    rowSpec = GridLayout.spec((index - 1).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
-                    columnSpec = GridLayout.spec(1, 1, GridLayout.FILL, 1f)
-                }
-                else -> {
-                    rowSpec = GridLayout.spec((index / 2).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
-                    columnSpec = GridLayout.spec((index % 2).coerceIn(0, 1), 1, GridLayout.FILL, 1f)
-                }
-            }
-            cell.layoutParams = GridLayout.LayoutParams(rowSpec, columnSpec).apply {
-                width = 0
-                height = 0
-                val margin = if (fullscreen == index) 0 else 3.dp
-                setMargins(margin, margin, margin, margin)
-            }
-        }
-        binding.iptvGrid.requestLayout()
-        if (!gridTifSurfaceLayoutListenerAttached) {
-            gridTifSurfaceLayoutListenerAttached = true
-            // Catches grid-wide layout passes (view visibility, grid position
-            // or bounds changes) that individual cell listeners do not see.
-            binding.iptvGrid.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                if (iptvGridActive) positionGridTifSurface()
-            }
-        }
-        binding.iptvGrid.post(::positionGridTifSurface)
-        binding.iptvGrid.doOnLayout {
-            if (!iptvGridActive) return@doOnLayout
-            gridControllers.forEachIndexed { index, controller ->
-                if (gridCells[index].visibility == View.VISIBLE &&
-                    gridChannels.getOrNull(index)?.source == LiveChannel.Source.IPTV
-                ) {
-                    controller.reattachVideoSurface()
-                    controller.goLive()
-                    controller.play()
-                }
-            }
-        }
-    }
-
-    private fun positionGridTifSurface() {
-        val tifIndex = gridChannels.indexOfFirst { it.source == LiveChannel.Source.TIF }
-        if (!iptvGridActive || tifIndex !in gridCells.indices) return
-        if (gridFullscreenIndex != null && gridFullscreenIndex != tifIndex) {
-            gridTifViewportGeneration++
-            binding.tvView.visibility = View.GONE
-            return
-        }
-        val cell = gridCells[tifIndex]
-        binding.tvView.fitSurfaceToBounds = true
-        if (cell.width <= 0 || cell.height <= 0) return
-        val targetLeft = (binding.iptvGrid.x + cell.x).toInt()
-        val targetTop = (binding.iptvGrid.y + cell.y).toInt()
-        val params = binding.tvView.layoutParams as FrameLayout.LayoutParams
-        if (
-            binding.tvView.visibility == View.VISIBLE &&
-            params.width == cell.width &&
-            params.height == cell.height &&
-            params.leftMargin == targetLeft &&
-            params.topMargin == targetTop
-        ) {
-            // Already positioned for this layout; skip the redundant update so
-            // repeated layout passes cannot flip the surface into rebuild loops.
-            return
-        }
-        binding.tvView.layoutParams = params.apply {
-            width = cell.width
-            height = cell.height
-            leftMargin = targetLeft
-            topMargin = targetTop
-            rightMargin = 0
-            bottomMargin = 0
-            gravity = Gravity.TOP or Gravity.START
-        }
-        binding.tvView.visibility = View.VISIBLE
-        val generation = ++gridTifViewportGeneration
-        val channel = gridChannels[tifIndex]
-        binding.tvView.doOnLayout {
-            binding.tvView.post {
-                if (!iptvGridActive || generation != gridTifViewportGeneration ||
-                    gridChannels.getOrNull(tifIndex)?.sourceKey != channel.sourceKey ||
-                    binding.tvView.visibility != View.VISIBLE
-                ) return@post
-                // Recreate the vendor session after the final viewport is laid out.
-                playback.stop()
-                playback.setMuted(gridActiveIndex != tifIndex)
-                playback.play(channel)
-                debugLog.recordDebug("MULTIVIEW_TIF_VIEWPORT | width=${binding.tvView.width}, height=${binding.tvView.height}")
-            }
-        }
-    }
-
-    private fun restorePrimaryPlayerSurfaces() {
-        binding.tvView.fitSurfaceToBounds = false
-        listOf<View>(binding.tvView, binding.iptvPlayerView).forEach { view ->
-            view.layoutParams = (view.layoutParams as FrameLayout.LayoutParams).apply {
-                width = FrameLayout.LayoutParams.MATCH_PARENT
-                height = FrameLayout.LayoutParams.MATCH_PARENT
-                setMargins(0, 0, 0, 0)
-                gravity = Gravity.FILL
-            }
-        }
-    }
-
-    private fun updateIptvGridFocus() {
-        val tifIndex = gridChannels.indexOfFirst { it.source == LiveChannel.Source.TIF }
-        if (!iptvGridActive) return
-        gridCells.forEachIndexed { index, cell ->
-            cell.background = ContextCompat.getDrawable(
-                this,
-                if (index == gridActiveIndex) R.drawable.bg_grid_cell_selected else R.drawable.bg_grid_cell,
-            )
-            gridControllers[index].setMuted(
-                index != gridActiveIndex ||
-                    gridChannels.getOrNull(index)?.source != LiveChannel.Source.IPTV,
-            )
-        }
-        playback.setMuted(gridActiveIndex != tifIndex)
-        debugLog.recordDebug(
-            "MULTIVIEW_FOCUS | slot=$gridActiveIndex, channel=${gridChannels.getOrNull(gridActiveIndex)?.sourceKey}",
-        )
-    }
-
-    private fun moveIptvGridFocus(keyCode: Int) {
-        if (gridFullscreenIndex != null) return
-        val candidate = MultiViewFocusResolver.nextFocus(
-            keyCode,
-            gridActiveIndex,
-            gridChannels.size,
-        )
-        if (candidate in gridChannels.indices && candidate != gridActiveIndex) {
-            gridActiveIndex = candidate
-            updateIptvGridFocus()
-        }
-    }
-
-    private fun zapIptvGridChannel(offset: Int) {
-        val current = gridChannels.getOrNull(gridActiveIndex) ?: return
-        val pool = availableMultiViewChannels().filter { candidate ->
-            candidate.source == current.source &&
-                gridChannels.none {
-                    it.sourceKey == candidate.sourceKey && it.sourceKey != current.sourceKey
-                }
-        }
-        val currentIndex = pool.indexOfFirst { it.sourceKey == current.sourceKey }
-        if (currentIndex < 0 || pool.size < 2) return
-        replaceIptvGridChannel(
-            gridActiveIndex,
-            pool[Math.floorMod(currentIndex + offset, pool.size)],
-        )
-    }
-
-    private fun replaceIptvGridChannel(index: Int, replacement: LiveChannel, connectionsChecked: Boolean = false) {
-        if (index !in gridChannels.indices) return
-        if (replacement.source == LiveChannel.Source.TIF &&
-            gridChannels.withIndex().any { it.index != index && it.value.source == LiveChannel.Source.TIF }
-        ) return
-        if (!connectionsChecked) {
-            checkSourceConnections(gridChannels.toMutableList().apply { this[index] = replacement }) {
-                if (iptvGridActive) replaceIptvGridChannel(index, replacement, connectionsChecked = true)
-            }
-            return
-        }
-        gridChannels = gridChannels.toMutableList().apply { this[index] = replacement }
-        gridSelectedKeys.clear()
-        gridSelectedKeys += gridChannels.map { it.sourceKey }
-        if (gridFullscreenIndex != null) gridFullscreenIndex = index
-        renderIptvGrid()
+        multiViewController.startIptvGrid(selected, connectionsChecked)
     }
 
     private fun stopIptvGrid(resumePrevious: Boolean) {
-        if (!iptvGridActive) return
-        val focused = gridChannels.getOrNull(gridActiveIndex)
-        val fallback = gridReturnChannel
-        iptvGridActive = false
-        gridTifViewportGeneration++
-        gridLongPressJob?.cancel()
-        gridFullscreenIndex = null
-        gridControllers.forEach(IptvPlaybackController::stop)
-        renderedGridKeys.indices.forEach { renderedGridKeys[it] = null }
-        renderedGridTifKey = null
-        playback.stop()
-        playback.setMuted(false)
-        restorePrimaryPlayerSurfaces()
-        osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
-        gridChannels = emptyList()
-        gridSelectedKeys.clear()
-        gridReturnChannel = null
-        if (resumePrevious) (focused ?: fallback)?.let {
-            playSelectedChannel(it, recordHistory = false)
-        }
-        debugLog.recordDebug("MULTIVIEW_STOP | resume=$resumePrevious, channel=${focused?.sourceKey}")
+        multiViewController.stopIptvGrid(resumePrevious)
     }
 
-    private fun openActiveGridChannelFullscreen() {
-        if (gridChannels.getOrNull(gridActiveIndex) == null) return
-        gridFullscreenIndex = gridActiveIndex
-        applyIptvGridLayout()
-        updateIptvGridFocus()
+    private fun startIptvOverlay(channel: LiveChannel, connectionsChecked: Boolean = false) {
+        multiViewController.startIptvOverlay(channel, connectionsChecked)
+    }
+
+    private fun stopIptvOverlay() {
+        multiViewController.stopIptvOverlay()
+    }
+
+    private fun beginMultiViewChannelSelection() {
+        multiViewController.beginMultiViewChannelSelection()
+    }
+
+    private fun toggleMultiViewChannel(channel: LiveChannel) {
+        multiViewController.toggleMultiViewChannel(channel)
     }
 
     private fun closeActiveGridChannelFullscreen() {
-        gridFullscreenIndex = null
-        applyIptvGridLayout()
-        updateIptvGridFocus()
-    }
-
-    private fun openActiveGridChannel() {
-        if (gridFullscreenIndex != null) {
-            closeActiveGridChannelFullscreen()
-        } else {
-            openActiveGridChannelFullscreen()
-        }
-    }
-
-    private fun closeActiveGridChannel() {
-        val mutable = gridChannels.toMutableList()
-        if (gridActiveIndex !in mutable.indices) return
-        mutable.removeAt(gridActiveIndex)
-        if (mutable.isEmpty()) {
-            stopIptvGrid(resumePrevious = true)
-            return
-        }
-        gridChannels = mutable
-        gridSelectedKeys.clear()
-        gridSelectedKeys += mutable.map { it.sourceKey }
-        gridActiveIndex = gridActiveIndex.coerceAtMost(mutable.lastIndex)
-        gridFullscreenIndex = null
-        renderIptvGrid()
-    }
-
-    private fun showActiveGridChannelActions() {
-        val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
-        val labels = mutableListOf(getString(R.string.grid_channel_change), getString(R.string.grid_channel_close),
-            getString(R.string.multiview_add_channels))
-        val pipBackground = if (gridChannels.size == 2) gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } else gridReturnChannel
-        val canUsePip = gridChannels.size <= 2 && channel.source == LiveChannel.Source.IPTV &&
-            pipBackground != null && pipBackground.sourceKey != channel.sourceKey
-        if (canUsePip) labels += getString(R.string.multiview_to_pip)
-        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(channel.displayName)
-            .setItems(labels.toTypedArray()) { _, which ->
-                when (which) {
-                    0 -> showGridChannelReplacementPicker()
-                    1 -> closeActiveGridChannel()
-                    2 -> showIptvGridPicker()
-                    3 -> {
-                        stopIptvGrid(resumePrevious = false)
-                        pipBackground?.let { playSelectedChannel(it, recordHistory = false) }
-                        startIptvOverlay(channel)
-                    }
-                }
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
-    }
-
-    private fun showGridChannelReplacementPicker() {
-        val targetIndex = gridActiveIndex
-        val hasOtherTif = gridChannels.withIndex().any {
-            it.index != targetIndex && it.value.source == LiveChannel.Source.TIF
-        }
-        val choices = availableMultiViewChannels().filter { candidate ->
-            gridChannels.none { it.sourceKey == candidate.sourceKey } &&
-                (!hasOtherTif || candidate.source != LiveChannel.Source.TIF)
-        }
-        if (choices.isEmpty()) return
-        AlertDialog.Builder(this)
-            .setTitle(R.string.grid_channel_change)
-            .setItems(choices.map { it.displayName }.toTypedArray()) { _, which ->
-                replaceIptvGridChannel(targetIndex, choices[which])
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        multiViewController.closeActiveGridChannelFullscreen()
     }
 
 
@@ -5927,8 +5087,7 @@ class MainActivity : TvRemoteActivity() {
 
     private fun hideChannelPanel() {
         if (multiViewAdding) {
-            numberInputJob?.cancel()
-            numberInput = ""
+            channelZapper.clearNumberInput()
         }
         multiViewAdding = false
         adapter.showMultiViewSelection(emptyList())
@@ -5958,116 +5117,23 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
-    private fun applyPanelGeometry() {
-        val screenWidth = resources.displayMetrics.widthPixels
-        val screenHeight = resources.displayMetrics.heightPixels
-        val verticalMargin = (screenHeight * VERTICAL_MARGIN_FRACTION).toInt()
-        val overlayGap = (screenWidth * OVERLAY_GAP_FRACTION).toInt()
-        val infoOuterMargin = (screenWidth * INFO_OUTER_MARGIN_FRACTION).toInt()
-        val infoHeight = currentInfoBarHeight(screenHeight)
-        val panelWidth = if (channelPanelExpanded) {
-            (screenWidth * EXPANDED_PANEL_FRACTION).toInt()
-        } else {
-            (screenWidth * COMPACT_PANEL_WIDTH_FRACTION).toInt()
-        }
-        binding.channelPanel.layoutParams =
-            (binding.channelPanel.layoutParams as FrameLayout.LayoutParams).apply {
-                width = panelWidth
-                height = if (channelPanelExpanded) {
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                } else {
-                    screenHeight - (verticalMargin * 2)
-                }
-                gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    Gravity.START
-                } else {
-                    Gravity.END
-                }) or Gravity.TOP
-                val horizontal = 0
-                val vertical = if (channelPanelExpanded) 0 else verticalMargin
-                setMargins(horizontal, vertical, horizontal, vertical)
-            }
-        binding.channelActions.layoutParams = binding.channelActions.layoutParams.apply {
-            height = (screenHeight * CHANNEL_ACTIONS_HEIGHT_FRACTION).toInt()
-        }
-        binding.infoBar.layoutParams =
-            (binding.infoBar.layoutParams as FrameLayout.LayoutParams).apply {
-                width = if (channelPanelExpanded) {
-                    screenWidth - panelWidth - overlayGap - infoOuterMargin
-                } else {
-                    screenWidth - panelWidth - overlayGap - infoOuterMargin
-                }
-                height = infoHeight
-                gravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    Gravity.END
-                } else {
-                    Gravity.START
-                }) or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
-                    Gravity.TOP
-                } else {
-                    Gravity.BOTTOM
-                }
-                if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-                    setMargins(
-                        0,
-                        verticalMargin,
-                        infoOuterMargin,
-                        verticalMargin,
-                    )
-                } else {
-                    setMargins(
-                        infoOuterMargin,
-                        verticalMargin,
-                        0,
-                        verticalMargin,
-                    )
-                }
-            }
-        val infoHorizontalPadding = (screenWidth * INFO_HORIZONTAL_PADDING_FRACTION).toInt()
-        val infoVerticalPadding = (screenHeight * INFO_VERTICAL_PADDING_FRACTION).toInt()
-        binding.infoBar.setPadding(
-            infoHorizontalPadding,
-            infoVerticalPadding,
-            infoHorizontalPadding,
-            infoVerticalPadding,
+    private fun setupTvOverlayLayoutHelper() {
+        tvOverlayLayoutHelper = TvOverlayLayoutHelper(
+            context = this,
+            binding = binding,
+            getDisplayPreferences = { displayPreferences },
+            isChannelPanelExpanded = { channelPanelExpanded },
+            showsVodTimeline = { showsVodTimeline() },
+            dp = { dp(it) },
         )
-        val diagGravity = (if (displayPreferences.channelPanelSide == ChannelPanelSide.LEFT) {
-            Gravity.END
-        } else {
-            Gravity.START
-        }) or if (displayPreferences.infoBarPosition == InfoBarPosition.TOP) {
-            Gravity.BOTTOM
-        } else {
-            Gravity.TOP
-        }
-        (binding.diagnosticsOverlay.layoutParams as? FrameLayout.LayoutParams)?.apply {
-            gravity = diagGravity
-            setMargins(infoOuterMargin, verticalMargin, infoOuterMargin, verticalMargin)
-            binding.diagnosticsOverlay.layoutParams = this
-        }
     }
+
+    private fun applyPanelGeometry() = tvOverlayLayoutHelper.applyPanelGeometry()
 
     private fun currentInfoBarHeight(screenHeight: Int): Int =
-        (screenHeight * INFO_COMPACT_HEIGHT_FRACTION).toInt() +
-            if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
-                dp(if (showsVodTimeline()) IPTV_INFO_EXTRA_HEIGHT_DP else 37)
-            } else {
-                0
-            }
+        tvOverlayLayoutHelper.currentInfoBarHeight(screenHeight)
 
-    private fun updateInfoBarHeight() {
-        val screenHeight = binding.root.height.takeIf { it > 0 }
-            ?: resources.displayMetrics.heightPixels
-        val targetHeight = currentInfoBarHeight(screenHeight)
-        val lp = binding.infoBar.layoutParams
-        if (lp != null && lp.height == targetHeight) return
-        binding.infoBar.layoutParams = (lp ?: FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            targetHeight,
-        )).apply {
-            height = targetHeight
-        }
-    }
+    private fun updateInfoBarHeight() = tvOverlayLayoutHelper.updateInfoBarHeight()
 
     private fun startClock() {
         clockJob?.cancel()
@@ -6516,112 +5582,8 @@ class MainActivity : TvRemoteActivity() {
         val isVodActive = isVodPlaybackActive()
 
         if (isVodActive) {
-            val isVodOverlayVisible = binding.vodPlayerOverlay.visibility == View.VISIBLE
-            if (event.action == KeyEvent.ACTION_UP) {
-                when (event.keyCode) {
-                    KeyEvent.KEYCODE_DPAD_CENTER,
-                    KeyEvent.KEYCODE_ENTER,
-                    KeyEvent.KEYCODE_BACK,
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    KeyEvent.KEYCODE_DPAD_UP,
-                    KeyEvent.KEYCODE_DPAD_DOWN,
-                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                    KeyEvent.KEYCODE_MEDIA_PLAY,
-                    KeyEvent.KEYCODE_MEDIA_PAUSE -> return true
-                }
-            }
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                if (!isVodOverlayVisible) {
-                    when (event.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_CENTER,
-                        KeyEvent.KEYCODE_ENTER -> {
-                            selectedVodTarget = VodControlTarget.PLAY_PAUSE
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_BACK -> {
-                            openVodLibrary()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            iptvPlayback.seekBy(-10_000L)
-                            selectedVodTarget = VodControlTarget.TIMELINE
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            iptvPlayback.seekBy(10_000L)
-                            selectedVodTarget = VodControlTarget.TIMELINE
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-                        KeyEvent.KEYCODE_MEDIA_PLAY,
-                        KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                            iptvPlayback.togglePlayPause()
-                            selectedVodTarget = VodControlTarget.PLAY_PAUSE
-                            showVodPlayerControls()
-                            return true
-                        }
-                    }
-                } else {
-                    when (event.keyCode) {
-                        KeyEvent.KEYCODE_BACK -> {
-                            hideVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_UP -> {
-                            selectedVodTarget = when (selectedVodTarget) {
-                                VodControlTarget.BACK -> VodControlTarget.BACK
-                                VodControlTarget.TIMELINE -> VodControlTarget.BACK
-                                else -> VodControlTarget.TIMELINE
-                            }
-                            renderVodControlSelection()
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            selectedVodTarget = when (selectedVodTarget) {
-                                VodControlTarget.BACK -> VodControlTarget.TIMELINE
-                                VodControlTarget.TIMELINE -> VodControlTarget.PLAY_PAUSE
-                                else -> selectedVodTarget
-                            }
-                            renderVodControlSelection()
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            if (selectedVodTarget == VodControlTarget.TIMELINE) {
-                                iptvPlayback.seekBy(-10_000L)
-                                updateVodPlayerControls()
-                            } else if (selectedVodTarget != VodControlTarget.BACK) {
-                                cycleVodButton(-1)
-                            }
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            if (selectedVodTarget == VodControlTarget.TIMELINE) {
-                                iptvPlayback.seekBy(10_000L)
-                                updateVodPlayerControls()
-                            } else if (selectedVodTarget != VodControlTarget.BACK) {
-                                cycleVodButton(1)
-                            }
-                            showVodPlayerControls()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_CENTER,
-                        KeyEvent.KEYCODE_ENTER -> {
-                            val wasBack = selectedVodTarget == VodControlTarget.BACK
-                            activateSelectedVodTarget()
-                            if (!wasBack) {
-                                showVodPlayerControls()
-                            }
-                            return true
-                        }
-                    }
-                }
+            if (vodPlayerOverlayController?.handleDispatchKeyEvent(event) == true) {
+                return true
             }
         }
 
@@ -6690,49 +5652,7 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         if (routedAction == RemoteAction.HANDLE_GRID) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_PROG_GREEN -> if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                    showIptvGridPicker()
-                }
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER -> {
-                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                        gridLongPressHandled = false
-                        gridLongPressJob?.cancel()
-                        gridLongPressJob = lifecycleScope.launch {
-                            delay(ViewConfiguration.getLongPressTimeout().toLong())
-                            gridLongPressHandled = true
-                            showActiveGridChannelActions()
-                        }
-                    } else if (event.action == KeyEvent.ACTION_UP) {
-                        gridLongPressJob?.cancel()
-                        if (!gridLongPressHandled) {
-                            openActiveGridChannel()
-                        }
-                    }
-                }
-                KeyEvent.KEYCODE_BACK -> if (event.action == KeyEvent.ACTION_DOWN) {
-                    if (gridFullscreenIndex != null) {
-                        closeActiveGridChannelFullscreen()
-                    } else {
-                        stopIptvGrid(resumePrevious = true)
-                    }
-                }
-                KeyEvent.KEYCODE_CHANNEL_UP -> if (event.action == KeyEvent.ACTION_DOWN) {
-                    zapIptvGridChannel(1)
-                }
-                KeyEvent.KEYCODE_CHANNEL_DOWN -> if (event.action == KeyEvent.ACTION_DOWN) {
-                    zapIptvGridChannel(-1)
-                }
-                else -> if (event.action == KeyEvent.ACTION_DOWN) {
-                    when (event.keyCode) {
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    KeyEvent.KEYCODE_DPAD_UP,
-                    KeyEvent.KEYCODE_DPAD_DOWN -> moveIptvGridFocus(event.keyCode)
-                    }
-                }
-            }
+            multiViewController.handleGridKeyEvent(event)
             return true
         }
         if (routedAction == RemoteAction.DISMISS_STATUS ||
@@ -7191,7 +6111,7 @@ class MainActivity : TvRemoteActivity() {
                 "MAIN_DESTROY | finishing=$isFinishing, config=$isChangingConfigurations",
             )
         }
-        numberInputJob?.cancel()
+        channelZapper.cancel()
         focusedTuneJob?.cancel()
         infoBarJob?.cancel()
         alphabetLoadJob?.cancel()
@@ -7213,7 +6133,7 @@ class MainActivity : TvRemoteActivity() {
         playback.stop()
         iptvPlayback.release()
         secondaryIptvPlayback.release()
-        gridControllers.forEach(IptvPlaybackController::release)
+        multiViewController.release()
         super.onDestroy()
     }
 

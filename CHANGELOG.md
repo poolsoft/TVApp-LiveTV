@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-23 - MainActivity Modülerleştirme ve Mimari Ayrıştırma (Refactoring)
+
+- **MainActivity Parçalama ve Sorumluluk Ayrımı:** Monolitik `MainActivity.kt` sınıfı, işlevsel sorumluluklarına göre 5 bağımsız denetleyiciye (controller/helper) ayrıştırıldı; kod tabanı sadeleştirilip modüler hale getirildi:
+  - **`VodPlayerOverlayController`:** Netflix tarzı bağımsız VOD OSD arayüzü, timeline kontrolü, sarma/seek, oynatma hızları, ses/altyazı panelleri ve VOD kumanda tuş döngüleri bağımsız denetleyiciye taşındı.
+  - **`MultiViewController`:** 2, 3 ve 4 hücreli IPTV + TIF Multi-View ızgarası, PiP penceresi, dinamik ses odaklama/susturma, hücre zapping ve DPAD/renk tuşu etkileşimleri taşındı (~830 satır).
+  - **`ChannelZapper`:** 0-9 sayısal kanal tuşlama (5 hane, 1.5s zaman aşımı), commit, sonraki/önceki zap ve Recall (önceki farklı kanala dönüş) mantığı ayrıştırıldı.
+  - **`TrackSelectionHelper`:** DVB/TIF ve IPTV ses/altyazı parça diyalogları, dil eşleme ve etiket formatlayıcıları taşındı.
+  - **`TvOverlayLayoutHelper`:** OSD responsive ekran geometrisi, dikey/yatay safe margin hesaplamaları, kanal listesi genişlik ve dinamik infobar yükseklik yerleşimleri taşındı.
+- **Sıfır Davranış Değişikliği ve Tam Geriye Uyumluluk:** Tüm kumanda tuş sözleşmeleri (`AGENTS.md`), D-Pad gezinimleri ve OSD koordinasyonu birebir korundu; birim testler ve derlemeler başarıyla doğrulandı.
+
 ## 2026-10-23 - 3 Sütunlu Modern Sinematik VOD Ana Sayfası ve TMDB Meta Veri Entegrasyonu
 
 - **3 Sütunlu Sinematik Smart TV Arayüzü:** VOD ana ekranı Stremio / Apple TV / Netflix standartlarında 3 sütunlu modern bir dashboard'a dönüştürüldü:
