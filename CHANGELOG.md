@@ -1,11 +1,12 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-23 - Kumanda odaklı VOD Player Barı ve Geri butonu
+## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 
-- **Kumanda Odaklı VOD Oynatma Deneyimi:** VOD (film/dizi) oynatılırken kumandadan `OK` tuşuna basıldığında filmin aniden kapanıp kütüphaneye dönmesi sorunu çözüldü. Artık film kesilmeden VOD Player kontrolleri açılır ve odak kumanda butonları üzerine gelir.
-- **VOD Oynatıcı Barı (Player Bar):** VOD modunda canlı TV'ye ait gereksiz kanal numarası ve sonraki yayın gibi alanlar gizlenerek sinematik temiz bir görünüm sağlandı.
-- **Kumandayla Gezilebilir Geri Butonu:** Kontrol çubuğunun en başına ve infobarın üst kısmına `[← VOD Listesi]` butonu eklendi. Kumandadan sol ok ile bu butona gidilip `OK` basıldığında veya film ekranındayken kumandadan `BACK` tuşuna basıldığında izleme süresi otomatik kaydedilerek doğrudan ana VOD listesine dönülür.
-- **Hızlı Ses ve Altyazı Kontrolü:** VOD kontrol butonları arasına doğrudan "Ses / Altyazı" butonu eklenerek kumandadan tek tıkla ses ve altyazı seçimi yapılması sağlandı.
+- **Bağımsız Sinematik VOD Player Barı:** VOD (film/dizi) oynatılırken canlı TV infobarı yerine Netflix tarzı modern, şık ve sinematik degrade arkaplana sahip bağımsız bir OSD (`vod_player_overlay`) geliştirildi.
+- **Sol Üstte Geri Butonu & Başlık:** Ekranın sol üst köşesine kumandayla doğrudan odaklanılabilen `[← VOD Listesi]` geri butonu, film başlığı ve liste adı eklendi; sağ üst köşeye ise anlık saat yerleştirildi.
+- **Kumanda Odaklı Kontrol Çubuğu:** Ekranın alt kısmına geçen/kalan süreyi gösteren ince zaman çizelgesi (timeline) ile birlikte kumanda ile kolayca yönetilebilen `-10s`, `Oynat / Duraklat`, `+10s`, `Hız (0.5x - 2.0x)`, `Ses / Altyazı` ve `Baştan Başlat` butonları eklendi.
+- **Sezgisel D-Pad Gezinimi:** Kumandada D-Pad Yukarı tuşuna basıldığında odak doğrudan sol üstteki `[← VOD Listesi]` butonuna geçer; D-Pad Aşağı tuşuna basıldığında alt kontrollere geri döner. Geri butonuna basıldığında veya film ekranındayken kumandadan `BACK` basıldığında izleme süresi kaydedilerek anında VOD kütüphanesine dönülür.
+- **Tek Tıkla Ses ve Altyazı:** VOD kontrol çubuğu üzerindeki `Ses / Altyazı` butonuyla harici menülere girmeden film ses parçaları ve altyazıları anında seçilebilir.
 
 ## 2026-10-23 - IPTV kopma koruması, canlı bağlantı iyileştirmeleri ve varsayılan ayar
 

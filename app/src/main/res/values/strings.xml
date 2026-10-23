@@ -819,4 +819,5 @@
     <string name="web_channel_editor_title">Kanal Listesi Düzenleyici</string>
     <string name="vod_back_to_list">VOD Listesi</string>
     <string name="vod_audio_subtitles">Ses / Altyazı</string>
+    <string name="vod_restart">Baştan Başlat</string>
 </resources>

@@ -819,4 +819,5 @@
     <string name="web_channel_editor_title">Channel List Editor</string>
     <string name="vod_back_to_list">VOD Library</string>
     <string name="vod_audio_subtitles">Audio / Subtitles</string>
+    <string name="vod_restart">Restart</string>
 </resources>

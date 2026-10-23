@@ -186,7 +186,11 @@ class MainActivity : TvRemoteActivity() {
     private var multiViewDraftInitialized = false
     private var restoredMultiViewKeys: List<String>? = null
     private enum class IptvControlRow { TIMELINE, BUTTONS }
-    private enum class IptvControlButton { VOD_BACK, PLAY_PAUSE, BUFFER, SPEED, AUDIO_SUB, MORE, CONNECTION }
+    private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
+    private enum class VodControlTarget { BACK, TIMELINE, REWIND, PLAY_PAUSE, FORWARD, SPEED, AUDIO_SUB, RESTART }
+    private var selectedVodTarget = VodControlTarget.PLAY_PAUSE
+    private var vodControlsJob: Job? = null
+    private var vodTickerJob: Job? = null
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -492,6 +496,7 @@ class MainActivity : TvRemoteActivity() {
         favoriteFilter = false
         channelPanelContent = ChannelPanelContent.NORMAL
         setupIptvControls()
+        setupVodPlayerControls()
         debugLog.recordDebug("MAIN_CREATE | savedState=${savedInstanceState != null}")
         debugLog.recordDebug(
             "DEVICE_CAPABILITIES | mode=$experienceMode, " +
@@ -1005,7 +1010,12 @@ class MainActivity : TvRemoteActivity() {
                 updateInfobarChannel(channel)
 
                 updateTechnicalBadges(channel, emptyList())
-                showInfoBar()
+                if (channel.isVodContent()) {
+                    setInfoBarVisible(false)
+                    showVodPlayerControls()
+                } else {
+                    showInfoBar()
+                }
                 loadPrograms(channel)
                 setIptvBufferingVisible(false)
                 iptvPlayback.stop()
@@ -1184,7 +1194,12 @@ class MainActivity : TvRemoteActivity() {
         updateAudioOnlyPanel(channel, channel.isRadioChannel())
         osdCoordinator.hideStatus()
         statusRetryAction = null
-        showInfoBar()
+        if (channel.isVodContent()) {
+            setInfoBarVisible(false)
+            showVodPlayerControls()
+        } else {
+            showInfoBar()
+        }
         loadPrograms(channel)
         runCatching {
             when (channel.source) {
@@ -2078,18 +2093,6 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun setupIptvControls() {
-        binding.vodTopBackBtn.setOnClickListener {
-            openVodLibrary()
-        }
-        binding.iptvBtnVodBack.setOnClickListener {
-            selectedIptvButton = IptvControlButton.VOD_BACK
-            activateSelectedIptvButton()
-        }
-        binding.iptvBtnAudioSub.setOnClickListener {
-            selectedIptvButton = IptvControlButton.AUDIO_SUB
-            activateSelectedIptvButton()
-            showIptvPlaybackControls()
-        }
         binding.iptvBtnPlayPause.setOnClickListener {
             selectedIptvButton = IptvControlButton.PLAY_PAUSE
             activateSelectedIptvButton()
@@ -2223,19 +2226,172 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+
+    private fun setupVodPlayerControls() {
+        binding.vodBtnBack.setOnClickListener {
+            openVodLibrary()
+        }
+        binding.vodTimelineRow.setOnClickListener {
+            selectedVodTarget = VodControlTarget.TIMELINE
+            renderVodControlSelection()
+            iptvPlayback.togglePlayPause()
+            updateVodPlayerControls()
+            showVodPlayerControls()
+        }
+        binding.vodBtnRewind.setOnClickListener {
+            selectedVodTarget = VodControlTarget.REWIND
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+        binding.vodBtnPlayPause.setOnClickListener {
+            selectedVodTarget = VodControlTarget.PLAY_PAUSE
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+        binding.vodBtnForward.setOnClickListener {
+            selectedVodTarget = VodControlTarget.FORWARD
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+        binding.vodBtnSpeed.setOnClickListener {
+            selectedVodTarget = VodControlTarget.SPEED
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+        binding.vodBtnAudioSub.setOnClickListener {
+            selectedVodTarget = VodControlTarget.AUDIO_SUB
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+        binding.vodBtnRestart.setOnClickListener {
+            selectedVodTarget = VodControlTarget.RESTART
+            activateSelectedVodTarget()
+            showVodPlayerControls()
+        }
+    }
+
+    private fun showVodPlayerControls(autoHide: Boolean = true) {
+        setInfoBarVisible(false)
+        hideChannelPanel()
+        binding.iptvPlaybackContainer.visibility = View.GONE
+        binding.vodPlayerOverlay.visibility = View.VISIBLE
+
+        updateVodPlayerControls()
+        renderVodControlSelection()
+
+        vodTickerJob?.cancel()
+        vodTickerJob = lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while (binding.vodPlayerOverlay.visibility == View.VISIBLE) {
+                    updateVodPlayerControls()
+                    delay(500L)
+                }
+            }
+        }
+
+        vodControlsJob?.cancel()
+        if (!autoHide) return
+        vodControlsJob = lifecycleScope.launch {
+            delay(5_000L)
+            hideVodPlayerControls()
+        }
+    }
+
+    private fun hideVodPlayerControls() {
+        vodControlsJob?.cancel()
+        vodTickerJob?.cancel()
+        binding.vodPlayerOverlay.visibility = View.GONE
+    }
+
+    private fun updateVodPlayerControls() {
+        val state = iptvPlayback.playbackSnapshot()
+        binding.vodPlayerTitle.text = currentChannel?.displayName ?: ""
+        val sourceName = currentChannel?.let { iptvSourceNames[it.inputId] } ?: getString(R.string.iptv_library_vod)
+        binding.vodPlayerSubtitle.text = sourceName
+        binding.vodPlayerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+
+        val duration = state.durationMillis.coerceAtLeast(1L)
+        binding.vodProgressBar.isIndeterminate = state.durationMillis <= 0L
+        binding.vodProgressBar.progress =
+            ((state.positionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
+        binding.vodProgressBar.secondaryProgress =
+            ((state.bufferedPositionMillis * 1_000L / duration).coerceIn(0L, 1_000L)).toInt()
+
+        binding.vodTimeCurrent.text = if (state.playbackSpeed != null) formatPlaybackTime(state.positionMillis)
+            else getString(R.string.unknown_value)
+        val remaining = (state.durationMillis - state.positionMillis).coerceAtLeast(0L)
+        binding.vodTimeDuration.text = if (state.durationMillis > 0) {
+            "-${formatPlaybackTime(remaining)} / ${formatPlaybackTime(state.durationMillis)}"
+        } else {
+            getString(R.string.unknown_value)
+        }
+
+        val isPlaying = state.isPlaying
+        binding.vodBtnPlayPause.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+            0,
+            0,
+            0,
+        )
+        binding.vodBtnPlayPause.setText(if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label)
+        binding.vodBtnSpeed.text = state.playbackSpeed?.let { String.format(Locale.getDefault(), "%.2gx", it) }
+            ?: "1.0x"
+    }
+
+    private fun renderVodControlSelection() {
+        val selectedBg = ContextCompat.getDrawable(this, R.drawable.bg_vod_button_selected)
+        val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_vod_button)
+
+        fun highlight(view: View, isSelected: Boolean) {
+            view.background = if (isSelected) selectedBg else defaultBg
+            if (isSelected) view.requestFocus()
+        }
+
+        highlight(binding.vodBtnBack, selectedVodTarget == VodControlTarget.BACK)
+        highlight(binding.vodTimelineRow, selectedVodTarget == VodControlTarget.TIMELINE)
+        highlight(binding.vodBtnRewind, selectedVodTarget == VodControlTarget.REWIND)
+        highlight(binding.vodBtnPlayPause, selectedVodTarget == VodControlTarget.PLAY_PAUSE)
+        highlight(binding.vodBtnForward, selectedVodTarget == VodControlTarget.FORWARD)
+        highlight(binding.vodBtnSpeed, selectedVodTarget == VodControlTarget.SPEED)
+        highlight(binding.vodBtnAudioSub, selectedVodTarget == VodControlTarget.AUDIO_SUB)
+        highlight(binding.vodBtnRestart, selectedVodTarget == VodControlTarget.RESTART)
+    }
+
+    private fun cycleVodButton(direction: Int) {
+        val buttonRow = listOf(
+            VodControlTarget.REWIND,
+            VodControlTarget.PLAY_PAUSE,
+            VodControlTarget.FORWARD,
+            VodControlTarget.SPEED,
+            VodControlTarget.AUDIO_SUB,
+            VodControlTarget.RESTART,
+        )
+        val idx = buttonRow.indexOf(selectedVodTarget).coerceAtLeast(0)
+        selectedVodTarget = buttonRow[(idx + direction + buttonRow.size) % buttonRow.size]
+        renderVodControlSelection()
+    }
+
+    private fun activateSelectedVodTarget() {
+        when (selectedVodTarget) {
+            VodControlTarget.BACK -> openVodLibrary()
+            VodControlTarget.TIMELINE,
+            VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()
+            VodControlTarget.REWIND -> iptvPlayback.seekBy(-10_000L)
+            VodControlTarget.FORWARD -> iptvPlayback.seekBy(10_000L)
+            VodControlTarget.SPEED -> showIptvSpeedChoices()
+            VodControlTarget.AUDIO_SUB -> showAudioTracks()
+            VodControlTarget.RESTART -> iptvPlayback.restartVod()
+        }
+        updateVodPlayerControls()
+    }
+
     private fun updateIptvPlaybackControls() {
         val state = iptvPlayback.playbackSnapshot()
         val isVod = showsVodTimeline()
         binding.iptvSeekbarRow.visibility = if (isVod) View.VISIBLE else View.GONE
         binding.iptvBtnSpeed.visibility = if (isVod) View.VISIBLE else View.GONE
         binding.iptvBtnConnection.visibility = if (!isVod) View.VISIBLE else View.GONE
-        binding.iptvBtnVodBack.visibility = if (isVod) View.VISIBLE else View.GONE
-        binding.iptvBtnAudioSub.visibility = if (isVod) View.VISIBLE else View.GONE
-        binding.vodTopBar.visibility = if (isVod) View.VISIBLE else View.GONE
-        binding.nowNumber.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.currentProgram.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.nextProgram.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.programMeta.visibility = if (isVod) View.GONE else View.VISIBLE
+
         if (!isVod && iptvControlRow == IptvControlRow.TIMELINE) iptvControlRow = IptvControlRow.BUTTONS
         if ((selectedIptvButton == IptvControlButton.SPEED && !isVod) ||
             (selectedIptvButton == IptvControlButton.CONNECTION && isVod)) {
@@ -2312,11 +2468,9 @@ class MainActivity : TvRemoteActivity() {
 
     private fun cycleIptvButton(direction: Int) {
         val visibleButtons = buildList {
-            if (showsVodTimeline()) add(IptvControlButton.VOD_BACK)
             add(IptvControlButton.PLAY_PAUSE)
-            if (!showsVodTimeline()) add(IptvControlButton.BUFFER)
+            add(IptvControlButton.BUFFER)
             if (showsVodTimeline()) add(IptvControlButton.SPEED)
-            if (showsVodTimeline()) add(IptvControlButton.AUDIO_SUB)
             add(IptvControlButton.MORE)
             if (!showsVodTimeline()) add(IptvControlButton.CONNECTION)
         }
@@ -2331,19 +2485,15 @@ class MainActivity : TvRemoteActivity() {
 
         if (!iptvControlsInteractive) {
             binding.iptvSeekbarRow.clearFocus()
-            binding.iptvBtnVodBack.clearFocus()
             binding.iptvBtnPlayPause.clearFocus()
             binding.iptvBtnBuffer.clearFocus()
             binding.iptvBtnSpeed.clearFocus()
-            binding.iptvBtnAudioSub.clearFocus()
             binding.iptvBtnMore.clearFocus()
             binding.iptvBtnConnection.clearFocus()
             binding.iptvSeekbarRow.background = defaultBg
-            binding.iptvBtnVodBack.background = defaultBg
             binding.iptvBtnPlayPause.background = defaultBg
             binding.iptvBtnBuffer.background = defaultBg
             binding.iptvBtnSpeed.background = defaultBg
-            binding.iptvBtnAudioSub.background = defaultBg
             binding.iptvBtnMore.background = defaultBg
             binding.iptvBtnConnection.background = defaultBg
             return
@@ -2364,11 +2514,9 @@ class MainActivity : TvRemoteActivity() {
             }
         }
 
-        updateButton(binding.iptvBtnVodBack, selectedIptvButton == IptvControlButton.VOD_BACK)
         updateButton(binding.iptvBtnPlayPause, selectedIptvButton == IptvControlButton.PLAY_PAUSE)
         updateButton(binding.iptvBtnBuffer, selectedIptvButton == IptvControlButton.BUFFER)
         updateButton(binding.iptvBtnSpeed, selectedIptvButton == IptvControlButton.SPEED)
-        updateButton(binding.iptvBtnAudioSub, selectedIptvButton == IptvControlButton.AUDIO_SUB)
         updateButton(binding.iptvBtnMore, selectedIptvButton == IptvControlButton.MORE)
         updateButton(binding.iptvBtnConnection, selectedIptvButton == IptvControlButton.CONNECTION)
     }
@@ -2388,24 +2536,15 @@ class MainActivity : TvRemoteActivity() {
         }
         binding.iptvSeekbarRow.alpha = if (iptvControlsInteractive) 1.0f else 0.65f
         val focusable = iptvControlsInteractive && !isChannelPanelOpen
-        binding.iptvBtnVodBack.isFocusable = focusable
         binding.iptvBtnPlayPause.isFocusable = focusable
         binding.iptvBtnBuffer.isFocusable = focusable
         binding.iptvBtnSpeed.isFocusable = focusable
-        binding.iptvBtnAudioSub.isFocusable = focusable
         binding.iptvBtnMore.isFocusable = focusable
         binding.iptvBtnConnection.isFocusable = focusable
     }
 
     private fun activateSelectedIptvButton() {
         when (selectedIptvButton) {
-            IptvControlButton.VOD_BACK -> {
-                openVodLibrary()
-                return
-            }
-            IptvControlButton.AUDIO_SUB -> {
-                showAudioTracks()
-            }
             IptvControlButton.PLAY_PAUSE -> {
                 if (!showsVodTimeline()) {
                     iptvManualTimeshift = false
@@ -2925,6 +3064,7 @@ class MainActivity : TvRemoteActivity() {
         }
         hideChannelPanel()
         hideIptvPlaybackControls()
+        hideVodPlayerControls()
         startActivity(Intent(this, VodHomeActivity::class.java).addFlags(
             Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP,
         ))
@@ -5206,14 +5346,8 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun updateInfobarChannel(channel: LiveChannel) {
-        val isVod = showsVodTimeline()
         binding.nowChannel.text = channel.displayName
         binding.nowNumber.text = channel.displayNumber
-        binding.nowNumber.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.vodTopBar.visibility = if (isVod) View.VISIBLE else View.GONE
-        binding.currentProgram.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.nextProgram.visibility = if (isVod) View.GONE else View.VISIBLE
-        binding.programMeta.visibility = if (isVod) View.GONE else View.VISIBLE
         val sourceName = if (channel.source == LiveChannel.Source.IPTV) iptvSourceNames[channel.inputId] else null
         if (!sourceName.isNullOrBlank()) {
             binding.nowSourceName.text = sourceName
@@ -6334,6 +6468,102 @@ class MainActivity : TvRemoteActivity() {
                     "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",
             )
         }
+        val isVodActive = (vodMode || currentIptvContentKind == IptvContentKind.VOD || showsVodTimeline()) &&
+            currentChannel?.source == LiveChannel.Source.IPTV
+
+        if (isVodActive) {
+            val isVodOverlayVisible = binding.vodPlayerOverlay.visibility == View.VISIBLE
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (!isVodOverlayVisible) {
+                    when (event.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_CENTER,
+                        KeyEvent.KEYCODE_ENTER -> {
+                            selectedVodTarget = VodControlTarget.PLAY_PAUSE
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_BACK -> {
+                            openVodLibrary()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_LEFT -> {
+                            iptvPlayback.seekBy(-10_000L)
+                            selectedVodTarget = VodControlTarget.TIMELINE
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            iptvPlayback.seekBy(10_000L)
+                            selectedVodTarget = VodControlTarget.TIMELINE
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                        KeyEvent.KEYCODE_MEDIA_PLAY,
+                        KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                            iptvPlayback.togglePlayPause()
+                            selectedVodTarget = VodControlTarget.PLAY_PAUSE
+                            showVodPlayerControls()
+                            return true
+                        }
+                    }
+                } else {
+                    when (event.keyCode) {
+                        KeyEvent.KEYCODE_BACK -> {
+                            hideVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_UP -> {
+                            selectedVodTarget = when (selectedVodTarget) {
+                                VodControlTarget.BACK -> VodControlTarget.BACK
+                                VodControlTarget.TIMELINE -> VodControlTarget.BACK
+                                else -> VodControlTarget.TIMELINE
+                            }
+                            renderVodControlSelection()
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_DOWN -> {
+                            selectedVodTarget = when (selectedVodTarget) {
+                                VodControlTarget.BACK -> VodControlTarget.TIMELINE
+                                VodControlTarget.TIMELINE -> VodControlTarget.PLAY_PAUSE
+                                else -> selectedVodTarget
+                            }
+                            renderVodControlSelection()
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_LEFT -> {
+                            if (selectedVodTarget == VodControlTarget.TIMELINE) {
+                                iptvPlayback.seekBy(-10_000L)
+                                updateVodPlayerControls()
+                            } else if (selectedVodTarget != VodControlTarget.BACK) {
+                                cycleVodButton(-1)
+                            }
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            if (selectedVodTarget == VodControlTarget.TIMELINE) {
+                                iptvPlayback.seekBy(10_000L)
+                                updateVodPlayerControls()
+                            } else if (selectedVodTarget != VodControlTarget.BACK) {
+                                cycleVodButton(1)
+                            }
+                            showVodPlayerControls()
+                            return true
+                        }
+                        KeyEvent.KEYCODE_DPAD_CENTER,
+                        KeyEvent.KEYCODE_ENTER -> {
+                            activateSelectedVodTarget()
+                            showVodPlayerControls()
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+
         val routedAction = remoteActionRouter.route(
             remoteUiContext(),
             event.toRemoteKey(),
