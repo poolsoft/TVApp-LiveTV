@@ -821,4 +821,14 @@
     <string name="vod_audio_subtitles">Ses / Altyazı</string>
     <string name="vod_restart">Baştan Başlat</string>
     <string name="vod_nav_iptv_live">IPTV</string>
+    <string name="vod_see_all">Tümünü Gör</string>
+    <string name="vod_sort_title">Sıralama</string>
+    <string name="vod_sort_default">Varsayılan</string>
+    <string name="vod_sort_name_asc">A - Z</string>
+    <string name="vod_sort_name_desc">Z - A</string>
+    <string name="vod_sort_recent">En Yeni</string>
+    <string name="vod_no_items_found">İçerik bulunamadı.</string>
+    <string name="vod_back_to_home">Ana Sayfaya Dön</string>
+    <string name="vod_popular_movies">Popüler Filmler</string>
+    <string name="vod_recent_movies">Son Eklenenler</string>
 </resources>

@@ -15,7 +15,11 @@
   - VOD ana ekranındaki sol menü butonları yalnızca donanım kapasitesine göre değil, Ayarlar'daki çalışma modu tercihine (`ExperienceModeOverride`: Otomatik, Hibrit, Sadece IPTV) göre dinamik uyarlandı.
   - Cihaz tuner/uydu destekliyor ve ayar Hibrit ise sol menüde **"Canlı TV"** (TIF / Uydu yayınları) ve **"IPTV"** (IPTV Canlı Yayınları) ayrı ayrı sunulur; kumandada Kırmızı tuş uyduya, Sarı tuş IPTV yayınına doğrudan geçiş yapar.
   - Sadece IPTV modunda çalışan cihazlarda veya ayarlarda Sadece IPTV seçildiğinde "IPTV" butonu gizlenir ve tek "Canlı TV" butonu doğrudan IPTV canlı yayınını başlatır.
-  - VOD ekranından canlı TV'ye geçişler hedef kaynak parametresiyle (`EXTRA_LIVE_TARGET_SOURCE`) kusursuz hale getirildi; kaba kapanma yerine doğrudan hedeflenen canlı kanala akıcı geçiş sağlandı.
+- **Tam Ekran VOD Grid (Izgara) Keşif Modu ve Zengin Sıralama:**
+  - "🔥 Popüler Filmler" ve "➕ Son Eklenenler" raylarının yanındaki **"Tümünü Gör ›"** butonları ile sol menüdeki **"Sinema"** ve **"Dizi"** butonları tam ekran interaktif Grid Keşif moduna bağlandı.
+  - **Sol Panel (Kategoriler & Sıralama):** Sol tarafa tek tıkla kategori filtreleme listesi (`vod_grid_recycler_categories`), "Tüm Kategoriler" seçeneği ve 4 farklı sıralama çipi (`Varsayılan`, `A - Z`, `Z - A`, `En Yeni Eklenenler`) eklendi.
+  - **Orta/Sağ Alan (5 Sütunlu Sayfalı Afiş Izgarası):** Binlerce içeriği takılmadan, bellek şişmesi olmadan akıcı şekilde gezdiren 5 sütunlu `GridLayoutManager` ve sonsuz kaydırma (Pagination onScrollListener) mimarisi kuruldu.
+  - **Kusursuz Kumanda ve Geri Tuşu Yönetimi:** Grid modundayken kumandadan `BACK (Geri)` tuşuna basıldığında veya `[← Ana Sayfaya Dön]` butonuna tıklandığında VOD'dan çıkmadan anında ana sayfa panosuna dönülür.
 
 ## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 

@@ -78,7 +78,13 @@ object VodCatalogQuery {
                 keys.forEachIndexed { i, key -> sql.append("WHEN ? THEN $i "); args += key }
                 sql.append("ELSE ${keys.size} END,")
             }
-            sql.append(if (filter.order == "NAME") "name COLLATE NOCASE,sourceKey" else "ordinal,sourceKey")
+            val orderClause = when (filter.order) {
+                "NAME" -> "name COLLATE NOCASE ASC, sourceKey"
+                "NAME_DESC" -> "name COLLATE NOCASE DESC, sourceKey"
+                "RECENT", "ORDINAL_DESC" -> "ordinal DESC, sourceKey"
+                else -> "ordinal ASC, sourceKey"
+            }
+            sql.append(orderClause)
             sql.append(" LIMIT ? OFFSET ?"); args += limit.coerceIn(1, 60); args += offset.coerceAtLeast(0)
         }
         return SimpleSQLiteQuery(sql.toString(), args.toTypedArray())

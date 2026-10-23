@@ -821,4 +821,14 @@
     <string name="vod_audio_subtitles">Audio / Subtitles</string>
     <string name="vod_restart">Restart</string>
     <string name="vod_nav_iptv_live">IPTV</string>
+    <string name="vod_see_all">See All</string>
+    <string name="vod_sort_title">Sort By</string>
+    <string name="vod_sort_default">Default</string>
+    <string name="vod_sort_name_asc">A - Z</string>
+    <string name="vod_sort_name_desc">Z - A</string>
+    <string name="vod_sort_recent">Recent</string>
+    <string name="vod_no_items_found">No content found.</string>
+    <string name="vod_back_to_home">Back to Home</string>
+    <string name="vod_popular_movies">Popular Movies</string>
+    <string name="vod_recent_movies">Recently Added</string>
 </resources>

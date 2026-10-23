@@ -38,6 +38,7 @@ import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.recyclerview.widget.GridLayoutManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -58,6 +59,19 @@ class VodHomeActivity : TvRemoteActivity() {
     private lateinit var recentAdapter: VodPosterAdapter
     private lateinit var sourceAdapter: VodSourceAdapter
     private lateinit var categoryAdapter: VodCategoryAdapter
+
+    // Grid Keşif Modu Bileşenleri
+    private lateinit var gridAdapter: VodPosterAdapter
+    private lateinit var gridCategoryAdapter: VodCategoryAdapter
+    private var isGridExploreMode = false
+    private var gridCurrentPage = 0
+    private var gridIsLoading = false
+    private var gridHasMore = true
+    private var gridOrder = "SOURCE"
+    private var gridSection = "MOVIE"
+    private var gridCategory: String? = null
+    private var gridJob: Job? = null
+    private val gridItems = mutableListOf<VodDisplayItem>()
 
     private val preferences by lazy { getSharedPreferences("vod-library", MODE_PRIVATE) }
     private var sources: List<IptvSourceSummary> = emptyList()
@@ -152,6 +166,51 @@ class VodHomeActivity : TvRemoteActivity() {
         }
         binding.vodRecyclerCategories.layoutManager = LinearLayoutManager(this)
         binding.vodRecyclerCategories.adapter = categoryAdapter
+
+        setupGridRecyclerViews()
+    }
+
+    private fun setupGridRecyclerViews() {
+        // Grid Afiş Adaptörü (5 Sütun)
+        gridAdapter = VodPosterAdapter(
+            onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
+            onItemFocused = { /* Odaklanan film bilgisi */ },
+        )
+        val gridLayoutManager = GridLayoutManager(this, 5)
+        binding.vodRecyclerGrid.layoutManager = gridLayoutManager
+        binding.vodRecyclerGrid.adapter = gridAdapter
+
+        // Sonsuz kaydırma (Pagination)
+        binding.vodRecyclerGrid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (dy > 0) {
+                    val visibleItemCount = gridLayoutManager.childCount
+                    val totalItemCount = gridLayoutManager.itemCount
+                    val firstVisibleItemPosition = gridLayoutManager.findFirstVisibleItemPosition()
+
+                    if (!gridIsLoading && gridHasMore) {
+                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 8) {
+                            loadNextGridPage()
+                        }
+                    }
+                }
+            }
+        })
+
+        // Grid Sol Panel - Kategoriler
+        gridCategoryAdapter = VodCategoryAdapter { catItem ->
+            val allCatsLabel = getString(R.string.vod_all_categories)
+            gridCategory = if (catItem.name == allCatsLabel || gridCategory == catItem.name) {
+                null
+            } else {
+                catItem.name
+            }
+            reloadGridData()
+            loadGridCategories()
+        }
+        binding.vodGridRecyclerCategories.layoutManager = LinearLayoutManager(this)
+        binding.vodGridRecyclerCategories.adapter = gridCategoryAdapter
     }
 
     private fun setupSidebarActions() {
@@ -180,16 +239,23 @@ class VodHomeActivity : TvRemoteActivity() {
         }
 
         binding.vodNavHome.setOnClickListener {
+            if (isGridExploreMode) exitGridExploreMode()
             filter = VodFilter()
             loadData()
         }
         binding.vodNavMovies.setOnClickListener {
-            filter = filter.copy(section = "MOVIES")
-            loadData()
+            enterGridExploreMode(
+                title = "🎬 " + getString(R.string.vod_movies),
+                initialOrder = "SOURCE",
+                initialSection = "MOVIE",
+            )
         }
         binding.vodNavSeries.setOnClickListener {
-            filter = filter.copy(section = "SERIES")
-            loadData()
+            enterGridExploreMode(
+                title = "📺 " + getString(R.string.vod_series),
+                initialOrder = "SOURCE",
+                initialSection = "SERIES",
+            )
         }
         binding.vodNavContinue.setOnClickListener {
             filter = filter.copy(view = "CONTINUE")
@@ -209,6 +275,165 @@ class VodHomeActivity : TvRemoteActivity() {
             currentHeroItem?.let { item ->
                 showHeroDetailsDialog(item)
             }
+        }
+
+        // Tümünü Gör Butonları
+        binding.vodBtnSeeAllPopular.setOnClickListener {
+            enterGridExploreMode(
+                title = "🔥 " + getString(R.string.vod_popular_movies),
+                initialOrder = "SOURCE",
+                initialSection = "MOVIE",
+            )
+        }
+        binding.vodBtnSeeAllRecent.setOnClickListener {
+            enterGridExploreMode(
+                title = "➕ " + getString(R.string.vod_recent_movies),
+                initialOrder = "ORDINAL_DESC",
+                initialSection = "MOVIE",
+            )
+        }
+
+        // Grid Ekranı Kontrolleri
+        binding.vodGridBtnBack.setOnClickListener {
+            exitGridExploreMode()
+        }
+
+        binding.vodSortDefault.setOnClickListener {
+            setGridSort("SOURCE", getString(R.string.vod_sort_default))
+        }
+        binding.vodSortNameAsc.setOnClickListener {
+            setGridSort("NAME", getString(R.string.vod_sort_name_asc))
+        }
+        binding.vodSortNameDesc.setOnClickListener {
+            setGridSort("NAME_DESC", getString(R.string.vod_sort_name_desc))
+        }
+        binding.vodSortRecent.setOnClickListener {
+            setGridSort("ORDINAL_DESC", getString(R.string.vod_sort_recent))
+        }
+    }
+
+    private fun enterGridExploreMode(
+        title: String,
+        initialOrder: String = "SOURCE",
+        initialSection: String = "MOVIE",
+        initialCategory: String? = null,
+    ) {
+        isGridExploreMode = true
+        gridOrder = initialOrder
+        gridSection = initialSection
+        gridCategory = initialCategory
+
+        binding.vodGridHeaderTitle.text = title
+        binding.vodGridSelectedOrderLabel.text = when (gridOrder) {
+            "NAME" -> getString(R.string.vod_sort_name_asc)
+            "NAME_DESC" -> getString(R.string.vod_sort_name_desc)
+            "ORDINAL_DESC" -> getString(R.string.vod_sort_recent)
+            else -> getString(R.string.vod_sort_default)
+        }
+        updateSortButtonsUi()
+
+        binding.vodHomeDashboard.visibility = View.GONE
+        binding.vodGridExploreView.visibility = View.VISIBLE
+
+        loadGridCategories()
+        reloadGridData()
+        binding.vodRecyclerGrid.requestFocus()
+    }
+
+    private fun exitGridExploreMode() {
+        isGridExploreMode = false
+        binding.vodGridExploreView.visibility = View.GONE
+        binding.vodHomeDashboard.visibility = View.VISIBLE
+        binding.vodNavHome.requestFocus()
+    }
+
+    private fun setGridSort(order: String, label: String) {
+        if (gridOrder == order) return
+        gridOrder = order
+        binding.vodGridSelectedOrderLabel.text = label
+        updateSortButtonsUi()
+        reloadGridData()
+    }
+
+    private fun updateSortButtonsUi() {
+        binding.vodSortDefault.isSelected = (gridOrder == "SOURCE")
+        binding.vodSortNameAsc.isSelected = (gridOrder == "NAME")
+        binding.vodSortNameDesc.isSelected = (gridOrder == "NAME_DESC")
+        binding.vodSortRecent.isSelected = (gridOrder == "ORDINAL_DESC")
+
+        val accentColor = getColor(R.color.accent)
+        val defaultColor = getColor(R.color.text_primary)
+        binding.vodSortDefault.setTextColor(if (gridOrder == "SOURCE") accentColor else defaultColor)
+        binding.vodSortNameAsc.setTextColor(if (gridOrder == "NAME") accentColor else defaultColor)
+        binding.vodSortNameDesc.setTextColor(if (gridOrder == "NAME_DESC") accentColor else defaultColor)
+        binding.vodSortRecent.setTextColor(if (gridOrder == "ORDINAL_DESC") accentColor else defaultColor)
+    }
+
+    private fun reloadGridData() {
+        gridJob?.cancel()
+        gridCurrentPage = 0
+        gridHasMore = true
+        gridItems.clear()
+        gridAdapter.submitList(emptyList())
+        loadNextGridPage()
+    }
+
+    private fun loadNextGridPage() {
+        if (gridIsLoading || !gridHasMore) return
+        gridIsLoading = true
+
+        gridJob = lifecycleScope.launch {
+            try {
+                val currentFilter = filter.copy(
+                    section = gridSection,
+                    category = gridCategory,
+                    order = gridOrder,
+                )
+                val pageData = withContext(Dispatchers.IO) {
+                    repository.page(sourceId, currentFilter, keys = emptyList(), page = gridCurrentPage)
+                }
+
+                if (pageData.isEmpty()) {
+                    gridHasMore = false
+                } else {
+                    val keys = pageData.map { it.sourceKey }
+                    val cachedTmdb = withContext(Dispatchers.IO) {
+                        database.vodTmdbDao().getBySourceKeys(keys).associateBy { it.sourceKey }
+                    }
+                    val displayItems = pageData.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
+                    gridItems.addAll(displayItems)
+                    gridAdapter.submitList(gridItems.toList())
+                    gridCurrentPage++
+                }
+
+                binding.vodGridEmptyState.visibility = if (gridItems.isEmpty()) View.VISIBLE else View.GONE
+
+                val count = withContext(Dispatchers.IO) {
+                    repository.count(sourceId, currentFilter, emptyList())
+                }
+                binding.vodGridItemCount.text = if (count > 0) "($count içerik)" else ""
+            } catch (e: Exception) {
+                if (e !is CancellationException) {
+                    debugLog.recordDebug("VOD Grid page load error: ${e.message}")
+                }
+            } finally {
+                gridIsLoading = false
+            }
+        }
+    }
+
+    private fun loadGridCategories() {
+        lifecycleScope.launch {
+            val catStrings = withContext(Dispatchers.IO) {
+                repository.categories(sourceId, gridSection)
+            }
+            val list = mutableListOf<VodCategoryItem>()
+            val allCatsLabel = getString(R.string.vod_all_categories)
+            list.add(VodCategoryItem(name = allCatsLabel, count = 0, icon = "📁"))
+            catStrings.filterNotNull().forEach {
+                list.add(VodCategoryItem(name = it, count = 0, icon = "📁"))
+            }
+            gridCategoryAdapter.submitList(list, gridCategory ?: allCatsLabel)
         }
     }
 
@@ -434,8 +659,21 @@ class VodHomeActivity : TvRemoteActivity() {
             .show()
     }
 
+    override fun onBackPressed() {
+        if (isGridExploreMode) {
+            exitGridExploreMode()
+        } else {
+            super.onBackPressed()
+        }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && isGridExploreMode) {
+                exitGridExploreMode()
+                return true
+            }
+
             val capabilities = DeviceCapabilitiesSession.get(this)
             val modeOverride = ExperienceModePreferencesStore(this).load()
             val experienceMode = resolveExperienceMode(capabilities, BuildConfig.MOBILE_UI_ENABLED, modeOverride)
@@ -453,6 +691,7 @@ class VodHomeActivity : TvRemoteActivity() {
                     }
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> {
+                    if (isGridExploreMode) exitGridExploreMode()
                     filter = filter.copy(view = "CONTINUE")
                     loadData()
                     return true
