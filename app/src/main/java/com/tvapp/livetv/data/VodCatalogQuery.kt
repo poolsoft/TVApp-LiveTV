@@ -21,15 +21,19 @@ object VodCatalogQuery {
           CASE WHEN INSTR(LOWER(c.streamUrl),'/series/') > 0 THEN 'EPISODE' ELSE 'MOVIE' END AS kind,
           m.providerId, NULL AS parentKey, NULL AS seasonNumber, NULL AS episodeNumber,
           m.description, m.durationMillis, c.originalIndex AS ordinal, COALESCE(u.favorite,0) AS favorite
-        FROM iptv_channels c LEFT JOIN user_channels u ON u.sourceKey=c.sourceKey
+        FROM iptv_channels c
+        JOIN iptv_sources s ON s.id=c.sourceId
+        LEFT JOIN user_channels u ON u.sourceKey=c.sourceKey
         LEFT JOIN vod_metadata m ON m.sourceKey=c.sourceKey
-        WHERE c.contentType='VOD'
+        WHERE c.contentType='VOD' AND s.enabled=1 AND COALESCE(u.hidden,0)=0
         UNION ALL
         SELECT m.sourceKey,m.sourceId,COALESCE(u.customName,m.name),m.logoUrl,m.category,
           m.kind,m.providerId,m.parentKey,m.seasonNumber,m.episodeNumber,m.description,m.durationMillis,
           COALESCE(m.episodeNumber,0),COALESCE(u.favorite,0)
-        FROM vod_metadata m LEFT JOIN user_channels u ON u.sourceKey=m.sourceKey
-        WHERE m.kind IN ('SERIES','EPISODE')
+        FROM vod_metadata m
+        JOIN iptv_sources s ON s.id=m.sourceId
+        LEFT JOIN user_channels u ON u.sourceKey=m.sourceKey
+        WHERE m.kind IN ('SERIES','EPISODE') AND s.enabled=1 AND COALESCE(u.hidden,0)=0
     """
 
     fun item(key: String) = SimpleSQLiteQuery("SELECT * FROM ($CATALOG) WHERE sourceKey=? LIMIT 1", arrayOf(key))
@@ -42,8 +46,14 @@ object VodCatalogQuery {
 
     fun build(sourceId: Long, filter: VodFilter, keys: List<String> = emptyList(),
         offset: Int = 0, limit: Int = 60, count: Boolean = false, categories: Boolean = false): SimpleSQLiteQuery {
-        val args = mutableListOf<Any>(sourceId)
-        val where = StringBuilder("sourceId=?")
+        val args = mutableListOf<Any>()
+        val where = StringBuilder()
+        if (sourceId > 0L) {
+            where.append("sourceId=?")
+            args += sourceId
+        } else {
+            where.append("1=1")
+        }
         if (filter.parentKey != null) {
             where.append(" AND parentKey=?"); args += filter.parentKey
             filter.season?.let { where.append(" AND seasonNumber=?"); args += it }

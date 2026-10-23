@@ -67,10 +67,27 @@ class VodCategoryAdapter(
     private var items: List<VodCategoryItem> = emptyList()
     private var selectedCategory: String? = null
 
+    init {
+        setHasStableIds(true)
+    }
+
+    override fun getItemId(position: Int): Long {
+        return items.getOrNull(position)?.name.hashCode().toLong()
+    }
+
     fun submitList(categories: List<VodCategoryItem>, selected: String?) {
         items = categories
         selectedCategory = selected
         notifyDataSetChanged()
+    }
+
+    fun setSelectedCategory(selected: String?) {
+        if (selectedCategory == selected) return
+        val prevIndex = items.indexOfFirst { it.name == selectedCategory }
+        selectedCategory = selected
+        val newIndex = items.indexOfFirst { it.name == selectedCategory }
+        if (prevIndex != -1) notifyItemChanged(prevIndex)
+        if (newIndex != -1) notifyItemChanged(newIndex)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

@@ -19,9 +19,17 @@
   - Akış kapatıldığında worker iş parçacığının erken sonlanması ve consumer thread'in beklemeden -1 dönmesi sonucu CI testinde (`BufferedLiveInputStreamTest`) oluşan hata giderildi; `closed` durumu kontrol edilerek `IOException` fırlatılması güvenceye alındı.
 - **Açılışta Doğrudan Çökme (Fatal Crash) Hatasının Giderilmesi:**
   - `MainActivity.onCreate()` aşamasında `restoredMultiViewKeys` alanına henüz `multiViewController` ilklendirilmeden erişilmesi sonucu oluşan `UninitializedPropertyAccessException` hatası giderildi; `restoredMultiViewKeys` doğrudan `MainActivity` içinde saklanıp denetleyici kurulduğunda aktarıldı.
+- **VOD Listesinde Pasif Kaynakların ve Gizlenen İçeriklerin Filtrelenmesi:**
+  - `VodCatalogQuery.kt`: `CATALOG` SQL birleşimine `iptv_sources` tablosu bağlanarak `s.enabled = 1` (devre dışı bırakılmış IPTV kaynaklarının VOD film ve dizileri listelenmez) ve `COALESCE(u.hidden, 0) = 0` (kullanıcının gizlediği/atladığı içerikler listelenmez) koşulları getirildi.
+  - `VodHomeActivity.kt`: Kaynak seçim menüsünde (`vodSourceCombo`) pasif kaynaklar filtrelenerek yalnızca aktif listelerin görünmesi sağlandı; önceden seçilmiş kaynak pasif duruma getirilmişse otomatik olarak "Tüm Liste" (`-1L`) varsayılanına dönülmesi sağlandı.
+- **VOD Seçim Durumunun (State) Korunması, Odak Sıçramasının ve Üzerine Binmenin (Overlap) Önlenmesi:**
+  - VOD ızgara seçimleri (aktif kaynak, seçili kategori, sıralama ölçütü) kalıcı olarak saklandı; içerik açılıp geri dönüldüğünde kullanıcının son seçimleri ve kategori odağı aynen geri yüklendi.
+  - Kategori seçiminde odağın ekranın üstündeki arama kutusuna sıçraması engellendi; `VodCategoryAdapter`'a `stableIds` ve tekil öğe güncellemesi (`setSelectedCategory`) eklenerek odak seçilen kategoride tutuldu.
+  - Izgarada aşağı kaydırma yapıldığında kartların "İzlemeye Devam Et" alanının üzerine taşması kırpma (clipping) sınırları düzenlenerek giderildi.
+  - "Tüm Liste" (`sourceId <= 0L`) seçildiğinde içeriklerin boş dönmesi sorunu `VodCatalogQuery` WHERE koşulu düzeltilerek giderildi.
 - **VOD Kart Boyutlarının Optimize Edilmesi ve Seçici Çerçeve Kırpılmasının Önlenmesi:**
   - VOD ızgarasındaki kartların yüksekliği ekran oranına göre optimize edildi (poster 124dp, genişlik 106dp, başlık 11sp, yıl/puan 10sp); 2 tam satırın ekrana tam ve ferah şekilde sığması sağlandı.
-  - Kartların üstten ve alttan odaklandığında (`scale 1.03x` + `2.5dp` neon mavi çerçeve) sınırlarının kesilmesini önlemek amacıyla `vod_recycler_grid` üzerine `paddingTop="8dp"` / `paddingBottom="24dp"` ve kapsayıcılara `clipChildren="false"` / `clipToPadding="false"` uygulandı; seçici çerçeve tüm kenarlarıyla net ve pürüzsüz görünür hale getirildi.
+  - Kartların üstten ve alttan odaklandığında (`scale 1.03x` + `2.5dp` neon mavi çerçeve) sınırlarının kesilmesini önlemek amacıyla `vod_recycler_grid` üzerine `paddingTop="8dp"` / `paddingBottom="24dp"` ve kapsayıcılara `clipToPadding="false"` uygulandı; seçici çerçeve tüm kenarlarıyla net ve pürüzsüz görünür hale getirildi.
 
 ## 2026-10-23 - MainActivity Modülerleştirme ve Mimari Ayrıştırma (Refactoring)
 

@@ -95,6 +95,8 @@ class VodHomeActivity : TvRemoteActivity() {
         resumeStore = IptvResumeStore(this)
         database = TVAppDatabase.getInstance(this)
         sourceId = preferences.getLong("source", -1L)
+        gridCategory = preferences.getString("category", null)
+        gridOrder = preferences.getString("order", "SOURCE") ?: "SOURCE"
 
         setupRecyclerViews()
         setupClickListeners()
@@ -163,8 +165,9 @@ class VodHomeActivity : TvRemoteActivity() {
             } else {
                 catItem.name
             }
+            preferences.edit().putString("category", gridCategory).apply()
+            gridCategoryAdapter.setSelectedCategory(gridCategory ?: allCatsLabel)
             reloadGridData()
-            loadGridCategories()
         }
         binding.vodGridRecyclerCategories.layoutManager = LinearLayoutManager(this)
         binding.vodGridRecyclerCategories.adapter = gridCategoryAdapter
@@ -189,15 +192,19 @@ class VodHomeActivity : TvRemoteActivity() {
         // Sıralama Butonları
         binding.vodSortDefault.setOnClickListener {
             setGridSort("SOURCE", getString(R.string.vod_sort_default))
+            it.requestFocus()
         }
         binding.vodSortNameAsc.setOnClickListener {
             setGridSort("NAME", getString(R.string.vod_sort_name_asc))
+            it.requestFocus()
         }
         binding.vodSortNameDesc.setOnClickListener {
             setGridSort("NAME_DESC", getString(R.string.vod_sort_name_desc))
+            it.requestFocus()
         }
         binding.vodSortRecent.setOnClickListener {
             setGridSort("ORDINAL_DESC", getString(R.string.vod_sort_recent))
+            it.requestFocus()
         }
 
         updateSortButtonsUi()
@@ -206,8 +213,19 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun loadSourcesAndInitialData() {
         lifecycleScope.launch {
             try {
-                sources = withContext(Dispatchers.IO) { iptv.sources() }
+                sources = withContext(Dispatchers.IO) { iptv.sources() }.filter { it.source.enabled }
+                if (sourceId > 0L && sources.none { it.source.id == sourceId }) {
+                    sourceId = -1L
+                    preferences.edit().putLong("source", -1L).apply()
+                }
                 updateSourceComboText()
+                updateSortButtonsUi()
+                binding.vodGridSelectedOrderLabel.text = when (gridOrder) {
+                    "NAME" -> getString(R.string.vod_sort_name_asc)
+                    "NAME_DESC" -> getString(R.string.vod_sort_name_desc)
+                    "ORDINAL_DESC" -> getString(R.string.vod_sort_recent)
+                    else -> getString(R.string.vod_sort_default)
+                }
                 loadGridCategories()
                 reloadGridData()
                 loadContinueWatching()
@@ -291,6 +309,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun setGridSort(order: String, label: String) {
         if (gridOrder == order) return
         gridOrder = order
+        preferences.edit().putString("order", gridOrder).apply()
         binding.vodGridSelectedOrderLabel.text = label
         updateSortButtonsUi()
         reloadGridData()
@@ -315,7 +334,9 @@ class VodHomeActivity : TvRemoteActivity() {
         gridCurrentPage = 0
         gridHasMore = true
         gridItems.clear()
-        gridAdapter.submitList(emptyList())
+        if (binding.vodRecyclerGrid.hasFocus()) {
+            gridAdapter.submitList(emptyList())
+        }
         loadNextGridPage()
     }
 
@@ -376,7 +397,12 @@ class VodHomeActivity : TvRemoteActivity() {
             catStrings.filterNotNull().forEach {
                 list.add(VodCategoryItem(name = it, count = 0, icon = "📁"))
             }
-            gridCategoryAdapter.submitList(list, gridCategory ?: allCatsLabel)
+            val activeCat = gridCategory ?: allCatsLabel
+            gridCategoryAdapter.submitList(list, activeCat)
+            val activeIndex = list.indexOfFirst { it.name == activeCat }
+            if (activeIndex > 0) {
+                binding.vodGridRecyclerCategories.scrollToPosition(activeIndex)
+            }
         }
     }
 
