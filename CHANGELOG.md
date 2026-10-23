@@ -11,7 +11,11 @@
   - TMDB v3 API entegrasyonu ile eksik IPTV afişleri, yüksek çözünürlüklü arka plan görselleri (backdrop), resmi Türkçe özetler, türler ve TMDB puanları arka planda otomatik çekilip Room veritabanında (`VodTmdbEntity`) önbelleğe alındı.
 - **Kusursuz Seçici Mavi Çerçeve ve Padding İyileştirmesi:** Film kartlarına kumandayla odaklanıldığında mavi neon çerçevenin ebeveyn sınırları tarafından kırpılması/yarım görünmesi sorunu giderildi; RecyclerView ve kapsayıcılara `clipChildren="false"`, `clipToPadding="false"` ve dengeli dikey/yatay margin ve padding verilerek çerçevenin tam ve net görünmesi sağlandı.
 - **Sinematik Default Kapak (Placeholder & Error Drawable):** Afişi henüz yüklenmeyen veya internet/kaynak kaynaklı afişi bulunmayan filmler için şık koyu lacivert degrade ve ortalanmış modern mavi film sembolü içeren `bg_vod_default_poster` oluşturuldu; hem poster raylarında hem de Hero Banner'da devreye alındı.
-- **Gelişmiş Parantez İçi Başlık Temizleme ve Esnek TMDB Araması:** Parantez içindeki tür/oyuncu açıklamaları asıl film adından arındırıldı; yıl uyuşmazlığı durumlarında otomatik ikinci fallback araması eklenerek TMDB eşleşme başarı oranı maksimize edildi.
+- **Çalışma Moduna ve Donanıma Göre Dinamik VOD Menüsü:**
+  - VOD ana ekranındaki sol menü butonları yalnızca donanım kapasitesine göre değil, Ayarlar'daki çalışma modu tercihine (`ExperienceModeOverride`: Otomatik, Hibrit, Sadece IPTV) göre dinamik uyarlandı.
+  - Cihaz tuner/uydu destekliyor ve ayar Hibrit ise sol menüde **"Canlı TV"** (TIF / Uydu yayınları) ve **"IPTV"** (IPTV Canlı Yayınları) ayrı ayrı sunulur; kumandada Kırmızı tuş uyduya, Sarı tuş IPTV yayınına doğrudan geçiş yapar.
+  - Sadece IPTV modunda çalışan cihazlarda veya ayarlarda Sadece IPTV seçildiğinde "IPTV" butonu gizlenir ve tek "Canlı TV" butonu doğrudan IPTV canlı yayınını başlatır.
+  - VOD ekranından canlı TV'ye geçişler hedef kaynak parametresiyle (`EXTRA_LIVE_TARGET_SOURCE`) kusursuz hale getirildi; kaba kapanma yerine doğrudan hedeflenen canlı kanala akıcı geçiş sağlandı.
 
 ## 2026-10-23 - Netflix Tarzı Sinematik VOD Player Barı ve Kumanda Kontrolleri
 

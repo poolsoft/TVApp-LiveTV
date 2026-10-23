@@ -31,6 +31,10 @@ import com.tvapp.livetv.vod.VodDisplayItem
 import com.tvapp.livetv.vod.VodPosterAdapter
 import com.tvapp.livetv.vod.VodSourceAdapter
 import com.tvapp.livetv.vod.VodTitleCleaner
+import com.tvapp.livetv.platform.DeviceCapabilitiesSession
+import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.resolveExperienceMode
+import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -98,6 +102,7 @@ class VodHomeActivity : TvRemoteActivity() {
     override fun onResume() {
         super.onResume()
         clockHandler.post(clockRunnable)
+        setupSidebarActions()
     }
 
     override fun onPause() {
@@ -150,11 +155,34 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun setupSidebarActions() {
+        val capabilities = DeviceCapabilitiesSession.get(this)
+        val modeOverride = ExperienceModePreferencesStore(this).load()
+        val experienceMode = resolveExperienceMode(
+            capabilities = capabilities,
+            mobileUiEnabled = BuildConfig.MOBILE_UI_ENABLED,
+            override = modeOverride,
+        )
+
+        val isHybrid = experienceMode == ExperienceMode.HYBRID_TV
+        if (isHybrid) {
+            // Uydu donanimi ve ayarlari aktif: Canli TV (Uydu) ve IPTV Canli ayri gosterilir
+            binding.vodNavLive.text = getString(R.string.live_tv)
+            binding.vodNavLive.setOnClickListener { openLiveTv(targetSource = "TIF") }
+
+            binding.vodNavIptv.visibility = View.VISIBLE
+            binding.vodNavIptv.setText(R.string.vod_nav_iptv_live)
+            binding.vodNavIptv.setOnClickListener { openLiveTv(targetSource = "IPTV") }
+        } else {
+            // Sadece IPTV modu: Tek bir Canli TV butonu IPTV canli yayinina gecer
+            binding.vodNavLive.text = getString(R.string.live_tv)
+            binding.vodNavLive.setOnClickListener { openLiveTv(targetSource = "IPTV") }
+            binding.vodNavIptv.visibility = View.GONE
+        }
+
         binding.vodNavHome.setOnClickListener {
             filter = VodFilter()
             loadData()
         }
-        binding.vodNavLive.setOnClickListener { openLiveTv() }
         binding.vodNavMovies.setOnClickListener {
             filter = filter.copy(section = "MOVIES")
             loadData()
@@ -183,6 +211,7 @@ class VodHomeActivity : TvRemoteActivity() {
             }
         }
     }
+
 
     private fun updateHeroBanner(displayItem: VodDisplayItem) {
         currentHeroItem = displayItem
@@ -351,7 +380,15 @@ class VodHomeActivity : TvRemoteActivity() {
         startActivity(intent)
     }
 
-    private fun openLiveTv() {
+    private fun openLiveTv(targetSource: String? = null) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_LIVE_MODE, true)
+            if (targetSource != null) {
+                putExtra(MainActivity.EXTRA_LIVE_TARGET_SOURCE, targetSource)
+            }
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        startActivity(intent)
         finish()
     }
 
@@ -399,10 +436,21 @@ class VodHomeActivity : TvRemoteActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
+            val capabilities = DeviceCapabilitiesSession.get(this)
+            val modeOverride = ExperienceModePreferencesStore(this).load()
+            val experienceMode = resolveExperienceMode(capabilities, BuildConfig.MOBILE_UI_ENABLED, modeOverride)
+            val isHybrid = experienceMode == ExperienceMode.HYBRID_TV
+
             when (event.keyCode) {
                 KeyEvent.KEYCODE_PROG_RED -> {
-                    openLiveTv()
+                    openLiveTv(if (isHybrid) "TIF" else "IPTV")
                     return true
+                }
+                KeyEvent.KEYCODE_PROG_YELLOW -> {
+                    if (isHybrid) {
+                        openLiveTv("IPTV")
+                        return true
+                    }
                 }
                 KeyEvent.KEYCODE_PROG_GREEN -> {
                     filter = filter.copy(view = "CONTINUE")

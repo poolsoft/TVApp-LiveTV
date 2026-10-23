@@ -820,4 +820,5 @@
     <string name="vod_back_to_list">VOD Listesi</string>
     <string name="vod_audio_subtitles">Ses / Altyazı</string>
     <string name="vod_restart">Baştan Başlat</string>
+    <string name="vod_nav_iptv_live">IPTV</string>
 </resources>

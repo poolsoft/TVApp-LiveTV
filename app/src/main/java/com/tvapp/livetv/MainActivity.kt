@@ -135,6 +135,7 @@ class MainActivity : TvRemoteActivity() {
         const val EXTRA_VOD_SOURCE_KEY = "com.tvapp.livetv.extra.VOD_SOURCE_KEY"
         const val EXTRA_VOD_START_OVER = "com.tvapp.livetv.extra.VOD_START_OVER"
         const val EXTRA_LIVE_MODE = "com.tvapp.livetv.extra.LIVE_MODE"
+        const val EXTRA_LIVE_TARGET_SOURCE = "com.tvapp.livetv.extra.LIVE_TARGET_SOURCE"
         const val MODE_PREFS = "playback-mode"
         const val LAST_VOD_KEY = "last-vod-key"
         private const val LAST_LIVE_KEY = "last-live-key"
@@ -3116,7 +3117,7 @@ class MainActivity : TvRemoteActivity() {
             }.setNegativeButton(R.string.close, null).show()
     }
 
-    private fun switchToLiveMode() {
+    private fun switchToLiveMode(targetSource: String? = null) {
         saveCurrentIptvResumePosition()
         vodMode = false
         intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
@@ -3133,7 +3134,11 @@ class MainActivity : TvRemoteActivity() {
                 lastKey?.let { iptvRepository.channel(it) }
             }
             if (vodMode || requestGeneration != channelResolutionGeneration) return@launch
-            val channel = last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
+            val channel = when (targetSource) {
+                "TIF" -> channels.firstOrNull { it.source == LiveChannel.Source.TIF && !it.isVodContent() }
+                "IPTV" -> channels.firstOrNull { it.source == LiveChannel.Source.IPTV && !it.isVodContent() }
+                else -> null
+            } ?: last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
             if (channel != null) selectChannel(channel, recordHistory = false)
             else loadChannels(preserveCurrentPlayback = false)
         }
@@ -7229,7 +7234,9 @@ class MainActivity : TvRemoteActivity() {
     private fun handleVodSourceDeepLink(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_LIVE_MODE, false) == true) {
             intent.removeExtra(EXTRA_LIVE_MODE)
-            switchToLiveMode()
+            val targetSource = intent.getStringExtra(EXTRA_LIVE_TARGET_SOURCE)
+            intent.removeExtra(EXTRA_LIVE_TARGET_SOURCE)
+            switchToLiveMode(targetSource)
             return
         }
         val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY)

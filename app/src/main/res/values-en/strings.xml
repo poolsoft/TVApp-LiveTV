@@ -820,4 +820,5 @@
     <string name="vod_back_to_list">VOD Library</string>
     <string name="vod_audio_subtitles">Audio / Subtitles</string>
     <string name="vod_restart">Restart</string>
+    <string name="vod_nav_iptv_live">IPTV</string>
 </resources>
