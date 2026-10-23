@@ -1,5 +1,23 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-23 - VOD Grid Keşif Ana Ekranı, Devam Et Rayı, LiveTV Mod Ayrımı ve Favoriler Filtresi
+
+- **VOD Grid Keşif Ekranı Varsayılan Ana Ekran Yapıldı:** Önceki kullanışsız 3 sütunlu dashboard kaldırılarak, zengin ve modern Grid Keşif arayüzü doğrudan VOD ana ekranı haline getirildi:
+  - **Sol Panel:** Tek tıkla açılan "Playlist / Liste" (Combo seçici) butonu, Canlı TV'ye dönüş butonu, 4 sıralama seçeneği (Varsayılan, A-Z, Z-A, En Yeni Eklenenler) ve dinamik kategoriler listesi.
+  - **Playlist / Liste Combo Seçimi:** IPTV sağlayıcıları arasında tek tıkla geçiş sağlayan açılır diyalog; tüm kaynakları veya belirli bir listeyi filtreleme imkanı.
+  - **Üstte "İzlemeye Devam Et" (Devam Et) Yatay Rayı:** VOD ekranının üst kısmına yarım kalan film ve dizilerin gösterildiği yatay afiş rayı eklendi (`vod_continue_container` & `vod_recycler_continue`); içerik yoksa alan otomatik gizlenir.
+  - **Sağ Alan:** 5 sütunlu akıcı ve sayfalı (Pagination) afiş ızgarası ile binlerce içerik takılmadan listelenir.
+  - **Doğrudan Canlı TV'ye Dönüş:** Kumanda Geri (Back) tuşu, sol paneldeki "Canlı TV'ye Dön" butonu ve Kırmızı renk tuşu ile VOD'dan doğrudan Canlı TV'ye dönülür.
+- **LiveTV & VOD Modu Kesin Ayrımı ve Infobar Çakışmasının Giderilmesi:**
+  - VOD oynatılırken LiveTV infobarı kesin olarak engellendi (`binding.infoBar.visibility = View.GONE`), VOD infobarı tek yetkili kılındı.
+  - LiveTV moduna dönüldüğünde VOD oynatıcı arayüzü tamamen gizlendi (`vodPlayerOverlayController?.hideControls()`).
+  - VOD'dan Canlı TV'ye dönüldüğünde (`switchToLiveMode`) Canlı TV her zaman kanal listesi açık modda (`showChannelPanel(expanded = false)`) başlatılarak kullanıcı dostu hızlı zapping sağlandı.
+- **Kanal Listesi Filtrelerine "Favori Kanallar" Bağımsız Listesi Eklendi:**
+  - `ChannelSourceFilter.FAVORITES` eklendi; Sarı tuş kısa basış döngüsüne ve Sarı tuş uzun basış kaynak seçici diyaloğuna "Favori Kanallar" seçeneği dahil edildi.
+  - Favoriler seçildiğinde listede yalnızca favorilere eklenmiş kanallar filtrelenir ve başlıkta sarı yıldız ikonu görüntülenir.
+- **`BufferedLiveInputStream` Yarış Durumu (Race Condition) Düzeltmesi:**
+  - Akış kapatıldığında worker iş parçacığının erken sonlanması ve consumer thread'in beklemeden -1 dönmesi sonucu CI testinde (`BufferedLiveInputStreamTest`) oluşan hata giderildi; `closed` durumu kontrol edilerek `IOException` fırlatılması güvenceye alındı.
+
 ## 2026-10-23 - MainActivity Modülerleştirme ve Mimari Ayrıştırma (Refactoring)
 
 - **MainActivity Parçalama ve Sorumluluk Ayrımı:** Monolitik `MainActivity.kt` sınıfı, işlevsel sorumluluklarına göre 5 bağımsız denetleyiciye (controller/helper) ayrıştırıldı; kod tabanı sadeleştirilip modüler hale getirildi:

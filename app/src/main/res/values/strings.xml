@@ -23,6 +23,10 @@
     <string name="vod_return_item">İçeriğe dön</string>
     <string name="vod_continue_named">%1$s içeriğine devam et</string>
     <string name="vod_saved_position">Kaldığın yer: %1$s</string>
+    <string name="favorite_channels">Favori Kanallar</string>
+    <string name="vod_select_source">Liste Seçimi</string>
+    <string name="vod_all_sources">Tüm Listeler</string>
+    <string name="vod_continue_watching">İzlemeye Devam Et</string>
     <string name="vod_sort_name">Sıralama: Ad</string>
     <string name="vod_sort_source">Sıralama: Kaynak sırası</string>
     <string name="vod_count">%1$d içerik</string>

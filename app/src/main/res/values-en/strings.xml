@@ -23,6 +23,10 @@
     <string name="vod_return_item">Return to content</string>
     <string name="vod_continue_named">Continue %1$s</string>
     <string name="vod_saved_position">Saved position: %1$s</string>
+    <string name="favorite_channels">Favorite Channels</string>
+    <string name="vod_select_source">Select Playlist</string>
+    <string name="vod_all_sources">All Playlists</string>
+    <string name="vod_continue_watching">Continue Watching</string>
     <string name="vod_sort_name">Sort: Name</string>
     <string name="vod_sort_source">Sort: Source order</string>
     <string name="vod_count">%1$d items</string>

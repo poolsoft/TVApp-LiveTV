@@ -23,6 +23,10 @@ class VodRepository(context: Context, private val database: TVAppDatabase = TVAp
         // Resolve a single item without loading its source catalog.
         return dao.page(VodCatalogQuery.item(key)).firstOrNull()
     }
+    suspend fun resumeItems(keys: List<String>): List<VodCatalogItem> {
+        if (keys.isEmpty()) return emptyList()
+        return dao.page(VodCatalogQuery.resumeItems(keys))
+    }
 
     suspend fun refreshSeries(sourceId: Long, force: Boolean = false) {
         val source = database.iptvDao().getSource(sourceId) ?: return

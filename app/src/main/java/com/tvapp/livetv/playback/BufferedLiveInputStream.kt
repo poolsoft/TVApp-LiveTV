@@ -60,6 +60,7 @@ internal class BufferedLiveInputStream(
                 throw InterruptedIOException("Live read interrupted")
             }
             if (chunk == null) {
+                if (closed) throw IOException("Live buffer closed")
                 if (finished && queue.isEmpty()) {
                     failure?.let { throw it }
                     return -1

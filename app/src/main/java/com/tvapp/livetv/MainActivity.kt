@@ -2969,7 +2969,8 @@ class MainActivity : TvRemoteActivity() {
         val requestGeneration = channelResolutionGeneration
         iptvPlayback.stop()
         hideIptvPlaybackControls()
-        hideChannelPanel()
+        vodPlayerOverlayController?.hideControls()
+        binding.vodPlayerOverlay.visibility = View.GONE
         channelPanelContent = ChannelPanelContent.NORMAL
         applyChannelFilter(requestFocus = false)
         val lastKey = modePreferences.getString(LAST_LIVE_KEY, null)
@@ -2985,6 +2986,7 @@ class MainActivity : TvRemoteActivity() {
             } ?: last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
             if (channel != null) selectChannel(channel, recordHistory = false)
             else loadChannels(preserveCurrentPlayback = false)
+            showChannelPanel(expanded = false)
         }
     }
 
@@ -4786,6 +4788,7 @@ class MainActivity : TvRemoteActivity() {
                     channel.source == LiveChannel.Source.TIF && !channel.isRadioChannel()
                 ChannelSourceFilter.RADIO -> channel.isRadioChannel()
                 ChannelSourceFilter.IPTV -> channel.source == LiveChannel.Source.IPTV
+                ChannelSourceFilter.FAVORITES -> channel.favorite
             }
         }
         .filter { channel -> !favoriteFilter || channel.favorite }
@@ -4973,6 +4976,10 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvPlaybackContainer.visibility = if (
             state.infoBarVisible && state.iptvChromeVisible && !vodActive
         ) View.VISIBLE else View.GONE
+        if (!vodActive && binding.vodPlayerOverlay.visibility == View.VISIBLE) {
+            binding.vodPlayerOverlay.visibility = View.GONE
+            vodPlayerOverlayController?.hideControls()
+        }
         binding.recentChannelsPanel.visibility = if (
             state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
         ) View.VISIBLE else View.GONE
@@ -4996,6 +5003,13 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun setInfoBarVisible(visible: Boolean) {
+        if (visible && isVodPlaybackActive()) {
+            osdCoordinator.hideInfoBar()
+            binding.infoBar.visibility = View.GONE
+            binding.iptvPlaybackContainer.visibility = View.GONE
+            showVodPlayerControls()
+            return
+        }
         if (!visible && iptvControlsInteractive) {
             iptvControlsInteractive = false
             iptvControlRow = IptvControlRow.TIMELINE
@@ -5004,6 +5018,8 @@ class MainActivity : TvRemoteActivity() {
         }
         if (!visible) iptvInfoTickerJob?.cancel()
         if (visible) {
+            vodPlayerOverlayController?.hideControls()
+            binding.vodPlayerOverlay.visibility = View.GONE
             osdCoordinator.showInfoBar(
                 iptvChrome = currentChannel?.source == LiveChannel.Source.IPTV,
                 interactive = iptvControlsInteractive,
@@ -5017,6 +5033,8 @@ class MainActivity : TvRemoteActivity() {
         val (icon, description) = when {
             channelPanelContent == ChannelPanelContent.IPTV_LIBRARY ->
                 R.drawable.ic_iptv_library to R.string.iptv_library
+            sourceFilter == ChannelSourceFilter.FAVORITES ->
+                R.drawable.ic_star to R.string.favorite_channels
             sourceFilter == ChannelSourceFilter.SATELLITE ->
                 R.drawable.ic_source_tif to R.string.satellite_channels
             sourceFilter == ChannelSourceFilter.RADIO ->
@@ -5318,10 +5336,17 @@ class MainActivity : TvRemoteActivity() {
     private fun cycleChannelListMode() {
         focusedTuneJob?.cancel()
         if (experienceMode != ExperienceMode.HYBRID_TV) {
-            if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-                applyChannelFilter(showFavorites = false, source = ChannelSourceFilter.ALL)
-            } else {
-                openSavedIptvLibrary()
+            when {
+                channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> applyChannelFilter(
+                    showFavorites = false,
+                    source = ChannelSourceFilter.ALL,
+                )
+                sourceFilter == ChannelSourceFilter.ALL -> applyChannelFilter(
+                    showFavorites = false,
+                    source = ChannelSourceFilter.FAVORITES,
+                )
+                sourceFilter == ChannelSourceFilter.FAVORITES -> openSavedIptvLibrary()
+                else -> applyChannelFilter(showFavorites = false, source = ChannelSourceFilter.ALL)
             }
             return
         }
@@ -5341,6 +5366,10 @@ class MainActivity : TvRemoteActivity() {
             sourceFilter == ChannelSourceFilter.RADIO -> applyChannelFilter(
                 showFavorites = false,
                 source = ChannelSourceFilter.IPTV,
+            )
+            sourceFilter == ChannelSourceFilter.IPTV -> applyChannelFilter(
+                showFavorites = false,
+                source = ChannelSourceFilter.FAVORITES,
             )
             else -> openSavedIptvLibrary()
         }
@@ -5379,6 +5408,14 @@ class MainActivity : TvRemoteActivity() {
                     ) { applyChannelFilter(false, ChannelSourceFilter.IPTV) },
                 )
             }
+            add(
+                ChannelListModeOption(
+                    getString(R.string.favorite_channels),
+                    channelPanelContent == ChannelPanelContent.NORMAL &&
+                        sourceFilter == ChannelSourceFilter.FAVORITES,
+                    apply = { applyChannelFilter(false, ChannelSourceFilter.FAVORITES) },
+                ),
+            )
             add(
                 ChannelListModeOption(
                     getString(R.string.iptv_library),
