@@ -2363,18 +2363,19 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun renderVodControlSelection() {
-        val selectedBg = ContextCompat.getDrawable(this, R.drawable.bg_vod_button_selected)
-        val defaultBg = ContextCompat.getDrawable(this, R.drawable.bg_vod_button)
-        val selectedTimelineBg = ContextCompat.getDrawable(this, R.drawable.bg_vod_timeline_selected)
-
         fun highlight(view: View, isSelected: Boolean) {
-            view.background = if (isSelected) selectedBg else defaultBg
+            val bgRes = if (isSelected) R.drawable.bg_vod_button_selected else R.drawable.bg_vod_button
+            view.setBackgroundResource(bgRes)
             if (isSelected) view.requestFocus()
         }
 
         highlight(binding.vodBtnBack, selectedVodTarget == VodControlTarget.BACK)
-        binding.vodTimelineRow.background = if (selectedVodTarget == VodControlTarget.TIMELINE) selectedTimelineBg else null
-        if (selectedVodTarget == VodControlTarget.TIMELINE) binding.vodTimelineRow.requestFocus()
+        if (selectedVodTarget == VodControlTarget.TIMELINE) {
+            binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline_selected)
+            binding.vodTimelineRow.requestFocus()
+        } else {
+            binding.vodTimelineRow.background = null
+        }
         highlight(binding.vodBtnRewind, selectedVodTarget == VodControlTarget.REWIND)
         highlight(binding.vodBtnPlayPause, selectedVodTarget == VodControlTarget.PLAY_PAUSE)
         highlight(binding.vodBtnForward, selectedVodTarget == VodControlTarget.FORWARD)
