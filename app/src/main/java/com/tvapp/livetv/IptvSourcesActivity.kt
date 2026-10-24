@@ -1131,6 +1131,13 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         } ?: getString(R.string.never)
 
                         val detailsText = when {
+                            summary.source.kind == IptvRepository.KIND_JSON_VOD -> {
+                                if (summary.vodCount > 0) {
+                                    getString(R.string.iptv_source_vod_stats_line, summary.vodCount, updatedAt)
+                                } else {
+                                    getString(R.string.vod_archive_description)
+                                }
+                            }
                             summary.channelCount == 0 && summary.vodCount > 0 -> {
                                 getString(R.string.iptv_source_vod_stats_line, summary.vodCount, updatedAt)
                             }

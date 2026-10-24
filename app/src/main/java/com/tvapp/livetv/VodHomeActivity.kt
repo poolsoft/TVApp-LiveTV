@@ -531,7 +531,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun enrichMissingTmdb(items: List<VodCatalogItem>, cached: Map<String, VodTmdbEntity>) {
         tmdbJob?.cancel()
         tmdbJob = lifecycleScope.launch(Dispatchers.IO) {
-            val missing = items.filter { it.sourceKey !in cached }.distinctBy { it.name }
+            val missing = items.filter { it.logoUrl.isNullOrBlank() && it.sourceKey !in cached }.distinctBy { it.name }
             for (item in missing.take(15)) {
                 try {
                     val cleaned = VodTitleCleaner.clean(item.name)
@@ -591,26 +591,85 @@ class VodHomeActivity : TvRemoteActivity() {
             val episodes = withContext(Dispatchers.IO) {
                 repository.episodesForSeries(seriesItem.sourceKey)
             }
-            if (episodes.isEmpty()) {
-                Toast.makeText(this@VodHomeActivity, R.string.vod_no_episodes_found, Toast.LENGTH_SHORT).show()
+            if (episodes.isNotEmpty()) {
+                val titles = episodes.map { ep ->
+                    val s = ep.seasonNumber ?: 1
+                    val e = ep.episodeNumber ?: 1
+                    "${s}. Sezon ${e}. Bölüm - ${ep.name}"
+                }.toTypedArray()
+
+                AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
+                    .setTitle(seriesItem.name)
+                    .setItems(titles) { _, which ->
+                        val selectedEp = episodes[which]
+                        playEpisode(selectedEp)
+                    }
+                    .setNegativeButton(R.string.close, null)
+                    .show()
                 return@launch
             }
 
-            val titles = episodes.map { ep ->
-                val s = ep.seasonNumber ?: 1
-                val e = ep.episodeNumber ?: 1
-                "${s}. Sezon ${e}. Bölüm - ${ep.name}"
-            }.toTypedArray()
+            // Check if episodes are stored as JSON in streamUrl
+            val meta = withContext(Dispatchers.IO) {
+                database.vodDao().metadata(seriesItem.sourceKey)
+            }
+            val rawEpisodes = meta?.streamUrl
+            if (!rawEpisodes.isNullOrBlank() && rawEpisodes.startsWith("[")) {
+                try {
+                    val jsonArray = org.json.JSONArray(rawEpisodes)
+                    if (jsonArray.length() > 0) {
+                        val parsedEpisodes = mutableListOf<Pair<String, String>>()
+                        for (i in 0 until jsonArray.length()) {
+                            val epObj = jsonArray.optJSONObject(i)
+                            if (epObj != null) {
+                                val epTitle = epObj.optString("title").trim().ifEmpty {
+                                    epObj.optString("name").trim()
+                                }.ifEmpty {
+                                    "${i + 1}. Bölüm"
+                                }
+                                val epUrl = epObj.optString("videoUrl").trim().ifEmpty {
+                                    epObj.optString("url").trim()
+                                }
+                                if (epUrl.isNotEmpty()) {
+                                    parsedEpisodes.add(Pair(epTitle, epUrl))
+                                }
+                            }
+                        }
 
-            AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
-                .setTitle(seriesItem.name)
-                .setItems(titles) { _, which ->
-                    val selectedEp = episodes[which]
-                    playEpisode(selectedEp)
+                        if (parsedEpisodes.isNotEmpty()) {
+                            val titles = parsedEpisodes.map { it.first }.toTypedArray()
+                            AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
+                                .setTitle(seriesItem.name)
+                                .setItems(titles) { _, which ->
+                                    val (epTitle, epUrl) = parsedEpisodes[which]
+                                    playDynamicEpisode(seriesItem, epTitle, epUrl)
+                                }
+                                .setNegativeButton(R.string.close, null)
+                                .show()
+                            return@launch
+                        }
+                    }
+                } catch (e: Exception) {
+                    debugLog.recordDebug("Parse dynamic JSON episodes failed: ${e.message}")
                 }
-                .setNegativeButton(R.string.close, null)
-                .show()
+            }
+
+            Toast.makeText(this@VodHomeActivity, R.string.vod_no_episodes_found, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun playDynamicEpisode(seriesItem: VodCatalogItem, epTitle: String, epUrl: String) {
+        lastPlayedSourceKey = seriesItem.sourceKey
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, seriesItem.sourceKey)
+            putExtra(MainActivity.EXTRA_VOD_STREAM_URL, epUrl)
+            putExtra(MainActivity.EXTRA_VOD_TITLE, seriesItem.name)
+            putExtra(MainActivity.EXTRA_VOD_EPISODE_TITLE, epTitle)
+            putExtra(MainActivity.EXTRA_VOD_LOGO_URL, seriesItem.logoUrl)
+            putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        startActivity(intent)
     }
 
     private fun playEpisode(episode: VodMetadataEntity) {

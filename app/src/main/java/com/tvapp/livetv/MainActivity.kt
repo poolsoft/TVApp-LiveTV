@@ -138,6 +138,10 @@ import java.util.Locale
 class MainActivity : TvRemoteActivity() {
     companion object {
         const val EXTRA_VOD_SOURCE_KEY = "com.tvapp.livetv.extra.VOD_SOURCE_KEY"
+        const val EXTRA_VOD_STREAM_URL = "com.tvapp.livetv.extra.VOD_STREAM_URL"
+        const val EXTRA_VOD_TITLE = "com.tvapp.livetv.extra.VOD_TITLE"
+        const val EXTRA_VOD_EPISODE_TITLE = "com.tvapp.livetv.extra.VOD_EPISODE_TITLE"
+        const val EXTRA_VOD_LOGO_URL = "com.tvapp.livetv.extra.VOD_LOGO_URL"
         const val EXTRA_VOD_START_OVER = "com.tvapp.livetv.extra.VOD_START_OVER"
         const val EXTRA_LIVE_MODE = "com.tvapp.livetv.extra.LIVE_MODE"
         const val EXTRA_LIVE_TARGET_SOURCE = "com.tvapp.livetv.extra.LIVE_TARGET_SOURCE"
@@ -2279,33 +2283,83 @@ class MainActivity : TvRemoteActivity() {
                 appDb.vodDao().episodesForSeries(seriesKey)
             }
 
-            if (episodes.isEmpty()) {
-                openVodLibrary()
+            if (episodes.isNotEmpty()) {
+                val episodeNames = episodes.map { ep ->
+                    val epNum = ep.episodeNumber
+                    val sNum = ep.seasonNumber ?: 1
+                    if (epNum != null) {
+                        getString(R.string.vod_season_episode_fmt, sNum, epNum) +
+                            (if (ep.name.isNotBlank() && !ep.name.startsWith("$epNum")) " - ${ep.name}" else "")
+                    } else ep.name
+                }.toTypedArray()
+
+                val currentIndex = episodes.indexOfFirst { it.sourceKey == activeKey }.coerceAtLeast(0)
+
+                AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+                    .setTitle(currentChannel?.displayName ?: getString(R.string.vod_select_episode))
+                    .setSingleChoiceItems(episodeNames, currentIndex) { dialog, which ->
+                        val chosen = episodes.getOrNull(which)
+                        if (chosen != null && chosen.sourceKey != activeKey) {
+                            openVod(chosen.sourceKey)
+                        }
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(R.string.close, null)
+                    .show()
                 return@launch
             }
 
-            val episodeNames = episodes.map { ep ->
-                val epNum = ep.episodeNumber
-                val sNum = ep.seasonNumber ?: 1
-                if (epNum != null) {
-                    getString(R.string.vod_season_episode_fmt, sNum, epNum) +
-                        (if (ep.name.isNotBlank() && !ep.name.startsWith("$epNum")) " - ${ep.name}" else "")
-                } else ep.name
-            }.toTypedArray()
-
-            val currentIndex = episodes.indexOfFirst { it.sourceKey == activeKey }.coerceAtLeast(0)
-
-            AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
-                .setTitle(currentChannel?.displayName ?: getString(R.string.vod_select_episode))
-                .setSingleChoiceItems(episodeNames, currentIndex) { dialog, which ->
-                    val chosen = episodes.getOrNull(which)
-                    if (chosen != null && chosen.sourceKey != activeKey) {
-                        openVod(chosen.sourceKey)
+            // Check if series has episodes JSON in streamUrl
+            val seriesMeta = withContext(Dispatchers.IO) {
+                if (currentMeta.kind == "SERIES") currentMeta else appDb.vodDao().metadata(seriesKey)
+            }
+            val rawEpisodes = seriesMeta?.streamUrl
+            if (!rawEpisodes.isNullOrBlank() && rawEpisodes.startsWith("[")) {
+                try {
+                    val jsonArray = org.json.JSONArray(rawEpisodes)
+                    val parsedEpisodes = mutableListOf<Pair<String, String>>()
+                    for (i in 0 until jsonArray.length()) {
+                        val epObj = jsonArray.optJSONObject(i)
+                        if (epObj != null) {
+                            val epTitle = epObj.optString("title").trim().ifEmpty {
+                                epObj.optString("name").trim()
+                            }.ifEmpty { "${i + 1}. Bölüm" }
+                            val epUrl = epObj.optString("videoUrl").trim().ifEmpty {
+                                epObj.optString("url").trim()
+                            }
+                            if (epUrl.isNotEmpty()) {
+                                parsedEpisodes.add(Pair(epTitle, epUrl))
+                            }
+                        }
                     }
-                    dialog.dismiss()
+
+                    if (parsedEpisodes.isNotEmpty()) {
+                        val titles = parsedEpisodes.map { it.first }.toTypedArray()
+                        val currentIndex = parsedEpisodes.indexOfFirst { it.first == active.episodeTitle }.coerceAtLeast(0)
+                        AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+                            .setTitle(currentChannel?.displayName ?: seriesMeta.name)
+                            .setSingleChoiceItems(titles, currentIndex) { dialog, which ->
+                                val (epTitle, epUrl) = parsedEpisodes[which]
+                                val vodIntent = Intent().apply {
+                                    putExtra(EXTRA_VOD_SOURCE_KEY, seriesKey)
+                                    putExtra(EXTRA_VOD_STREAM_URL, epUrl)
+                                    putExtra(EXTRA_VOD_TITLE, seriesMeta.name)
+                                    putExtra(EXTRA_VOD_EPISODE_TITLE, epTitle)
+                                    putExtra(EXTRA_VOD_LOGO_URL, seriesMeta.logoUrl)
+                                }
+                                handleVodSourceDeepLink(vodIntent)
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(R.string.close, null)
+                            .show()
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    debugLog.recordDebug("Parse episodes JSON failed: ${e.message}")
                 }
-                .setNegativeButton(R.string.close, null)
-                .show()
+            }
+
+            openVodLibrary()
         }
         return true
     }
@@ -6257,8 +6311,10 @@ class MainActivity : TvRemoteActivity() {
             switchToLiveMode(targetSource)
             return
         }
+        val directStreamUrl = intent?.getStringExtra(EXTRA_VOD_STREAM_URL)
         val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY)
             ?: (if (vodMode && currentChannel == null) modePreferences.getString(LAST_VOD_KEY, null) else null)
+            ?: if (!directStreamUrl.isNullOrBlank()) "direct_vod_${System.currentTimeMillis()}" else null
             ?: run {
                 if (vodMode && currentChannel == null) openVodLibrary()
                 return
@@ -6272,6 +6328,43 @@ class MainActivity : TvRemoteActivity() {
             iptvPlayback.stop()
             iptvResumeStore.clear(sourceKey)
         }
+
+        if (!directStreamUrl.isNullOrBlank()) {
+            val mainTitle = intent.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
+            val subTitle = intent.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
+            val logo = intent.getStringExtra(EXTRA_VOD_LOGO_URL)
+            lifecycleScope.launch {
+                val resolved = withContext(Dispatchers.IO) {
+                    com.tvapp.livetv.vod.WebVideoResolver.resolveStream(directStreamUrl, this@MainActivity)
+                }
+                if (!resolved.isPlayable) {
+                    withContext(Dispatchers.Main) {
+                        showIptvNotice(R.string.vod_stream_resolve_failed)
+                    }
+                    return@launch
+                }
+                if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
+                val channel = LiveChannel(
+                    id = sourceKey.hashCode().toLong(),
+                    sourceKey = sourceKey,
+                    inputId = "iptv:direct_vod",
+                    displayNumber = "VOD",
+                    displayName = mainTitle,
+                    source = LiveChannel.Source.IPTV,
+                    uri = resolved.streamUrl,
+                    userAgent = resolved.userAgent,
+                    referrer = resolved.referrer,
+                    origin = resolved.origin,
+                    logoUrl = logo,
+                    iptvContentType = "VOD",
+                ).apply {
+                    episodeTitle = subTitle
+                }
+                selectChannel(channel, recordHistory = true)
+            }
+            return
+        }
+
         if (currentChannel?.sourceKey == sourceKey && iptvPlayback.tunedSourceKey() == sourceKey &&
             iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY
         ) {

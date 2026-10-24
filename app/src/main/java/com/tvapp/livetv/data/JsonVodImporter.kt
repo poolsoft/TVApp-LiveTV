@@ -50,8 +50,9 @@ object JsonVodImporter {
             if (isSeries) {
                 val seriesSlug = hashString("$sourceId:series:$title")
                 val seriesKey = "iptv:$sourceId:series:$seriesSlug"
+                val episodesRaw = episodesArray?.toString()
 
-                // Add Series Parent Entity
+                // Add Series Parent Entity with episodes JSON stored in streamUrl
                 metadataBatch.add(
                     VodMetadataEntity(
                         sourceKey = seriesKey,
@@ -66,51 +67,11 @@ object JsonVodImporter {
                         category = category,
                         description = description,
                         durationMillis = null,
-                        streamUrl = null,
+                        streamUrl = episodesRaw,
                         updatedAt = now,
                     )
                 )
                 count++
-
-                // Add Episodes
-                if (episodesArray != null) {
-                    for (epIdx in 0 until episodesArray.length()) {
-                        val epObj = episodesArray.optJSONObject(epIdx) ?: continue
-                        val epTitle = epObj.optString("title").trim().ifEmpty {
-                            "${epIdx + 1}. Bölüm"
-                        }
-                        val videoUrl = epObj.optString("videoUrl").trim().ifEmpty {
-                            epObj.optString("url").trim()
-                        }
-                        if (videoUrl.isEmpty()) continue
-
-                        // Extract episode number from title (e.g., "8. Bölüm" -> 8) or index
-                        val parsedEpNumber = Regex("(\\d+)\\s*\\.?\\s*B[oö]l[uü]m", RegexOption.IGNORE_CASE)
-                            .find(epTitle)?.groupValues?.get(1)?.toIntOrNull() ?: (epIdx + 1)
-                        val seasonNumber = epObj.optInt("season", 1)
-
-                        val epKey = "iptv:$sourceId:episode:$seriesSlug:s${seasonNumber}e$parsedEpNumber"
-
-                        metadataBatch.add(
-                            VodMetadataEntity(
-                                sourceKey = epKey,
-                                sourceId = sourceId,
-                                kind = "EPISODE",
-                                providerId = "json_ep_${i}_$epIdx",
-                                parentKey = seriesKey,
-                                seasonNumber = seasonNumber,
-                                episodeNumber = parsedEpNumber,
-                                name = epTitle,
-                                logoUrl = poster,
-                                category = category,
-                                description = description,
-                                durationMillis = null,
-                                streamUrl = videoUrl,
-                                updatedAt = now,
-                            )
-                        )
-                    }
-                }
             } else {
                 // Standalone Movie
                 val videoUrl = item.optString("videoUrl").trim().ifEmpty {
@@ -142,8 +103,8 @@ object JsonVodImporter {
                 }
             }
 
-            // Save in batches of 200 items to avoid SQLite statement limits
-            if (metadataBatch.size >= 200) {
+            // Save in batches of 400 items to avoid memory & SQLite statement limits
+            if (metadataBatch.size >= 400) {
                 database.vodDao().upsert(metadataBatch)
                 metadataBatch.clear()
                 onProgress(i + 1, total)
