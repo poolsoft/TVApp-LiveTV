@@ -31,6 +31,7 @@ data class LiveChannel(
     val groupId: Long? = null,
 ) {
     var episodeTitle: String? = null
+    var cookie: String? = null
 
     fun isVodContent(): Boolean = source == Source.IPTV && iptvContentType.equals("VOD", ignoreCase = true)
 

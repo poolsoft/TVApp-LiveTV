@@ -1,13 +1,17 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-24 - Evrensel Ağ Akış Yakalayıcısı (Universal Stream Sniffer) ve VOD Loop Koruması
+## 2026-10-24 - VOD Akış Çözümleme, Çerez (Cookie) Desteği, SSL Bypass ve Loop Önleme
 
-- **Evrensel Ağ Akış Yakalayıcısı (Universal Network Stream Sniffer - `WebVideoResolver`):**
-  - Kırılgan HTML etiketleri veya web sitesi bazlı kurallara bağımlı kalmadan; tüm web sayfalarında (filmmodu, pilavyer, vidmoly vb.) arka planda çalışan Headless WebView üzerinde `fetch`, `XMLHttpRequest` ve `HTMLMediaElement.src` fonksiyonları kancalanarak (hooking) ve `shouldInterceptRequest`/`onLoadResource` dinlenerek ağ seviyesinde evrensel akış yakalama (`.m3u8`, `.mpd`, `stream.php`, `/hls/`, `.mp4`) sağlandı.
-  - Dinamik video oynatıcıları harekete geçiren evrensel otomatik oynatma (autoplay) tetikleyicisi eklendi.
-- **VOD Çözümleme Döngüsü (Loop) ve Sayfa Atma Koruması (`MainActivity`):**
-  - VOD akışı çözülürken kullanıcının canlı TV'ye dönmesi durumunda önceki çözümleme görevi iptal edilecek (`vodResolveJob?.cancel()`) şekilde güvenli coroutine yönetimi kuruldu.
-  - Başarısız akışlarda kullanıcıyı zorla VOD kütüphanesine fırlatarak devamlı döngüye (loop) sokan `openVodLibrary()` çağrıları kaldırıldı; kullanıcı ekranı değiştirilmeden yalnızca bilgilendirici uyarı mesajı (`showIptvNotice`) gösterilmesi sağlandı.
+- **ExoPlayer HTTP Veri Kaynağına Cookie ve SSL Trust-All Desteği (`IptvDataSourceFactory` & `LiveChannel`):**
+  - Web tabanlı video akışlarında CDN'lerin ve korumalı sunucuların talep ettiği oturum/Cloudflare çerezlerinin (`Cookie`) ExoPlayer HTTP başlıklarına eklenmesi sağlandı.
+  - SSL sertifikası süresi dolmuş veya geçersiz web sitelerinde oluşan `SSLHandshakeException` ve buna bağlı `Source error / Kanal açılamadı` hatası, OkHttp istemcisine `trustAll` SSL soket desteği eklenerek tamamen çözüldü.
+- **Sniffer Pencereye Bağlantı ve Çerez Yakalama (`WebVideoResolver`):**
+  - `mrowser` mimarisi referans alınarak, arka planda çalışan WebView Activity DecorView'a iliştirildi (`attach`); böylece modern web sitelerindeki oynatıcıların görünmeyen pencerelerde JavaScript ve video oynatmayı dondurması engellendi.
+  - Ağdan geçen akışlara ait `Referer`, `Origin` ve `CookieManager` çerezleri anında toplanıp ExoPlayer'a teslim edilecek yapı kuruldu.
+- **VOD Intent Tüketimi ve Canlı TV Temizliği (`MainActivity`):**
+  - `handleVodSourceDeepLink` içerisinde gelen VOD extra'ları (`EXTRA_VOD_STREAM_URL`, `EXTRA_VOD_SOURCE_KEY`, vb.) anında silinerek `onResume` / odak değişimlerinde tekrar tetiklenen sonsuz döngü (loop) engellendi.
+  - "Kanal açılamadı" diyaloğunda "KAPAT" butonuna basıldığında siyah ekranda asılı kalmak yerine doğrudan VOD kütüphanesine dönülmesi sağlandı.
+  - Canlı TV'ye geçişte VOD kanal referansı temizlenerek boş infobar çıkması önlendi.
 - **VOD Film Akış Çözümleme ve Loading Deneyimi (`VodHomeActivity` & `MainActivity`):**
   - Film listesinden bir içeriğe tıklandığında siyah ekranda bekleme ve boş canlı TV infobarı gelmesi sorunu giderildi.
   - Tıklanır tıklanmaz `MainActivity`'de VOD oynatıcı arayüzü ve TV buffering loading simgesi hemen ekrana gelir.

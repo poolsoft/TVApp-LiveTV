@@ -19,6 +19,7 @@ object IptvDataSourceFactory {
         userAgent: String?,
         referrer: String?,
         origin: String? = null,
+        cookie: String? = null,
         liveEdge: Boolean = false,
         reconnectLive: Boolean = false,
         livePrefetchBytes: Int = 8 * 1024 * 1024,
@@ -33,6 +34,7 @@ object IptvDataSourceFactory {
         okHttp.setDefaultRequestProperties(buildMap {
             referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
             origin?.takeIf(String::isNotBlank)?.let { put("Origin", it) }
+            cookie?.takeIf(String::isNotBlank)?.let { put("Cookie", it) }
         })
         val resolved = ResolvingDataSource.Factory(okHttp) { dataSpec ->
             val resolved = StalkerStreamUri.resolve(dataSpec.uri)
@@ -69,12 +71,29 @@ object IptvDataSourceFactory {
     private const val DEFAULT_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 11; Android TV) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    private val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
+        object : javax.net.ssl.X509TrustManager {
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+            override fun checkClientTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+        }
+    )
+
+    private val trustAllSslSocketFactory: javax.net.ssl.SSLSocketFactory by lazy {
+        val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+        sslContext.socketFactory
+    }
+
     private val HTTP_CLIENT = sharedClient(READ_TIMEOUT_MS)
     private val LIVE_HTTP_CLIENT = sharedClient(LIVE_READ_TIMEOUT_MS)
 
     private fun sharedClient(readTimeoutMs: Int) = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
         .readTimeout(readTimeoutMs.toLong(), TimeUnit.MILLISECONDS)
+        .sslSocketFactory(trustAllSslSocketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+        .hostnameVerifier { _, _ -> true }
         .followRedirects(true)
         .followSslRedirects(true)
         .retryOnConnectionFailure(true)

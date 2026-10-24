@@ -657,7 +657,12 @@ class MainActivity : TvRemoteActivity() {
         binding.retryButton.setOnClickListener {
             statusRetryAction?.invoke() ?: ensurePermissionAndLoad()
         }
-        binding.closeButton.setOnClickListener { osdCoordinator.hideStatus() }
+        binding.closeButton.setOnClickListener {
+            osdCoordinator.hideStatus()
+            if (vodMode) {
+                openVodLibrary()
+            }
+        }
         binding.scanButton.setOnClickListener { openTunerSetup() }
         binding.allFilter.setOnClickListener {
             applyChannelFilter(source = ChannelSourceFilter.ALL)
@@ -3084,6 +3089,13 @@ class MainActivity : TvRemoteActivity() {
         vodResolveJob = null
         binding.iptvBufferingContainer.visibility = View.GONE
         intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
+        intent.removeExtra(EXTRA_VOD_STREAM_URL)
+        intent.removeExtra(EXTRA_VOD_TITLE)
+        intent.removeExtra(EXTRA_VOD_EPISODE_TITLE)
+        intent.removeExtra(EXTRA_VOD_LOGO_URL)
+        if (currentChannel?.isVodContent() == true) {
+            currentChannel = null
+        }
         channelResolutionGeneration++
         val requestGeneration = channelResolutionGeneration
         iptvPlayback.stop()
@@ -6324,6 +6336,11 @@ class MainActivity : TvRemoteActivity() {
                 if (vodMode && currentChannel == null) openVodLibrary()
                 return
             }
+
+        // Consume intent extras immediately so that re-entering onResume / focus does not re-trigger deep link loop
+        intent?.removeExtra(EXTRA_VOD_STREAM_URL)
+        intent?.removeExtra(EXTRA_VOD_SOURCE_KEY)
+
         enterVodMode()
         val requestGeneration = ++channelResolutionGeneration
         val startOver = intent?.getBooleanExtra(EXTRA_VOD_START_OVER, false) == true
@@ -6335,9 +6352,12 @@ class MainActivity : TvRemoteActivity() {
         }
 
         if (!directStreamUrl.isNullOrBlank()) {
-            val mainTitle = intent.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
-            val subTitle = intent.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
-            val logo = intent.getStringExtra(EXTRA_VOD_LOGO_URL)
+            val mainTitle = intent?.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
+            val subTitle = intent?.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
+            val logo = intent?.getStringExtra(EXTRA_VOD_LOGO_URL)
+            intent?.removeExtra(EXTRA_VOD_TITLE)
+            intent?.removeExtra(EXTRA_VOD_EPISODE_TITLE)
+            intent?.removeExtra(EXTRA_VOD_LOGO_URL)
 
             iptvPlayback.stop()
             val pendingChannel = LiveChannel(
@@ -6377,6 +6397,7 @@ class MainActivity : TvRemoteActivity() {
                     origin = resolved.origin,
                 ).apply {
                     episodeTitle = subTitle
+                    cookie = resolved.cookie
                 }
                 selectChannel(playChannel, recordHistory = true)
             }
@@ -6422,7 +6443,9 @@ class MainActivity : TvRemoteActivity() {
                             userAgent = resolved.userAgent,
                             referrer = resolved.referrer,
                             origin = resolved.origin,
-                        )
+                        ).apply {
+                            cookie = resolved.cookie
+                        }
                     }
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
@@ -6471,6 +6494,7 @@ class MainActivity : TvRemoteActivity() {
                                 origin = resolved.origin,
                             ).apply {
                                 episodeTitle = subTitle
+                                cookie = resolved.cookie
                             }
                         }
                     } else null

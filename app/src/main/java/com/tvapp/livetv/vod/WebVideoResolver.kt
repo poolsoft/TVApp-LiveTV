@@ -99,16 +99,26 @@ object WebVideoResolver {
         val userAgent: String? = USER_AGENT,
         val referrer: String? = null,
         val origin: String? = null,
+        val cookie: String? = null,
         val isPlayable: Boolean = true,
     )
+
+    fun originOf(url: String): String? {
+        val uri = try { java.net.URI(url) } catch (e: Exception) { return null }
+        val scheme = uri.scheme?.lowercase() ?: return null
+        if (scheme != "http" && scheme != "https") return null
+        val host = uri.host?.lowercase() ?: return null
+        val defaultPort = if (scheme == "https") 443 else 80
+        val port = if (uri.port == -1 || uri.port == defaultPort) "" else ":${uri.port}"
+        return "$scheme://$host$port"
+    }
 
     suspend fun resolveStream(rawUrl: String, context: android.content.Context? = null): ResolvedStream = withContext(Dispatchers.IO) {
         val targetUrl = rawUrl.trim()
         if (targetUrl.isEmpty()) return@withContext ResolvedStream(targetUrl, isPlayable = false)
         if (isDirectStream(targetUrl)) return@withContext ResolvedStream(targetUrl, isPlayable = true)
 
-        val pageUri = runCatching { android.net.Uri.parse(targetUrl) }.getOrNull()
-        val pageOrigin = pageUri?.let { "${it.scheme}://${it.host}" }
+        val pageOrigin = originOf(targetUrl)
 
         // 1. Fast path: Check for quick static links in page HTML (e.g. data-pv, json-ld, direct m3u8)
         val fastResolved = runCatching {
@@ -116,34 +126,33 @@ object WebVideoResolver {
         }.getOrNull()
 
         if (!fastResolved.isNullOrBlank() && isDirectStream(fastResolved)) {
+            val cookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fastResolved) }.getOrNull()
             return@withContext ResolvedStream(
                 streamUrl = fastResolved,
                 referrer = targetUrl,
                 origin = pageOrigin,
+                cookie = cookie,
                 isPlayable = true,
             )
         }
 
-        // 2. Dynamic stream sniffer path: Use Headless WebView network interception
+        // 2. Dynamic stream sniffer path: Use attached WebView with network interception
         if (context != null) {
             val webViewResolved = runCatching {
                 resolveViaHeadlessWebView(context, targetUrl)
             }.getOrNull()
-            if (!webViewResolved.isNullOrBlank() && isDirectStream(webViewResolved)) {
-                return@withContext ResolvedStream(
-                    streamUrl = webViewResolved,
-                    referrer = targetUrl,
-                    origin = pageOrigin,
-                    isPlayable = true,
-                )
+            if (webViewResolved != null && webViewResolved.isPlayable) {
+                return@withContext webViewResolved
             }
         }
 
         val fallback = fastResolved ?: targetUrl
+        val fallbackCookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fallback) }.getOrNull()
         ResolvedStream(
             streamUrl = fallback,
             referrer = targetUrl,
             origin = pageOrigin,
+            cookie = fallbackCookie,
             isPlayable = isDirectStream(fallback),
         )
     }
@@ -151,15 +160,28 @@ object WebVideoResolver {
     suspend fun resolve(rawUrl: String, context: android.content.Context? = null): String =
         resolveStream(rawUrl, context).streamUrl
 
-    private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): String? =
+    private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): ResolvedStream? =
         withContext(Dispatchers.Main) {
-            val deferred = kotlinx.coroutines.CompletableDeferred<String?>()
+            val deferred = kotlinx.coroutines.CompletableDeferred<ResolvedStream?>()
             var webView: android.webkit.WebView? = null
+            var attachedParent: android.view.ViewGroup? = null
             try {
                 val appCtx = context.applicationContext
                 val wv = android.webkit.WebView(appCtx)
                 webView = wv
-                wv.layout(0, 0, 1920, 1080)
+
+                // Attach to Activity DecorView invisibly so Chrome engine enables full layout,
+                // DOM rendering and video autoplay without background throttle
+                val activity = context as? android.app.Activity
+                val decor = activity?.window?.decorView as? android.view.ViewGroup
+                if (decor != null) {
+                    wv.alpha = 0.01f
+                    decor.addView(wv, android.view.ViewGroup.LayoutParams(1920, 1080))
+                    attachedParent = decor
+                } else {
+                    wv.layout(0, 0, 1920, 1080)
+                }
+
                 wv.onResume()
                 wv.settings.apply {
                     javaScriptEnabled = true
@@ -173,11 +195,23 @@ object WebVideoResolver {
                     javaScriptCanOpenWindowsAutomatically = true
                 }
 
-                fun onSniffedUrl(url: String?) {
+                fun onSniffedUrl(url: String?, reqReferrer: String?) {
                     if (url.isNullOrBlank() || deferred.isCompleted) return
                     val clean = url.trim()
                     if (isNetworkMediaCandidate(clean)) {
-                        deferred.complete(clean)
+                        val cookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(clean) }.getOrNull()
+                        val ref = reqReferrer?.takeIf { it.isNotBlank() } ?: pageUrl
+                        val orig = originOf(ref)
+                        deferred.complete(
+                            ResolvedStream(
+                                streamUrl = clean,
+                                userAgent = USER_AGENT,
+                                referrer = ref,
+                                origin = orig,
+                                cookie = cookie,
+                                isPlayable = true,
+                            )
+                        )
                     }
                 }
 
@@ -281,13 +315,17 @@ object WebVideoResolver {
                         view: android.webkit.WebView?,
                         request: android.webkit.WebResourceRequest?,
                     ): android.webkit.WebResourceResponse? {
-                        onSniffedUrl(request?.url?.toString())
+                        val reqUrl = request?.url?.toString()
+                        val reqRef = request?.requestHeaders?.entries?.firstOrNull {
+                            it.key.equals("Referer", ignoreCase = true)
+                        }?.value
+                        onSniffedUrl(reqUrl, reqRef)
                         return super.shouldInterceptRequest(view, request)
                     }
 
                     override fun onLoadResource(view: android.webkit.WebView?, url: String?) {
                         super.onLoadResource(view, url)
-                        onSniffedUrl(url)
+                        onSniffedUrl(url, pageUrl)
                     }
 
                     override fun onPageStarted(view: android.webkit.WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -306,7 +344,7 @@ object WebVideoResolver {
                         val text = message?.message().orEmpty()
                         if (text.startsWith("net_stream_sniff:")) {
                             val stream = text.removePrefix("net_stream_sniff:").trim()
-                            onSniffedUrl(stream)
+                            onSniffedUrl(stream, pageUrl)
                         }
                         return super.onConsoleMessage(message)
                     }
@@ -319,6 +357,7 @@ object WebVideoResolver {
                 }
             } finally {
                 runCatching {
+                    attachedParent?.removeView(webView)
                     webView?.stopLoading()
                     webView?.destroy()
                 }
