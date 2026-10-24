@@ -102,7 +102,9 @@ class IptvSourcesActivity : TvRemoteActivity() {
             selectedSourcePosition = position
             selectedSourceId = sources.getOrNull(position)?.source?.id
             sources.getOrNull(position)?.let { summary ->
-                if (summary.source.kind == IptvRepository.KIND_URL || BuildConfig.MOBILE_UI_ENABLED) {
+                if (summary.source.kind == IptvRepository.KIND_JSON_VOD) {
+                    showJsonVodActions(summary)
+                } else if (summary.source.kind == IptvRepository.KIND_URL || BuildConfig.MOBILE_UI_ENABLED) {
                     showSourceActions(summary)
                 } else {
                     openChannelSelection(summary.source.id, summary.source.name)
@@ -518,7 +520,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
                     runCatching {
                         val isJsonVod = item.sourceFormat.equals("json", ignoreCase = true) || item.url.endsWith(".json", ignoreCase = true)
                         if (isJsonVod) {
-                            repository.importJsonVodUrl(item.url, item.name, username = "github:$username", ::showImportProgress)
+                            repository.registerJsonVodSource(item.url, item.name, username = "github:$username")
                         } else if (existing != null) {
                             // Update existing source
                             repository.refresh(existing.source, ::showImportProgress)
@@ -713,6 +715,38 @@ class IptvSourcesActivity : TvRemoteActivity() {
         }
         dialog.setOnShowListener { actionViews.firstOrNull()?.requestFocus() }
         dialog.show()
+    }
+
+    private fun showJsonVodActions(summary: IptvSourceSummary) {
+        if (operationGate.isBusy) return
+        val items = arrayOf(
+            getString(R.string.open_page),
+            getString(R.string.refresh_iptv_source),
+            getString(R.string.edit_iptv_source_url),
+            getString(R.string.delete),
+        )
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(summary.source.name)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> {
+                        startActivity(
+                            Intent(this, VodHomeActivity::class.java).apply {
+                                putExtra("source", summary.source.id)
+                            }
+                        )
+                    }
+                    1 -> {
+                        runImport("IPTV_JSON_VOD_REFRESH", summary.source.name) {
+                            repository.refresh(summary.source)
+                        }
+                    }
+                    2 -> promptSourceUrl(summary)
+                    3 -> confirmDeleteSource(summary)
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun performSourceAction(summary: IptvSourceSummary, action: SourceAction) {
@@ -1211,6 +1245,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
             IptvRepository.KIND_DOCUMENT -> R.string.source_type_m3u_file
             IptvRepository.KIND_XTREAM -> R.string.source_type_xtream
             IptvRepository.KIND_STALKER -> R.string.source_type_stalker
+            IptvRepository.KIND_JSON_VOD -> R.string.vod_archive_label
             else -> R.string.source_type_m3u
         },
     )
@@ -1220,6 +1255,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
         IptvRepository.KIND_DOCUMENT -> R.drawable.ic_file
         IptvRepository.KIND_XTREAM -> R.drawable.ic_server
         IptvRepository.KIND_STALKER -> R.drawable.ic_portal
+        IptvRepository.KIND_JSON_VOD -> R.drawable.ic_vod
         else -> R.drawable.ic_source_iptv
     }
 

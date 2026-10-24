@@ -46,10 +46,21 @@ object WebVideoResolver {
         return DIRECT_STREAM_PATTERN.matcher(noQuery).matches()
     }
 
-    suspend fun resolve(rawUrl: String, context: android.content.Context? = null): String = withContext(Dispatchers.IO) {
+    data class ResolvedStream(
+        val streamUrl: String,
+        val userAgent: String? = USER_AGENT,
+        val referrer: String? = null,
+        val origin: String? = null,
+        val isPlayable: Boolean = true,
+    )
+
+    suspend fun resolveStream(rawUrl: String, context: android.content.Context? = null): ResolvedStream = withContext(Dispatchers.IO) {
         val targetUrl = rawUrl.trim()
-        if (targetUrl.isEmpty()) return@withContext targetUrl
-        if (isDirectStream(targetUrl)) return@withContext targetUrl
+        if (targetUrl.isEmpty()) return@withContext ResolvedStream(targetUrl, isPlayable = false)
+        if (isDirectStream(targetUrl)) return@withContext ResolvedStream(targetUrl, isPlayable = true)
+
+        val pageUri = runCatching { android.net.Uri.parse(targetUrl) }.getOrNull()
+        val pageOrigin = pageUri?.let { "${it.scheme}://${it.host}" }
 
         // 1. Fast path: Not a direct stream; attempt to resolve via HTTP GET and HTML regex
         val fastResolved = runCatching {
@@ -57,7 +68,12 @@ object WebVideoResolver {
         }.getOrNull()
 
         if (!fastResolved.isNullOrBlank() && isDirectStream(fastResolved)) {
-            return@withContext fastResolved
+            return@withContext ResolvedStream(
+                streamUrl = fastResolved,
+                referrer = targetUrl,
+                origin = pageOrigin,
+                isPlayable = true,
+            )
         }
 
         // 2. Slow/dynamic path: If HTTP didn't resolve and context is available, run Headless WebView sniffer
@@ -65,13 +81,27 @@ object WebVideoResolver {
             val webViewResolved = runCatching {
                 resolveViaHeadlessWebView(context, targetUrl)
             }.getOrNull()
-            if (!webViewResolved.isNullOrBlank()) {
-                return@withContext webViewResolved
+            if (!webViewResolved.isNullOrBlank() && isDirectStream(webViewResolved)) {
+                return@withContext ResolvedStream(
+                    streamUrl = webViewResolved,
+                    referrer = targetUrl,
+                    origin = pageOrigin,
+                    isPlayable = true,
+                )
             }
         }
 
-        fastResolved ?: targetUrl
+        val fallback = fastResolved ?: targetUrl
+        ResolvedStream(
+            streamUrl = fallback,
+            referrer = targetUrl,
+            origin = pageOrigin,
+            isPlayable = isDirectStream(fallback),
+        )
     }
+
+    suspend fun resolve(rawUrl: String, context: android.content.Context? = null): String =
+        resolveStream(rawUrl, context).streamUrl
 
     private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): String? =
         withContext(Dispatchers.Main) {

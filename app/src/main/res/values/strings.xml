@@ -698,6 +698,12 @@
     <string name="iptv_source_stats_line">%1$d kanal · %2$d seçili · %3$s</string>
     <string name="iptv_source_vod_stats_line">%1$d VOD içerik · %2$s</string>
     <string name="iptv_source_hybrid_stats_line">%1$d kanal (%2$d seçili) · %3$d VOD · %4$s</string>
+    <string name="vod_stream_resolve_failed">Bu video akışı çözülemedi veya sayfa oynatılamıyor.</string>
+    <string name="vod_select_episode">Bölüm Seçin</string>
+    <string name="vod_season_episode_fmt">%1$d. Sezon %2$d. Bölüm</string>
+    <string name="vod_archive_description">VOD Arşivi · Tıklayarak içerikleri görüntüleyin</string>
+    <string name="vod_archive_label">VOD Arşivi</string>
+    <string name="vod_archive_preparing">VOD Arşivi hazırlanıyor, lütfen bekleyin…</string>
     <string name="iptv_source_progress">%1$s · %2$s</string>
     <string name="iptv_source_import_complete">%1$s güncellendi · %2$d IPTV içeriği</string>
     <string name="never">Henüz değil</string>

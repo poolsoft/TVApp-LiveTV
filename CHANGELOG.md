@@ -1,5 +1,19 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-24 - JSON VOD On-Demand Arşiv Mimarisi, Oynatıcı Bölüm Seçici ve Web Akış Başlıkları
+
+- **JSON VOD Kaynaklarının Hafifletilmiş On-Demand Mimarisi (`IptvRepository`, `IptvSourcesActivity`, `VodHomeActivity`):**
+  - Toplu içe aktarma sırasında on binlerce satırlık JSON VOD listelerinin uygulamayı dondurmasını engellemek üzere hafifletilmiş kayıt (`KIND_JSON_VOD`) yapısı kuruldu.
+  - Listeler ana IPTV kanal listesine anında saniyeler içinde eklenir; içerik veritabanı kilitlenmesi önlenir.
+  - VOD ekranında bir JSON VOD arşivi ilk kez seçildiğinde içerikler arka planda on-demand olarak indirilerek ("VOD Arşivi hazırlanıyor, lütfen bekleyin...") afiş ızgarası doldurulur.
+  - IPTV Listeleri ekranında JSON VOD kaynakları için "VOD Arşivi" etiketi, özel simge ve tıklandığında "VOD Kütüphanesinde Aç", "İçerikleri Yenile" gibi seçenekler sunan aksiyon menüsü eklendi.
+- **Web Akış Başlıkları (Referer/User-Agent) ve Çözümleme Koruması (`WebVideoResolver` & `MainActivity`):**
+  - Web sayfalarından çözülen `.m3u8` akışlarının CDN engellerine (403 Forbidden vb.) takılmaması için asıl sayfa URL'si `Referer` ve `Origin`, Android TV tarayıcı kimliği ise `User-Agent` başlığı olarak ExoPlayer'a iletildi.
+  - Çözülemeyen web sayfalarının doğrudan video oynatıcıya verilip oynatıcıyı hata döngüsüne sokması engellendi; kullanıcıya bilgilendirici uyarı mesajı gösterildi.
+- **VOD Player Başlık Hiyerarşisi ve "Liste" Bölüm Seçici (`VodPlayerOverlayController` & `MainActivity`):**
+  - Dizi oynatılırken üst barda dizi adı (`displayName`) büyük ana başlık, sezon ve bölüm bilgisi (`epgTitle`) ise zarif bir alt bilgi olarak konumlandırıldı.
+  - Oynatıcı alt barda sağdaki "Liste ⌄" butonuna tıklandığında dizi için sezon ve bölümleri listeleyen TV uyumlu bölüm seçici açılır; seçilen bölüm oynatıcıdan çıkmadan doğrudan başlatılır.
+
 ## 2026-10-24 - Yardımcı JSON VOD Kaynakları, Akıllı Web Video Çözümleyici (WebVideoResolver) ve Dizi Bölüm Seçici
 
 - **Web Sayfalarından Otomatik Medya Akışı Çözümleme (`WebVideoResolver`):**

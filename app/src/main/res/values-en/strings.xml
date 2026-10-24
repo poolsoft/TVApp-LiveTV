@@ -698,6 +698,12 @@
     <string name="iptv_source_stats_line">%1$d channels · %2$d selected · %3$s</string>
     <string name="iptv_source_vod_stats_line">%1$d VOD items · %2$s</string>
     <string name="iptv_source_hybrid_stats_line">%1$d channels (%2$d selected) · %3$d VOD · %4$s</string>
+    <string name="vod_stream_resolve_failed">Unable to resolve playable video stream from this webpage.</string>
+    <string name="vod_select_episode">Select Episode</string>
+    <string name="vod_season_episode_fmt">Season %1$d Episode %2$d</string>
+    <string name="vod_archive_description">VOD Archive · Click to view contents</string>
+    <string name="vod_archive_label">VOD Archive</string>
+    <string name="vod_archive_preparing">Preparing VOD archive, please wait…</string>
     <string name="iptv_source_progress">%1$s · %2$s</string>
     <string name="iptv_source_import_complete">%1$s updated · %2$d IPTV items</string>
     <string name="never">Not yet</string>

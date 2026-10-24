@@ -486,7 +486,7 @@ class IptvRepository(context: Context) {
             IptvSourceEntity(
                 name = name,
                 location = normalized,
-                kind = KIND_URL,
+                kind = KIND_JSON_VOD,
                 username = username,
                 enabled = true,
                 lastUpdatedAt = now,
@@ -496,6 +496,7 @@ class IptvRepository(context: Context) {
             (conflicting ?: dao.getSource(sourceId)!!).copy(
                 name = name,
                 location = normalized,
+                kind = KIND_JSON_VOD,
                 username = username ?: conflicting?.username,
                 enabled = true,
                 lastUpdatedAt = now,
@@ -507,6 +508,36 @@ class IptvRepository(context: Context) {
         }
         notifySharedChannelsChanged()
         return IptvImportResult(sourceId, name, count)
+    }
+
+    suspend fun registerJsonVodSource(location: String, name: String, username: String? = null): Long {
+        val normalized = location.trim()
+        val conflicting = dao.getSourceByLocation(normalized)
+        val now = System.currentTimeMillis()
+        val sourceId = conflicting?.id ?: dao.insertSource(
+            IptvSourceEntity(
+                name = name,
+                location = normalized,
+                kind = KIND_JSON_VOD,
+                username = username,
+                enabled = true,
+                lastUpdatedAt = now,
+            ),
+        )
+        if (conflicting != null) {
+            dao.updateSource(
+                conflicting.copy(
+                    name = name,
+                    location = normalized,
+                    kind = KIND_JSON_VOD,
+                    username = username ?: conflicting.username,
+                    enabled = true,
+                    lastUpdatedAt = now,
+                ),
+            )
+        }
+        notifySharedChannelsChanged()
+        return sourceId
     }
 
     suspend fun updateUrl(
@@ -683,6 +714,7 @@ class IptvRepository(context: Context) {
                 importUrlInternal(source.location, source.name, source, onProgress, source.username)
             }
         }
+        KIND_JSON_VOD -> importJsonVodUrl(source.location, source.name, source.username, onProgress)
         KIND_DOCUMENT -> importDocument(Uri.parse(source.location), source.name, source, onProgress)
         KIND_XTREAM -> importXtream(
             checkNotNull(source.serverUrl),
@@ -920,6 +952,7 @@ class IptvRepository(context: Context) {
         const val KIND_DOCUMENT = "DOCUMENT"
         const val KIND_XTREAM = "XTREAM"
         const val KIND_STALKER = "STALKER"
+        const val KIND_JSON_VOD = "JSON_VOD"
         private const val CONNECTION_TIMEOUT_MS = 10_000
         private const val READ_TIMEOUT_MS = 20_000
         private const val DEFAULT_USER_AGENT = "TVApp/0.1 AndroidTV"

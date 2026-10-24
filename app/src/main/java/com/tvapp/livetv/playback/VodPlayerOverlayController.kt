@@ -38,6 +38,7 @@ class VodPlayerOverlayController(
     private val getSourceName: (LiveChannel) -> String,
     private val formatPlaybackTime: (Long) -> String,
     private val getString: (Int) -> String,
+    private val onOpenEpisodeList: (() -> Boolean)? = null,
 ) {
     var selectedTarget = VodControlTarget.PLAY_PAUSE
         private set
@@ -134,8 +135,14 @@ class VodPlayerOverlayController(
     fun updateControls() {
         val state = iptvPlayback.playbackSnapshot()
         val channel = getCurrentChannel()
-        binding.vodPlayerTitle.text = channel?.displayName.orEmpty()
-        binding.vodPlayerSubtitle.text = channel?.let { getSourceName(it) } ?: getString(R.string.iptv_library_vod)
+        val episodeInfo: String? = channel?.episodeTitle?.takeIf { it.isNotBlank() }
+        if (episodeInfo != null) {
+            binding.vodPlayerTitle.text = channel.displayName
+            binding.vodPlayerSubtitle.text = episodeInfo
+        } else {
+            binding.vodPlayerTitle.text = channel?.displayName.orEmpty()
+            binding.vodPlayerSubtitle.text = channel?.let { getSourceName(it) } ?: getString(R.string.iptv_library_vod)
+        }
         binding.vodPlayerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
         val duration = state.durationMillis.coerceAtLeast(1L)
@@ -190,8 +197,12 @@ class VodPlayerOverlayController(
 
     fun activateSelectedTarget() {
         when (selectedTarget) {
-            VodControlTarget.BACK,
-            VodControlTarget.LIST -> onOpenVodLibrary()
+            VodControlTarget.BACK -> onOpenVodLibrary()
+            VodControlTarget.LIST -> {
+                if (onOpenEpisodeList?.invoke() != true) {
+                    onOpenVodLibrary()
+                }
+            }
             VodControlTarget.FULLSCREEN -> hideControls()
             VodControlTarget.TIMELINE,
             VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()

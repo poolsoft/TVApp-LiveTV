@@ -99,7 +99,8 @@ class VodHomeActivity : TvRemoteActivity() {
         history = PlaybackHistoryStore(this, "vod-playback-history")
         resumeStore = IptvResumeStore(this)
         database = TVAppDatabase.getInstance(this)
-        sourceId = preferences.getLong("source", -1L)
+        val intentSourceId = intent.getLongExtra("source", -1L)
+        sourceId = if (intentSourceId > 0L) intentSourceId else preferences.getLong("source", -1L)
         gridCategory = preferences.getString("category", null)
         gridOrder = preferences.getString("order", "SOURCE") ?: "SOURCE"
 
@@ -242,14 +243,70 @@ class VodHomeActivity : TvRemoteActivity() {
                     "ORDINAL_DESC" -> getString(R.string.vod_sort_recent)
                     else -> getString(R.string.vod_sort_default)
                 }
-                loadGridCategories()
-                reloadGridData()
-                loadContinueWatching()
+                ensureSourceReady(sourceId) {
+                    loadGridCategories()
+                    reloadGridData()
+                    loadContinueWatching()
+                }
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     debugLog.recordDebug("VOD Sources load failed: ${e.message}")
                 }
             }
+        }
+    }
+
+    private fun ensureSourceReady(targetSourceId: Long, onReady: () -> Unit) {
+        if (targetSourceId <= 0L) {
+            onReady()
+            return
+        }
+        val targetSourceSummary = sources.find { it.source.id == targetSourceId }
+        val isJsonVod = targetSourceSummary?.source?.kind == IptvRepository.KIND_JSON_VOD
+        if (!isJsonVod) {
+            onReady()
+            return
+        }
+        lifecycleScope.launch {
+            val totalInDb = withContext(Dispatchers.IO) {
+                database.vodDao().countTotalBySourceId(targetSourceId)
+            }
+            if (totalInDb > 0) {
+                onReady()
+                return@launch
+            }
+
+            val progressDialog = AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(R.string.vod_archive_label)
+                .setMessage(getString(R.string.vod_archive_preparing))
+                .setCancelable(false)
+                .create()
+            progressDialog.show()
+
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    val location = targetSourceSummary.source.location
+                    val name = targetSourceSummary.source.name
+                    val user = targetSourceSummary.source.username
+                    iptv.importJsonVodUrl(
+                        location = location,
+                        name = name,
+                        username = user
+                    )
+                    true
+                } catch (e: Exception) {
+                    if (e !is CancellationException) {
+                        debugLog.recordDebug("JSON VOD fetch on-demand failed: ${e.message}")
+                    }
+                    false
+                }
+            }
+            progressDialog.dismiss()
+            if (success) {
+                sources = withContext(Dispatchers.IO) { iptv.sources() }.filter { it.source.enabled }
+                updateSourceComboText()
+            }
+            onReady()
         }
     }
 
@@ -287,10 +344,12 @@ class VodHomeActivity : TvRemoteActivity() {
                 gridItems.clear()
                 gridAdapter.submitList(emptyList())
                 updateSourceComboText()
-                loadGridCategories()
-                reloadGridData()
-                loadContinueWatching(shouldFocus = false)
                 dialog.dismiss()
+                ensureSourceReady(sourceId) {
+                    loadGridCategories()
+                    reloadGridData()
+                    loadContinueWatching(shouldFocus = false)
+                }
             }
             .setNegativeButton(R.string.close, null)
             .show()

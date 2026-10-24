@@ -2251,13 +2251,75 @@ class MainActivity : TvRemoteActivity() {
             getSourceName = { ch -> iptvSourceNames[ch.inputId] ?: getString(R.string.iptv_library_vod) },
             formatPlaybackTime = { ms -> formatPlaybackTime(ms) },
             getString = { resId -> getString(resId) },
+            onOpenEpisodeList = { showEpisodePickerForActiveVod() },
         )
         controller.setup()
         vodPlayerOverlayController = controller
     }
 
+    private fun showEpisodePickerForActiveVod(): Boolean {
+        val active = currentChannel ?: return false
+        val activeKey = active.sourceKey
+        lifecycleScope.launch {
+            val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+            val currentMeta = withContext(Dispatchers.IO) {
+                runCatching { appDb.vodDao().metadata(activeKey) }.getOrNull()
+            } ?: run {
+                openVodLibrary()
+                return@launch
+            }
+
+            val seriesKey = currentMeta.parentKey ?: if (currentMeta.kind == "SERIES") currentMeta.sourceKey else null
+            if (seriesKey == null) {
+                openVodLibrary()
+                return@launch
+            }
+
+            val episodes = withContext(Dispatchers.IO) {
+                appDb.vodDao().episodesForSeries(seriesKey)
+            }
+
+            if (episodes.isEmpty()) {
+                openVodLibrary()
+                return@launch
+            }
+
+            val episodeNames = episodes.map { ep ->
+                val epNum = ep.episodeNumber
+                val sNum = ep.seasonNumber ?: 1
+                if (epNum != null) {
+                    getString(R.string.vod_season_episode_fmt, sNum, epNum) +
+                        (if (ep.name.isNotBlank() && !ep.name.startsWith("$epNum")) " - ${ep.name}" else "")
+                } else ep.name
+            }.toTypedArray()
+
+            val currentIndex = episodes.indexOfFirst { it.sourceKey == activeKey }.coerceAtLeast(0)
+
+            AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(currentChannel?.displayName ?: getString(R.string.vod_select_episode))
+                .setSingleChoiceItems(episodeNames, currentIndex) { dialog, which ->
+                    val chosen = episodes.getOrNull(which)
+                    if (chosen != null && chosen.sourceKey != activeKey) {
+                        openVod(chosen.sourceKey)
+                    }
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+        return true
+    }
+
     private fun showVodPlayerControls(autoHide: Boolean = true) {
         vodPlayerOverlayController?.showControls(autoHide)
+    }
+
+    private fun openVod(sourceKey: String, startOver: Boolean = false) {
+        val vodIntent = Intent().apply {
+            putExtra(EXTRA_VOD_SOURCE_KEY, sourceKey)
+            if (startOver) putExtra(EXTRA_VOD_START_OVER, true)
+        }
+        handleVodSourceDeepLink(vodIntent)
     }
 
     private fun hideVodPlayerControls() {
@@ -6233,18 +6295,40 @@ class MainActivity : TvRemoteActivity() {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
                     val meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
                     if (meta != null && !meta.streamUrl.isNullOrBlank()) {
-                        val resolvedUrl = com.tvapp.livetv.vod.WebVideoResolver.resolve(meta.streamUrl, this@MainActivity)
-                        LiveChannel(
-                            id = meta.sourceKey.hashCode().toLong(),
-                            sourceKey = meta.sourceKey,
-                            inputId = "iptv:${meta.sourceId}",
-                            displayNumber = "VOD",
-                            displayName = meta.name,
-                            source = LiveChannel.Source.IPTV,
-                            uri = resolvedUrl,
-                            logoUrl = meta.logoUrl,
-                            iptvContentType = "VOD",
-                        )
+                        val parentTitle = meta.parentKey?.let { pKey ->
+                            runCatching { appDb.vodDao().metadata(pKey)?.name }.getOrNull()
+                        }
+                        val mainTitle = parentTitle ?: meta.name
+                        val subTitle = if (parentTitle != null) {
+                            val sNum = meta.seasonNumber ?: 1
+                            val epNum = meta.episodeNumber
+                            if (epNum != null) getString(R.string.vod_season_episode_fmt, sNum, epNum) else meta.name
+                        } else null
+
+                        val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
+                        if (!resolved.isPlayable) {
+                            withContext(Dispatchers.Main) {
+                                showIptvNotice(R.string.vod_stream_resolve_failed)
+                            }
+                            null
+                        } else {
+                            LiveChannel(
+                                id = meta.sourceKey.hashCode().toLong(),
+                                sourceKey = meta.sourceKey,
+                                inputId = "iptv:${meta.sourceId}",
+                                displayNumber = "VOD",
+                                displayName = mainTitle,
+                                source = LiveChannel.Source.IPTV,
+                                uri = resolved.streamUrl,
+                                userAgent = resolved.userAgent,
+                                referrer = resolved.referrer,
+                                origin = resolved.origin,
+                                logoUrl = meta.logoUrl,
+                                iptvContentType = "VOD",
+                            ).apply {
+                                episodeTitle = subTitle
+                            }
+                        }
                     } else null
                 }
             }
