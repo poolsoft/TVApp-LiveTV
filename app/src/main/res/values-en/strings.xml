@@ -858,4 +858,12 @@
     <string name="vod_added_to_continue">Added to Continue Watching</string>
     <string name="vod_fullscreen_label">Fullscreen</string>
     <string name="vod_no_episodes_found">No episodes found for this series.</string>
+    <string name="open_browser">Web Browser</string>
+    <string name="browser_back_to_tv">Back to TV</string>
+    <string name="browser_url_hint">Enter URL or search...</string>
+    <string name="browser_go">Go</string>
+    <string name="browser_reload">Reload</string>
+    <string name="browser_play_stream">Play Video</string>
+    <string name="browser_stream_detected">Video stream detected!</string>
+    <string name="browser_no_stream_yet">No video stream detected yet.</string>
 </resources>

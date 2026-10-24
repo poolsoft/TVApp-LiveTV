@@ -156,6 +156,12 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".browser.TvBrowserActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".TvChannelViewActivity"
             android:excludeFromRecents="true"
             android:exported="true"

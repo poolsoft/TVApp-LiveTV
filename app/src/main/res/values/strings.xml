@@ -858,4 +858,12 @@
     <string name="vod_added_to_continue">İzlemeye Devam Et listesine eklendi</string>
     <string name="vod_fullscreen_label">Tam Ekran</string>
     <string name="vod_no_episodes_found">Bu dizinin bölümleri bulunamadı.</string>
+    <string name="open_browser">Web Tarayıcısı</string>
+    <string name="browser_back_to_tv">TV\'ye Dön</string>
+    <string name="browser_url_hint">Adres girin veya arayın...</string>
+    <string name="browser_go">Git</string>
+    <string name="browser_reload">Yenile</string>
+    <string name="browser_play_stream">Videoyu Oynat</string>
+    <string name="browser_stream_detected">Video akışı algılandı!</string>
+    <string name="browser_no_stream_yet">Henüz video akışı algılanmadı.</string>
 </resources>

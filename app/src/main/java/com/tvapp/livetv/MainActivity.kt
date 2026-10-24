@@ -3069,17 +3069,25 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showPlaybackModeDialog() {
         val lastVod = modePreferences.getString(LAST_VOD_KEY, null)
-        val labels = mutableListOf(getString(R.string.switch_to_live_tv), getString(R.string.vod_home_title))
-        if (lastVod != null) labels += getString(R.string.continue_watching)
+        val actions = mutableListOf<Pair<String, () -> Unit>>()
+        actions += (getString(R.string.switch_to_live_tv) to { switchToLiveMode() })
+        actions += (getString(R.string.vod_home_title) to { openVodLibrary() })
+        if (lastVod != null) {
+            actions += (getString(R.string.continue_watching) to {
+                handleVodSourceDeepLink(Intent().putExtra(EXTRA_VOD_SOURCE_KEY, lastVod))
+            })
+        }
+        actions += (getString(R.string.open_browser) to { openTvBrowser() })
+
         AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
             .setTitle(R.string.playback_mode_title)
-            .setItems(labels.toTypedArray()) { _, which ->
-                when (which) {
-                    0 -> switchToLiveMode()
-                    1 -> openVodLibrary()
-                    2 -> handleVodSourceDeepLink(Intent().putExtra(EXTRA_VOD_SOURCE_KEY, lastVod))
-                }
+            .setItems(actions.map { it.first }.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.second?.invoke()
             }.setNegativeButton(R.string.close, null).show()
+    }
+
+    private fun openTvBrowser() {
+        startActivity(Intent(this, com.tvapp.livetv.browser.TvBrowserActivity::class.java))
     }
 
     private fun switchToLiveMode(targetSource: String? = null) {
@@ -6379,6 +6387,15 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvBufferingContainer.visibility = View.VISIBLE
             binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
 
+            val customReferrer = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_REFERRER)
+            val customOrigin = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_ORIGIN)
+            val customUserAgent = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
+            val customCookie = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_COOKIE)
+            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_REFERRER)
+            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_ORIGIN)
+            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
+            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_COOKIE)
+
             vodResolveJob?.cancel()
             vodResolveJob = lifecycleScope.launch {
                 val resolved = withContext(Dispatchers.IO) {
@@ -6392,12 +6409,12 @@ class MainActivity : TvRemoteActivity() {
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
                 val playChannel = pendingChannel.copy(
                     uri = resolved.streamUrl,
-                    userAgent = resolved.userAgent,
-                    referrer = resolved.referrer,
-                    origin = resolved.origin,
+                    userAgent = customUserAgent ?: resolved.userAgent,
+                    referrer = customReferrer ?: resolved.referrer,
+                    origin = customOrigin ?: resolved.origin,
                 ).apply {
                     episodeTitle = subTitle
-                    cookie = resolved.cookie
+                    cookie = customCookie ?: resolved.cookie
                 }
                 selectChannel(playChannel, recordHistory = true)
             }
