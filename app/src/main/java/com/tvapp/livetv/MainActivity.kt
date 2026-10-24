@@ -317,6 +317,7 @@ class MainActivity : TvRemoteActivity() {
         set(value) { channelZapper.numberInput = value }
     private var focusedTuneJob: Job? = null
     private var channelResolutionGeneration = 0
+    private var vodResolveJob: Job? = null
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
@@ -3079,6 +3080,9 @@ class MainActivity : TvRemoteActivity() {
     private fun switchToLiveMode(targetSource: String? = null) {
         saveCurrentIptvResumePosition()
         vodMode = false
+        vodResolveJob?.cancel()
+        vodResolveJob = null
+        binding.iptvBufferingContainer.visibility = View.GONE
         intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
         channelResolutionGeneration++
         val requestGeneration = channelResolutionGeneration
@@ -6355,14 +6359,14 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvBufferingContainer.visibility = View.VISIBLE
             binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
 
-            lifecycleScope.launch {
+            vodResolveJob?.cancel()
+            vodResolveJob = lifecycleScope.launch {
                 val resolved = withContext(Dispatchers.IO) {
                     com.tvapp.livetv.vod.WebVideoResolver.resolveStream(directStreamUrl, this@MainActivity)
                 }
                 binding.iptvBufferingContainer.visibility = View.GONE
                 if (!resolved.isPlayable) {
                     showIptvNotice(R.string.vod_stream_resolve_failed)
-                    openVodLibrary()
                     return@launch
                 }
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
@@ -6393,7 +6397,8 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBufferingContainer.visibility = View.VISIBLE
         binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
 
-        lifecycleScope.launch {
+        vodResolveJob?.cancel()
+        vodResolveJob = lifecycleScope.launch {
             val channel = withContext(Dispatchers.IO) {
                 val direct = channels.firstOrNull { it.sourceKey == sourceKey }
                     ?: runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
@@ -6409,7 +6414,6 @@ class MainActivity : TvRemoteActivity() {
                         withContext(Dispatchers.Main) {
                             binding.iptvBufferingContainer.visibility = View.GONE
                             showIptvNotice(R.string.vod_stream_resolve_failed)
-                            openVodLibrary()
                         }
                         null
                     } else {
@@ -6457,7 +6461,6 @@ class MainActivity : TvRemoteActivity() {
                             withContext(Dispatchers.Main) {
                                 binding.iptvBufferingContainer.visibility = View.GONE
                                 showIptvNotice(R.string.vod_stream_resolve_failed)
-                                openVodLibrary()
                             }
                             null
                         } else {
@@ -6479,7 +6482,6 @@ class MainActivity : TvRemoteActivity() {
                 selectChannel(channel, recordHistory = true)
             } else {
                 showIptvNotice(R.string.channel_not_found)
-                openVodLibrary()
             }
         }
     }

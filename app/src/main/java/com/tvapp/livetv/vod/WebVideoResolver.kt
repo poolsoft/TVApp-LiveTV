@@ -39,11 +39,59 @@ object WebVideoResolver {
     private val IFRAME_SRC_REGEX =
         Pattern.compile("<iframe[^>]+src=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
 
+    private val DATA_PV_REGEX =
+        Pattern.compile("data-pv=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
+
+    private val CORE_JS_REGEX =
+        Pattern.compile("src=[\"'](https?://[^\"']+/assets/js/core\\.js)[\"']", Pattern.CASE_INSENSITIVE)
+
+    private val STREAM_PROP_REGEX =
+        Pattern.compile("\"stream\"\\s*:\\s*\"([^\"]+)\"", Pattern.CASE_INSENSITIVE)
+
     fun isDirectStream(url: String): Boolean {
         val clean = url.trim()
-        if (clean.contains("playlist.m3u8", ignoreCase = true)) return true
+        if (clean.isEmpty()) return false
+        val lower = clean.lowercase()
+        if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
+            lower.contains("/hls/") || lower.contains("playlist.m3u8")
+        ) {
+            return true
+        }
         val noQuery = clean.substringBefore("?")
         return DIRECT_STREAM_PATTERN.matcher(noQuery).matches()
+    }
+
+    private fun isNetworkMediaCandidate(url: String): Boolean {
+        val clean = url.trim()
+        if (clean.isEmpty()) return false
+        val lower = clean.lowercase()
+
+        // Exclude static assets, analytics, ads
+        if (lower.contains("google-analytics") || lower.contains("googletagmanager") ||
+            lower.contains("facebook.net") || lower.contains("doubleclick") ||
+            lower.contains("adnxs") || lower.contains("clarity.ms") || lower.contains("hotjar") ||
+            lower.contains("favicon.ico") || lower.endsWith(".css") || lower.endsWith(".png") ||
+            lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".webp") ||
+            lower.endsWith(".svg") || lower.endsWith(".woff") || lower.endsWith(".woff2") ||
+            lower.endsWith(".ttf") || (lower.endsWith(".js") && !lower.contains("s.php"))
+        ) {
+            return false
+        }
+
+        // Check for media extensions or streaming paths
+        if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
+            lower.contains("/hls/") || lower.contains("/dash/") || lower.contains("playlist.m3u8") ||
+            lower.contains("master.m3u8") || lower.contains("manifest")
+        ) {
+            return true
+        }
+
+        // Direct video files (excluding short ad videos)
+        if (lower.contains(".mp4") && !lower.contains("ad_") && !lower.contains("banner") && !lower.contains("preview_")) {
+            return true
+        }
+
+        return false
     }
 
     data class ResolvedStream(
@@ -62,7 +110,7 @@ object WebVideoResolver {
         val pageUri = runCatching { android.net.Uri.parse(targetUrl) }.getOrNull()
         val pageOrigin = pageUri?.let { "${it.scheme}://${it.host}" }
 
-        // 1. Fast path: Not a direct stream; attempt to resolve via HTTP GET and HTML regex
+        // 1. Fast path: Check for quick static links in page HTML (e.g. data-pv, json-ld, direct m3u8)
         val fastResolved = runCatching {
             extractStreamFromPage(targetUrl, depth = 0)
         }.getOrNull()
@@ -76,7 +124,7 @@ object WebVideoResolver {
             )
         }
 
-        // 2. Slow/dynamic path: If HTTP didn't resolve and context is available, run Headless WebView sniffer
+        // 2. Dynamic stream sniffer path: Use Headless WebView network interception
         if (context != null) {
             val webViewResolved = runCatching {
                 resolveViaHeadlessWebView(context, targetUrl)
@@ -111,12 +159,107 @@ object WebVideoResolver {
                 val appCtx = context.applicationContext
                 val wv = android.webkit.WebView(appCtx)
                 webView = wv
+                wv.layout(0, 0, 1920, 1080)
+                wv.onResume()
                 wv.settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
+                    databaseEnabled = true
                     mediaPlaybackRequiresUserGesture = false
+                    mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     userAgentString = USER_AGENT
+                    allowFileAccess = true
+                    allowContentAccess = true
+                    javaScriptCanOpenWindowsAutomatically = true
                 }
+
+                fun onSniffedUrl(url: String?) {
+                    if (url.isNullOrBlank() || deferred.isCompleted) return
+                    val clean = url.trim()
+                    if (isNetworkMediaCandidate(clean)) {
+                        deferred.complete(clean)
+                    }
+                }
+
+                val universalHookScript = """
+                    (function() {
+                        if (window.__sniff_installed) return;
+                        window.__sniff_installed = true;
+
+                        function report(u) {
+                            if (u && typeof u === 'string' && u.indexOf('http') === 0) {
+                                console.log('net_stream_sniff:' + u);
+                            }
+                        }
+
+                        // 1. Hook fetch
+                        var origFetch = window.fetch;
+                        if (origFetch) {
+                            window.fetch = function() {
+                                var arg = arguments[0];
+                                if (typeof arg === 'string') {
+                                    report(arg);
+                                } else if (arg && arg.url) {
+                                    report(arg.url);
+                                }
+                                return origFetch.apply(this, arguments);
+                            };
+                        }
+
+                        // 2. Hook XMLHttpRequest
+                        var origOpen = XMLHttpRequest.prototype.open;
+                        XMLHttpRequest.prototype.open = function(method, url) {
+                            report(url);
+                            return origOpen.apply(this, arguments);
+                        };
+
+                        // 3. Hook HTMLMediaElement src
+                        try {
+                            var mediaProto = HTMLMediaElement.prototype;
+                            var origSrcDesc = Object.getOwnPropertyDescriptor(mediaProto, 'src');
+                            if (origSrcDesc && origSrcDesc.set) {
+                                Object.defineProperty(mediaProto, 'src', {
+                                    set: function(val) {
+                                        report(val);
+                                        return origSrcDesc.set.apply(this, arguments);
+                                    },
+                                    get: origSrcDesc.get,
+                                    configurable: true
+                                });
+                            }
+                        } catch(e) {}
+
+                        // 4. Autoplay trigger helper
+                        function triggerAutoplay() {
+                            var vids = document.querySelectorAll('video, audio');
+                            for (var i = 0; i < vids.length; i++) {
+                                try {
+                                    if (vids[i].src) report(vids[i].src);
+                                    var sources = vids[i].querySelectorAll('source');
+                                    for (var s = 0; s < sources.length; s++) {
+                                        if (sources[s].src) report(sources[s].src);
+                                    }
+                                    vids[i].muted = true;
+                                    vids[i].play();
+                                } catch(e){}
+                            }
+                            var buttons = document.querySelectorAll(
+                                '.play, .vjs-big-play-button, .plyr__control, button[aria-label*="Play"], button[aria-label*="Oynat"], [data-player], .jw-display-icon-container, [class*="play"], [id*="play"]'
+                            );
+                            for (var b = 0; b < buttons.length; b++) {
+                                try { buttons[b].click(); } catch(e){}
+                            }
+                        }
+
+                        triggerAutoplay();
+                        var count = 0;
+                        var timer = setInterval(function() {
+                            count++;
+                            triggerAutoplay();
+                            if (count > 10) clearInterval(timer);
+                        }, 500);
+                    })();
+                """.trimIndent()
 
                 wv.webViewClient = object : android.webkit.WebViewClient() {
                     override fun onReceivedSslError(
@@ -127,131 +270,43 @@ object WebVideoResolver {
                         handler?.proceed()
                     }
 
+                    override fun shouldOverrideUrlLoading(
+                        view: android.webkit.WebView?,
+                        request: android.webkit.WebResourceRequest?,
+                    ): Boolean {
+                        return false
+                    }
+
                     override fun shouldInterceptRequest(
                         view: android.webkit.WebView?,
                         request: android.webkit.WebResourceRequest?,
                     ): android.webkit.WebResourceResponse? {
-                        val reqUrl = request?.url?.toString()
-                        if (!reqUrl.isNullOrEmpty()) {
-                            val lower = reqUrl.lowercase()
-                            if (lower.contains(".m3u8") || (lower.contains(".mp4") && !lower.contains("ad") && !lower.contains("analytic"))) {
-                                deferred.complete(reqUrl)
-                            }
-                        }
+                        onSniffedUrl(request?.url?.toString())
                         return super.shouldInterceptRequest(view, request)
+                    }
+
+                    override fun onLoadResource(view: android.webkit.WebView?, url: String?) {
+                        super.onLoadResource(view, url)
+                        onSniffedUrl(url)
+                    }
+
+                    override fun onPageStarted(view: android.webkit.WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                        super.onPageStarted(view, url, favicon)
+                        view?.evaluateJavascript(universalHookScript, null)
                     }
 
                     override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        // Inject advanced sniffer script based on reverse-engineered engines (Dizipal, FullHDFilm, RapidVid, JWPlayer)
-                        view?.evaluateJavascript(
-                            """
-                            (function() {
-                                try {
-                                    // 1. Direct HTML5 Video
-                                    var vids = document.querySelectorAll('video');
-                                    for (var i = 0; i < vids.length; i++) {
-                                        var src = vids[i].currentSrc || vids[i].src || '';
-                                        if (src && src.indexOf('blob:') !== 0 && src.indexOf('http') === 0) {
-                                            console.log('dom_stream_detected:' + src);
-                                            return;
-                                        }
-                                    }
-
-                                    // 2. JWPlayer instance detection
-                                    if (typeof window.jwplayer === 'function') {
-                                        try {
-                                            var pl = window.jwplayer().getPlaylist();
-                                            if (Array.isArray(pl) && pl.length > 0 && Array.isArray(pl[0].sources)) {
-                                                for (var s = 0; s < pl[0].sources.length; s++) {
-                                                    var file = pl[0].sources[s].file;
-                                                    if (file && file.indexOf('http') === 0) {
-                                                        console.log('dom_stream_detected:' + file);
-                                                        return;
-                                                    }
-                                                }
-                                            }
-                                        } catch(e) {}
-                                    }
-
-                                    // 3. DPlayer options detection
-                                    if (window.dp && window.dp.options && window.dp.options.video && window.dp.options.video.url) {
-                                        console.log('dom_stream_detected:' + window.dp.options.video.url);
-                                        return;
-                                    }
-
-                                    // 4. FullHDFilm scx & rot13 decoder
-                                    if (typeof window.scx === 'object' && window.scx !== null) {
-                                        function rot13(str) {
-                                            return (str + '').replace(/[a-z]/gi, function(c) {
-                                                return String.fromCharCode((c <= 'Z' ? 90 : 122) >= (c = c.charCodeAt(0) + 13) ? c : c - 26);
-                                            });
-                                        }
-                                        for (var key in window.scx) {
-                                            var entry = window.scx[key];
-                                            if (entry && entry.sx) {
-                                                var sources = [].concat(entry.sx.t || []).concat(entry.sx.p || []);
-                                                for (var si = 0; si < sources.length; si++) {
-                                                    var enc = sources[si];
-                                                    if (typeof enc === 'string') {
-                                                        try {
-                                                            var dec = atob(rot13(enc));
-                                                            if (dec && dec.indexOf('http') === 0) {
-                                                                console.log('dom_stream_detected:' + dec);
-                                                                return;
-                                                            }
-                                                        } catch(e) {}
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // 5. RapidVid / Imgscdn _p8 decoder
-                                    if (typeof window._p8 === 'string' && window._p8.length > 20) {
-                                        try {
-                                            var rev = atob(window._p8.split('').reverse().join(''));
-                                            var rk = "K9L";
-                                            var rn = "";
-                                            for (var ri = 0; ri < rev.length; ri++) {
-                                                var diff = (rk.charCodeAt(ri % 3) % 5) + 1;
-                                                rn += String.fromCharCode(rev.charCodeAt(ri) - diff);
-                                            }
-                                            var pdata = JSON.parse(atob(rn));
-                                            if (pdata && (pdata.tm || pdata.cm)) {
-                                                console.log('dom_stream_detected:' + (pdata.tm || pdata.cm));
-                                                return;
-                                            }
-                                        } catch(e) {}
-                                    }
-
-                                    // 6. Iframe targets (vidmoly, rapidvid, streamtape, closeload, etc.)
-                                    var ifrs = document.querySelectorAll('iframe');
-                                    for (var j = 0; j < ifrs.length; j++) {
-                                        var isrc = ifrs[j].src || ifrs[j].getAttribute('data-src') || '';
-                                        if (isrc && isrc.indexOf('http') === 0 && isrc.indexOf('about:blank') === -1) {
-                                            if (isrc.indexOf('.m3u8') !== -1 || isrc.indexOf('.mp4') !== -1) {
-                                                console.log('dom_stream_detected:' + isrc);
-                                                return;
-                                            }
-                                        }
-                                    }
-                                } catch(e) {}
-                            })();
-                            """.trimIndent(),
-                            null,
-                        )
+                        view?.evaluateJavascript(universalHookScript, null)
                     }
                 }
 
                 wv.webChromeClient = object : android.webkit.WebChromeClient() {
                     override fun onConsoleMessage(message: android.webkit.ConsoleMessage?): Boolean {
                         val text = message?.message().orEmpty()
-                        if (text.startsWith("dom_stream_detected:")) {
-                            val stream = text.removePrefix("dom_stream_detected:").trim()
-                            if (stream.startsWith("http")) {
-                                deferred.complete(stream)
-                            }
+                        if (text.startsWith("net_stream_sniff:")) {
+                            val stream = text.removePrefix("net_stream_sniff:").trim()
+                            onSniffedUrl(stream)
                         }
                         return super.onConsoleMessage(message)
                     }
@@ -259,7 +314,7 @@ object WebVideoResolver {
 
                 wv.loadUrl(pageUrl)
 
-                kotlinx.coroutines.withTimeoutOrNull(6_000L) {
+                kotlinx.coroutines.withTimeoutOrNull(10_000L) {
                     deferred.await()
                 }
             } finally {
@@ -274,7 +329,32 @@ object WebVideoResolver {
         if (depth > 2) return null
         val html = fetchHtml(pageUrl) ?: return null
 
-        // 1. Check for JSON-LD VideoObject contentUrl
+        // 1. Check for Pilavyer data-pv & s.php
+        val pvMatcher = DATA_PV_REGEX.matcher(html)
+        if (pvMatcher.find()) {
+            val slug = pvMatcher.group(1)?.trim()
+            if (!slug.isNullOrEmpty()) {
+                val host = if (html.contains("play2.pilavyerplay.top")) {
+                    "https://play2.pilavyerplay.top"
+                } else {
+                    val coreMatcher = CORE_JS_REGEX.matcher(html)
+                    if (coreMatcher.find()) {
+                        coreMatcher.group(1)?.substringBefore("/assets/js/core.js") ?: "https://play2.pilavyerplay.top"
+                    } else "https://play2.pilavyerplay.top"
+                }
+                val sUrl = "$host/assets/js/s.php?s=$slug"
+                val sHtml = fetchHtml(sUrl, referrer = pageUrl)
+                if (!sHtml.isNullOrBlank()) {
+                    val streamMatcher = STREAM_PROP_REGEX.matcher(sHtml)
+                    if (streamMatcher.find()) {
+                        val stream = streamMatcher.group(1)?.replace("\\/", "/")?.replace("\\u0026", "&")
+                        if (!stream.isNullOrBlank()) return stream
+                    }
+                }
+            }
+        }
+
+        // 2. Check for JSON-LD VideoObject contentUrl
         val jsonLdMatcher = JSON_LD_REGEX.matcher(html)
         while (jsonLdMatcher.find()) {
             val jsonText = jsonLdMatcher.group(1).orEmpty()
@@ -296,7 +376,7 @@ object WebVideoResolver {
             }
         }
 
-        // 2. Look for direct .m3u8 stream links inside HTML
+        // 3. Look for direct .m3u8 stream links inside HTML
         val m3u8Matcher = M3U8_REGEX.matcher(html)
         if (m3u8Matcher.find()) {
             val stream = m3u8Matcher.group(0)
@@ -305,7 +385,7 @@ object WebVideoResolver {
             }
         }
 
-        // 3. Look for direct .mp4 video links inside HTML
+        // 4. Look for direct .mp4 video links inside HTML
         val mp4Matcher = MP4_REGEX.matcher(html)
         if (mp4Matcher.find()) {
             val stream = mp4Matcher.group(0)
@@ -314,7 +394,7 @@ object WebVideoResolver {
             }
         }
 
-        // 4. Look for video iframe embeds
+        // 5. Look for video iframe embeds
         val iframeMatcher = IFRAME_SRC_REGEX.matcher(html)
         while (iframeMatcher.find()) {
             val iframeSrc = iframeMatcher.group(1)
@@ -328,13 +408,16 @@ object WebVideoResolver {
         return null
     }
 
-    private fun fetchHtml(urlString: String): String? = runCatching {
+    private fun fetchHtml(urlString: String, referrer: String? = null): String? = runCatching {
         val url = URL(urlString)
         val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 6_000
             readTimeout = 8_000
             requestMethod = "GET"
             setRequestProperty("User-Agent", USER_AGENT)
+            if (!referrer.isNullOrBlank()) {
+                setRequestProperty("Referer", referrer)
+            }
             setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             instanceFollowRedirects = true
             if (this is javax.net.ssl.HttpsURLConnection) {

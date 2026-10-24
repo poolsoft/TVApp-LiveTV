@@ -1,7 +1,13 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-24 - VOD Film ve Web Akış Çözümleme İyileştirmesi, Oynatıcı Sezon/Bölüm Başlığı
+## 2026-10-24 - Evrensel Ağ Akış Yakalayıcısı (Universal Stream Sniffer) ve VOD Loop Koruması
 
+- **Evrensel Ağ Akış Yakalayıcısı (Universal Network Stream Sniffer - `WebVideoResolver`):**
+  - Kırılgan HTML etiketleri veya web sitesi bazlı kurallara bağımlı kalmadan; tüm web sayfalarında (filmmodu, pilavyer, vidmoly vb.) arka planda çalışan Headless WebView üzerinde `fetch`, `XMLHttpRequest` ve `HTMLMediaElement.src` fonksiyonları kancalanarak (hooking) ve `shouldInterceptRequest`/`onLoadResource` dinlenerek ağ seviyesinde evrensel akış yakalama (`.m3u8`, `.mpd`, `stream.php`, `/hls/`, `.mp4`) sağlandı.
+  - Dinamik video oynatıcıları harekete geçiren evrensel otomatik oynatma (autoplay) tetikleyicisi eklendi.
+- **VOD Çözümleme Döngüsü (Loop) ve Sayfa Atma Koruması (`MainActivity`):**
+  - VOD akışı çözülürken kullanıcının canlı TV'ye dönmesi durumunda önceki çözümleme görevi iptal edilecek (`vodResolveJob?.cancel()`) şekilde güvenli coroutine yönetimi kuruldu.
+  - Başarısız akışlarda kullanıcıyı zorla VOD kütüphanesine fırlatarak devamlı döngüye (loop) sokan `openVodLibrary()` çağrıları kaldırıldı; kullanıcı ekranı değiştirilmeden yalnızca bilgilendirici uyarı mesajı (`showIptvNotice`) gösterilmesi sağlandı.
 - **VOD Film Akış Çözümleme ve Loading Deneyimi (`VodHomeActivity` & `MainActivity`):**
   - Film listesinden bir içeriğe tıklandığında siyah ekranda bekleme ve boş canlı TV infobarı gelmesi sorunu giderildi.
   - Tıklanır tıklanmaz `MainActivity`'de VOD oynatıcı arayüzü ve TV buffering loading simgesi hemen ekrana gelir.
