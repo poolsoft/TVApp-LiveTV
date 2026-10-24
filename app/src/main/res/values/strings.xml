@@ -696,6 +696,8 @@
     <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d kanal · %4$d seçili · %5$s</string>
     <string name="iptv_source_row_url_detailed">%1$s · %2$s\n%3$s\n%4$d kanal · %5$d seçili · %6$s</string>
     <string name="iptv_source_stats_line">%1$d kanal · %2$d seçili · %3$s</string>
+    <string name="iptv_source_vod_stats_line">%1$d VOD içerik · %2$s</string>
+    <string name="iptv_source_hybrid_stats_line">%1$d kanal (%2$d seçili) · %3$d VOD · %4$s</string>
     <string name="iptv_source_progress">%1$s · %2$s</string>
     <string name="iptv_source_import_complete">%1$s güncellendi · %2$d IPTV içeriği</string>
     <string name="never">Henüz değil</string>

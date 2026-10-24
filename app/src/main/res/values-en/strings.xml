@@ -696,6 +696,8 @@
     <string name="iptv_source_row_detailed">%1$s · %2$s\n%3$d channels · %4$d selected · %5$s</string>
     <string name="iptv_source_row_url_detailed">%1$s · %2$s\n%3$s\n%4$d channels · %5$d selected · %6$s</string>
     <string name="iptv_source_stats_line">%1$d channels · %2$d selected · %3$s</string>
+    <string name="iptv_source_vod_stats_line">%1$d VOD items · %2$s</string>
+    <string name="iptv_source_hybrid_stats_line">%1$d channels (%2$d selected) · %3$d VOD · %4$s</string>
     <string name="iptv_source_progress">%1$s · %2$s</string>
     <string name="iptv_source_import_complete">%1$s updated · %2$d IPTV items</string>
     <string name="never">Not yet</string>

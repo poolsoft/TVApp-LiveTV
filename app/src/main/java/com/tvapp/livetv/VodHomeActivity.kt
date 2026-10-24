@@ -62,7 +62,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private var gridIsLoading = false
     private var gridHasMore = true
     private var gridOrder = "SOURCE"
-    private var gridSection = "MOVIE"
+    private var gridSection = "ALL"
     private var gridCategory: String? = null
     private var gridQuery: String = ""
     private var gridJob: Job? = null
@@ -281,10 +281,15 @@ class VodHomeActivity : TvRemoteActivity() {
                 val selectedId = ids[which]
                 sourceId = selectedId
                 preferences.edit().putLong("source", sourceId).apply()
+                gridCategory = null
+                preferences.edit().putString("category", null).apply()
+                lastFocusedGridPosition = 0
+                gridItems.clear()
+                gridAdapter.submitList(emptyList())
                 updateSourceComboText()
                 loadGridCategories()
                 reloadGridData()
-                loadContinueWatching()
+                loadContinueWatching(shouldFocus = false)
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.close, null)
@@ -394,9 +399,7 @@ class VodHomeActivity : TvRemoteActivity() {
         gridCurrentPage = 0
         gridHasMore = true
         gridItems.clear()
-        if (binding.vodRecyclerGrid.hasFocus()) {
-            gridAdapter.submitList(emptyList())
-        }
+        gridAdapter.submitList(emptyList())
         loadNextGridPage()
     }
 

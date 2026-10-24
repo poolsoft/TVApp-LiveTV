@@ -1096,12 +1096,29 @@ class IptvSourcesActivity : TvRemoteActivity() {
                             DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
                         } ?: getString(R.string.never)
 
-                        detailsView.text = getString(
-                            R.string.iptv_source_stats_line,
-                            summary.channelCount,
-                            summary.selectedChannelCount,
-                            updatedAt,
-                        )
+                        val detailsText = when {
+                            summary.channelCount == 0 && summary.vodCount > 0 -> {
+                                getString(R.string.iptv_source_vod_stats_line, summary.vodCount, updatedAt)
+                            }
+                            summary.channelCount > 0 && summary.vodCount > 0 -> {
+                                getString(
+                                    R.string.iptv_source_hybrid_stats_line,
+                                    summary.channelCount,
+                                    summary.selectedChannelCount,
+                                    summary.vodCount,
+                                    updatedAt,
+                                )
+                            }
+                            else -> {
+                                getString(
+                                    R.string.iptv_source_stats_line,
+                                    summary.channelCount,
+                                    summary.selectedChannelCount,
+                                    updatedAt,
+                                )
+                            }
+                        }
+                        detailsView.text = detailsText
                         view.alpha = if (summary.source.enabled) 1.0f else 0.55f
                         return view
                     }

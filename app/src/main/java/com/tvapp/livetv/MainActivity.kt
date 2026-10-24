@@ -6233,7 +6233,7 @@ class MainActivity : TvRemoteActivity() {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
                     val meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
                     if (meta != null && !meta.streamUrl.isNullOrBlank()) {
-                        val resolvedUrl = com.tvapp.livetv.vod.WebVideoResolver.resolve(meta.streamUrl)
+                        val resolvedUrl = com.tvapp.livetv.vod.WebVideoResolver.resolve(meta.streamUrl, this@MainActivity)
                         LiveChannel(
                             id = meta.sourceKey.hashCode().toLong(),
                             sourceKey = meta.sourceKey,

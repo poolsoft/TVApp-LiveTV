@@ -11,9 +11,16 @@
 - **Diziler İçin Bölüm Seçici Diyaloğu (`VodHomeActivity` & `VodDao`):**
   - JSON VOD arşivlerinde yer alan binlerce dizi bölümü için `episodesForSeries` Room sorgusu eklendi.
   - Dizi kartına tıklandığında doğrudan ilk linki açmak yerine sezon ve bölüm bilgilerini listeleyen akıcı bir TV diyalogu açılır; kullanıcı kumandadan istediği bölümü seçip izleyebilir.
-- **Yardımcı VOD Listeleri İzolasyonu (M3U Kanal Listesini Koruma):**
-  - GitHub VOD manifestindeki (`vod2.json`) JSON formatlı arşivlerin (`dizitime.json`, `filmmodu.json`, `hdfilmcehennemi.json` vb.) 50.000'den fazla içerik barındırması ve hiyerarşik yapıya sahip olması nedeniyle bu kaynakların Canlı TV (`iptv_channels`) veritabanını kirletmesi ve EPG/kanal listesini yavaşlatması önlendi.
-  - Toplu ekleme ekranında (`IptvSourcesActivity.kt`) formatı `json` veya uzantısı `.json` olan listeler Canlı TV M3U akışına sokulmayıp doğrudan yardımcı VOD kütüphanesine (`importJsonVodUrl`) aktarılacak şekilde ayrıştırıldı.
+- **IPTV Listeleri Ekranında VOD İçerik Sayımı (`IptvDao`, `IptvRepository`, `IptvSourcesActivity`):**
+  - Yalnızca `iptv_channels` tablosunu sayan ve JSON VOD listelerinde "0 kanal (0 seçili)" görünmesine neden olan istatistik yapısı düzeltildi.
+  - Kaynak bir VOD listesi ise veya Canlı TV kanalı içermiyorsa, kartta doğrudan `vod_metadata` tablosundaki kayıt sayısı (`"%1$d VOD içerik · %2$s"`) gösterilecek şekilde güncellendi.
+- **VOD Ana Ekranı ve Katalog Sorgusu Düzeltmesi (`VodCatalogQuery` & `VodHomeActivity`):**
+  - `VodCatalogQuery.CATALOG` SQL birleşiminde `vod_metadata` tablosuna `'MOVIE'` türü de dahil edildi (`kind IN ('MOVIE','SERIES','EPISODE')`).
+  - `VodHomeActivity` varsayılan filtre bölümü `gridSection = "ALL"` yapılarak dizitime gibi dizi arşivlerinin ve film arşivlerinin tek ekranda eksiksiz listelenmesi sağlandı.
+  - Kaynak değiştirildiğinde veya kategori sıfırlandığında ekranın eski listeden kalan afişleri temizlemesi ve yeni kaynağın afişlerini yüklemesi güvenceye alındı.
+- **Headless WebView ile Dinamik Video Akışı Yakalama (`WebVideoResolver`):**
+  - Güneş TV decompile bulguları doğrultusunda, HTTP GET ile çözülemeyen dinamik JavaScript, karmaşık iframe ve token korumalı sayfalar için arka planda çalışan görünmez bir `WebView` sniffer motoru eklendi.
+  - `shouldInterceptRequest` ve DOM enjeksiyonu ile `.m3u8` / `.mp4` akışları yakalanıp zaman aşımı korumasıyla ExoPlayer'a teslim edilir.
 
 
 - **VOD Player Arayüzünün Modern Simgelerle Yeniden Tasarımı (`activity_main.xml` & `VodPlayerOverlayController`):**

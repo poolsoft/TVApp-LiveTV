@@ -35,6 +35,7 @@ data class IptvSourceSummary(
     val source: IptvSourceEntity,
     val channelCount: Int,
     val selectedChannelCount: Int,
+    val vodCount: Int = 0,
 )
 
 data class IptvImportResult(
@@ -73,12 +74,17 @@ class IptvRepository(context: Context) {
     private val debugLog = CrashReportStore(appContext)
     private val xmlTvRepository by lazy { XmlTvRepository(appContext) }
 
-    suspend fun sources(): List<IptvSourceSummary> = dao.getSources().map { source ->
-        IptvSourceSummary(
-            source,
-            dao.channelCount(source.id),
-            dao.selectedChannelCount(source.id),
-        )
+    suspend fun sources(): List<IptvSourceSummary> {
+        val vodDao = database.vodDao()
+        return dao.getSources().map { source ->
+            val vCount = vodDao.countTitlesBySourceId(source.id)
+            IptvSourceSummary(
+                source,
+                dao.channelCount(source.id),
+                dao.selectedChannelCount(source.id),
+                vCount,
+            )
+        }
     }
 
     suspend fun sourceNames(): Map<String, String> =

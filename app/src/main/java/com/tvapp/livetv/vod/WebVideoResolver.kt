@@ -46,16 +46,107 @@ object WebVideoResolver {
         return DIRECT_STREAM_PATTERN.matcher(noQuery).matches()
     }
 
-    suspend fun resolve(rawUrl: String): String = withContext(Dispatchers.IO) {
+    suspend fun resolve(rawUrl: String, context: android.content.Context? = null): String = withContext(Dispatchers.IO) {
         val targetUrl = rawUrl.trim()
         if (targetUrl.isEmpty()) return@withContext targetUrl
         if (isDirectStream(targetUrl)) return@withContext targetUrl
 
-        // Not a direct stream; attempt to resolve from webpage HTML
-        runCatching {
+        // 1. Fast path: Not a direct stream; attempt to resolve via HTTP GET and HTML regex
+        val fastResolved = runCatching {
             extractStreamFromPage(targetUrl, depth = 0)
-        }.getOrNull() ?: targetUrl
+        }.getOrNull()
+
+        if (!fastResolved.isNullOrBlank() && isDirectStream(fastResolved)) {
+            return@withContext fastResolved
+        }
+
+        // 2. Slow/dynamic path: If HTTP didn't resolve and context is available, run Headless WebView sniffer
+        if (context != null) {
+            val webViewResolved = runCatching {
+                resolveViaHeadlessWebView(context, targetUrl)
+            }.getOrNull()
+            if (!webViewResolved.isNullOrBlank()) {
+                return@withContext webViewResolved
+            }
+        }
+
+        fastResolved ?: targetUrl
     }
+
+    private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): String? =
+        withContext(Dispatchers.Main) {
+            val deferred = kotlinx.coroutines.CompletableDeferred<String?>()
+            var webView: android.webkit.WebView? = null
+            try {
+                val appCtx = context.applicationContext
+                val wv = android.webkit.WebView(appCtx)
+                webView = wv
+                wv.settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    mediaPlaybackRequiresUserGesture = false
+                    userAgentString = USER_AGENT
+                }
+
+                wv.webViewClient = object : android.webkit.WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        view: android.webkit.WebView?,
+                        request: android.webkit.WebResourceRequest?,
+                    ): android.webkit.WebResourceResponse? {
+                        val reqUrl = request?.url?.toString()
+                        if (!reqUrl.isNullOrEmpty()) {
+                            val lower = reqUrl.lowercase()
+                            if (lower.contains(".m3u8") || (lower.contains(".mp4") && !lower.contains("ad") && !lower.contains("analytic"))) {
+                                deferred.complete(reqUrl)
+                            }
+                        }
+                        return super.shouldInterceptRequest(view, request)
+                    }
+
+                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        // Inject basic sniffer script to trigger hidden video/iframe sources
+                        view?.evaluateJavascript(
+                            """
+                            (function() {
+                                try {
+                                    var v = document.querySelector('video');
+                                    if (v && v.src && v.src.indexOf('http') === 0) {
+                                        console.log('dom_stream_detected:' + v.src);
+                                    }
+                                } catch(e) {}
+                            })();
+                            """.trimIndent(),
+                            null,
+                        )
+                    }
+                }
+
+                wv.webChromeClient = object : android.webkit.WebChromeClient() {
+                    override fun onConsoleMessage(message: android.webkit.ConsoleMessage?): Boolean {
+                        val text = message?.message().orEmpty()
+                        if (text.startsWith("dom_stream_detected:")) {
+                            val stream = text.removePrefix("dom_stream_detected:").trim()
+                            if (stream.startsWith("http")) {
+                                deferred.complete(stream)
+                            }
+                        }
+                        return super.onConsoleMessage(message)
+                    }
+                }
+
+                wv.loadUrl(pageUrl)
+
+                kotlinx.coroutines.withTimeoutOrNull(10_000L) {
+                    deferred.await()
+                }
+            } finally {
+                runCatching {
+                    webView?.stopLoading()
+                    webView?.destroy()
+                }
+            }
+        }
 
     private fun extractStreamFromPage(pageUrl: String, depth: Int): String? {
         if (depth > 2) return null

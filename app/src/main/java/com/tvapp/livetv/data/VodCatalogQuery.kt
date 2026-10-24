@@ -33,7 +33,7 @@ object VodCatalogQuery {
         FROM vod_metadata m
         JOIN iptv_sources s ON s.id=m.sourceId
         LEFT JOIN user_channels u ON u.sourceKey=m.sourceKey
-        WHERE m.kind IN ('SERIES','EPISODE') AND s.enabled=1 AND COALESCE(u.hidden,0)=0
+        WHERE m.kind IN ('MOVIE','SERIES','EPISODE') AND s.enabled=1 AND COALESCE(u.hidden,0)=0
     """
 
     fun item(key: String) = SimpleSQLiteQuery("SELECT * FROM ($CATALOG) WHERE sourceKey=? LIMIT 1", arrayOf(key))
@@ -61,6 +61,7 @@ object VodCatalogQuery {
             where.append(when {
                 filter.view == "CONTINUE" -> " AND kind IN ('MOVIE','EPISODE')"
                 filter.section == "SERIES" -> " AND kind IN ('SERIES','EPISODE')"
+                filter.section == "ALL" -> " AND kind IN ('MOVIE','SERIES','EPISODE')"
                 else -> " AND kind='MOVIE'"
             })
             if (filter.view == "ALL") where.append(" AND (kind!='EPISODE' OR parentKey IS NULL)")

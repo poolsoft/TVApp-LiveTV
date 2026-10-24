@@ -29,5 +29,9 @@ interface VodDao {
     suspend fun pruneSeries(sourceId: Long, updatedAt: Long)
     @Query("DELETE FROM vod_metadata WHERE parentKey = :parent AND updatedAt != :updatedAt")
     suspend fun pruneEpisodes(parent: String, updatedAt: Long)
+    @Query("SELECT COUNT(*) FROM vod_metadata WHERE sourceId = :sourceId AND (parentKey IS NULL OR kind != 'EPISODE')")
+    suspend fun countTitlesBySourceId(sourceId: Long): Int
+    @Query("SELECT COUNT(*) FROM vod_metadata WHERE sourceId = :sourceId")
+    suspend fun countTotalBySourceId(sourceId: Long): Int
     @Upsert suspend fun upsert(items: List<VodMetadataEntity>)
 }
