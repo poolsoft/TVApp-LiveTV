@@ -849,4 +849,5 @@
     <string name="vod_watch_later">Sonra İzle</string>
     <string name="vod_added_to_continue">İzlemeye Devam Et listesine eklendi</string>
     <string name="vod_fullscreen_label">Tam Ekran</string>
+    <string name="vod_no_episodes_found">Bu dizinin bölümleri bulunamadı.</string>
 </resources>

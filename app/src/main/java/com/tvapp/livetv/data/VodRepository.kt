@@ -61,6 +61,7 @@ class VodRepository(context: Context, private val database: TVAppDatabase = TVAp
     }
 
     suspend fun seasons(key: String): List<Int> = dao.seasons(key)
+    suspend fun episodesForSeries(seriesKey: String): List<VodMetadataEntity> = dao.episodesForSeries(seriesKey)
     suspend fun nextEpisode(key: String): VodCatalogItem? = dao.nextEpisode(key)?.let { item(it.sourceKey) }
 
     suspend fun continueItems(sourceId: Long, section: String, keys: List<String>): List<VodCatalogItem> {

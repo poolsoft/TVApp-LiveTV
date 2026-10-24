@@ -1,6 +1,20 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-24 - VOD Oynatıcı Modern Simge Tasarımı, Akıllı Odaklanma ve "Sonra İzle" Desteği
+## 2026-10-24 - Yardımcı JSON VOD Kaynakları, Akıllı Web Video Çözümleyici (WebVideoResolver) ve Dizi Bölüm Seçici
+
+- **Web Sayfalarından Otomatik Medya Akışı Çözümleme (`WebVideoResolver`):**
+  - Web sayfası bağlantılarını (`kanald.com.tr`, `filmmodu`, `hdfilmcehennemi`, `dizibox` vb.) arka planda çözümleyen akıllı HTTP çözümleyici motoru geliştirildi:
+    - Sayfa HTML'i içindeki `<script type="application/ld+json">` Schema.org `VideoObject` nesnelerinden `"contentUrl"` doğrudan okunarak milisaniyeler içinde `.m3u8` akış adresi elde edilir.
+    - JSON-LD bulunamayan sayfalarda Regex tabanlı derin HLS (`.m3u8`) ve MP4 taraması yapılır.
+    - İframe ve harici oynatıcı yerleştirmeleri takip edilerek oynatılabilir asıl akış URL'si dinamik olarak ayrıştırılır.
+  - VOD derin bağlantısı (`MainActivity.kt`) açılırken linkin web sayfası olması durumunda oynatıcı başlamadan önce arka planda `WebVideoResolver.resolve` çalıştırılarak canlı oynatıcıya doğrudan çözülmüş akış iletilir.
+- **Diziler İçin Bölüm Seçici Diyaloğu (`VodHomeActivity` & `VodDao`):**
+  - JSON VOD arşivlerinde yer alan binlerce dizi bölümü için `episodesForSeries` Room sorgusu eklendi.
+  - Dizi kartına tıklandığında doğrudan ilk linki açmak yerine sezon ve bölüm bilgilerini listeleyen akıcı bir TV diyalogu açılır; kullanıcı kumandadan istediği bölümü seçip izleyebilir.
+- **Yardımcı VOD Listeleri İzolasyonu (M3U Kanal Listesini Koruma):**
+  - GitHub VOD manifestindeki (`vod2.json`) JSON formatlı arşivlerin (`dizitime.json`, `filmmodu.json`, `hdfilmcehennemi.json` vb.) 50.000'den fazla içerik barındırması ve hiyerarşik yapıya sahip olması nedeniyle bu kaynakların Canlı TV (`iptv_channels`) veritabanını kirletmesi ve EPG/kanal listesini yavaşlatması önlendi.
+  - Toplu ekleme ekranında (`IptvSourcesActivity.kt`) formatı `json` veya uzantısı `.json` olan listeler Canlı TV M3U akışına sokulmayıp doğrudan yardımcı VOD kütüphanesine (`importJsonVodUrl`) aktarılacak şekilde ayrıştırıldı.
+
 
 - **VOD Player Arayüzünün Modern Simgelerle Yeniden Tasarımı (`activity_main.xml` & `VodPlayerOverlayController`):**
   - Oynatıcı arayüzü referans tasarıma uygun şekilde simge tabanlı şık kontrollere dönüştürüldü:

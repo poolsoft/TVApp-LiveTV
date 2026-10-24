@@ -516,7 +516,10 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 }
                 withContext(Dispatchers.IO) {
                     runCatching {
-                        if (existing != null) {
+                        val isJsonVod = item.sourceFormat.equals("json", ignoreCase = true) || item.url.endsWith(".json", ignoreCase = true)
+                        if (isJsonVod) {
+                            repository.importJsonVodUrl(item.url, item.name, username = "github:$username", ::showImportProgress)
+                        } else if (existing != null) {
                             // Update existing source
                             repository.refresh(existing.source, ::showImportProgress)
                         } else {

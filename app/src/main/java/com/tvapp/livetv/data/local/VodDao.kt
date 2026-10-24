@@ -19,6 +19,8 @@ interface VodDao {
         "(next.seasonNumber=origin.seasonNumber AND next.episodeNumber>origin.episodeNumber)) " +
         "ORDER BY next.seasonNumber,next.episodeNumber,next.sourceKey LIMIT 1")
     suspend fun nextEpisode(key: String): VodMetadataEntity?
+    @Query("SELECT * FROM vod_metadata WHERE parentKey = :seriesKey AND kind = 'EPISODE' ORDER BY seasonNumber, episodeNumber, sourceKey")
+    suspend fun episodesForSeries(seriesKey: String): List<VodMetadataEntity>
     @Query("SELECT DISTINCT seasonNumber FROM vod_metadata WHERE parentKey = :key AND seasonNumber IS NOT NULL ORDER BY seasonNumber")
     suspend fun seasons(key: String): List<Int>
     @Query("SELECT MIN(updatedAt) FROM vod_metadata WHERE parentKey = :key")

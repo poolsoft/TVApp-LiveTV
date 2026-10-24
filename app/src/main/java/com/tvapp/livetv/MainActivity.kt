@@ -6222,10 +6222,31 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         // VOD items usually live outside the main channel list; resolve
-        // directly from the IPTV repository so the deep link always works.
+        // directly from the IPTV repository or vod_metadata (for JSON VOD archives)
+        // using WebVideoResolver when needed.
         lifecycleScope.launch {
             val channel = withContext(Dispatchers.IO) {
-                runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
+                val direct = runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
+                if (direct != null) {
+                    direct
+                } else {
+                    val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                    val meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
+                    if (meta != null && !meta.streamUrl.isNullOrBlank()) {
+                        val resolvedUrl = com.tvapp.livetv.vod.WebVideoResolver.resolve(meta.streamUrl)
+                        LiveChannel(
+                            id = meta.sourceKey.hashCode().toLong(),
+                            sourceKey = meta.sourceKey,
+                            inputId = "iptv:${meta.sourceId}",
+                            displayNumber = "VOD",
+                            displayName = meta.name,
+                            source = LiveChannel.Source.IPTV,
+                            uri = resolvedUrl,
+                            logoUrl = meta.logoUrl,
+                            iptvContentType = "VOD",
+                        )
+                    } else null
+                }
             }
             if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
             if (channel?.isVodContent() == true) {

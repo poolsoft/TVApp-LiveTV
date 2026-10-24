@@ -19,6 +19,7 @@ import com.tvapp.livetv.data.VodFilter
 import com.tvapp.livetv.data.VodRepository
 import com.tvapp.livetv.data.local.TVAppDatabase
 import com.tvapp.livetv.data.local.VodCatalogItem
+import com.tvapp.livetv.data.local.VodMetadataEntity
 import com.tvapp.livetv.data.local.VodTmdbEntity
 import com.tvapp.livetv.databinding.ActivityVodHomeBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
@@ -127,7 +128,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun setupRecyclerViews() {
         // Devam Et (İzlemeye Devam Et) Rayı
         continueAdapter = VodPosterAdapter(
-            onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
+            onItemClick = { displayItem -> onVodItemClicked(displayItem) },
             onItemFocused = { /* Odak animasyonu adapter içinde */ },
             onItemLongClick = { displayItem ->
                 showContinueContextMenu(displayItem)
@@ -139,7 +140,7 @@ class VodHomeActivity : TvRemoteActivity() {
 
         // Grid Afiş Adaptörü (5 Sütun)
         gridAdapter = VodPosterAdapter(
-            onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
+            onItemClick = { displayItem -> onVodItemClicked(displayItem) },
             onItemFocused = { item ->
                 val pos = gridAdapter.currentList.indexOfFirst { it.catalogItem.sourceKey == item.catalogItem.sourceKey }
                 if (pos != -1) lastFocusedGridPosition = pos
@@ -512,6 +513,52 @@ class VodHomeActivity : TvRemoteActivity() {
                 }
             }
         }
+    }
+
+    private fun onVodItemClicked(displayItem: VodDisplayItem) {
+        val item = displayItem.catalogItem
+        if (item.kind == "SERIES") {
+            showEpisodesDialog(item)
+        } else {
+            playItem(item)
+        }
+    }
+
+    private fun showEpisodesDialog(seriesItem: VodCatalogItem) {
+        lifecycleScope.launch {
+            val episodes = withContext(Dispatchers.IO) {
+                repository.episodesForSeries(seriesItem.sourceKey)
+            }
+            if (episodes.isEmpty()) {
+                Toast.makeText(this@VodHomeActivity, R.string.vod_no_episodes_found, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val titles = episodes.map { ep ->
+                val s = ep.seasonNumber ?: 1
+                val e = ep.episodeNumber ?: 1
+                "${s}. Sezon ${e}. Bölüm - ${ep.name}"
+            }.toTypedArray()
+
+            AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(seriesItem.name)
+                .setItems(titles) { _, which ->
+                    val selectedEp = episodes[which]
+                    playEpisode(selectedEp)
+                }
+                .setNegativeButton(R.string.close, null)
+                .show()
+        }
+    }
+
+    private fun playEpisode(episode: VodMetadataEntity) {
+        lastPlayedSourceKey = episode.sourceKey
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, episode.sourceKey)
+            putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        startActivity(intent)
     }
 
     private fun playItem(item: VodCatalogItem) {

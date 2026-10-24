@@ -849,4 +849,5 @@
     <string name="vod_watch_later">Watch Later</string>
     <string name="vod_added_to_continue">Added to Continue Watching</string>
     <string name="vod_fullscreen_label">Fullscreen</string>
+    <string name="vod_no_episodes_found">No episodes found for this series.</string>
 </resources>
