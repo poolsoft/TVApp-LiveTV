@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0A0E17"
+    android:descendantFocusability="afterDescendants"
     android:orientation="vertical"
     android:padding="16dp">
 

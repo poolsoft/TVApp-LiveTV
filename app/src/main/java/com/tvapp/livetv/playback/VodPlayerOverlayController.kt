@@ -16,13 +16,14 @@ import kotlinx.coroutines.launch
 
 enum class VodControlTarget {
     BACK,
+    AUDIO_SUB,
+    SPEED,
+    FULLSCREEN,
+    PLAY_PAUSE,
     TIMELINE,
     REWIND,
-    PLAY_PAUSE,
     FORWARD,
-    SPEED,
-    AUDIO_SUB,
-    RESTART,
+    LIST,
 }
 
 class VodPlayerOverlayController(
@@ -48,7 +49,27 @@ class VodPlayerOverlayController(
 
     fun setup() {
         binding.vodBtnBack.setOnClickListener {
-            onOpenVodLibrary()
+            selectedTarget = VodControlTarget.BACK
+            activateSelectedTarget()
+        }
+        binding.vodBtnAudioSub.setOnClickListener {
+            selectedTarget = VodControlTarget.AUDIO_SUB
+            activateSelectedTarget()
+            showControls()
+        }
+        binding.vodBtnSpeed.setOnClickListener {
+            selectedTarget = VodControlTarget.SPEED
+            activateSelectedTarget()
+            showControls()
+        }
+        binding.vodBtnFullscreen.setOnClickListener {
+            selectedTarget = VodControlTarget.FULLSCREEN
+            activateSelectedTarget()
+        }
+        binding.vodBtnPlayPause.setOnClickListener {
+            selectedTarget = VodControlTarget.PLAY_PAUSE
+            activateSelectedTarget()
+            showControls()
         }
         binding.vodTimelineRow.setOnClickListener {
             selectedTarget = VodControlTarget.TIMELINE
@@ -62,30 +83,14 @@ class VodPlayerOverlayController(
             activateSelectedTarget()
             showControls()
         }
-        binding.vodBtnPlayPause.setOnClickListener {
-            selectedTarget = VodControlTarget.PLAY_PAUSE
-            activateSelectedTarget()
-            showControls()
-        }
         binding.vodBtnForward.setOnClickListener {
             selectedTarget = VodControlTarget.FORWARD
             activateSelectedTarget()
             showControls()
         }
-        binding.vodBtnSpeed.setOnClickListener {
-            selectedTarget = VodControlTarget.SPEED
+        binding.vodBtnList.setOnClickListener {
+            selectedTarget = VodControlTarget.LIST
             activateSelectedTarget()
-            showControls()
-        }
-        binding.vodBtnAudioSub.setOnClickListener {
-            selectedTarget = VodControlTarget.AUDIO_SUB
-            activateSelectedTarget()
-            showControls()
-        }
-        binding.vodBtnRestart.setOnClickListener {
-            selectedTarget = VodControlTarget.RESTART
-            activateSelectedTarget()
-            showControls()
         }
     }
 
@@ -146,24 +151,16 @@ class VodPlayerOverlayController(
             getString(R.string.unknown_value)
         }
 
-        val remaining = (state.durationMillis - state.positionMillis).coerceAtLeast(0L)
         binding.vodTimeDuration.text = if (state.durationMillis > 0) {
-            "-${formatPlaybackTime(remaining)} / ${formatPlaybackTime(state.durationMillis)}"
+            formatPlaybackTime(state.durationMillis)
         } else {
             getString(R.string.unknown_value)
         }
 
         val isPlaying = state.isPlaying
-        binding.vodBtnPlayPause.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
-            0,
-            0,
-            0,
+        binding.vodBtnPlayPause.setImageResource(
+            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
         )
-        binding.vodBtnPlayPause.setText(if (isPlaying) R.string.iptv_pause_label else R.string.iptv_play_label)
-        binding.vodBtnSpeed.text = state.playbackSpeed?.let {
-            String.format(Locale.getDefault(), "%.2gx", it)
-        } ?: "1.0x"
     }
 
     fun renderSelection() {
@@ -174,50 +171,34 @@ class VodPlayerOverlayController(
         }
 
         highlight(binding.vodBtnBack, selectedTarget == VodControlTarget.BACK)
+        highlight(binding.vodBtnAudioSub, selectedTarget == VodControlTarget.AUDIO_SUB)
+        highlight(binding.vodBtnSpeed, selectedTarget == VodControlTarget.SPEED)
+        highlight(binding.vodBtnFullscreen, selectedTarget == VodControlTarget.FULLSCREEN)
+
+        highlight(binding.vodBtnPlayPause, selectedTarget == VodControlTarget.PLAY_PAUSE)
         if (selectedTarget == VodControlTarget.TIMELINE) {
             binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline_selected)
             binding.vodTimelineRow.requestFocus()
         } else {
             binding.vodTimelineRow.background = null
         }
-        highlight(binding.vodBtnRewind, selectedTarget == VodControlTarget.REWIND)
-        highlight(binding.vodBtnPlayPause, selectedTarget == VodControlTarget.PLAY_PAUSE)
-        highlight(binding.vodBtnForward, selectedTarget == VodControlTarget.FORWARD)
-        highlight(binding.vodBtnSpeed, selectedTarget == VodControlTarget.SPEED)
-        highlight(binding.vodBtnAudioSub, selectedTarget == VodControlTarget.AUDIO_SUB)
-        highlight(binding.vodBtnRestart, selectedTarget == VodControlTarget.RESTART)
-    }
 
-    fun cycleButton(direction: Int) {
-        val buttonRow = listOf(
-            VodControlTarget.REWIND,
-            VodControlTarget.PLAY_PAUSE,
-            VodControlTarget.FORWARD,
-            VodControlTarget.SPEED,
-            VodControlTarget.AUDIO_SUB,
-            VodControlTarget.RESTART,
-        )
-        val currentIndex = buttonRow.indexOf(selectedTarget)
-        val nextIndex = if (currentIndex == -1) {
-            if (direction > 0) 0 else buttonRow.lastIndex
-        } else {
-            (currentIndex + direction + buttonRow.size) % buttonRow.size
-        }
-        selectedTarget = buttonRow[nextIndex]
-        renderSelection()
-        scheduleAutoHide()
+        highlight(binding.vodBtnRewind, selectedTarget == VodControlTarget.REWIND)
+        highlight(binding.vodBtnForward, selectedTarget == VodControlTarget.FORWARD)
+        highlight(binding.vodBtnList, selectedTarget == VodControlTarget.LIST)
     }
 
     fun activateSelectedTarget() {
         when (selectedTarget) {
-            VodControlTarget.BACK -> onOpenVodLibrary()
+            VodControlTarget.BACK,
+            VodControlTarget.LIST -> onOpenVodLibrary()
+            VodControlTarget.FULLSCREEN -> hideControls()
             VodControlTarget.TIMELINE,
             VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()
             VodControlTarget.REWIND -> iptvPlayback.seekBy(-10_000L)
             VodControlTarget.FORWARD -> iptvPlayback.seekBy(10_000L)
             VodControlTarget.SPEED -> onShowSpeedChoices()
             VodControlTarget.AUDIO_SUB -> onShowAudioTracks()
-            VodControlTarget.RESTART -> iptvPlayback.restartVod()
         }
         updateControls()
     }
@@ -283,9 +264,12 @@ class VodPlayerOverlayController(
                     }
                     KeyEvent.KEYCODE_DPAD_UP -> {
                         selectedTarget = when (selectedTarget) {
-                            VodControlTarget.BACK -> VodControlTarget.BACK
+                            VodControlTarget.REWIND,
+                            VodControlTarget.FORWARD,
+                            VodControlTarget.LIST -> VodControlTarget.PLAY_PAUSE
+                            VodControlTarget.PLAY_PAUSE,
                             VodControlTarget.TIMELINE -> VodControlTarget.BACK
-                            else -> VodControlTarget.TIMELINE
+                            else -> selectedTarget
                         }
                         renderSelection()
                         showControls()
@@ -293,8 +277,12 @@ class VodPlayerOverlayController(
                     }
                     KeyEvent.KEYCODE_DPAD_DOWN -> {
                         selectedTarget = when (selectedTarget) {
-                            VodControlTarget.BACK -> VodControlTarget.TIMELINE
-                            VodControlTarget.TIMELINE -> VodControlTarget.PLAY_PAUSE
+                            VodControlTarget.BACK,
+                            VodControlTarget.AUDIO_SUB,
+                            VodControlTarget.SPEED,
+                            VodControlTarget.FULLSCREEN -> VodControlTarget.PLAY_PAUSE
+                            VodControlTarget.PLAY_PAUSE,
+                            VodControlTarget.TIMELINE -> VodControlTarget.REWIND
                             else -> selectedTarget
                         }
                         renderSelection()
@@ -302,30 +290,54 @@ class VodPlayerOverlayController(
                         return true
                     }
                     KeyEvent.KEYCODE_DPAD_LEFT -> {
-                        if (selectedTarget == VodControlTarget.TIMELINE) {
-                            iptvPlayback.seekBy(-10_000L)
-                            updateControls()
-                        } else if (selectedTarget != VodControlTarget.BACK) {
-                            cycleButton(-1)
+                        when (selectedTarget) {
+                            VodControlTarget.FULLSCREEN -> selectedTarget = VodControlTarget.SPEED
+                            VodControlTarget.SPEED -> selectedTarget = VodControlTarget.AUDIO_SUB
+                            VodControlTarget.AUDIO_SUB -> selectedTarget = VodControlTarget.BACK
+                            VodControlTarget.TIMELINE -> {
+                                iptvPlayback.seekBy(-10_000L)
+                                updateControls()
+                            }
+                            VodControlTarget.PLAY_PAUSE -> {
+                                // Solunda eleman yok
+                            }
+                            VodControlTarget.LIST -> selectedTarget = VodControlTarget.FORWARD
+                            VodControlTarget.FORWARD -> selectedTarget = VodControlTarget.REWIND
+                            VodControlTarget.REWIND -> {
+                                // Solunda eleman yok
+                            }
+                            else -> Unit
                         }
+                        renderSelection()
                         showControls()
                         return true
                     }
                     KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                        if (selectedTarget == VodControlTarget.TIMELINE) {
-                            iptvPlayback.seekBy(10_000L)
-                            updateControls()
-                        } else if (selectedTarget != VodControlTarget.BACK) {
-                            cycleButton(1)
+                        when (selectedTarget) {
+                            VodControlTarget.BACK -> selectedTarget = VodControlTarget.AUDIO_SUB
+                            VodControlTarget.AUDIO_SUB -> selectedTarget = VodControlTarget.SPEED
+                            VodControlTarget.SPEED -> selectedTarget = VodControlTarget.FULLSCREEN
+                            VodControlTarget.PLAY_PAUSE -> selectedTarget = VodControlTarget.TIMELINE
+                            VodControlTarget.TIMELINE -> {
+                                iptvPlayback.seekBy(10_000L)
+                                updateControls()
+                            }
+                            VodControlTarget.REWIND -> selectedTarget = VodControlTarget.FORWARD
+                            VodControlTarget.FORWARD -> selectedTarget = VodControlTarget.LIST
+                            VodControlTarget.LIST -> {
+                                // Sağında eleman yok
+                            }
+                            else -> Unit
                         }
+                        renderSelection()
                         showControls()
                         return true
                     }
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER -> {
-                        val wasBack = selectedTarget == VodControlTarget.BACK
+                        val wasBackOrList = selectedTarget == VodControlTarget.BACK || selectedTarget == VodControlTarget.LIST
                         activateSelectedTarget()
-                        if (!wasBack) {
+                        if (!wasBackOrList) {
                             showControls()
                         }
                         return true

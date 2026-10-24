@@ -20,6 +20,7 @@ data class VodDisplayItem(
 class VodPosterAdapter(
     private val onItemClick: (VodDisplayItem) -> Unit,
     private val onItemFocused: (VodDisplayItem) -> Unit,
+    private val onItemLongClick: ((VodDisplayItem) -> Boolean)? = null,
 ) : ListAdapter<VodDisplayItem, VodPosterAdapter.ViewHolder>(DiffCallback) {
 
     fun updateTmdbItem(sourceKey: String, tmdb: VodTmdbEntity) {
@@ -48,6 +49,15 @@ class VodPosterAdapter(
                 val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     onItemClick(getItem(pos))
+                }
+            }
+
+            binding.root.setOnLongClickListener {
+                val pos = bindingAdapterPosition
+                if (pos != RecyclerView.NO_POSITION && onItemLongClick != null) {
+                    onItemLongClick.invoke(getItem(pos))
+                } else {
+                    false
                 }
             }
 

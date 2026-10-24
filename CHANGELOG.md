@@ -1,5 +1,24 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-24 - VOD Oynatıcı Modern Simge Tasarımı, Akıllı Odaklanma ve "Sonra İzle" Desteği
+
+- **VOD Player Arayüzünün Modern Simgelerle Yeniden Tasarımı (`activity_main.xml` & `VodPlayerOverlayController`):**
+  - Oynatıcı arayüzü referans tasarıma uygun şekilde simge tabanlı şık kontrollere dönüştürüldü:
+    - **Üst Bar:** Geri butonu (`ic_arrow_back`), İçerik Başlığı ve meta bilgileri (Yıl/Türler/Puan), sağ tarafta Altyazı (`[CC]`), Ayarlar (`⚙`), Tam Ekran (`⤢`) simgeleri ve saat.
+    - **Alt Bar 1. Satır (Zaman Çizelgesi & Oynat):** Sol başta büyük Oynat/Duraklat dairesel simgesi (`▶` / `⏸`), geçen süre (`vod_time_current`), mavi dolgulu modern SeekBar/ProgressBar ve toplam süre (`vod_time_duration`).
+    - **Alt Bar 2. Satır (Kontroller):** 10 saniye geri sarma (`↺10`), 10 saniye ileri sarma (`↻10`), ses simgesi (`🔊`) ve seviye göstergesi, sağ tarafta ise doğrudan VOD kütüphanesine dönen "Liste ⌄" butonu.
+  - Kumanda D-Pad navigasyonu iki satırlı ve üst barlı yeni düğme hiyerarşisine göre uyarlandı.
+- **VOD Ekranı Seçimlerinin Korunması & Arama Kutusuna Odak Gitmesinin Önlenmesi (`VodHomeActivity`):**
+  - Player'dan geri dönüldüğünde seçili kategori, sıralama, aktif kaynak ve yüklenmiş ızgara verisi sıfırlanmadan korundu.
+  - Sayfa açılışında ve geri dönüşte odağın otomatik olarak arama kutusuna (`vod_search_box`) gitmesi engellendi; arama kutusu yalnızca kullanıcı kumandadan bilinçli olarak YUKARI bastığında odak alacak şekilde sınırlandırıldı.
+- **Akıllı Odaklanma (Smart Focus):**
+  - Player'dan dönüldüğünde, izlenen içerik "İzlemeye Devam Et" listesine eklenmişse kumanda odağı doğrudan o içeriğin devam et kartının üzerine konumlandırılır.
+  - İzlenen içerik devam ete eklenmemişse veya devam et listesi boşsa, odak afiş ızgarasındaki son seçilen/kaldığı karta yönlendirilir.
+- **Afişlerde OK Uzun Basma (Long Click) -> "Sonra İzle" (İzlemeye Devam Ete Ekle):**
+  - Film ve dizi afişlerinin üzerinde kumandadan OK tuşuna uzun basıldığında açılan bağlam menüsü eklendi (`VodPosterAdapter` & `VodHomeActivity`).
+  - Menüden "Sonra İzle" seçildiğinde içerik `IptvResumeStore.markWatchLater` ile anında "İzlemeye Devam Et" rayına eklenir ve odak o karta verilir.
+  - "İzlemeye Devam Et" rayındaki kartlara uzun basıldığında ise listeden kaldırma seçeneği sunulur.
+
 ## 2026-10-23 - VOD Grid Keşif Ana Ekranı, Devam Et Rayı, LiveTV Mod Ayrımı ve Favoriler Filtresi
 
 - **VOD Grid Keşif Ekranı Varsayılan Ana Ekran Yapıldı:** Önceki kullanışsız 3 sütunlu dashboard kaldırılarak, zengin ve modern Grid Keşif arayüzü doğrudan VOD ana ekranı haline getirildi:

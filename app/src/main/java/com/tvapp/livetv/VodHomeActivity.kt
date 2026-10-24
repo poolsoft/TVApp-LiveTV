@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -70,6 +71,9 @@ class VodHomeActivity : TvRemoteActivity() {
     private var sources: List<IptvSourceSummary> = emptyList()
     private var sourceId = -1L
 
+    private var lastPlayedSourceKey: String? = null
+    private var lastFocusedGridPosition: Int = 0
+
     private var tmdbJob: Job? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockRunnable = object : Runnable {
@@ -102,13 +106,12 @@ class VodHomeActivity : TvRemoteActivity() {
         setupClickListeners()
         updateClock()
         loadSourcesAndInitialData()
-        binding.vodRecyclerGrid.requestFocus()
     }
 
     override fun onResume() {
         super.onResume()
         clockHandler.post(clockRunnable)
-        loadContinueWatching()
+        loadContinueWatching(shouldFocus = true)
     }
 
     override fun onPause() {
@@ -126,6 +129,10 @@ class VodHomeActivity : TvRemoteActivity() {
         continueAdapter = VodPosterAdapter(
             onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
             onItemFocused = { /* Odak animasyonu adapter içinde */ },
+            onItemLongClick = { displayItem ->
+                showContinueContextMenu(displayItem)
+                true
+            },
         )
         binding.vodRecyclerContinue.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.vodRecyclerContinue.adapter = continueAdapter
@@ -133,7 +140,14 @@ class VodHomeActivity : TvRemoteActivity() {
         // Grid Afiş Adaptörü (5 Sütun)
         gridAdapter = VodPosterAdapter(
             onItemClick = { displayItem -> playItem(displayItem.catalogItem) },
-            onItemFocused = { /* Odak animasyonu adapter içinde */ },
+            onItemFocused = { item ->
+                val pos = gridAdapter.currentList.indexOfFirst { it.catalogItem.sourceKey == item.catalogItem.sourceKey }
+                if (pos != -1) lastFocusedGridPosition = pos
+            },
+            onItemLongClick = { displayItem ->
+                showPosterContextMenu(displayItem)
+                true
+            },
         )
         val gridLayoutManager = GridLayoutManager(this, 5)
         binding.vodRecyclerGrid.layoutManager = gridLayoutManager
@@ -167,6 +181,7 @@ class VodHomeActivity : TvRemoteActivity() {
             }
             preferences.edit().putString("category", gridCategory).apply()
             gridCategoryAdapter.setSelectedCategory(gridCategory ?: allCatsLabel)
+            lastFocusedGridPosition = 0
             reloadGridData()
         }
         binding.vodGridRecyclerCategories.layoutManager = LinearLayoutManager(this)
@@ -275,12 +290,15 @@ class VodHomeActivity : TvRemoteActivity() {
             .show()
     }
 
-    private fun loadContinueWatching() {
+    private fun loadContinueWatching(shouldFocus: Boolean = true) {
         lifecycleScope.launch {
             try {
                 val resumeEntries = withContext(Dispatchers.IO) { resumeStore.entries() }
                 if (resumeEntries.isEmpty()) {
                     binding.vodContinueContainer.visibility = View.GONE
+                    if (shouldFocus) {
+                        focusGridOrSavedPosition()
+                    }
                     return@launch
                 }
                 val keys = resumeEntries.map { it.sourceKey }
@@ -289,6 +307,9 @@ class VodHomeActivity : TvRemoteActivity() {
                 }
                 if (items.isEmpty()) {
                     binding.vodContinueContainer.visibility = View.GONE
+                    if (shouldFocus) {
+                        focusGridOrSavedPosition()
+                    }
                     return@launch
                 }
                 val allKeys = items.map { it.sourceKey }
@@ -296,12 +317,50 @@ class VodHomeActivity : TvRemoteActivity() {
                     database.vodTmdbDao().getBySourceKeys(allKeys).associateBy { it.sourceKey }
                 }
                 val displayItems = items.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
-                continueAdapter.submitList(displayItems)
                 binding.vodContinueContainer.visibility = View.VISIBLE
+                continueAdapter.submitList(displayItems) {
+                    if (isFinishing || isDestroyed) return@submitList
+                    if (shouldFocus) {
+                        val targetKey = lastPlayedSourceKey
+                        val targetIndex = if (!targetKey.isNullOrEmpty()) {
+                            displayItems.indexOfFirst { it.catalogItem.sourceKey == targetKey }
+                        } else -1
+
+                        if (targetIndex != -1) {
+                            binding.vodRecyclerContinue.post {
+                                binding.vodRecyclerContinue.scrollToPosition(targetIndex)
+                                binding.vodRecyclerContinue.postDelayed({
+                                    val vh = binding.vodRecyclerContinue.findViewHolderForAdapterPosition(targetIndex)
+                                    vh?.itemView?.requestFocus() ?: binding.vodRecyclerContinue.requestFocus()
+                                }, 60L)
+                            }
+                        } else {
+                            focusGridOrSavedPosition()
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     binding.vodContinueContainer.visibility = View.GONE
+                    if (shouldFocus) {
+                        focusGridOrSavedPosition()
+                    }
                 }
+            }
+        }
+    }
+
+    private fun focusGridOrSavedPosition() {
+        binding.vodRecyclerGrid.post {
+            if (gridAdapter.itemCount > 0) {
+                val targetPos = lastFocusedGridPosition.coerceIn(0, gridAdapter.itemCount - 1)
+                binding.vodRecyclerGrid.scrollToPosition(targetPos)
+                binding.vodRecyclerGrid.postDelayed({
+                    val vh = binding.vodRecyclerGrid.findViewHolderForAdapterPosition(targetPos)
+                    vh?.itemView?.requestFocus() ?: binding.vodRecyclerGrid.requestFocus()
+                }, 60L)
+            } else {
+                binding.vodRecyclerGrid.requestFocus()
             }
         }
     }
@@ -456,12 +515,63 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun playItem(item: VodCatalogItem) {
+        lastPlayedSourceKey = item.sourceKey
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
             putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
             addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         startActivity(intent)
+    }
+
+    private fun showPosterContextMenu(displayItem: VodDisplayItem) {
+        val title = displayItem.tmdb?.title
+            ?: VodTitleCleaner.clean(displayItem.catalogItem.name).cleanTitle
+        val options = arrayOf(
+            getString(R.string.vod_watch_later),
+            getString(R.string.close),
+        )
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(title)
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        val duration = displayItem.catalogItem.durationMillis ?: 0L
+                        resumeStore.markWatchLater(displayItem.catalogItem.sourceKey, duration)
+                        Toast.makeText(this, R.string.vod_added_to_continue, Toast.LENGTH_SHORT).show()
+                        lastPlayedSourceKey = displayItem.catalogItem.sourceKey
+                        loadContinueWatching(shouldFocus = true)
+                    }
+                    1 -> dialog.dismiss()
+                }
+            }
+            .show()
+    }
+
+    private fun showContinueContextMenu(displayItem: VodDisplayItem) {
+        val title = displayItem.tmdb?.title
+            ?: VodTitleCleaner.clean(displayItem.catalogItem.name).cleanTitle
+        val options = arrayOf(
+            getString(R.string.multiview_remove_channel),
+            getString(R.string.close),
+        )
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(title)
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        resumeStore.clear(displayItem.catalogItem.sourceKey)
+                        if (lastPlayedSourceKey == displayItem.catalogItem.sourceKey) {
+                            lastPlayedSourceKey = null
+                        }
+                        loadContinueWatching(shouldFocus = true)
+                    }
+                    1 -> dialog.dismiss()
+                }
+            }
+            .show()
     }
 
     private fun openLiveTv(targetSource: String? = null) {

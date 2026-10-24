@@ -45,6 +45,16 @@ class IptvResumeStore(context: Context) {
             .apply()
     }
 
+    fun markWatchLater(sourceKey: String, durationMillis: Long = 0L) {
+        val duration = if (durationMillis > 0L) durationMillis else 7_200_000L
+        preferences.edit()
+            .putLong(positionKey(sourceKey), MINIMUM_RESUME_POSITION_MS + 1_000L)
+            .putLong(durationKey(sourceKey), duration)
+            .putLong(updatedKey(sourceKey), System.currentTimeMillis())
+            .remove(sourceKey)
+            .apply()
+    }
+
     fun entries(): List<IptvResumeEntry> = preferences.all
         .asSequence()
         .mapNotNull { (key, value) ->
