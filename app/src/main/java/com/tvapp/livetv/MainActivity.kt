@@ -2340,8 +2340,9 @@ class MainActivity : TvRemoteActivity() {
                             .setTitle(currentChannel?.displayName ?: seriesMeta.name)
                             .setSingleChoiceItems(titles, currentIndex) { dialog, which ->
                                 val (epTitle, epUrl) = parsedEpisodes[which]
+                                val epKey = "${seriesKey}:ep:${which}_${epUrl.hashCode()}"
                                 val vodIntent = Intent().apply {
-                                    putExtra(EXTRA_VOD_SOURCE_KEY, seriesKey)
+                                    putExtra(EXTRA_VOD_SOURCE_KEY, epKey)
                                     putExtra(EXTRA_VOD_STREAM_URL, epUrl)
                                     putExtra(EXTRA_VOD_TITLE, seriesMeta.name)
                                     putExtra(EXTRA_VOD_EPISODE_TITLE, epTitle)
@@ -6333,34 +6334,47 @@ class MainActivity : TvRemoteActivity() {
             val mainTitle = intent.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
             val subTitle = intent.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
             val logo = intent.getStringExtra(EXTRA_VOD_LOGO_URL)
+
+            iptvPlayback.stop()
+            val pendingChannel = LiveChannel(
+                id = sourceKey.hashCode().toLong(),
+                sourceKey = sourceKey,
+                inputId = "iptv:direct_vod",
+                displayNumber = "VOD",
+                displayName = mainTitle,
+                source = LiveChannel.Source.IPTV,
+                uri = directStreamUrl,
+                logoUrl = logo,
+                iptvContentType = "VOD",
+            ).apply {
+                episodeTitle = subTitle
+            }
+            currentChannel = pendingChannel
+            showVodPlayerControls(autoHide = false)
+            binding.iptvBufferingSpinner.visibility = View.VISIBLE
+            binding.iptvBufferingContainer.visibility = View.VISIBLE
+            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+
             lifecycleScope.launch {
                 val resolved = withContext(Dispatchers.IO) {
                     com.tvapp.livetv.vod.WebVideoResolver.resolveStream(directStreamUrl, this@MainActivity)
                 }
+                binding.iptvBufferingContainer.visibility = View.GONE
                 if (!resolved.isPlayable) {
-                    withContext(Dispatchers.Main) {
-                        showIptvNotice(R.string.vod_stream_resolve_failed)
-                    }
+                    showIptvNotice(R.string.vod_stream_resolve_failed)
+                    openVodLibrary()
                     return@launch
                 }
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-                val channel = LiveChannel(
-                    id = sourceKey.hashCode().toLong(),
-                    sourceKey = sourceKey,
-                    inputId = "iptv:direct_vod",
-                    displayNumber = "VOD",
-                    displayName = mainTitle,
-                    source = LiveChannel.Source.IPTV,
+                val playChannel = pendingChannel.copy(
                     uri = resolved.streamUrl,
                     userAgent = resolved.userAgent,
                     referrer = resolved.referrer,
                     origin = resolved.origin,
-                    logoUrl = logo,
-                    iptvContentType = "VOD",
                 ).apply {
                     episodeTitle = subTitle
                 }
-                selectChannel(channel, recordHistory = true)
+                selectChannel(playChannel, recordHistory = true)
             }
             return
         }
@@ -6369,21 +6383,43 @@ class MainActivity : TvRemoteActivity() {
             iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY
         ) {
             iptvPlayback.play()
-            showInfoBar()
+            showVodPlayerControls(autoHide = true)
             return
         }
-        channels.firstOrNull { it.sourceKey == sourceKey }?.let { channel ->
-            if (channel.isVodContent()) selectChannel(channel, recordHistory = true)
-            return
-        }
-        // VOD items usually live outside the main channel list; resolve
-        // directly from the IPTV repository or vod_metadata (for JSON VOD archives)
-        // using WebVideoResolver when needed.
+
+        // VOD items resolution directly from repository/DB
+        iptvPlayback.stop()
+        binding.iptvBufferingSpinner.visibility = View.VISIBLE
+        binding.iptvBufferingContainer.visibility = View.VISIBLE
+        binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+
         lifecycleScope.launch {
             val channel = withContext(Dispatchers.IO) {
-                val direct = runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
+                val direct = channels.firstOrNull { it.sourceKey == sourceKey }
+                    ?: runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
+
                 if (direct != null) {
-                    direct
+                    val vodPending = direct.copy(iptvContentType = "VOD")
+                    withContext(Dispatchers.Main) {
+                        currentChannel = vodPending
+                        showVodPlayerControls(autoHide = false)
+                    }
+                    val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(vodPending.uri, this@MainActivity)
+                    if (!resolved.isPlayable) {
+                        withContext(Dispatchers.Main) {
+                            binding.iptvBufferingContainer.visibility = View.GONE
+                            showIptvNotice(R.string.vod_stream_resolve_failed)
+                            openVodLibrary()
+                        }
+                        null
+                    } else {
+                        vodPending.copy(
+                            uri = resolved.streamUrl,
+                            userAgent = resolved.userAgent,
+                            referrer = resolved.referrer,
+                            origin = resolved.origin,
+                        )
+                    }
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
                     val meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
@@ -6398,26 +6434,38 @@ class MainActivity : TvRemoteActivity() {
                             if (epNum != null) getString(R.string.vod_season_episode_fmt, sNum, epNum) else meta.name
                         } else null
 
+                        val pendingChannel = LiveChannel(
+                            id = meta.sourceKey.hashCode().toLong(),
+                            sourceKey = meta.sourceKey,
+                            inputId = "iptv:${meta.sourceId}",
+                            displayNumber = "VOD",
+                            displayName = mainTitle,
+                            source = LiveChannel.Source.IPTV,
+                            uri = meta.streamUrl,
+                            logoUrl = meta.logoUrl,
+                            iptvContentType = "VOD",
+                        ).apply {
+                            episodeTitle = subTitle
+                        }
+                        withContext(Dispatchers.Main) {
+                            currentChannel = pendingChannel
+                            showVodPlayerControls(autoHide = false)
+                        }
+
                         val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
                         if (!resolved.isPlayable) {
                             withContext(Dispatchers.Main) {
+                                binding.iptvBufferingContainer.visibility = View.GONE
                                 showIptvNotice(R.string.vod_stream_resolve_failed)
+                                openVodLibrary()
                             }
                             null
                         } else {
-                            LiveChannel(
-                                id = meta.sourceKey.hashCode().toLong(),
-                                sourceKey = meta.sourceKey,
-                                inputId = "iptv:${meta.sourceId}",
-                                displayNumber = "VOD",
-                                displayName = mainTitle,
-                                source = LiveChannel.Source.IPTV,
+                            pendingChannel.copy(
                                 uri = resolved.streamUrl,
                                 userAgent = resolved.userAgent,
                                 referrer = resolved.referrer,
                                 origin = resolved.origin,
-                                logoUrl = meta.logoUrl,
-                                iptvContentType = "VOD",
                             ).apply {
                                 episodeTitle = subTitle
                             }
@@ -6425,8 +6473,9 @@ class MainActivity : TvRemoteActivity() {
                     } else null
                 }
             }
+            binding.iptvBufferingContainer.visibility = View.GONE
             if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-            if (channel?.isVodContent() == true) {
+            if (channel != null) {
                 selectChannel(channel, recordHistory = true)
             } else {
                 showIptvNotice(R.string.channel_not_found)

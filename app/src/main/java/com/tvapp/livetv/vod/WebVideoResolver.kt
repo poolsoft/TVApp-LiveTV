@@ -119,6 +119,14 @@ object WebVideoResolver {
                 }
 
                 wv.webViewClient = object : android.webkit.WebViewClient() {
+                    override fun onReceivedSslError(
+                        view: android.webkit.WebView?,
+                        handler: android.webkit.SslErrorHandler?,
+                        error: android.net.http.SslError?,
+                    ) {
+                        handler?.proceed()
+                    }
+
                     override fun shouldInterceptRequest(
                         view: android.webkit.WebView?,
                         request: android.webkit.WebResourceRequest?,
@@ -251,7 +259,7 @@ object WebVideoResolver {
 
                 wv.loadUrl(pageUrl)
 
-                kotlinx.coroutines.withTimeoutOrNull(10_000L) {
+                kotlinx.coroutines.withTimeoutOrNull(6_000L) {
                     deferred.await()
                 }
             } finally {
@@ -321,13 +329,18 @@ object WebVideoResolver {
     }
 
     private fun fetchHtml(urlString: String): String? = runCatching {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8_000
-            readTimeout = 12_000
+        val url = URL(urlString)
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 6_000
+            readTimeout = 8_000
             requestMethod = "GET"
             setRequestProperty("User-Agent", USER_AGENT)
             setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             instanceFollowRedirects = true
+            if (this is javax.net.ssl.HttpsURLConnection) {
+                sslSocketFactory = trustAllSslContext.socketFactory
+                hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            }
         }
 
         try {
@@ -342,4 +355,17 @@ object WebVideoResolver {
             conn.disconnect()
         }
     }.getOrNull()
+
+    private val trustAllSslContext: javax.net.ssl.SSLContext by lazy {
+        val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
+            object : javax.net.ssl.X509TrustManager {
+                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+                override fun checkClientTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+            }
+        )
+        javax.net.ssl.SSLContext.getInstance("TLS").apply {
+            init(null, trustAllCerts, java.security.SecureRandom())
+        }
+    }
 }

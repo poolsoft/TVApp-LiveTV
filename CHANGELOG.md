@@ -1,6 +1,17 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-24 - JSON VOD On-Demand Arşiv Mimarisi, Oynatıcı Bölüm Seçici ve Web Akış Başlıkları
+## 2026-10-24 - VOD Film ve Web Akış Çözümleme İyileştirmesi, Oynatıcı Sezon/Bölüm Başlığı
+
+- **VOD Film Akış Çözümleme ve Loading Deneyimi (`VodHomeActivity` & `MainActivity`):**
+  - Film listesinden bir içeriğe tıklandığında siyah ekranda bekleme ve boş canlı TV infobarı gelmesi sorunu giderildi.
+  - Tıklanır tıklanmaz `MainActivity`'de VOD oynatıcı arayüzü ve TV buffering loading simgesi hemen ekrana gelir.
+  - Web tabanlı film sayfaları (filmmodu, web embed vb.) ExoPlayer'a verilmeden önce arka planda `WebVideoResolver` ile m3u8/mp4 akışına çözülür; çözülemeyen veya hatalı sertifikalı sayfalarda WebView SSL bypass ve timeout koruması ile kilitlenme önlenir.
+- **VOD Başlık Formatı ve Sezon/Bölüm Entegrasyonu (`VodPlayerOverlayController` & `VodHomeActivity`):**
+  - Oynatıcı üst başlığında dizi adının sonunda sezon ve bölüm bilgisi (`Dizi Adı · 1. Sezon 1. Bölüm`) birleşik olarak gösterilir.
+  - Dinamik JSON dizilerinde bölüm başlığı açıkça `X. Sezon Y. Bölüm` olarak formatlanır.
+- **Oynatıcı İçi Bölüm Değiştirme Desteği (`MainActivity`):**
+  - Oynatıcıdaki "Liste" butonundan veya bölüm seçicisinden başka bir bölüm seçildiğinde yayının değişmemesi hatası giderildi (bölüm bazlı tekil anahtar yapısı oluşturuldu).
+
 
 - **JSON VOD Kaynaklarının Hafifletilmiş On-Demand Mimarisi (`IptvRepository`, `IptvSourcesActivity`, `VodHomeActivity`):**
   - Toplu içe aktarma sırasında on binlerce satırlık JSON VOD listelerinin uygulamayı dondurmasını engellemek üzere hafifletilmiş kayıt (`KIND_JSON_VOD`) yapısı kuruldu.

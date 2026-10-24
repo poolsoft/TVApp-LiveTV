@@ -137,7 +137,12 @@ class VodPlayerOverlayController(
         val channel = getCurrentChannel()
         val episodeInfo: String? = channel?.episodeTitle?.takeIf { it.isNotBlank() }
         if (episodeInfo != null) {
-            binding.vodPlayerTitle.text = channel.displayName
+            val mainTitle = channel.displayName
+            binding.vodPlayerTitle.text = if (mainTitle.contains(episodeInfo, ignoreCase = true)) {
+                mainTitle
+            } else {
+                "$mainTitle · $episodeInfo"
+            }
             binding.vodPlayerSubtitle.text = episodeInfo
         } else {
             binding.vodPlayerTitle.text = channel?.displayName.orEmpty()

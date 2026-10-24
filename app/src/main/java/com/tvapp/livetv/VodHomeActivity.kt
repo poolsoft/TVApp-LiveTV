@@ -622,10 +622,18 @@ class VodHomeActivity : TvRemoteActivity() {
                         for (i in 0 until jsonArray.length()) {
                             val epObj = jsonArray.optJSONObject(i)
                             if (epObj != null) {
-                                val epTitle = epObj.optString("title").trim().ifEmpty {
+                                val season = epObj.optInt("season", epObj.optInt("season_number", 1)).coerceAtLeast(1)
+                                val epNumber = epObj.optInt("episode", epObj.optInt("episode_number", i + 1)).coerceAtLeast(1)
+                                val rawTitle = epObj.optString("title").trim().ifEmpty {
                                     epObj.optString("name").trim()
-                                }.ifEmpty {
-                                    "${i + 1}. Bölüm"
+                                }
+                                val epTitle = if (rawTitle.isNotEmpty() &&
+                                    !rawTitle.equals("$epNumber. Bölüm", true) &&
+                                    !rawTitle.equals("Bölüm $epNumber", true)
+                                ) {
+                                    "$season. Sezon $epNumber. Bölüm - $rawTitle"
+                                } else {
+                                    "$season. Sezon $epNumber. Bölüm"
                                 }
                                 val epUrl = epObj.optString("videoUrl").trim().ifEmpty {
                                     epObj.optString("url").trim()
@@ -642,7 +650,7 @@ class VodHomeActivity : TvRemoteActivity() {
                                 .setTitle(seriesItem.name)
                                 .setItems(titles) { _, which ->
                                     val (epTitle, epUrl) = parsedEpisodes[which]
-                                    playDynamicEpisode(seriesItem, epTitle, epUrl)
+                                    playDynamicEpisode(seriesItem, which, epTitle, epUrl)
                                 }
                                 .setNegativeButton(R.string.close, null)
                                 .show()
@@ -658,10 +666,11 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
-    private fun playDynamicEpisode(seriesItem: VodCatalogItem, epTitle: String, epUrl: String) {
-        lastPlayedSourceKey = seriesItem.sourceKey
+    private fun playDynamicEpisode(seriesItem: VodCatalogItem, epIndex: Int, epTitle: String, epUrl: String) {
+        val epKey = "${seriesItem.sourceKey}:ep:${epIndex}_${epUrl.hashCode()}"
+        lastPlayedSourceKey = epKey
         val intent = Intent(this, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, seriesItem.sourceKey)
+            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, epKey)
             putExtra(MainActivity.EXTRA_VOD_STREAM_URL, epUrl)
             putExtra(MainActivity.EXTRA_VOD_TITLE, seriesItem.name)
             putExtra(MainActivity.EXTRA_VOD_EPISODE_TITLE, epTitle)
@@ -674,8 +683,22 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun playEpisode(episode: VodMetadataEntity) {
         lastPlayedSourceKey = episode.sourceKey
+        val season = episode.seasonNumber ?: 1
+        val epNum = episode.episodeNumber
+        val subTitle = if (epNum != null) {
+            if (episode.name.isNotBlank() && !episode.name.equals("$epNum. Bölüm", true)) {
+                "$season. Sezon $epNum. Bölüm - ${episode.name}"
+            } else {
+                "$season. Sezon $epNum. Bölüm"
+            }
+        } else episode.name
+
         val intent = Intent(this, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, episode.sourceKey)
+            putExtra(MainActivity.EXTRA_VOD_STREAM_URL, episode.streamUrl)
+            putExtra(MainActivity.EXTRA_VOD_TITLE, episode.name)
+            putExtra(MainActivity.EXTRA_VOD_EPISODE_TITLE, subTitle)
+            putExtra(MainActivity.EXTRA_VOD_LOGO_URL, episode.logoUrl)
             putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
             addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
@@ -684,12 +707,26 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun playItem(item: VodCatalogItem) {
         lastPlayedSourceKey = item.sourceKey
-        val intent = Intent(this, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
-            putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
-            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        lifecycleScope.launch {
+            val (url, logo) = withContext(Dispatchers.IO) {
+                val meta = database.vodDao().metadata(item.sourceKey)
+                if (meta != null && !meta.streamUrl.isNullOrBlank()) {
+                    Pair(meta.streamUrl, meta.logoUrl ?: item.logoUrl)
+                } else {
+                    val ch = database.iptvDao().getChannel(item.sourceKey)
+                    Pair(ch?.streamUrl, ch?.logoUrl ?: item.logoUrl)
+                }
+            }
+            val intent = Intent(this@VodHomeActivity, MainActivity::class.java).apply {
+                putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
+                putExtra(MainActivity.EXTRA_VOD_STREAM_URL, url)
+                putExtra(MainActivity.EXTRA_VOD_TITLE, item.name)
+                putExtra(MainActivity.EXTRA_VOD_LOGO_URL, logo)
+                putExtra(MainActivity.EXTRA_VOD_START_OVER, false)
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            startActivity(intent)
         }
-        startActivity(intent)
     }
 
     private fun showPosterContextMenu(displayItem: VodDisplayItem) {
