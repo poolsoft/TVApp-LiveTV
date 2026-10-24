@@ -61,9 +61,11 @@ jobs:
           TVAPP_KEY_ALIAS: ${{ secrets.TVAPP_KEY_ALIAS }}
           TVAPP_KEY_PASSWORD: ${{ secrets.TVAPP_KEY_PASSWORD }}
           TVAPP_STORE_PASSWORD: ${{ secrets.TVAPP_STORE_PASSWORD }}
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1024m -XX:+UseG1GC'"
         run: |
           chmod +x gradlew
-          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileRelease \
+          ./gradlew testLocalDebugUnitTest testPaidDebugUnitTest
+          ./gradlew assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileRelease \
             -PtvappTargetAbis=arm64-v8a,armeabi-v7a
 
       - name: Prepare release assets
