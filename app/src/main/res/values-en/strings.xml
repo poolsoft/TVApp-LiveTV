@@ -871,7 +871,8 @@
     <string name="browser_clear_url">Clear</string>
     <string name="browser_search_hint">Search Google or enter web address...</string>
     <string name="browser_popular_sites">Popular Sites &amp; Shortcuts</string>
-    <string name="browser_home_subtitle">Mrowser TV Web Browser</string>
+    <string name="browser_home_subtitle">TVApp Web Browser</string>
+    <string name="browser_play_fullscreen">Play Fullscreen</string>
     <string name="browser_home_search_btn">Search / Go</string>
     <string name="browser_action_mouse">Virtual Mouse</string>
     <string name="browser_action_paste">Paste</string>
@@ -906,7 +907,7 @@
     <string name="quick_hub_xmltv">XMLTV / EPG</string>
     <string name="quick_hub_xmltv_hint">Configure electronic program guide sources</string>
     <string name="quick_hub_browser">Web Browser</string>
-    <string name="quick_hub_browser_hint">Opens Mrowser TV web browser</string>
+    <string name="quick_hub_browser_hint">Opens TVApp Web browser</string>
     <string name="quick_hub_guide">TV Guide</string>
     <string name="quick_hub_guide_hint">View full-screen TV program guide</string>
     <string name="quick_hub_multiview">Multi-View</string>

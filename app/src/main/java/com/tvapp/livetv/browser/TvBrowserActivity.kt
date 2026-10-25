@@ -11,11 +11,13 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -29,6 +31,12 @@ import com.tvapp.livetv.R
  * Android TV icin sanal imlec, D-pad gezinme, ayarlar ve video akis yakalama destekli web tarayicisi.
  */
 class TvBrowserActivity : Activity() {
+
+    private lateinit var mainVerticalContainer: LinearLayout
+    private lateinit var fullscreenContainer: FrameLayout
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var hasAutoFullscreened = false
 
     private lateinit var layout: CursorLayout
     private lateinit var webView: WebView
@@ -144,8 +152,19 @@ class TvBrowserActivity : Activity() {
         btnActionReload = findViewById(R.id.btn_action_reload)
         btnActionPlay = findViewById(R.id.btn_action_play)
 
+        mainVerticalContainer = findViewById(R.id.browser_main_vertical_container)
+        fullscreenContainer = findViewById(R.id.fullscreen_custom_view_container)
+
         layout.topBar = topBar
         layout.dashboard = homeDashboard
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+        val token = currentFocus?.windowToken ?: urlInput.windowToken
+        imm?.hideSoftInputFromWindow(token, 0)
+        urlInput.clearFocus()
+        homeSearchInput.clearFocus()
     }
 
     private fun showHomeDashboard() {
@@ -161,49 +180,16 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun showTopBar() {
-        if (topBarVisible && topBar.translationY == 0f && topBar.alpha == 1f) {
-            resetAutoHideTimer()
-            return
-        }
         topBarVisible = true
-        topBar.animate()
-            .translationY(0f)
-            .alpha(1f)
-            .setDuration(220)
-            .withEndAction {
-                cursor.minY = layout.getTopBarBottomLimit()
-            }
-            .start()
-        resetAutoHideTimer()
+        topBar.visibility = View.VISIBLE
     }
 
     private fun hideTopBar() {
-        if (homeDashboard.visibility == View.VISIBLE) {
-            // Home Dashboard acikken ust bar gorunur kalir
-            return
-        }
-        if (layout.isTopBarFocused() || urlInput.hasFocus()) {
-            resetAutoHideTimer()
-            return
-        }
-        topBarVisible = false
-        val barH = if (topBar.height > 0) topBar.height.toFloat() else 80f
-        topBar.animate()
-            .translationY(-barH - 40f)
-            .alpha(0f)
-            .setDuration(250)
-            .withEndAction {
-                cursor.minY = 0f
-            }
-            .start()
+        // Ust bar sabit olarak tepede kalir, sayfa alt ucundan baslar
     }
 
     private fun resetAutoHideTimer() {
-        uiHandler.removeCallbacks(autoHideRunnable)
-        if (homeDashboard.visibility == View.VISIBLE) return
-        if (!layout.isTopBarFocused() && !urlInput.hasFocus()) {
-            uiHandler.postDelayed(autoHideRunnable, autoHideDelayMs)
-        }
+        // Sabit barda auto-hide gerekmez
     }
 
     private fun setupSniffer() {
@@ -271,6 +257,32 @@ class TvBrowserActivity : Activity() {
                     progressBar.visibility = View.GONE
                 }
             }
+
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                customView = view
+                customViewCallback = callback
+                fullscreenContainer.removeAllViews()
+                fullscreenContainer.addView(
+                    view,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
+                fullscreenContainer.visibility = View.VISIBLE
+                mainVerticalContainer.visibility = View.GONE
+                view?.requestFocus()
+            }
+
+            override fun onHideCustomView() {
+                fullscreenContainer.visibility = View.GONE
+                fullscreenContainer.removeAllViews()
+                mainVerticalContainer.visibility = View.VISIBLE
+                customViewCallback?.onCustomViewHidden()
+                customView = null
+                customViewCallback = null
+                webView.requestFocus()
+            }
         }
     }
 
@@ -296,7 +308,10 @@ class TvBrowserActivity : Activity() {
             onPlayStreamClicked()
         }
         layout.onBack = {
-            if (homeDashboard.visibility == View.VISIBLE) {
+            if (customView != null) {
+                webView.webChromeClient?.onHideCustomView()
+                true
+            } else if (homeDashboard.visibility == View.VISIBLE) {
                 finish()
                 true
             } else if (webView.canGoBack()) {
@@ -626,18 +641,32 @@ class TvBrowserActivity : Activity() {
 
     private fun getSavedFavorites(): MutableList<Pair<String, String>> {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val rawJson = prefs.getString(KEY_FAVORITES, null) ?: return mutableListOf()
+        val rawJson = prefs.getString(KEY_FAVORITES, null)
         val list = mutableListOf<Pair<String, String>>()
-        try {
-            val array = org.json.JSONArray(rawJson)
-            for (i in 0 until array.length()) {
-                val obj = array.optJSONObject(i) ?: continue
-                val u = obj.optString("url")
-                val t = obj.optString("title")
-                if (u.isNotBlank()) list.add(t to u)
+        if (rawJson != null) {
+            try {
+                val array = org.json.JSONArray(rawJson)
+                for (i in 0 until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    val u = obj.optString("url")
+                    val t = obj.optString("title")
+                    if (u.isNotBlank()) list.add(t to u)
+                }
+            } catch (_: Exception) {
+                // ignore
             }
-        } catch (_: Exception) {
-            // ignore
+        }
+        if (list.isEmpty()) {
+            list.addAll(
+                listOf(
+                    "Google" to "https://www.google.com",
+                    "YouTube" to "https://www.youtube.com",
+                    "HDFilmcehennemi" to "https://www.hdfilmcehennemi.life",
+                    "Filmmodu" to "https://www.filmmodu.cx",
+                    "DiziBOX" to "https://www.dizibox.pw",
+                    "Diziwatch" to "https://diziwatch.net"
+                )
+            )
         }
         return list
     }
@@ -731,16 +760,8 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun onPlayStreamClicked() {
-        val streams = sniffer.allPlayableRequests()
-        if (streams.isEmpty()) {
-            Toast.makeText(this, R.string.browser_no_stream_yet, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (streams.size == 1) {
-            playDetectedStream(streams[0])
-            return
-        }
-        showStreamSelectionDialog(streams)
+        requestFullscreenVideo()
+        Toast.makeText(this, R.string.browser_play_fullscreen, Toast.LENGTH_SHORT).show()
     }
 
     private fun showStreamSelectionDialog(streams: List<PlaybackRequest>) {
@@ -864,6 +885,8 @@ class TvBrowserActivity : Activity() {
     private fun loadUrl(rawInput: String) {
         val trimmed = rawInput.trim()
         if (trimmed.isBlank()) return
+        hideKeyboard()
+        hasAutoFullscreened = false
         hideHomeDashboard()
         val target = UrlNormalizer.normalize(trimmed)
         urlInput.setText(target)
@@ -889,7 +912,69 @@ class TvBrowserActivity : Activity() {
         btnActionPlay.visibility = View.VISIBLE
         floatingPlayChip.visibility = View.VISIBLE
         showTopBar()
-        Toast.makeText(this, R.string.browser_stream_detected, Toast.LENGTH_SHORT).show()
+        if (!hasAutoFullscreened) {
+            hasAutoFullscreened = true
+            requestFullscreenVideo()
+        }
+    }
+
+    private fun requestFullscreenVideo() {
+        val js = """
+            (function() {
+                function tryFullscreen(elem) {
+                    if (!elem) return false;
+                    try {
+                        if (elem.requestFullscreen) { elem.requestFullscreen(); return true; }
+                        if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); return true; }
+                        if (elem.mozRequestFullScreen) { elem.mozRequestFullScreen(); return true; }
+                        if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); return true; }
+                    } catch (e) {}
+                    return false;
+                }
+                var videos = document.querySelectorAll('video');
+                for (var i = 0; i < videos.length; i++) {
+                    var v = videos[i];
+                    if (v.readyState > 0 || !v.paused || v.currentTime > 0) {
+                        if (tryFullscreen(v)) return;
+                    }
+                }
+                if (videos.length > 0) {
+                    if (tryFullscreen(videos[0])) return;
+                }
+                var fsSelectors = [
+                    'button[class*="fullscreen"]',
+                    'button[id*="fullscreen"]',
+                    'button[aria-label*="fullscreen" i]',
+                    'button[title*="fullscreen" i]',
+                    'button[class*="tam-ekran"]',
+                    'button.vjs-fullscreen-control',
+                    'button.plyr__control--fullscreen',
+                    '[class*="fullscreen-button"]',
+                    '[class*="vjs-fullscreen-control"]'
+                ];
+                for (var s = 0; s < fsSelectors.length; s++) {
+                    var el = document.querySelector(fsSelectors[s]);
+                    if (el && el.offsetParent !== null) {
+                        el.click();
+                        return;
+                    }
+                }
+                var iframes = document.querySelectorAll('iframe');
+                for (var k = 0; k < iframes.length; k++) {
+                    if (tryFullscreen(iframes[k])) return;
+                }
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (customView != null) {
+            webView.webChromeClient?.onHideCustomView()
+            return
+        }
+        super.onBackPressed()
     }
 
     private fun playDetectedStream(request: PlaybackRequest) {
@@ -908,7 +993,6 @@ class TvBrowserActivity : Activity() {
             request.headers["Cookie"]?.let { putExtra(EXTRA_VOD_COOKIE, it) }
         }
         startActivity(intent)
-        finish()
     }
 
     override fun onDestroy() {

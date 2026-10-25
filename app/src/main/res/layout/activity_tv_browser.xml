@@ -4,188 +4,45 @@
     android:layout_height="match_parent"
     android:background="@color/black">
 
-    <com.tvapp.livetv.browser.CursorLayout
-        android:id="@+id/browser_cursor_layout"
+    <!-- Ana Dikey Kapsayici: Ust Bar Sabit, Altinda Icerik -->
+    <LinearLayout
+        android:id="@+id/browser_main_vertical_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <!-- Web Sayfasi Gorunumu -->
-        <WebView
-            android:id="@+id/browser_web_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <!-- Home Dashboard (Arama, Hizli Erisim ve Favoriler Sayfasi) -->
-        <ScrollView
-            android:id="@+id/browser_home_dashboard"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#0F172A"
-            android:fillViewport="true"
-            android:scrollbars="none"
-            android:visibility="visible">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:paddingStart="48dp"
-                android:paddingEnd="48dp"
-                android:paddingTop="90dp"
-                android:paddingBottom="48dp">
-
-                <!-- Baslik ve Logo -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
-
-                    <ImageView
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:src="@drawable/ic_browser_globe"
-                        android:tint="#00E5FF"
-                        android:contentDescription="@string/browser_home_subtitle" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="TVApp Web"
-                        android:textColor="@color/text_primary"
-                        android:textSize="28sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:background="@drawable/bg_browser_chip_play"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
-                        android:paddingTop="2dp"
-                        android:paddingBottom="2dp"
-                        android:text="Mrowser"
-                        android:textColor="@color/text_primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/browser_home_subtitle"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    android:layout_marginBottom="28dp" />
-
-                <!-- Arama Kutusu ve Butonu -->
-                <LinearLayout
-                    android:layout_width="760dp"
-                    android:layout_height="52dp"
-                    android:orientation="horizontal"
-                    android:background="@drawable/bg_browser_field"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="8dp"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="36dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_search"
-                        android:tint="@color/text_secondary"
-                        android:contentDescription="@string/browser_home_search_btn" />
-
-                    <EditText
-                        android:id="@+id/home_search_input"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:background="@android:color/transparent"
-                        android:hint="@string/browser_search_hint"
-                        android:textColorHint="@color/text_secondary"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:singleLine="true"
-                        android:imeOptions="actionGo"
-                        android:inputType="textUri"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
-                        android:focusable="true" />
-
-                    <Button
-                        android:id="@+id/btn_home_search"
-                        android:layout_width="wrap_content"
-                        android:layout_height="38dp"
-                        android:minHeight="38dp"
-                        android:background="@drawable/bg_vod_accent_btn"
-                        android:text="@string/browser_home_search_btn"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:paddingStart="20dp"
-                        android:paddingEnd="20dp"
-                        android:focusable="true" />
-                </LinearLayout>
-
-                <!-- Favoriler Bolumu -->
-                <TextView
-                    android:id="@+id/home_favorites_title"
-                    android:layout_width="760dp"
-                    android:layout_height="wrap_content"
-                    android:text="@string/browser_favorites"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="16dp"
-                    android:visibility="gone" />
-
-                <!-- Dinamik Favoriler Gridi -->
-                <LinearLayout
-                    android:id="@+id/home_favorites_container"
-                    android:layout_width="760dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:visibility="gone" />
-
-            </LinearLayout>
-        </ScrollView>
-
-        <!-- Mrowser Stili Kapsul Adres ve Kontrol Bari (Tam Ekran Uzerinde Kapsul) -->
+        <!-- Sabit Ust Bar (Sayfa Altinda Kalmaz, Sayfa Bunun Alt Ucundan Baslar) -->
         <LinearLayout
             android:id="@+id/browser_top_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:layout_marginTop="16dp"
-            android:layout_marginStart="32dp"
-            android:layout_marginEnd="32dp"
             android:orientation="vertical"
             android:gravity="center_horizontal"
-            android:elevation="10dp">
+            android:background="#0A0F1D"
+            android:paddingTop="10dp"
+            android:paddingBottom="8dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:elevation="8dp">
 
             <!-- Ana Kapsul Adres ve Kontrol Bari -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:layout_height="52dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
                 android:clipToPadding="false"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:background="@drawable/bg_browser_capsule_bar">
 
-                <!-- TV'ye Don Butonu (Mrowser Stili TV Simgesi) -->
+                <!-- TV'ye Don Butonu (Canli TV Simgesi) -->
                 <ImageButton
                     android:id="@+id/btn_browser_exit_tv"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/bg_browser_bar_icon"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:src="@drawable/ic_tv"
                     android:tint="@color/text_primary"
                     android:contentDescription="@string/browser_back_to_tv"
@@ -196,11 +53,11 @@
                 <!-- Sanal Mouse Modu Butonu (Fare / Tus Modu) -->
                 <ImageButton
                     android:id="@+id/btn_browser_mouse_mode"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:src="@drawable/ic_mouse"
                     android:tint="#00E5FF"
                     android:contentDescription="@string/browser_action_mouse"
@@ -211,11 +68,11 @@
                 <!-- Ana Sayfa (Home Dashboard) Butonu -->
                 <ImageButton
                     android:id="@+id/btn_browser_home"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:src="@drawable/ic_home"
                     android:tint="@color/text_primary"
                     android:contentDescription="@string/browser_home"
@@ -226,11 +83,11 @@
                 <!-- Sayfa Geri Butonu (Sadece tarayici sayfa gecmisi icin) -->
                 <ImageButton
                     android:id="@+id/btn_browser_nav_back"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
-                    android:padding="9dp"
+                    android:padding="8dp"
                     android:src="@drawable/ic_arrow_back"
                     android:tint="@color/text_primary"
                     android:contentDescription="@string/close"
@@ -241,8 +98,8 @@
                 <!-- Yenile Butonu -->
                 <ImageButton
                     android:id="@+id/btn_browser_reload"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
                     android:src="@drawable/ic_replay_10"
@@ -255,20 +112,20 @@
                 <!-- Ayirici Cizgi -->
                 <View
                     android:layout_width="1dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="10dp"
-                    android:layout_marginEnd="10dp"
+                    android:layout_height="22dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
                     android:background="#30FFFFFF" />
 
                 <!-- Adres ve Arama Cubugu Container -->
                 <LinearLayout
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_browser_field"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingStart="14dp"
+                    android:paddingStart="12dp"
                     android:paddingEnd="6dp">
 
                     <EditText
@@ -293,12 +150,12 @@
                     <!-- Tek Tusla Adres Temizleme Butonu -->
                     <ImageButton
                         android:id="@+id/btn_browser_clear_url"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
                         android:background="@drawable/bg_browser_bar_icon"
                         android:src="@drawable/ic_close"
                         android:tint="@color/text_secondary"
-                        android:padding="6dp"
+                        android:padding="5dp"
                         android:scaleType="fitCenter"
                         android:contentDescription="@string/browser_clear_url"
                         android:focusable="true"
@@ -309,8 +166,8 @@
                 <Button
                     android:id="@+id/btn_browser_go"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:minHeight="38dp"
+                    android:layout_height="36dp"
+                    android:minHeight="36dp"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_vod_accent_btn"
                     android:text="@string/browser_go"
@@ -319,15 +176,15 @@
                     android:textStyle="bold"
                     android:focusable="true"
                     android:clickable="true"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp" />
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp" />
 
                 <!-- Favoriler Butonu (Yildiz Simgesi) -->
                 <ImageButton
                     android:id="@+id/btn_browser_favorite"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
                     android:src="@drawable/ic_star"
                     android:tint="@color/text_primary"
@@ -339,9 +196,9 @@
                 <!-- Ayarlar Butonu -->
                 <ImageButton
                     android:id="@+id/btn_browser_settings"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
                     android:src="@drawable/ic_settings"
                     android:tint="@color/text_primary"
@@ -350,34 +207,34 @@
                     android:focusable="true"
                     android:clickable="true" />
 
-                <!-- Tespit Edilen Videoyu Oynat Butonu (Yesil Parlayan Hap) -->
+                <!-- Sayfa Playerini Tam Ekran Oynat Butonu (Yesil Parlayan Buton) -->
                 <Button
                     android:id="@+id/btn_play_stream"
                     android:layout_width="wrap_content"
-                    android:layout_height="38dp"
-                    android:minHeight="38dp"
-                    android:layout_marginStart="10dp"
+                    android:layout_height="36dp"
+                    android:minHeight="36dp"
+                    android:layout_marginStart="8dp"
                     android:background="@drawable/bg_browser_chip_play"
                     android:drawableStart="@drawable/ic_play"
                     android:drawablePadding="6dp"
-                    android:text="@string/browser_play_stream"
+                    android:text="@string/browser_play_fullscreen"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:focusable="true"
                     android:clickable="true"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="16dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="14dp"
                     android:visibility="gone" />
 
             </LinearLayout>
 
-            <!-- URL Hızlı Eylem Çubuğu (URL altındaki açılır buton çubuğu) -->
+            <!-- URL Hızlı Eylem Çubuğu (Sadece URL alanına girildiğinde açılır) -->
             <LinearLayout
                 android:id="@+id/browser_url_action_bar"
                 android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:layout_marginTop="8dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
                 android:background="@drawable/bg_browser_capsule_bar"
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
@@ -389,8 +246,8 @@
                 <Button
                     android:id="@+id/btn_action_clear"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:drawableStart="@drawable/ic_close"
                     android:drawablePadding="4dp"
@@ -398,8 +255,8 @@
                     android:textColor="@color/text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="14dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
                     android:nextFocusUp="@id/edit_browser_url"
                     android:focusable="true"
                     android:clickable="true" />
@@ -408,9 +265,9 @@
                 <Button
                     android:id="@+id/btn_action_go"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_vod_accent_btn"
                     android:drawableStart="@drawable/ic_search"
                     android:drawablePadding="4dp"
@@ -418,8 +275,8 @@
                     android:textColor="@color/text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="14dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
                     android:nextFocusUp="@id/edit_browser_url"
                     android:focusable="true"
                     android:clickable="true" />
@@ -428,9 +285,9 @@
                 <Button
                     android:id="@+id/btn_action_mouse"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:drawableStart="@drawable/ic_mouse"
                     android:drawablePadding="4dp"
@@ -438,8 +295,8 @@
                     android:textColor="#00E5FF"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="14dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
                     android:nextFocusUp="@id/edit_browser_url"
                     android:focusable="true"
                     android:clickable="true" />
@@ -448,9 +305,9 @@
                 <Button
                     android:id="@+id/btn_action_com"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:text=".com"
                     android:textColor="@color/text_primary"
@@ -466,9 +323,9 @@
                 <Button
                     android:id="@+id/btn_action_https"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:text="https://"
                     android:textColor="@color/text_primary"
@@ -480,13 +337,13 @@
                     android:focusable="true"
                     android:clickable="true" />
 
-                <!-- Favori Butonu -->
+                <!-- Favoriler Butonu -->
                 <Button
                     android:id="@+id/btn_action_favorite"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:drawableStart="@drawable/ic_star"
                     android:drawablePadding="4dp"
@@ -504,9 +361,9 @@
                 <Button
                     android:id="@+id/btn_action_reload"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_action_btn"
                     android:drawableStart="@drawable/ic_replay_10"
                     android:drawablePadding="4dp"
@@ -520,22 +377,22 @@
                     android:focusable="true"
                     android:clickable="true" />
 
-                <!-- Oynatıcıda Aç Butonu (Akış tespit edildiğinde) -->
+                <!-- Tam Ekran Oynat Butonu -->
                 <Button
                     android:id="@+id/btn_action_play"
                     android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minHeight="34dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_height="32dp"
+                    android:minHeight="32dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_chip_play"
                     android:drawableStart="@drawable/ic_play"
                     android:drawablePadding="4dp"
-                    android:text="@string/browser_play_stream"
+                    android:text="@string/browser_play_fullscreen"
                     android:textColor="@color/text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="14dp"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="12dp"
                     android:visibility="gone"
                     android:nextFocusUp="@id/edit_browser_url"
                     android:focusable="true"
@@ -551,31 +408,179 @@
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="3dp"
-            android:layout_gravity="top"
             android:indeterminate="true"
             android:visibility="gone" />
 
-        <!-- Ekran Altinda Yuzen Mrowser Stili Oynat Rozeti -->
-        <TextView
-            android:id="@+id/browser_floating_play_chip"
-            android:layout_width="wrap_content"
-            android:layout_height="50dp"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="36dp"
-            android:background="@drawable/bg_browser_chip_play"
-            android:elevation="12dp"
-            android:gravity="center_vertical"
-            android:paddingStart="18dp"
-            android:paddingEnd="24dp"
-            android:drawableStart="@drawable/ic_play"
-            android:drawablePadding="10dp"
-            android:text="@string/browser_play_stream"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            android:clickable="true" />
+        <!-- Icerik Alani: Sayfa Tam Ust Barin Alt Ucundan Baslar -->
+        <com.tvapp.livetv.browser.CursorLayout
+            android:id="@+id/browser_cursor_layout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-    </com.tvapp.livetv.browser.CursorLayout>
+            <!-- Web Sayfasi Gorunumu -->
+            <WebView
+                android:id="@+id/browser_web_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Home Dashboard (Arama ve Favoriler Sayfasi) -->
+            <ScrollView
+                android:id="@+id/browser_home_dashboard"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#0F172A"
+                android:fillViewport="true"
+                android:scrollbars="none"
+                android:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:paddingStart="48dp"
+                    android:paddingEnd="48dp"
+                    android:paddingTop="36dp"
+                    android:paddingBottom="48dp">
+
+                    <!-- Baslik ve Logo -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <ImageView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:src="@drawable/ic_browser_globe"
+                            android:tint="#00E5FF"
+                            android:contentDescription="@string/browser_home_subtitle" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="TVApp Web"
+                            android:textColor="@color/text_primary"
+                            android:textSize="28sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/browser_home_subtitle"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="28dp" />
+
+                    <!-- Arama Kutusu ve Butonu -->
+                    <LinearLayout
+                        android:layout_width="760dp"
+                        android:layout_height="52dp"
+                        android:orientation="horizontal"
+                        android:background="@drawable/bg_browser_field"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="8dp"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="36dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_search"
+                            android:tint="@color/text_secondary"
+                            android:contentDescription="@string/browser_home_search_btn" />
+
+                        <EditText
+                            android:id="@+id/home_search_input"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@android:color/transparent"
+                            android:hint="@string/browser_search_hint"
+                            android:textColorHint="@color/text_secondary"
+                            android:textColor="@color/text_primary"
+                            android:textSize="15sp"
+                            android:singleLine="true"
+                            android:imeOptions="actionGo"
+                            android:inputType="textUri"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:focusable="true" />
+
+                        <Button
+                            android:id="@+id/btn_home_search"
+                            android:layout_width="wrap_content"
+                            android:layout_height="38dp"
+                            android:minHeight="38dp"
+                            android:background="@drawable/bg_vod_accent_btn"
+                            android:text="@string/browser_home_search_btn"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingStart="20dp"
+                            android:paddingEnd="20dp"
+                            android:focusable="true" />
+                    </LinearLayout>
+
+                    <!-- Favoriler Bolumu -->
+                    <TextView
+                        android:id="@+id/home_favorites_title"
+                        android:layout_width="760dp"
+                        android:layout_height="wrap_content"
+                        android:text="@string/browser_favorites"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="16dp"
+                        android:visibility="visible" />
+
+                    <!-- Dinamik Favoriler Gridi -->
+                    <LinearLayout
+                        android:id="@+id/home_favorites_container"
+                        android:layout_width="760dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="visible" />
+
+                </LinearLayout>
+            </ScrollView>
+
+            <!-- Ekran Altinda Yuzen Oynat Rozeti -->
+            <TextView
+                android:id="@+id/browser_floating_play_chip"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="28dp"
+                android:background="@drawable/bg_browser_chip_play"
+                android:elevation="12dp"
+                android:gravity="center_vertical"
+                android:paddingStart="18dp"
+                android:paddingEnd="24dp"
+                android:drawableStart="@drawable/ic_play"
+                android:drawablePadding="10dp"
+                android:text="@string/browser_play_fullscreen"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                android:clickable="true" />
+
+        </com.tvapp.livetv.browser.CursorLayout>
+
+    </LinearLayout>
+
+    <!-- Web Sayfasi Video Tam Ekran Kapsayicisi (Custom View) -->
+    <FrameLayout
+        android:id="@+id/fullscreen_custom_view_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/black"
+        android:visibility="gone" />
 
 </FrameLayout>
