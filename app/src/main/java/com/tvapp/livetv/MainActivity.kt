@@ -5104,12 +5104,6 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
-        if (!iptvControlsInteractive && catchUpReturnChannel == null) {
-            binding.infoColorActions.addView(TvUiComponents.colorAction(
-                this, R.drawable.key_red, getString(R.string.playback_mode_short),
-                interactive = BuildConfig.MOBILE_UI_ENABLED, clicked = ::showPlaybackModeDialog,
-            ))
-        }
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
             catchUpReturnChannel?.let { liveChannel ->
                 binding.infoColorActions.addView(

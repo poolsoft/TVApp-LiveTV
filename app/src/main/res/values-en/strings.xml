@@ -863,9 +863,15 @@
     <string name="browser_url_hint">Enter URL or search...</string>
     <string name="browser_go">Go</string>
     <string name="browser_reload">Reload</string>
-    <string name="browser_play_stream">Play Video</string>
+    <string name="browser_play_stream">Open in Player</string>
     <string name="browser_stream_detected">Video stream detected!</string>
     <string name="browser_no_stream_yet">No video stream detected yet.</string>
+    <string name="browser_home">Home</string>
+    <string name="browser_clear_url">Clear</string>
+    <string name="browser_search_hint">Search Google or enter web address...</string>
+    <string name="browser_popular_sites">Popular Sites &amp; Shortcuts</string>
+    <string name="browser_home_subtitle">Mrowser TV Web Browser</string>
+    <string name="browser_home_search_btn">Search / Go</string>
     <string name="browser_settings">Browser Settings</string>
     <string name="browser_cursor_speed">Cursor Speed</string>
     <string name="browser_speed_slow">Slow (65%)</string>

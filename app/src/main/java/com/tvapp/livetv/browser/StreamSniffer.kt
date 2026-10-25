@@ -47,7 +47,7 @@ class StreamSniffer(
     }
 
     private fun announce() {
-        if (hasStream() && announced.compareAndSet(false, true)) {
+        if (hasStream()) {
             val req = bestRequest()
             if (req != null) {
                 onStreamAvailable(req)

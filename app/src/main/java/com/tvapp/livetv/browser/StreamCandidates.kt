@@ -53,13 +53,16 @@ object MediaUrlClassifier {
 
     fun classify(url: String): MediaKind {
         val path = url.substringBefore('?').substringBefore('#').lowercase()
+        val lowerUrl = url.lowercase()
         return when {
-            path.endsWith(".m3u8") || path.contains("playlist.m3u8") || path.contains("manifest.m3u8") -> MediaKind.MANIFEST_HLS
-            path.endsWith(".mpd") -> MediaKind.MANIFEST_DASH
-            path.endsWith(".vtt") || path.endsWith(".srt") -> MediaKind.SUBTITLE
             path.endsWith(".ts") || path.endsWith(".m4s") -> MediaKind.SEGMENT
-            PROGRESSIVE_EXTENSIONS.any { path.endsWith(it) } ->
+            path.endsWith(".vtt") || path.endsWith(".srt") || lowerUrl.contains(".vtt") -> MediaKind.SUBTITLE
+            path.endsWith(".m3u8") || lowerUrl.contains(".m3u8") || lowerUrl.contains("playlist.m3u8") || lowerUrl.contains("manifest.m3u8") -> MediaKind.MANIFEST_HLS
+            path.endsWith(".mpd") || lowerUrl.contains(".mpd") -> MediaKind.MANIFEST_DASH
+            PROGRESSIVE_EXTENSIONS.any { path.endsWith(it) || lowerUrl.contains(it) } ->
                 if (isSegmentLike(path)) MediaKind.SEGMENT else MediaKind.PROGRESSIVE
+            lowerUrl.contains("/hls/") && !isSegmentLike(path) -> MediaKind.MANIFEST_HLS
+            lowerUrl.contains("/dash/") && !isSegmentLike(path) -> MediaKind.MANIFEST_DASH
             else -> MediaKind.OTHER
         }
     }

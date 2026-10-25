@@ -33,12 +33,13 @@ class CursorLayout @JvmOverloads constructor(
     var onModeChanged: ((CursorController.Mode) -> Unit)? = null
 
     private val density = resources.displayMetrics.density
-    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E50914") }
-    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#00E5FF") }
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2.5f * density
-        color = Color.parseColor("#FFFFFF")
+        strokeWidth = 3.5f * density
+        color = Color.parseColor("#E6000000")
     }
+    private val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFFFFF") }
 
     private val longPressHandler = Handler(Looper.getMainLooper())
     private var okDown = false
@@ -83,10 +84,14 @@ class CursorLayout @JvmOverloads constructor(
 
     fun leaveTopBarToCursor() {
         topBar?.clearFocus()
-        this.requestFocus()
-        val topLimit = getTopBarBottomLimit()
-        cursor.moveTo(cursor.x, topLimit + 30f)
-        cursor.stopMove()
+        if (cursor.mode == CursorController.Mode.FOCUS) {
+            webView.requestFocus()
+        } else {
+            this.requestFocus()
+            val topLimit = getTopBarBottomLimit()
+            cursor.moveTo(cursor.x, topLimit + 30f)
+            cursor.stopMove()
+        }
         invalidate()
     }
 
@@ -109,9 +114,24 @@ class CursorLayout @JvmOverloads constructor(
             return true
         }
 
+        // Kumanda Menu veya Info tusu ile dogrudan ust bara gecis
+        if (event.keyCode == KeyEvent.KEYCODE_MENU ||
+            event.keyCode == KeyEvent.KEYCODE_INFO ||
+            event.keyCode == KeyEvent.KEYCODE_SETTINGS
+        ) {
+            if (event.action == KeyEvent.ACTION_UP) {
+                if (isTopBarFocused()) {
+                    leaveTopBarToCursor()
+                } else {
+                    enterTopBar()
+                }
+            }
+            return true
+        }
+
         // Ust barda odak varsa
         if (isTopBarFocused()) {
-            // Alta basildiginda sanal fareye donus
+            // Alta basildiginda sayfaya/imlece donus
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     leaveTopBarToCursor()
@@ -136,6 +156,14 @@ class CursorLayout @JvmOverloads constructor(
                         return true
                     }
                     return handleDpad(event)
+                } else {
+                    // FOCUS modunda sayfanin en ustundeyken UP tusuna basildiginda ust bara odaklan
+                    if (webView.scrollY <= 10) {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            enterTopBar()
+                        }
+                        return true
+                    }
                 }
             }
 
@@ -210,7 +238,8 @@ class CursorLayout @JvmOverloads constructor(
         if (cursor.mode == CursorController.Mode.CURSOR && !isTopBarFocused()) {
             val r = 9f * density
             canvas.drawCircle(cursor.x, cursor.y, r, dotPaint)
-            canvas.drawCircle(cursor.x, cursor.y, r, outlinePaint)
+            canvas.drawCircle(cursor.x, cursor.y, r, shadowPaint)
+            canvas.drawCircle(cursor.x, cursor.y, 3.5f * density, innerPaint)
         }
     }
 

@@ -18,6 +18,7 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.tvapp.livetv.MainActivity
@@ -32,7 +33,9 @@ class TvBrowserActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var topBar: LinearLayout
     private lateinit var urlInput: EditText
+    private lateinit var btnClearUrl: ImageButton
     private lateinit var btnExitTv: ImageButton
+    private lateinit var btnHome: ImageButton
     private lateinit var btnNavBack: ImageButton
     private lateinit var btnReload: ImageButton
     private lateinit var btnGo: Button
@@ -41,6 +44,19 @@ class TvBrowserActivity : Activity() {
     private lateinit var btnPlayStream: Button
     private lateinit var floatingPlayChip: TextView
     private lateinit var progressBar: ProgressBar
+
+    // Home Dashboard bilesenleri
+    private lateinit var homeDashboard: ScrollView
+    private lateinit var homeSearchInput: EditText
+    private lateinit var btnHomeSearch: Button
+    private lateinit var cardPopularGoogle: LinearLayout
+    private lateinit var cardPopularHdfilm: LinearLayout
+    private lateinit var cardPopularYoutube: LinearLayout
+    private lateinit var cardPopularFilmmodu: LinearLayout
+    private lateinit var cardPopularDizibox: LinearLayout
+    private lateinit var cardPopularDiziwatch: LinearLayout
+    private lateinit var homeFavoritesTitle: TextView
+    private lateinit var homeFavoritesContainer: LinearLayout
 
     private lateinit var cursor: CursorController
     private lateinit var sniffer: StreamSniffer
@@ -65,8 +81,12 @@ class TvBrowserActivity : Activity() {
         setupCursor()
         setupListeners()
 
-        val initialUrl = intent.getStringExtra(EXTRA_URL) ?: DEFAULT_HOME_URL
-        loadUrl(initialUrl)
+        val initialUrl = intent.getStringExtra(EXTRA_URL)
+        if (!initialUrl.isNullOrBlank()) {
+            loadUrl(initialUrl)
+        } else {
+            showHomeDashboard()
+        }
         resetAutoHideTimer()
     }
 
@@ -85,7 +105,9 @@ class TvBrowserActivity : Activity() {
         webView = findViewById(R.id.browser_web_view)
         topBar = findViewById(R.id.browser_top_bar)
         urlInput = findViewById(R.id.edit_browser_url)
+        btnClearUrl = findViewById(R.id.btn_browser_clear_url)
         btnExitTv = findViewById(R.id.btn_browser_exit_tv)
+        btnHome = findViewById(R.id.btn_browser_home)
         btnNavBack = findViewById(R.id.btn_browser_nav_back)
         btnReload = findViewById(R.id.btn_browser_reload)
         btnGo = findViewById(R.id.btn_browser_go)
@@ -95,7 +117,32 @@ class TvBrowserActivity : Activity() {
         floatingPlayChip = findViewById(R.id.browser_floating_play_chip)
         progressBar = findViewById(R.id.browser_progress_bar)
 
+        // Home Dashboard
+        homeDashboard = findViewById(R.id.browser_home_dashboard)
+        homeSearchInput = findViewById(R.id.home_search_input)
+        btnHomeSearch = findViewById(R.id.btn_home_search)
+        cardPopularGoogle = findViewById(R.id.card_popular_google)
+        cardPopularHdfilm = findViewById(R.id.card_popular_hdfilm)
+        cardPopularYoutube = findViewById(R.id.card_popular_youtube)
+        cardPopularFilmmodu = findViewById(R.id.card_popular_filmmodu)
+        cardPopularDizibox = findViewById(R.id.card_popular_dizibox)
+        cardPopularDiziwatch = findViewById(R.id.card_popular_diziwatch)
+        homeFavoritesTitle = findViewById(R.id.home_favorites_title)
+        homeFavoritesContainer = findViewById(R.id.home_favorites_container)
+
         layout.topBar = topBar
+    }
+
+    private fun showHomeDashboard() {
+        homeDashboard.visibility = View.VISIBLE
+        urlInput.setText("")
+        populateHomeFavorites()
+        showTopBar()
+        homeSearchInput.requestFocus()
+    }
+
+    private fun hideHomeDashboard() {
+        homeDashboard.visibility = View.GONE
     }
 
     private fun showTopBar() {
@@ -116,6 +163,10 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun hideTopBar() {
+        if (homeDashboard.visibility == View.VISIBLE) {
+            // Home Dashboard acikken ust bar gorunur kalir
+            return
+        }
         if (layout.isTopBarFocused() || urlInput.hasFocus()) {
             resetAutoHideTimer()
             return
@@ -134,6 +185,7 @@ class TvBrowserActivity : Activity() {
 
     private fun resetAutoHideTimer() {
         uiHandler.removeCallbacks(autoHideRunnable)
+        if (homeDashboard.visibility == View.VISIBLE) return
         if (!layout.isTopBarFocused() && !urlInput.hasFocus()) {
             uiHandler.postDelayed(autoHideRunnable, autoHideDelayMs)
         }
@@ -227,11 +279,15 @@ class TvBrowserActivity : Activity() {
             onPlayStreamClicked()
         }
         layout.onBack = {
-            if (webView.canGoBack()) {
+            if (homeDashboard.visibility == View.VISIBLE) {
+                finish()
+                true
+            } else if (webView.canGoBack()) {
                 webView.goBack()
                 true
             } else {
-                false
+                showHomeDashboard()
+                true
             }
         }
         layout.onExitPage = {
@@ -271,17 +327,32 @@ class TvBrowserActivity : Activity() {
             finish()
         }
 
+        btnHome.setOnClickListener {
+            showHomeDashboard()
+        }
+
         btnNavBack.setOnClickListener {
-            if (webView.canGoBack()) {
+            if (homeDashboard.visibility == View.VISIBLE) {
+                finish()
+            } else if (webView.canGoBack()) {
                 webView.goBack()
             } else {
-                finish()
+                showHomeDashboard()
             }
         }
 
         btnReload.setOnClickListener {
-            webView.reload()
+            if (homeDashboard.visibility == View.VISIBLE) {
+                populateHomeFavorites()
+            } else {
+                webView.reload()
+            }
             resetAutoHideTimer()
+        }
+
+        btnClearUrl.setOnClickListener {
+            urlInput.setText("")
+            urlInput.requestFocus()
         }
 
         btnGo.setOnClickListener {
@@ -316,12 +387,121 @@ class TvBrowserActivity : Activity() {
             }
         }
 
+        btnHomeSearch.setOnClickListener {
+            val q = homeSearchInput.text.toString().trim()
+            if (q.isNotBlank()) {
+                loadUrl(q)
+            }
+        }
+
+        homeSearchInput.setOnEditorActionListener { _, actionId, event ->
+            if (actionId == EditorInfo.IME_ACTION_GO ||
+                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
+            ) {
+                val q = homeSearchInput.text.toString().trim()
+                if (q.isNotBlank()) {
+                    loadUrl(q)
+                    true
+                } else false
+            } else false
+        }
+
+        // Populer siteler kart dinleyicileri
+        cardPopularGoogle.setOnClickListener { loadUrl("https://www.google.com") }
+        cardPopularHdfilm.setOnClickListener { loadUrl("https://www.hdfilmcehennemi.life") }
+        cardPopularYoutube.setOnClickListener { loadUrl("https://www.youtube.com") }
+        cardPopularFilmmodu.setOnClickListener { loadUrl("https://www.filmmodu.cx") }
+        cardPopularDizibox.setOnClickListener { loadUrl("https://www.dizibox.tv") }
+        cardPopularDiziwatch.setOnClickListener { loadUrl("https://diziwatch.net") }
+
         btnPlayStream.setOnClickListener {
             onPlayStreamClicked()
         }
 
         floatingPlayChip.setOnClickListener {
             onPlayStreamClicked()
+        }
+    }
+
+    private fun populateHomeFavorites() {
+        val favs = getSavedFavorites()
+        if (favs.isEmpty()) {
+            homeFavoritesTitle.visibility = View.GONE
+            homeFavoritesContainer.visibility = View.GONE
+            homeFavoritesContainer.removeAllViews()
+            return
+        }
+        homeFavoritesTitle.visibility = View.VISIBLE
+        homeFavoritesContainer.visibility = View.VISIBLE
+        homeFavoritesContainer.removeAllViews()
+
+        val density = resources.displayMetrics.density
+        val chunked = favs.chunked(3)
+        for (rowItems in chunked) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 0, 0, (14 * density).toInt())
+                }
+            }
+
+            for ((index, item) in rowItems.withIndex()) {
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = android.view.Gravity.CENTER
+                    setBackgroundResource(R.drawable.bg_browser_card)
+                    isFocusable = true
+                    isClickable = true
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        (72 * density).toInt(),
+                        1f
+                    ).apply {
+                        if (index > 0) {
+                            setMargins((14 * density).toInt(), 0, 0, 0)
+                        }
+                    }
+                    val titleView = TextView(this@TvBrowserActivity).apply {
+                        text = item.first.take(24)
+                        setTextColor(getColor(R.color.accent))
+                        textSize = 15f
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        maxLines = 1
+                    }
+                    val urlView = TextView(this@TvBrowserActivity).apply {
+                        text = item.second.substringBefore('?').take(32)
+                        setTextColor(getColor(R.color.text_secondary))
+                        textSize = 11f
+                        maxLines = 1
+                    }
+                    addView(titleView)
+                    addView(urlView)
+                    setOnClickListener {
+                        loadUrl(item.second)
+                    }
+                    setOnLongClickListener {
+                        showFavoriteActionsDialog(item.first, item.second)
+                        true
+                    }
+                }
+                row.addView(card)
+            }
+            for (i in rowItems.size until 3) {
+                val spacer = View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        1,
+                        1f
+                    ).apply {
+                        setMargins((14 * density).toInt(), 0, 0, 0)
+                    }
+                }
+                row.addView(spacer)
+            }
+            homeFavoritesContainer.addView(row)
         }
     }
 
@@ -382,6 +562,9 @@ class TvBrowserActivity : Activity() {
             Toast.makeText(this, R.string.browser_favorite_added, Toast.LENGTH_SHORT).show()
         }
         updateFavoriteIcon()
+        if (homeDashboard.visibility == View.VISIBLE) {
+            populateHomeFavorites()
+        }
     }
 
     private fun showFavoritesDialog() {
@@ -417,6 +600,9 @@ class TvBrowserActivity : Activity() {
                         favs.removeAll { it.second.equals(url, ignoreCase = true) }
                         saveFavorites(favs)
                         updateFavoriteIcon()
+                        if (homeDashboard.visibility == View.VISIBLE) {
+                            populateHomeFavorites()
+                        }
                         Toast.makeText(this, R.string.browser_favorite_removed, Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -557,7 +743,10 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun loadUrl(rawInput: String) {
-        val target = UrlNormalizer.normalize(rawInput)
+        val trimmed = rawInput.trim()
+        if (trimmed.isBlank()) return
+        hideHomeDashboard()
+        val target = UrlNormalizer.normalize(trimmed)
         urlInput.setText(target)
         progressBar.visibility = View.VISIBLE
         webView.loadUrl(target)
@@ -566,6 +755,7 @@ class TvBrowserActivity : Activity() {
     private fun showStreamDetected(request: PlaybackRequest) {
         btnPlayStream.visibility = View.VISIBLE
         floatingPlayChip.visibility = View.VISIBLE
+        showTopBar()
         Toast.makeText(this, R.string.browser_stream_detected, Toast.LENGTH_SHORT).show()
     }
 
