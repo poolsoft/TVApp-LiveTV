@@ -131,8 +131,18 @@ class CursorLayout @JvmOverloads constructor(
 
         // Ust barda odak varsa
         if (isTopBarFocused()) {
-            // Alta basildiginda sayfaya/imlece donus
+            // Alta basildiginda
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                val urlEdit = topBar?.findViewById<View>(R.id.edit_browser_url)
+                val actionClear = topBar?.findViewById<View>(R.id.btn_action_clear)
+                // Eger adres cubugu odaktaysa, alt eylem barindaki Temizle butonuna gec
+                if (urlEdit?.hasFocus() == true && actionClear != null && actionClear.visibility == View.VISIBLE) {
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        actionClear.requestFocus()
+                    }
+                    return true
+                }
+                // Eger alt eylem barindaysa veya diger butonlardaysa sayfaya/imlece don
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     leaveTopBarToCursor()
                 }

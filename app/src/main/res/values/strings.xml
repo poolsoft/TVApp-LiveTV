@@ -872,6 +872,10 @@
     <string name="browser_popular_sites">Popüler Siteler ve Kısayollar</string>
     <string name="browser_home_subtitle">Mrowser TV Web Tarayıcısı</string>
     <string name="browser_home_search_btn">Ara / Git</string>
+    <string name="browser_action_mouse">Sanal Fare</string>
+    <string name="browser_action_paste">Yapıştır</string>
+    <string name="browser_mode_cursor_short">Fare Modu</string>
+    <string name="browser_mode_focus_short">Tuş Modu</string>
     <string name="browser_settings">Tarayıcı Ayarları</string>
     <string name="browser_cursor_speed">Fare İmleç Hızı</string>
     <string name="browser_speed_slow">Yavaş (%65)</string>

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -34,7 +35,7 @@ class TvBrowserActivity : Activity() {
     private lateinit var topBar: LinearLayout
     private lateinit var urlInput: EditText
     private lateinit var btnClearUrl: ImageButton
-    private lateinit var btnExitTv: ImageButton
+    private lateinit var btnTopMouseMode: ImageButton
     private lateinit var btnHome: ImageButton
     private lateinit var btnNavBack: ImageButton
     private lateinit var btnReload: ImageButton
@@ -58,6 +59,17 @@ class TvBrowserActivity : Activity() {
     private lateinit var homeFavoritesTitle: TextView
     private lateinit var homeFavoritesContainer: LinearLayout
 
+    // URL Hizli Eylem Cubugu bilesenleri
+    private lateinit var actionBar: LinearLayout
+    private lateinit var btnActionClear: Button
+    private lateinit var btnActionGo: Button
+    private lateinit var btnActionMouse: Button
+    private lateinit var btnActionCom: Button
+    private lateinit var btnActionHttps: Button
+    private lateinit var btnActionFavorite: Button
+    private lateinit var btnActionReload: Button
+    private lateinit var btnActionPlay: Button
+
     private lateinit var cursor: CursorController
     private lateinit var sniffer: StreamSniffer
 
@@ -80,6 +92,7 @@ class TvBrowserActivity : Activity() {
         setupWebView()
         setupCursor()
         setupListeners()
+        updateMouseModeButton()
 
         val initialUrl = intent.getStringExtra(EXTRA_URL)
         if (!initialUrl.isNullOrBlank()) {
@@ -106,7 +119,7 @@ class TvBrowserActivity : Activity() {
         topBar = findViewById(R.id.browser_top_bar)
         urlInput = findViewById(R.id.edit_browser_url)
         btnClearUrl = findViewById(R.id.btn_browser_clear_url)
-        btnExitTv = findViewById(R.id.btn_browser_exit_tv)
+        btnTopMouseMode = findViewById(R.id.btn_browser_mouse_mode)
         btnHome = findViewById(R.id.btn_browser_home)
         btnNavBack = findViewById(R.id.btn_browser_nav_back)
         btnReload = findViewById(R.id.btn_browser_reload)
@@ -129,6 +142,17 @@ class TvBrowserActivity : Activity() {
         cardPopularDiziwatch = findViewById(R.id.card_popular_diziwatch)
         homeFavoritesTitle = findViewById(R.id.home_favorites_title)
         homeFavoritesContainer = findViewById(R.id.home_favorites_container)
+
+        // URL Hizli Eylem Cubugu
+        actionBar = findViewById(R.id.browser_url_action_bar)
+        btnActionClear = findViewById(R.id.btn_action_clear)
+        btnActionGo = findViewById(R.id.btn_action_go)
+        btnActionMouse = findViewById(R.id.btn_action_mouse)
+        btnActionCom = findViewById(R.id.btn_action_com)
+        btnActionHttps = findViewById(R.id.btn_action_https)
+        btnActionFavorite = findViewById(R.id.btn_action_favorite)
+        btnActionReload = findViewById(R.id.btn_action_reload)
+        btnActionPlay = findViewById(R.id.btn_action_play)
 
         layout.topBar = topBar
     }
@@ -204,6 +228,7 @@ class TvBrowserActivity : Activity() {
                 uiHandler.post {
                     currentPlaybackRequest = null
                     btnPlayStream.visibility = View.GONE
+                    btnActionPlay.visibility = View.GONE
                     floatingPlayChip.visibility = View.GONE
                 }
             },
@@ -299,6 +324,7 @@ class TvBrowserActivity : Activity() {
 
         // Mod degistiginde (OK uzun basilinca) TV bildirimini goster
         layout.onModeChanged = { mode ->
+            updateMouseModeButton()
             val msgRes = if (mode == CursorController.Mode.CURSOR) {
                 R.string.browser_mode_cursor
             } else {
@@ -323,8 +349,16 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun setupListeners() {
-        btnExitTv.setOnClickListener {
-            finish()
+        btnTopMouseMode.setOnClickListener {
+            cursor.toggleMode()
+            updateMouseModeButton()
+            val msgRes = if (cursor.mode == CursorController.Mode.CURSOR) {
+                R.string.browser_mode_cursor
+            } else {
+                R.string.browser_mode_focus
+            }
+            Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
+            resetAutoHideTimer()
         }
 
         btnHome.setOnClickListener {
@@ -373,6 +407,69 @@ class TvBrowserActivity : Activity() {
 
         btnSettings.setOnClickListener {
             showSettingsDialog()
+        }
+
+        // URL Hizli Eylem Cubugu Buton Dinleyicileri
+        btnActionClear.setOnClickListener {
+            urlInput.setText("")
+            urlInput.requestFocus()
+            resetAutoHideTimer()
+        }
+
+        btnActionGo.setOnClickListener {
+            val text = urlInput.text.toString()
+            loadUrl(text)
+            resetAutoHideTimer()
+        }
+
+        btnActionMouse.setOnClickListener {
+            cursor.toggleMode()
+            updateMouseModeButton()
+            val msgRes = if (cursor.mode == CursorController.Mode.CURSOR) {
+                R.string.browser_mode_cursor
+            } else {
+                R.string.browser_mode_focus
+            }
+            Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
+            resetAutoHideTimer()
+        }
+
+        btnActionCom.setOnClickListener {
+            val cur = urlInput.text.toString()
+            if (!cur.endsWith(".com") && !cur.contains(".com/")) {
+                urlInput.append(".com")
+            }
+            urlInput.requestFocus()
+            urlInput.setSelection(urlInput.text.length)
+            resetAutoHideTimer()
+        }
+
+        btnActionHttps.setOnClickListener {
+            val cur = urlInput.text.toString()
+            if (!cur.startsWith("http://") && !cur.startsWith("https://")) {
+                urlInput.setText("https://$cur")
+            }
+            urlInput.requestFocus()
+            urlInput.setSelection(urlInput.text.length)
+            resetAutoHideTimer()
+        }
+
+        btnActionFavorite.setOnClickListener {
+            toggleFavorite()
+            resetAutoHideTimer()
+        }
+
+        btnActionReload.setOnClickListener {
+            if (homeDashboard.visibility == View.VISIBLE) {
+                populateHomeFavorites()
+            } else {
+                webView.reload()
+            }
+            resetAutoHideTimer()
+        }
+
+        btnActionPlay.setOnClickListener {
+            onPlayStreamClicked()
         }
 
         urlInput.setOnEditorActionListener { _, actionId, event ->
@@ -752,8 +849,22 @@ class TvBrowserActivity : Activity() {
         webView.loadUrl(target)
     }
 
+    private fun updateMouseModeButton() {
+        val isCursor = cursor.mode == CursorController.Mode.CURSOR
+        if (isCursor) {
+            btnTopMouseMode.setColorFilter(Color.parseColor("#00E5FF"))
+            btnActionMouse.text = getString(R.string.browser_mode_cursor_short)
+            btnActionMouse.setTextColor(Color.parseColor("#00E5FF"))
+        } else {
+            btnTopMouseMode.setColorFilter(Color.parseColor("#94A3B8"))
+            btnActionMouse.text = getString(R.string.browser_mode_focus_short)
+            btnActionMouse.setTextColor(Color.parseColor("#94A3B8"))
+        }
+    }
+
     private fun showStreamDetected(request: PlaybackRequest) {
         btnPlayStream.visibility = View.VISIBLE
+        btnActionPlay.visibility = View.VISIBLE
         floatingPlayChip.visibility = View.VISIBLE
         showTopBar()
         Toast.makeText(this, R.string.browser_stream_detected, Toast.LENGTH_SHORT).show()

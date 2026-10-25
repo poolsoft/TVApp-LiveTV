@@ -872,6 +872,10 @@
     <string name="browser_popular_sites">Popular Sites &amp; Shortcuts</string>
     <string name="browser_home_subtitle">Mrowser TV Web Browser</string>
     <string name="browser_home_search_btn">Search / Go</string>
+    <string name="browser_action_mouse">Virtual Mouse</string>
+    <string name="browser_action_paste">Paste</string>
+    <string name="browser_mode_cursor_short">Mouse Mode</string>
+    <string name="browser_mode_focus_short">Focus Mode</string>
     <string name="browser_settings">Browser Settings</string>
     <string name="browser_cursor_speed">Cursor Speed</string>
     <string name="browser_speed_slow">Slow (65%)</string>

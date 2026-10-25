@@ -158,7 +158,7 @@
         <activity
             android:name=".browser.TvBrowserActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize"
-            android:exported="false"
+            android:exported="true"
             android:screenOrientation="landscape" />
 
         <activity
