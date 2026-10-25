@@ -1,127 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/black">
 
-    <!-- Top Action Bar -->
-    <LinearLayout
-        android:id="@+id/browser_top_bar"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#161B22"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
-
-        <!-- TV'ye Don / Geri Butonu -->
-        <Button
-            android:id="@+id/btn_browser_back_to_tv"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:minHeight="40dp"
-            android:background="@drawable/bg_vod_secondary_btn"
-            android:drawableStart="@drawable/ic_tv"
-            android:drawablePadding="8dp"
-            android:text="@string/browser_back_to_tv"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:focusable="true"
-            android:paddingStart="12dp"
-            android:paddingEnd="16dp" />
-
-        <!-- Geri (History Back) -->
-        <ImageButton
-            android:id="@+id/btn_browser_nav_back"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_vod_secondary_btn"
-            android:src="@drawable/ic_arrow_back"
-            android:tint="@color/text_primary"
-            android:contentDescription="@string/browser_back_to_tv"
-            android:focusable="true" />
-
-        <!-- Yenile -->
-        <ImageButton
-            android:id="@+id/btn_browser_reload"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_vod_secondary_btn"
-            android:src="@drawable/ic_replay_10"
-            android:tint="@color/text_primary"
-            android:contentDescription="@string/browser_reload"
-            android:focusable="true" />
-
-        <!-- Adres ve Arama Cubugu -->
-        <EditText
-            android:id="@+id/edit_browser_url"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_browser_field"
-            android:hint="@string/browser_url_hint"
-            android:textColorHint="@color/text_secondary"
-            android:textColor="@color/text_primary"
-            android:textSize="14sp"
-            android:singleLine="true"
-            android:imeOptions="actionGo"
-            android:inputType="textUri"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:focusable="true" />
-
-        <!-- Git Butonu -->
-        <Button
-            android:id="@+id/btn_browser_go"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:minHeight="40dp"
-            android:background="@drawable/bg_vod_accent_btn"
-            android:text="@string/browser_go"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:focusable="true"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp" />
-
-        <!-- Tespit Edilen Videoyu Oynat Cipi / Butonu -->
-        <Button
-            android:id="@+id/btn_play_stream"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:minHeight="40dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_browser_chip_play"
-            android:drawableStart="@drawable/ic_play"
-            android:drawablePadding="6dp"
-            android:text="@string/browser_play_stream"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:focusable="true"
-            android:paddingStart="14dp"
-            android:paddingEnd="16dp"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <!-- Sayfa Yuklenme Cizgisi -->
-    <ProgressBar
-        android:id="@+id/browser_progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:indeterminate="true"
-        android:visibility="gone" />
-
-    <!-- CursorLayout ve WebView Govdesi -->
     <com.tvapp.livetv.browser.CursorLayout
         android:id="@+id/browser_cursor_layout"
         android:layout_width="match_parent"
@@ -132,26 +14,148 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <!-- Ekran Altinda Yuzen Buyuk Oynat Rozeti (CursorLayout hit-test ile tiklanabilir) -->
+        <!-- Mrowser Stili Kapsul Adres ve Kontrol Bari (Tam Ekran Uzerinde Kapsul) -->
+        <LinearLayout
+            android:id="@+id/browser_top_bar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_gravity="top"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_browser_capsule_bar"
+            android:elevation="10dp">
+
+            <!-- Sadece Geri Simgesi (Sade ve sik Mrowser tasarimi) -->
+            <ImageButton
+                android:id="@+id/btn_browser_nav_back"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_browser_bar_icon"
+                android:src="@drawable/ic_arrow_back"
+                android:tint="@color/text_primary"
+                android:contentDescription="@string/close"
+                android:scaleType="center"
+                android:focusable="true"
+                android:clickable="true" />
+
+            <!-- Yenile Butonu -->
+            <ImageButton
+                android:id="@+id/btn_browser_reload"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_browser_bar_icon"
+                android:src="@drawable/ic_replay_10"
+                android:tint="@color/text_primary"
+                android:contentDescription="@string/browser_reload"
+                android:scaleType="center"
+                android:focusable="true"
+                android:clickable="true" />
+
+            <!-- Ayirici Cizgi -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                android:background="#30FFFFFF" />
+
+            <!-- Adres ve Arama Cubugu -->
+            <EditText
+                android:id="@+id/edit_browser_url"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_browser_field"
+                android:hint="@string/browser_url_hint"
+                android:textColorHint="@color/text_secondary"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:singleLine="true"
+                android:imeOptions="actionGo"
+                android:inputType="textUri"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:gravity="center_vertical"
+                android:focusable="true"
+                android:clickable="true" />
+
+            <!-- Git Butonu -->
+            <Button
+                android:id="@+id/btn_browser_go"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:minHeight="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_vod_accent_btn"
+                android:text="@string/browser_go"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:focusable="true"
+                android:clickable="true"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
+
+            <!-- Tespit Edilen Videoyu Oynat Butonu -->
+            <Button
+                android:id="@+id/btn_play_stream"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:minHeight="38dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/bg_browser_chip_play"
+                android:drawableStart="@drawable/ic_play"
+                android:drawablePadding="6dp"
+                android:text="@string/browser_play_stream"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:focusable="true"
+                android:clickable="true"
+                android:paddingStart="14dp"
+                android:paddingEnd="16dp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- Sayfa Yuklenme Cizgisi -->
+        <ProgressBar
+            android:id="@+id/browser_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="top"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+        <!-- Ekran Altinda Yuzen Mrowser Stili Oynat Rozeti -->
         <TextView
             android:id="@+id/browser_floating_play_chip"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
+            android:layout_height="50dp"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="36dp"
             android:background="@drawable/bg_browser_chip_play"
-            android:elevation="8dp"
+            android:elevation="12dp"
             android:gravity="center_vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="20dp"
+            android:paddingStart="18dp"
+            android:paddingEnd="24dp"
             android:drawableStart="@drawable/ic_play"
-            android:drawablePadding="8dp"
+            android:drawablePadding="10dp"
             android:text="@string/browser_play_stream"
             android:textColor="@color/text_primary"
             android:textSize="15sp"
             android:textStyle="bold"
-            android:visibility="gone" />
+            android:visibility="gone"
+            android:clickable="true" />
 
     </com.tvapp.livetv.browser.CursorLayout>
 
-</LinearLayout>
+</FrameLayout>

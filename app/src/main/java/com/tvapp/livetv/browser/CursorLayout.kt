@@ -7,11 +7,14 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
+import android.widget.EditText
 import android.widget.FrameLayout
 
 /**
- * Sanal fare imlecini cizen ve D-pad hareketlerini yoneten FrameLayout.
+ * Sanal fare imlecini cizen, D-pad hareketlerini yoneten ve ust bar bilesenlerine tiklamayi saglayan FrameLayout.
  */
 class CursorLayout @JvmOverloads constructor(
     context: Context,
@@ -45,6 +48,12 @@ class CursorLayout @JvmOverloads constructor(
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP) {
+                val focused = findFocus()
+                if (focused is EditText) {
+                    focused.clearFocus()
+                    this.requestFocus()
+                    return true
+                }
                 if (onBack()) return true
                 if (webView.canGoBack()) {
                     webView.goBack()
@@ -56,9 +65,14 @@ class CursorLayout @JvmOverloads constructor(
             return true
         }
 
-        // Eger ust bar veya herhangi bir alt bilesen odakliysa (focus almissa), normal tus akisina izin ver
+        // Eger EditText acik ve kullanici yazi yaziyorsa normal tus akisina izin ver
         val focused = findFocus()
-        if (focused != null && focused !== this && focused !== webView) {
+        if (focused is EditText) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
+                focused.clearFocus()
+                this.requestFocus()
+                return true
+            }
             return super.dispatchKeyEvent(event)
         }
 
@@ -98,7 +112,16 @@ class CursorLayout @JvmOverloads constructor(
             KeyEvent.ACTION_UP -> {
                 if (okDown) {
                     okDown = false
-                    if (chipContains(cursor.x, cursor.y)) {
+                    val hit = findClickableChildAt(this, cursor.x, cursor.y)
+                    if (hit != null && hit !== webView) {
+                        if (hit is EditText) {
+                            hit.requestFocus()
+                            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                            imm?.showSoftInput(hit, InputMethodManager.SHOW_IMPLICIT)
+                        } else {
+                            hit.performClick()
+                        }
+                    } else if (chipContains(cursor.x, cursor.y)) {
                         onChipClick()
                     } else {
                         cursor.tap()
@@ -107,6 +130,31 @@ class CursorLayout @JvmOverloads constructor(
             }
         }
         return true
+    }
+
+    private fun findClickableChildAt(view: View, x: Float, y: Float): View? {
+        if (view.visibility != View.VISIBLE) return null
+        if (view is ViewGroup && view !== webView) {
+            for (i in view.childCount - 1 downTo 0) {
+                val child = view.getChildAt(i)
+                val hit = findClickableChildAt(child, x, y)
+                if (hit != null) return hit
+            }
+        }
+        val loc = IntArray(2)
+        view.getLocationOnScreen(loc)
+        val l = loc[0]
+        val t = loc[1]
+        val r = l + view.width
+        val b = t + view.height
+        val rootLoc = IntArray(2)
+        getLocationOnScreen(rootLoc)
+        val screenX = x + rootLoc[0]
+        val screenY = y + rootLoc[1]
+        val inside = screenX >= l && screenX <= r && screenY >= t && screenY <= b
+        return if (inside && (view.isClickable || view is EditText)) {
+            view
+        } else null
     }
 
     private fun chipContains(x: Float, y: Float): Boolean {

@@ -29,7 +29,6 @@ class TvBrowserActivity : Activity() {
     private lateinit var layout: CursorLayout
     private lateinit var webView: WebView
     private lateinit var urlInput: EditText
-    private lateinit var btnBackToTv: Button
     private lateinit var btnNavBack: ImageButton
     private lateinit var btnReload: ImageButton
     private lateinit var btnGo: Button
@@ -62,7 +61,6 @@ class TvBrowserActivity : Activity() {
         layout = findViewById(R.id.browser_cursor_layout)
         webView = findViewById(R.id.browser_web_view)
         urlInput = findViewById(R.id.edit_browser_url)
-        btnBackToTv = findViewById(R.id.btn_browser_back_to_tv)
         btnNavBack = findViewById(R.id.btn_browser_nav_back)
         btnReload = findViewById(R.id.btn_browser_reload)
         btnGo = findViewById(R.id.btn_browser_go)
@@ -161,16 +159,17 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun setupListeners() {
-        btnBackToTv.setOnClickListener {
-            finish()
-        }
-
         btnNavBack.setOnClickListener {
             if (webView.canGoBack()) {
                 webView.goBack()
             } else {
                 finish()
             }
+        }
+
+        btnNavBack.setOnLongClickListener {
+            finish()
+            true
         }
 
         btnReload.setOnClickListener {
