@@ -274,15 +274,34 @@ object WebVideoResolver {
                                         if (sources[s].src) report(sources[s].src);
                                     }
                                     vids[i].muted = true;
-                                    vids[i].play();
+                                    var p = vids[i].play();
+                                    if (p && typeof p.catch === 'function') { p.catch(function(){}); }
                                 } catch(e){}
                             }
+
                             var buttons = document.querySelectorAll(
-                                '.play, .vjs-big-play-button, .plyr__control, button[aria-label*="Play"], button[aria-label*="Oynat"], [data-player], .jw-display-icon-container, [class*="play"], [id*="play"]'
+                                '.play-btn, .vjs-big-play-button, .jw-display-icon-container, .plyr__control--overlaid, .play, .plyr__control, button[aria-label*="Play"], button[aria-label*="Oynat"], [data-player], [class*="play"], [id*="play"], .vjs-play-control, .click-to-play'
                             );
                             for (var b = 0; b < buttons.length; b++) {
                                 try { buttons[b].click(); } catch(e){}
                             }
+
+                            try {
+                                var iframes = document.querySelectorAll('iframe');
+                                for (var f = 0; f < iframes.length; f++) {
+                                    try {
+                                        var doc = iframes[f].contentDocument || iframes[f].contentWindow.document;
+                                        if (doc) {
+                                            var ivs = doc.querySelectorAll('video, audio');
+                                            for (var iv = 0; iv < ivs.length; iv++) {
+                                                ivs[iv].muted = true;
+                                                var ip = ivs[iv].play();
+                                                if (ip && typeof ip.catch === 'function') { ip.catch(function(){}); }
+                                            }
+                                        }
+                                    } catch(e){}
+                                }
+                            } catch(e){}
                         }
 
                         triggerAutoplay();

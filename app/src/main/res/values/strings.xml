@@ -877,4 +877,5 @@
     <string name="browser_cache_cleared">Tarayıcı önbelleği temizlendi.</string>
     <string name="browser_mode_cursor">Fare Modu: D-Pad ile sanal imleç yönetimi</string>
     <string name="browser_mode_focus">Tuş Modu: Sayfa içi bağlantılara odaklanma</string>
+    <string name="browser_select_stream">Oynatılacak Akışı Seçin</string>
 </resources>

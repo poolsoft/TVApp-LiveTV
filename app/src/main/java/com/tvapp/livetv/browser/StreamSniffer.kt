@@ -65,6 +65,21 @@ class StreamSniffer(
         return PlaybackRequest(best.url, headers, emptyList(), pageUrl)
     }
 
+    /**
+     * Yakalanan tum oynatilabilir akislari dondurur.
+     */
+    fun allPlayableRequests(): List<PlaybackRequest> {
+        val playables = candidates.filter { it.kind in PLAYABLE }
+        if (playables.isEmpty()) return emptyList()
+
+        val cookie = runCatching { CookieManager.getInstance().getCookie(pageUrl) }.getOrNull()
+        return playables.map { candidate ->
+            val headers = PlaybackHeaders.build(candidate.url, pageUrl, userAgent(), candidate.headers)
+                .let { if (!cookie.isNullOrEmpty()) it + ("Cookie" to cookie) else it }
+            PlaybackRequest(candidate.url, headers, emptyList(), pageUrl)
+        }.distinctBy { it.url }
+    }
+
     companion object {
         const val PROGRESSIVE_GRACE_MS = 1200L
 

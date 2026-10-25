@@ -161,7 +161,7 @@ class TvBrowserActivity : Activity() {
         layout.cursor = cursor
         layout.playChip = floatingPlayChip
         layout.onChipClick = {
-            currentPlaybackRequest?.let { playDetectedStream(it) }
+            onPlayStreamClicked()
         }
         layout.onBack = {
             if (webView.canGoBack()) {
@@ -237,13 +237,61 @@ class TvBrowserActivity : Activity() {
         }
 
         btnPlayStream.setOnClickListener {
-            currentPlaybackRequest?.let { playDetectedStream(it) }
-                ?: Toast.makeText(this, R.string.browser_no_stream_yet, Toast.LENGTH_SHORT).show()
+            onPlayStreamClicked()
         }
 
         floatingPlayChip.setOnClickListener {
-            currentPlaybackRequest?.let { playDetectedStream(it) }
+            onPlayStreamClicked()
         }
+    }
+
+    private fun onPlayStreamClicked() {
+        val streams = sniffer.allPlayableRequests()
+        if (streams.isEmpty()) {
+            Toast.makeText(this, R.string.browser_no_stream_yet, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (streams.size == 1) {
+            playDetectedStream(streams[0])
+            return
+        }
+        showStreamSelectionDialog(streams)
+    }
+
+    private fun showStreamSelectionDialog(streams: List<PlaybackRequest>) {
+        val items = streams.mapIndexed { index, req ->
+            buildStreamLabel(index + 1, req.url)
+        }.toTypedArray()
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.browser_select_stream)
+            .setItems(items) { dialog, which ->
+                dialog.dismiss()
+                val selected = streams.getOrNull(which) ?: return@setItems
+                playDetectedStream(selected)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun buildStreamLabel(index: Int, url: String): String {
+        val cleanUrl = url.substringBefore('?')
+        val ext = cleanUrl.substringAfterLast('.', "")
+        val quality = when {
+            url.contains("1080", ignoreCase = true) -> " [1080p]"
+            url.contains("720", ignoreCase = true) -> " [720p]"
+            url.contains("480", ignoreCase = true) -> " [480p]"
+            url.contains("360", ignoreCase = true) -> " [360p]"
+            else -> ""
+        }
+        val type = when {
+            url.contains(".m3u8", ignoreCase = true) -> "HLS"
+            url.contains(".mpd", ignoreCase = true) -> "DASH"
+            url.contains(".mp4", ignoreCase = true) -> "MP4"
+            else -> ext.uppercase().take(4)
+        }
+        val domain = runCatching { java.net.URI(url).host }.getOrNull() ?: ""
+        return "$index. $type$quality - $domain"
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {

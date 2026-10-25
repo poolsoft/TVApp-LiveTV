@@ -877,4 +877,5 @@
     <string name="browser_cache_cleared">Browser cache cleared.</string>
     <string name="browser_mode_cursor">Cursor Mode: Virtual pointer with D-Pad</string>
     <string name="browser_mode_focus">Focus Mode: D-Pad navigation for links</string>
+    <string name="browser_select_stream">Select Stream to Play</string>
 </resources>
