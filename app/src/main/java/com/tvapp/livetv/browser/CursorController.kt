@@ -25,6 +25,12 @@ class CursorController(
     var y = 0f
         private set
 
+    /** Fare imlecinin cikamayacagi ust bar siniri */
+    var minY: Float = 0f
+
+    /** Fare en ust sinira ulastiginda cagrilan callback */
+    var onReachedTop: (() -> Unit)? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private var dirX = 0
     private var dirY = 0
@@ -37,28 +43,44 @@ class CursorController(
             val held = SystemClock.uptimeMillis() - holdStart
             val speed = CursorGeometry.speedForHoldMs(held, speedMultiplier())
             val p = CursorGeometry.step(
-                CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height
+                CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, minY
             )
+            val reachedTop = dirY < 0 && p.y <= minY + 2f && y <= minY + 2f
             x = p.x
             y = p.y
             val ticks = CursorGeometry.wheelStep(
-                dirY, y, webView.height, edgeZonePx, WHEEL_TICKS_PER_FRAME
+                dirY, y, webView.height, edgeZonePx, WHEEL_TICKS_PER_FRAME, minY
             )
             if (ticks != 0f) {
                 wheel(ticks)
             }
             invalidate()
+            if (reachedTop) {
+                stopMove()
+                onReachedTop?.invoke()
+                return
+            }
             handler.postDelayed(this, FRAME_MS)
         }
     }
 
     fun center(width: Int, height: Int) {
         x = width / 2f
-        y = height / 2f
+        y = ((height - minY) / 2f + minY).coerceAtLeast(minY + 20f)
+        invalidate()
+    }
+
+    fun moveTo(newX: Float, newY: Float) {
+        x = newX
+        y = newY.coerceAtLeast(minY)
         invalidate()
     }
 
     fun startMove(dx: Int, dy: Int) {
+        if (dy < 0 && y <= minY + 2f) {
+            onReachedTop?.invoke()
+            return
+        }
         if (dirX == dx && dirY == dy) return
         dirX = dx
         dirY = dy

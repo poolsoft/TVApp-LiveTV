@@ -4,17 +4,18 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewGroup
-import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.widget.EditText
 import android.widget.FrameLayout
+import com.tvapp.livetv.R
 
 /**
- * Sanal fare imlecini cizen, D-pad hareketlerini yoneten ve ust bar bilesenlerine tiklamayi saglayan FrameLayout.
+ * Sanal fare imlecini cizen, D-pad hareketlerini yoneten ve ust bar bilesenleri arasinda gecisi saglayan FrameLayout.
  */
 class CursorLayout @JvmOverloads constructor(
     context: Context,
@@ -24,10 +25,12 @@ class CursorLayout @JvmOverloads constructor(
     lateinit var webView: WebView
     lateinit var cursor: CursorController
 
+    var topBar: View? = null
     var onBack: () -> Boolean = { false }
     var onExitPage: () -> Unit = {}
     var playChip: View? = null
     var onChipClick: () -> Unit = {}
+    var onModeChanged: ((CursorController.Mode) -> Unit)? = null
 
     private val density = resources.displayMetrics.density
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E50914") }
@@ -37,7 +40,14 @@ class CursorLayout @JvmOverloads constructor(
         color = Color.parseColor("#FFFFFF")
     }
 
+    private val longPressHandler = Handler(Looper.getMainLooper())
     private var okDown = false
+    private var longPressed = false
+    private val longPressRunnable = Runnable {
+        longPressed = true
+        cursor.toggleMode()
+        onModeChanged?.invoke(cursor.mode)
+    }
 
     init {
         setWillNotDraw(false)
@@ -45,13 +55,44 @@ class CursorLayout @JvmOverloads constructor(
         isFocusableInTouchMode = true
     }
 
+    fun isTopBarFocused(): Boolean = topBar?.hasFocus() == true
+
+    fun getTopBarBottomLimit(): Float {
+        val bar = topBar ?: return 0f
+        val loc = IntArray(2)
+        bar.getLocationOnScreen(loc)
+        val rootLoc = IntArray(2)
+        getLocationOnScreen(rootLoc)
+        val relY = (loc[1] - rootLoc[1]) + bar.height
+        return relY.toFloat().coerceAtLeast(0f)
+    }
+
+    fun enterTopBar() {
+        cursor.stopMove()
+        val bar = topBar ?: return
+        // Oncelikle URL cubuguna, yoksa geri butonuna odaklan
+        val target = bar.findViewById<View>(R.id.edit_browser_url)
+            ?: bar.findViewById<View>(R.id.btn_browser_nav_back)
+            ?: bar
+        target.requestFocus()
+        invalidate()
+    }
+
+    fun leaveTopBarToCursor() {
+        topBar?.clearFocus()
+        this.requestFocus()
+        val topLimit = getTopBarBottomLimit()
+        cursor.moveTo(cursor.x, topLimit + 30f)
+        cursor.stopMove()
+        invalidate()
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Geri tusu mantigi
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP) {
-                val focused = findFocus()
-                if (focused is EditText) {
-                    focused.clearFocus()
-                    this.requestFocus()
+                if (isTopBarFocused()) {
+                    leaveTopBarToCursor()
                     return true
                 }
                 if (onBack()) return true
@@ -65,20 +106,36 @@ class CursorLayout @JvmOverloads constructor(
             return true
         }
 
-        // Eger EditText acik ve kullanici yazi yaziyorsa normal tus akisina izin ver
-        val focused = findFocus()
-        if (focused is EditText) {
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN) {
-                focused.clearFocus()
-                this.requestFocus()
+        // Ust barda odak varsa
+        if (isTopBarFocused()) {
+            // Alta basildiginda sanal fareye donus
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    leaveTopBarToCursor()
+                }
                 return true
             }
+            // Diger tuslar (Sol, Sag, OK, yazi yazma) ust bar bilesenleri tarafindan kullanilir
             return super.dispatchKeyEvent(event)
         }
 
+        // Sayfa uzerindeyken tus yonetimi
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> return handleOk(event)
-            KeyEvent.KEYCODE_DPAD_UP,
+
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (cursor.mode == CursorController.Mode.CURSOR) {
+                    val topLimit = getTopBarBottomLimit()
+                    if (cursor.y <= topLimit + 15f) {
+                        if (event.action == KeyEvent.ACTION_DOWN) {
+                            enterTopBar()
+                        }
+                        return true
+                    }
+                    return handleDpad(event)
+                }
+            }
+
             KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT,
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
@@ -87,6 +144,7 @@ class CursorLayout @JvmOverloads constructor(
                 }
             }
         }
+
         return super.dispatchKeyEvent(event)
     }
 
@@ -107,54 +165,28 @@ class CursorLayout @JvmOverloads constructor(
     private fun handleOk(event: KeyEvent): Boolean {
         when (event.action) {
             KeyEvent.ACTION_DOWN -> {
-                okDown = true
+                if (!okDown) {
+                    okDown = true
+                    longPressed = false
+                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_MS)
+                }
             }
             KeyEvent.ACTION_UP -> {
-                if (okDown) {
-                    okDown = false
-                    val hit = findClickableChildAt(this, cursor.x, cursor.y)
-                    if (hit != null && hit !== webView) {
-                        if (hit is EditText) {
-                            hit.requestFocus()
-                            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                            imm?.showSoftInput(hit, InputMethodManager.SHOW_IMPLICIT)
-                        } else {
-                            hit.performClick()
-                        }
-                    } else if (chipContains(cursor.x, cursor.y)) {
+                okDown = false
+                longPressHandler.removeCallbacks(longPressRunnable)
+                if (!longPressed) {
+                    if (chipContains(cursor.x, cursor.y)) {
                         onChipClick()
-                    } else {
+                    } else if (cursor.mode == CursorController.Mode.CURSOR) {
                         cursor.tap()
+                    } else {
+                        // FOCUS modunda web sayfasindaki secili baglantiya tikla
+                        super.dispatchKeyEvent(event)
                     }
                 }
             }
         }
         return true
-    }
-
-    private fun findClickableChildAt(view: View, x: Float, y: Float): View? {
-        if (view.visibility != View.VISIBLE) return null
-        if (view is ViewGroup && view !== webView) {
-            for (i in view.childCount - 1 downTo 0) {
-                val child = view.getChildAt(i)
-                val hit = findClickableChildAt(child, x, y)
-                if (hit != null) return hit
-            }
-        }
-        val loc = IntArray(2)
-        view.getLocationOnScreen(loc)
-        val l = loc[0]
-        val t = loc[1]
-        val r = l + view.width
-        val b = t + view.height
-        val rootLoc = IntArray(2)
-        getLocationOnScreen(rootLoc)
-        val screenX = x + rootLoc[0]
-        val screenY = y + rootLoc[1]
-        val inside = screenX >= l && screenX <= r && screenY >= t && screenY <= b
-        return if (inside && (view.isClickable || view is EditText)) {
-            view
-        } else null
     }
 
     private fun chipContains(x: Float, y: Float): Boolean {
@@ -171,10 +203,15 @@ class CursorLayout @JvmOverloads constructor(
 
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
-        if (cursor.mode == CursorController.Mode.CURSOR) {
+        // Ust barda odak yoksa ve sanal fare modu etkinse imleci ciz
+        if (cursor.mode == CursorController.Mode.CURSOR && !isTopBarFocused()) {
             val r = 9f * density
             canvas.drawCircle(cursor.x, cursor.y, r, dotPaint)
             canvas.drawCircle(cursor.x, cursor.y, r, outlinePaint)
         }
+    }
+
+    companion object {
+        const val LONG_PRESS_MS = 500L
     }
 }

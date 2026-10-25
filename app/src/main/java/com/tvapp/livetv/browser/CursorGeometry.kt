@@ -13,18 +13,25 @@ object CursorGeometry {
     data class Point(val x: Float, val y: Float)
 
     /**
-     * Imleci ekran sinirlari icinde tutar.
+     * Imleci ekran ve ust bar sinirlari icinde tutar.
      */
-    fun clamp(x: Float, y: Float, width: Int, height: Int): Point = Point(
+    fun clamp(x: Float, y: Float, width: Int, height: Int, minY: Float = 0f): Point = Point(
         x.coerceIn(0f, (width - 1).coerceAtLeast(0).toFloat()),
-        y.coerceIn(0f, (height - 1).coerceAtLeast(0).toFloat())
+        y.coerceIn(minY, (height - 1).coerceAtLeast(0).toFloat())
     )
 
     /**
      * D-pad yonune gore yeni imlec koordinatini hesaplar.
      */
-    fun step(current: Point, dirX: Int, dirY: Int, speedPx: Float, width: Int, height: Int): Point =
-        clamp(current.x + dirX * speedPx, current.y + dirY * speedPx, width, height)
+    fun step(
+        current: Point,
+        dirX: Int,
+        dirY: Int,
+        speedPx: Float,
+        width: Int,
+        height: Int,
+        minY: Float = 0f
+    ): Point = clamp(current.x + dirX * speedPx, current.y + dirY * speedPx, width, height, minY)
 
     /**
      * Tus basili tutuldugunda ivmelenme (acceleration) uygular.
@@ -41,15 +48,22 @@ object CursorGeometry {
         return base * multiplier
     }
 
-    fun isAtTopEdge(y: Float, zonePx: Float): Boolean = y <= zonePx
+    fun isAtTopEdge(y: Float, zonePx: Float, minY: Float = 0f): Boolean = y <= minY + zonePx
 
     fun isAtBottomEdge(y: Float, height: Int, zonePx: Float): Boolean = y >= height - zonePx
 
     /**
      * Ekran kenarina ulasildiginda fare tekerlegi (wheel) kaydirma miktarini hesaplar.
      */
-    fun wheelStep(dirY: Int, y: Float, height: Int, zonePx: Float, ticksPerFrame: Float): Float = when {
-        dirY < 0 && isAtTopEdge(y, zonePx) -> ticksPerFrame
+    fun wheelStep(
+        dirY: Int,
+        y: Float,
+        height: Int,
+        zonePx: Float,
+        ticksPerFrame: Float,
+        minY: Float = 0f
+    ): Float = when {
+        dirY < 0 && isAtTopEdge(y, zonePx, minY) -> ticksPerFrame
         dirY > 0 && isAtBottomEdge(y, height, zonePx) -> -ticksPerFrame
         else -> 0f
     }

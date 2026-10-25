@@ -866,4 +866,15 @@
     <string name="browser_play_stream">Play Video</string>
     <string name="browser_stream_detected">Video stream detected!</string>
     <string name="browser_no_stream_yet">No video stream detected yet.</string>
+    <string name="browser_settings">Browser Settings</string>
+    <string name="browser_cursor_speed">Cursor Speed</string>
+    <string name="browser_speed_slow">Slow (65%)</string>
+    <string name="browser_speed_normal">Normal (100%)</string>
+    <string name="browser_speed_fast">Fast (150%)</string>
+    <string name="browser_block_ads">Block Ads &amp; Pop-ups</string>
+    <string name="browser_desktop_mode">Desktop Site</string>
+    <string name="browser_clear_cache">Clear Cache &amp; Cookies</string>
+    <string name="browser_cache_cleared">Browser cache cleared.</string>
+    <string name="browser_mode_cursor">Cursor Mode: Virtual pointer with D-Pad</string>
+    <string name="browser_mode_focus">Focus Mode: D-Pad navigation for links</string>
 </resources>
