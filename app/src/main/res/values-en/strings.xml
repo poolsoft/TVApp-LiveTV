@@ -873,6 +873,8 @@
     <string name="browser_popular_sites">Popular Sites &amp; Shortcuts</string>
     <string name="browser_home_subtitle">TVApp Web Browser</string>
     <string name="browser_play_fullscreen">Play Fullscreen</string>
+    <string name="browser_fullscreen_enabled">Entered fullscreen mode (Press Back to exit)</string>
+    <string name="browser_fullscreen_disabled">Exited fullscreen</string>
     <string name="browser_home_search_btn">Search / Go</string>
     <string name="browser_action_mouse">Virtual Mouse</string>
     <string name="browser_action_paste">Paste</string>

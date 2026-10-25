@@ -873,6 +873,8 @@
     <string name="browser_popular_sites">Popüler Siteler ve Kısayollar</string>
     <string name="browser_home_subtitle">TVApp Web Tarayıcısı</string>
     <string name="browser_play_fullscreen">Tam Ekran Oynat</string>
+    <string name="browser_fullscreen_enabled">Tam ekran moduna geçildi (Çıkmak için Geri tuşuna basın)</string>
+    <string name="browser_fullscreen_disabled">Tam ekrandan çıkıldı</string>
     <string name="browser_home_search_btn">Ara / Git</string>
     <string name="browser_action_mouse">Sanal Fare</string>
     <string name="browser_action_paste">Yapıştır</string>

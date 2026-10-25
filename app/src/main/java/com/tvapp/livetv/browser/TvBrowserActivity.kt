@@ -37,6 +37,7 @@ class TvBrowserActivity : Activity() {
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var hasAutoFullscreened = false
+    private var isWebFullscreen = false
 
     private lateinit var layout: CursorLayout
     private lateinit var webView: WebView
@@ -293,11 +294,13 @@ class TvBrowserActivity : Activity() {
         cursor.dashboard = homeDashboard
 
         cursor.onCursorMove = { _, y ->
-            val barLimit = layout.getTopBarBottomLimit()
-            if (y < barLimit + 40f && !topBarVisible) {
-                showTopBar()
-            } else {
-                resetAutoHideTimer()
+            if (!isWebFullscreen) {
+                val barLimit = layout.getTopBarBottomLimit()
+                if (y < barLimit + 40f && !topBarVisible) {
+                    showTopBar()
+                } else {
+                    resetAutoHideTimer()
+                }
             }
         }
 
@@ -310,6 +313,9 @@ class TvBrowserActivity : Activity() {
         layout.onBack = {
             if (customView != null) {
                 webView.webChromeClient?.onHideCustomView()
+                true
+            } else if (isWebFullscreen) {
+                disableWebFullscreen()
                 true
             } else if (homeDashboard.visibility == View.VISIBLE) {
                 finish()
@@ -326,7 +332,9 @@ class TvBrowserActivity : Activity() {
             finish()
         }
         layout.onTopBarRequested = {
-            showTopBar()
+            if (!isWebFullscreen) {
+                showTopBar()
+            }
         }
 
         // Mod degistiginde (OK uzun basilinca) TV bildirimini goster
@@ -338,13 +346,17 @@ class TvBrowserActivity : Activity() {
                 R.string.browser_mode_focus
             }
             Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
-            showTopBar()
+            if (!isWebFullscreen) {
+                showTopBar()
+            }
         }
 
         // Fare en tepeye ulastiginda dogrudan ust bara odaklan
         cursor.onReachedTop = {
-            showTopBar()
-            layout.enterTopBar()
+            if (!isWebFullscreen) {
+                showTopBar()
+                layout.enterTopBar()
+            }
         }
 
         // Ust bar yerlestiginde farenin ust sinirini belirle ve imleci ortala
@@ -760,8 +772,11 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun onPlayStreamClicked() {
-        requestFullscreenVideo()
-        Toast.makeText(this, R.string.browser_play_fullscreen, Toast.LENGTH_SHORT).show()
+        if (!isWebFullscreen) {
+            enableWebFullscreen()
+        } else {
+            disableWebFullscreen()
+        }
     }
 
     private fun showStreamSelectionDialog(streams: List<PlaybackRequest>) {
@@ -885,6 +900,9 @@ class TvBrowserActivity : Activity() {
     private fun loadUrl(rawInput: String) {
         val trimmed = rawInput.trim()
         if (trimmed.isBlank()) return
+        if (isWebFullscreen) {
+            disableWebFullscreen()
+        }
         hideKeyboard()
         hasAutoFullscreened = false
         hideHomeDashboard()
@@ -911,67 +929,151 @@ class TvBrowserActivity : Activity() {
         btnPlayStream.visibility = View.VISIBLE
         btnActionPlay.visibility = View.VISIBLE
         floatingPlayChip.visibility = View.VISIBLE
-        showTopBar()
+        if (!isWebFullscreen) {
+            showTopBar()
+        }
         if (!hasAutoFullscreened) {
             hasAutoFullscreened = true
-            requestFullscreenVideo()
+            enableWebFullscreen()
         }
     }
 
-    private fun requestFullscreenVideo() {
+    private fun enableWebFullscreen() {
         val js = """
             (function() {
-                function tryFullscreen(elem) {
-                    if (!elem) return false;
-                    try {
-                        if (elem.requestFullscreen) { elem.requestFullscreen(); return true; }
-                        if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); return true; }
-                        if (elem.mozRequestFullScreen) { elem.mozRequestFullScreen(); return true; }
-                        if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); return true; }
-                    } catch (e) {}
-                    return false;
-                }
-                var videos = document.querySelectorAll('video');
-                for (var i = 0; i < videos.length; i++) {
-                    var v = videos[i];
-                    if (v.readyState > 0 || !v.paused || v.currentTime > 0) {
-                        if (tryFullscreen(v)) return;
+                try {
+                    var styleId = 'tvapp-fullscreen-style';
+                    if (!document.getElementById(styleId)) {
+                        var st = document.createElement('style');
+                        st.id = styleId;
+                        st.innerHTML = `
+                            .tvapp-web-fullscreen {
+                                position: fixed !important;
+                                top: 0 !important;
+                                left: 0 !important;
+                                width: 100vw !important;
+                                height: 100vh !important;
+                                max-width: 100vw !important;
+                                max-height: 100vh !important;
+                                z-index: 2147483647 !important;
+                                background: #000 !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                border: none !important;
+                            }
+                            .tvapp-web-fullscreen iframe, .tvapp-web-fullscreen video {
+                                width: 100% !important;
+                                height: 100% !important;
+                                max-width: 100% !important;
+                                max-height: 100% !important;
+                                border: none !important;
+                                object-fit: contain !important;
+                            }
+                            html.tvapp-lock-body, body.tvapp-lock-body {
+                                overflow: hidden !important;
+                            }
+                        `;
+                        document.head.appendChild(st);
                     }
-                }
-                if (videos.length > 0) {
-                    if (tryFullscreen(videos[0])) return;
-                }
-                var fsSelectors = [
-                    'button[class*="fullscreen"]',
-                    'button[id*="fullscreen"]',
-                    'button[aria-label*="fullscreen" i]',
-                    'button[title*="fullscreen" i]',
-                    'button[class*="tam-ekran"]',
-                    'button.vjs-fullscreen-control',
-                    'button.plyr__control--fullscreen',
-                    '[class*="fullscreen-button"]',
-                    '[class*="vjs-fullscreen-control"]'
-                ];
-                for (var s = 0; s < fsSelectors.length; s++) {
-                    var el = document.querySelector(fsSelectors[s]);
-                    if (el && el.offsetParent !== null) {
-                        el.click();
-                        return;
+
+                    var candidateSelectors = [
+                        '.video-player-container-here',
+                        '.player-container',
+                        '#videoplayer',
+                        '#player',
+                        '.jwplayer',
+                        '.video-js',
+                        '.plyr',
+                        'iframe[src*="embed"]',
+                        'iframe[src*="video"]',
+                        'iframe[src*="player"]',
+                        'iframe[allowfullscreen]',
+                        'div[class*="player"]',
+                        'div[id*="player"]',
+                        'iframe',
+                        'video'
+                    ];
+
+                    var target = null;
+                    for (var i = 0; i < candidateSelectors.length; i++) {
+                        var el = document.querySelector(candidateSelectors[i]);
+                        if (el && el.offsetWidth > 100 && el.offsetHeight > 80) {
+                            target = el;
+                            break;
+                        }
                     }
-                }
-                var iframes = document.querySelectorAll('iframe');
-                for (var k = 0; k < iframes.length; k++) {
-                    if (tryFullscreen(iframes[k])) return;
+                    if (!target) {
+                        target = document.querySelector('iframe') || document.querySelector('video');
+                    }
+
+                    if (target) {
+                        target.classList.add('tvapp-web-fullscreen');
+                        document.documentElement.classList.add('tvapp-lock-body');
+                        document.body.classList.add('tvapp-lock-body');
+
+                        var playBtn = target.querySelector('.play-that-video, .play-icon, button[class*="play"], [aria-label*="play" i], .jw-display-icon-display, .jw-icon-playback');
+                        if (playBtn) {
+                            playBtn.click();
+                        }
+
+                        var vid = target.tagName === 'VIDEO' ? target : target.querySelector('video');
+                        if (vid) {
+                            try { vid.play(); } catch(e){}
+                            try { if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen(); } catch(e){}
+                        }
+                        return 'SUCCESS';
+                    }
+                    return 'NO_TARGET';
+                } catch(err) {
+                    return 'ERROR: ' + err.message;
                 }
             })();
         """.trimIndent()
-        webView.evaluateJavascript(js, null)
+
+        webView.evaluateJavascript(js) {
+            isWebFullscreen = true
+            topBar.visibility = View.GONE
+            cursor.stopMove()
+            webView.requestFocus()
+            // Sanal medya oynat komutu gonder
+            webView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
+            webView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY))
+            Toast.makeText(this, R.string.browser_fullscreen_enabled, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun disableWebFullscreen() {
+        val js = """
+            (function() {
+                try {
+                    var elements = document.querySelectorAll('.tvapp-web-fullscreen');
+                    elements.forEach(function(el) {
+                        el.classList.remove('tvapp-web-fullscreen');
+                    });
+                    document.documentElement.classList.remove('tvapp-lock-body');
+                    document.body.classList.remove('tvapp-lock-body');
+                    return 'RESTORED';
+                } catch(e) {
+                    return 'ERROR: ' + e.message;
+                }
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(js) {
+            isWebFullscreen = false
+            topBar.visibility = View.VISIBLE
+            Toast.makeText(this, R.string.browser_fullscreen_disabled, Toast.LENGTH_SHORT).show()
+        }
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (customView != null) {
             webView.webChromeClient?.onHideCustomView()
+            return
+        }
+        if (isWebFullscreen) {
+            disableWebFullscreen()
             return
         }
         super.onBackPressed()
