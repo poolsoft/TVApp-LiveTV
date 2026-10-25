@@ -57,7 +57,7 @@ class CursorController(
             val p = CursorGeometry.step(
                 CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, effectiveMinY
             )
-            val reachedTop = !isEdgeZone(p.x) && minY > 0 && dirY < 0 && p.y <= minY + 2f && y <= minY + 2f
+            val reachedTop = dirY < 0 && p.y <= effectiveMinY + 4f && y <= effectiveMinY + 4f
             x = p.x
             y = p.y
             onCursorMove?.invoke(x, y)
@@ -93,7 +93,8 @@ class CursorController(
     }
 
     fun startMove(dx: Int, dy: Int) {
-        if (!isEdgeZone(x) && minY > 0 && dy < 0 && y <= minY + 2f) {
+        val effectiveMinY = if (isEdgeZone(x)) 0f else minY
+        if (dy < 0 && y <= effectiveMinY + 4f) {
             onReachedTop?.invoke()
             return
         }

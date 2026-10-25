@@ -916,4 +916,5 @@
     <string name="quick_hub_multiview_hint">Birden fazla kanalı aynı anda izleyin</string>
     <string name="quick_hub_settings">Ayarlar</string>
     <string name="quick_hub_settings_hint">Görüntü ve uygulama tercihlerini özelleştirin</string>
+    <string name="browser_auto_hide_top_bar">Üst Çubuğu Otomatik Gizle</string>
 </resources>

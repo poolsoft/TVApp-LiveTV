@@ -53,7 +53,6 @@ class TvBrowserActivity : Activity() {
     private lateinit var btnFavorite: ImageButton
     private lateinit var btnSettings: ImageButton
     private lateinit var btnPlayStream: Button
-    private lateinit var floatingPlayChip: TextView
     private lateinit var progressBar: ProgressBar
 
     // Home Dashboard bilesenleri
@@ -81,6 +80,7 @@ class TvBrowserActivity : Activity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var currentSpeedMultiplier = 1.0f
 
+    private var isAutoHideTopBarEnabled = true
     private var topBarVisible = true
     private val autoHideDelayMs = 3500L
     private val autoHideRunnable = Runnable { hideTopBar() }
@@ -115,6 +115,7 @@ class TvBrowserActivity : Activity() {
             2 -> 1.5f
             else -> 1.0f
         }
+        isAutoHideTopBarEnabled = prefs.getBoolean(KEY_AUTO_HIDE_TOP_BAR, true)
     }
 
     private fun initViews() {
@@ -132,7 +133,6 @@ class TvBrowserActivity : Activity() {
         btnFavorite = findViewById(R.id.btn_browser_favorite)
         btnSettings = findViewById(R.id.btn_browser_settings)
         btnPlayStream = findViewById(R.id.btn_play_stream)
-        floatingPlayChip = findViewById(R.id.browser_floating_play_chip)
         progressBar = findViewById(R.id.browser_progress_bar)
 
         // Home Dashboard
@@ -173,11 +173,13 @@ class TvBrowserActivity : Activity() {
         urlInput.setText("")
         populateHomeFavorites()
         showTopBar()
+        uiHandler.removeCallbacks(autoHideRunnable)
         homeSearchInput.requestFocus()
     }
 
     private fun hideHomeDashboard() {
         homeDashboard.visibility = View.GONE
+        resetAutoHideTimer()
     }
 
     private fun showTopBar() {
@@ -186,11 +188,17 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun hideTopBar() {
-        // Ust bar sabit olarak tepede kalir, sayfa alt ucundan baslar
+        if (isAutoHideTopBarEnabled && homeDashboard.visibility != View.VISIBLE && !layout.isTopBarFocused() && !isWebFullscreen) {
+            topBarVisible = false
+            topBar.visibility = View.GONE
+        }
     }
 
     private fun resetAutoHideTimer() {
-        // Sabit barda auto-hide gerekmez
+        uiHandler.removeCallbacks(autoHideRunnable)
+        if (isAutoHideTopBarEnabled && homeDashboard.visibility != View.VISIBLE && !layout.isTopBarFocused() && !isWebFullscreen) {
+            uiHandler.postDelayed(autoHideRunnable, autoHideDelayMs)
+        }
     }
 
     private fun setupSniffer() {
@@ -207,7 +215,6 @@ class TvBrowserActivity : Activity() {
                     currentPlaybackRequest = null
                     btnPlayStream.visibility = View.GONE
                     btnActionPlay.visibility = View.GONE
-                    floatingPlayChip.visibility = View.GONE
                 }
             },
             schedule = { delayMs, task -> uiHandler.postDelayed(task, delayMs) }
@@ -294,22 +301,17 @@ class TvBrowserActivity : Activity() {
         cursor.dashboard = homeDashboard
 
         cursor.onCursorMove = { _, y ->
+            layout.wakeCursor()
             if (!isWebFullscreen) {
-                val barLimit = layout.getTopBarBottomLimit()
-                if (y < barLimit + 40f && !topBarVisible) {
+                if (y < 40f && !topBarVisible) {
                     showTopBar()
-                } else {
-                    resetAutoHideTimer()
                 }
+                resetAutoHideTimer()
             }
         }
 
         layout.webView = webView
         layout.cursor = cursor
-        layout.playChip = floatingPlayChip
-        layout.onChipClick = {
-            onPlayStreamClicked()
-        }
         layout.onBack = {
             if (customView != null) {
                 webView.webChromeClient?.onHideCustomView()
@@ -334,6 +336,7 @@ class TvBrowserActivity : Activity() {
         layout.onTopBarRequested = {
             if (!isWebFullscreen) {
                 showTopBar()
+                uiHandler.removeCallbacks(autoHideRunnable)
             }
         }
 
@@ -348,6 +351,7 @@ class TvBrowserActivity : Activity() {
             Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
             if (!isWebFullscreen) {
                 showTopBar()
+                resetAutoHideTimer()
             }
         }
 
@@ -359,10 +363,9 @@ class TvBrowserActivity : Activity() {
             }
         }
 
-        // Ust bar yerlestiginde farenin ust sinirini belirle ve imleci ortala
+        // Imleci baslangicta ortala
         topBar.post {
-            val limit = layout.getTopBarBottomLimit()
-            cursor.minY = limit
+            cursor.minY = 0f
             cursor.center(webView.width, webView.height)
         }
     }
@@ -561,10 +564,6 @@ class TvBrowserActivity : Activity() {
         }
 
         btnPlayStream.setOnClickListener {
-            onPlayStreamClicked()
-        }
-
-        floatingPlayChip.setOnClickListener {
             onPlayStreamClicked()
         }
     }
@@ -815,6 +814,31 @@ class TvBrowserActivity : Activity() {
         return "$index. $type$quality - $domain"
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (layout.isTopBarFocused()) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                hideKeyboard()
+                layout.leaveTopBarToCursor()
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (urlInput.hasFocus() && actionBar.visibility != View.VISIBLE) {
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        actionBar.visibility = View.VISIBLE
+                        btnActionClear.requestFocus()
+                    }
+                    return true
+                }
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    hideKeyboard()
+                    layout.leaveTopBarToCursor()
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
             showSettingsDialog()
@@ -837,6 +861,7 @@ class TvBrowserActivity : Activity() {
 
         val options = arrayOf(
             "${getString(R.string.browser_cursor_speed)}: $speedLabel",
+            "${getString(R.string.browser_auto_hide_top_bar)}: ${if (isAutoHideTopBarEnabled) "✓" else "✗"}",
             "${getString(R.string.browser_block_ads)}: ${if (blockAds) "✓" else "✗"}",
             "${getString(R.string.browser_desktop_mode)}: ${if (desktopMode) "✓" else "✗"}",
             getString(R.string.browser_favorites),
@@ -850,18 +875,30 @@ class TvBrowserActivity : Activity() {
                 when (which) {
                     0 -> showCursorSpeedDialog()
                     1 -> {
+                        val next = !isAutoHideTopBarEnabled
+                        isAutoHideTopBarEnabled = next
+                        prefs.edit().putBoolean(KEY_AUTO_HIDE_TOP_BAR, next).apply()
+                        if (!next) {
+                            showTopBar()
+                            uiHandler.removeCallbacks(autoHideRunnable)
+                        } else {
+                            resetAutoHideTimer()
+                        }
+                        showSettingsDialog()
+                    }
+                    2 -> {
                         val next = !blockAds
                         prefs.edit().putBoolean(KEY_BLOCK_ADS, next).apply()
                         showSettingsDialog()
                     }
-                    2 -> {
+                    3 -> {
                         val next = !desktopMode
                         prefs.edit().putBoolean(KEY_DESKTOP_MODE, next).apply()
                         webView.settings.userAgentString = if (next) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
                         webView.reload()
                     }
-                    3 -> showFavoritesDialog()
-                    4 -> {
+                    4 -> showFavoritesDialog()
+                    5 -> {
                         webView.clearCache(true)
                         CookieManager.getInstance().removeAllCookies(null)
                         CookieManager.getInstance().flush()
@@ -910,6 +947,8 @@ class TvBrowserActivity : Activity() {
         urlInput.setText(target)
         progressBar.visibility = View.VISIBLE
         webView.loadUrl(target)
+        layout.leaveTopBarToCursor()
+        resetAutoHideTimer()
     }
 
     private fun updateMouseModeButton() {
@@ -928,7 +967,6 @@ class TvBrowserActivity : Activity() {
     private fun showStreamDetected(request: PlaybackRequest) {
         btnPlayStream.visibility = View.VISIBLE
         btnActionPlay.visibility = View.VISIBLE
-        floatingPlayChip.visibility = View.VISIBLE
         if (!isWebFullscreen) {
             showTopBar()
         }
@@ -1112,6 +1150,7 @@ class TvBrowserActivity : Activity() {
 
         private const val PREFS_NAME = "tv_browser_prefs"
         private const val KEY_CURSOR_SPEED = "cursor_speed"
+        private const val KEY_AUTO_HIDE_TOP_BAR = "auto_hide_top_bar"
         private const val KEY_BLOCK_ADS = "block_ads"
         private const val KEY_DESKTOP_MODE = "desktop_mode"
         private const val KEY_FAVORITES = "browser_favorites"

@@ -14,8 +14,8 @@
     </item>
 
     <item
-        android:width="88dp"
-        android:height="88dp"
-        android:drawable="@drawable/ic_tv"
+        android:width="96dp"
+        android:height="96dp"
+        android:drawable="@drawable/ic_app_launcher"
         android:gravity="center" />
 </layer-list>

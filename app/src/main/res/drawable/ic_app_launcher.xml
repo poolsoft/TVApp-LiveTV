@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Modern Koyu Gradyan Zemin (Beyaz arkaplanlarda da net kontrast saglar) -->
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="108dp" android:height="108dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#1E293B"
+                android:centerColor="#0F172A"
+                android:endColor="#020617"
+                android:type="linear" />
+            <corners android:radius="24dp" />
+            <stroke
+                android:width="2.5dp"
+                android:color="#00E5FF" />
+        </shape>
+    </item>
+
+    <!-- TV Ekran Cercevesi ve Canli Yayin Isiltisi -->
+    <item
+        android:width="60dp"
+        android:height="60dp"
+        android:gravity="center">
+        <vector
+            android:width="60dp"
+            android:height="60dp"
+            android:viewportWidth="64"
+            android:viewportHeight="64">
+            <!-- TV Antenleri -->
+            <path
+                android:strokeColor="#00E5FF"
+                android:strokeWidth="2.5"
+                android:strokeLineCap="round"
+                android:pathData="M24,14 L32,22 L40,14" />
+
+            <!-- TV Dis Cerceve -->
+            <path
+                android:fillColor="#1E293B"
+                android:strokeColor="#FFFFFF"
+                android:strokeWidth="2.5"
+                android:strokeLineJoin="round"
+                android:pathData="M14,22 L50,22 A4,4 0 0,1 54,26 L54,48 A4,4 0 0,1 50,52 L14,52 A4,4 0 0,1 10,48 L10,26 A4,4 0 0,1 14,22 Z" />
+
+            <!-- TV Ekran Ic Alani (Canli Mavi Gradyan) -->
+            <path
+                android:fillColor="#0D9488"
+                android:pathData="M14,25 L43,25 L43,49 L14,49 Z" />
+
+            <!-- Oynat (Play) Ucgeni -->
+            <path
+                android:fillColor="#00E5FF"
+                android:pathData="M25,31 L35,37 L25,43 Z" />
+
+            <!-- Sag Kontrol Dugmeleri -->
+            <path
+                android:fillColor="#94A3B8"
+                android:pathData="M48,28 A2,2 0 1,1 48,32 A2,2 0 1,1 48,28 M48,35 A2,2 0 1,1 48,39 A2,2 0 1,1 48,35 M46,44 L50,44 L50,46 L46,46 Z" />
+
+            <!-- TV Ayaklari -->
+            <path
+                android:strokeColor="#FFFFFF"
+                android:strokeWidth="2.5"
+                android:strokeLineCap="round"
+                android:pathData="M18,52 L14,57 M46,52 L50,57" />
+        </vector>
+    </item>
+</layer-list>

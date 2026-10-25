@@ -550,27 +550,6 @@
                 </LinearLayout>
             </ScrollView>
 
-            <!-- Ekran Altinda Yuzen Oynat Rozeti -->
-            <TextView
-                android:id="@+id/browser_floating_play_chip"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_gravity="bottom|center_horizontal"
-                android:layout_marginBottom="28dp"
-                android:background="@drawable/bg_browser_chip_play"
-                android:elevation="12dp"
-                android:gravity="center_vertical"
-                android:paddingStart="18dp"
-                android:paddingEnd="24dp"
-                android:drawableStart="@drawable/ic_play"
-                android:drawablePadding="10dp"
-                android:text="@string/browser_play_fullscreen"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                android:clickable="true" />
-
         </com.tvapp.livetv.browser.CursorLayout>
 
     </LinearLayout>

@@ -1,5 +1,22 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-26 - VOD Player Kapanma Düzeltmesi, Web Tarayıcı Üst Bar Auto-Hide, Fare Silikleşme & Modern İkon
+
+- **VOD Player Anında Kapanma / Kütüphaneye Geri Dönme Sorununun Giderilmesi (`MainActivity.kt`):**
+  - VOD kütüphanesinden bir film veya dizi seçildiğinde `WebVideoResolver` çözümlemesi başarısız olsa dahi akış doğrudan oynatıcıya (`Media3/ExoPlayer`) aktarılarak fallback oynatma sağlandı.
+  - Oynatıcı açılır açılmaz anında VOD kütüphanesine geri dönülmesine neden olan zoraki `openVodLibrary()` çağrıları kaldırıldı; kullanıcı kütüphaneye sadece kumandadan `BACK` tuşuna basarsa dönüyor.
+- **Web Tarayıcısı Üst Toolbar Otomatik Gizleme (Auto-Hide) ve Ayarlar (`TvBrowserActivity.kt`):**
+  - Web sayfasında gezinirken üst toolbar 3.5 saniye hareketsizlik sonrası otomatik olarak gizlenir.
+  - Tarayıcı Ayarları diyaloğuna "Üst Çubuğu Otomatik Gizle" (Auto-hide Top Bar) seçeneği eklendi, tercihler `SharedPreferences` ile saklanır.
+  - Kumandadan `MENU`, `SETTINGS` tuşuna basıldığında veya fare ekranın en üstüne ulaştığında üst toolbar anında geri açılır.
+- **Sanal Fare (Mouse) Hareketsizlik Silikleşmesi ve Üst Bara Geçiş İyileştirmesi (`CursorLayout.kt` & `CursorController.kt`):**
+  - Fare 2.5 saniye hareketsiz kaldığında ekranı kapatmaması için otomatik olarak silikleşir / görünmez olur (`idle fade-out`), kumanda hareket ettirildiği anda anında canlanır.
+  - Farenin ekranın en üstüne ulaştığında üst araç çubuğuna geçişini engelleyen sınır kontrolleri ve `dispatchKeyEvent` yönlendirmesi düzeltildi.
+- **Webview Üzerindeki Yüzen Oynat Butonunun Kaldırılması (`activity_tv_browser.xml`):**
+  - Ekranın alt kısmında görünen yeşil yüzen buton (`browser_floating_play_chip`) kaldırıldı; video oynatma kontrolleri yalnızca üst araç çubuğunda tutuldu.
+- **Beyaz Zeminlerde Net Görünen Modern TVApp İkonu (`ic_app_launcher.xml` & `AndroidManifest.xml`):**
+  - Açık ve beyaz zeminli arayüzlerde kaybolan beyaz ikon yerine koyu lacivert/gece mavisi gradyan arka plan, neon turkuaz hatlar ve canlı TV sembolü içeren modern `ic_app_launcher.xml` oluşturuldu ve uygulama launcher ikonu olarak tanımlandı.
+
 ## 2026-10-25 - Quick Hub 2x4 Menüsü, VOD Hata Döngüsü Koruması ve Odak İyileştirmeleri
 
 - **Canlı TV Ekranında OK Tuşuna Uzun Basma ile Modern Quick Hub Menüsü (`MainActivity` & `dialog_quick_hub.xml`):**
