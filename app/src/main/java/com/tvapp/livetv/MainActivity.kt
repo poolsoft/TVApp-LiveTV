@@ -6338,7 +6338,6 @@ class MainActivity : TvRemoteActivity() {
         }
         val directStreamUrl = intent?.getStringExtra(EXTRA_VOD_STREAM_URL)
         val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY)
-            ?: (if (vodMode && currentChannel == null) modePreferences.getString(LAST_VOD_KEY, null) else null)
             ?: if (!directStreamUrl.isNullOrBlank()) "direct_vod_${System.currentTimeMillis()}" else null
             ?: run {
                 if (vodMode && currentChannel == null) openVodLibrary()
@@ -6403,7 +6402,9 @@ class MainActivity : TvRemoteActivity() {
                 }
                 binding.iptvBufferingContainer.visibility = View.GONE
                 if (!resolved.isPlayable) {
+                    modePreferences.edit().remove(LAST_VOD_KEY).apply()
                     showIptvNotice(R.string.vod_stream_resolve_failed)
+                    openVodLibrary()
                     return@launch
                 }
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
@@ -6450,6 +6451,7 @@ class MainActivity : TvRemoteActivity() {
                     val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(vodPending.uri, this@MainActivity)
                     if (!resolved.isPlayable) {
                         withContext(Dispatchers.Main) {
+                            modePreferences.edit().remove(LAST_VOD_KEY).apply()
                             binding.iptvBufferingContainer.visibility = View.GONE
                             showIptvNotice(R.string.vod_stream_resolve_failed)
                         }
@@ -6466,13 +6468,46 @@ class MainActivity : TvRemoteActivity() {
                     }
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
-                    val meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
+                    var meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
+                    var dynamicEpTitle: String? = null
+                    var dynamicEpUrl: String? = null
+
+                    // JSON VOD dizi bolumu cozumlemesi (sourceKey format: parentKey:ep:index_hash)
+                    if (meta == null && sourceKey.contains(":ep:")) {
+                        val parentKey = sourceKey.substringBefore(":ep:")
+                        val parentMeta = runCatching { appDb.vodDao().metadata(parentKey) }.getOrNull()
+                        if (parentMeta != null && !parentMeta.streamUrl.isNullOrBlank() && parentMeta.streamUrl.startsWith("[")) {
+                            try {
+                                val epArray = org.json.JSONArray(parentMeta.streamUrl)
+                                val epPart = sourceKey.substringAfter(":ep:")
+                                val epIdx = epPart.substringBefore('_').toIntOrNull() ?: 0
+                                if (epIdx in 0 until epArray.length()) {
+                                    val epObj = epArray.optJSONObject(epIdx)
+                                    if (epObj != null) {
+                                        val sNum = epObj.optInt("season", epObj.optInt("season_number", 1)).coerceAtLeast(1)
+                                        val eNum = epObj.optInt("episode", epObj.optInt("episode_number", epIdx + 1)).coerceAtLeast(1)
+                                        val rawTitle = epObj.optString("title").trim().ifEmpty { epObj.optString("name").trim() }
+                                        dynamicEpTitle = if (rawTitle.isNotEmpty() && !rawTitle.equals("$eNum. Bölüm", true)) {
+                                            "$sNum. Sezon $eNum. Bölüm - $rawTitle"
+                                        } else {
+                                            "$sNum. Sezon $eNum. Bölüm"
+                                        }
+                                        dynamicEpUrl = epObj.optString("videoUrl").trim().ifEmpty { epObj.optString("url").trim() }
+                                        meta = parentMeta.copy(sourceKey = sourceKey, streamUrl = dynamicEpUrl)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                debugLog.recordDebug("Parse dynamic JSON episode in resolve failed: ${e.message}")
+                            }
+                        }
+                    }
+
                     if (meta != null && !meta.streamUrl.isNullOrBlank()) {
                         val parentTitle = meta.parentKey?.let { pKey ->
                             runCatching { appDb.vodDao().metadata(pKey)?.name }.getOrNull()
                         }
                         val mainTitle = parentTitle ?: meta.name
-                        val subTitle = if (parentTitle != null) {
+                        val subTitle = dynamicEpTitle ?: if (parentTitle != null) {
                             val sNum = meta.seasonNumber ?: 1
                             val epNum = meta.episodeNumber
                             if (epNum != null) getString(R.string.vod_season_episode_fmt, sNum, epNum) else meta.name
@@ -6499,6 +6534,7 @@ class MainActivity : TvRemoteActivity() {
                         val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
                         if (!resolved.isPlayable) {
                             withContext(Dispatchers.Main) {
+                                modePreferences.edit().remove(LAST_VOD_KEY).apply()
                                 binding.iptvBufferingContainer.visibility = View.GONE
                                 showIptvNotice(R.string.vod_stream_resolve_failed)
                             }
@@ -6522,7 +6558,9 @@ class MainActivity : TvRemoteActivity() {
             if (channel != null) {
                 selectChannel(channel, recordHistory = true)
             } else {
+                modePreferences.edit().remove(LAST_VOD_KEY).apply()
                 showIptvNotice(R.string.channel_not_found)
+                openVodLibrary()
             }
         }
     }

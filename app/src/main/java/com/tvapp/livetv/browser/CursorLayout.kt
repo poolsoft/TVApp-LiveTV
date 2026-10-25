@@ -49,6 +49,8 @@ class CursorLayout @JvmOverloads constructor(
         onModeChanged?.invoke(cursor.mode)
     }
 
+    var onTopBarRequested: (() -> Unit)? = null
+
     init {
         setWillNotDraw(false)
         isFocusable = true
@@ -70,6 +72,7 @@ class CursorLayout @JvmOverloads constructor(
     fun enterTopBar() {
         cursor.stopMove()
         val bar = topBar ?: return
+        onTopBarRequested?.invoke()
         // Oncelikle URL cubuguna, yoksa geri butonuna odaklan
         val target = bar.findViewById<View>(R.id.edit_browser_url)
             ?: bar.findViewById<View>(R.id.btn_browser_nav_back)
@@ -126,7 +129,7 @@ class CursorLayout @JvmOverloads constructor(
             KeyEvent.KEYCODE_DPAD_UP -> {
                 if (cursor.mode == CursorController.Mode.CURSOR) {
                     val topLimit = getTopBarBottomLimit()
-                    if (cursor.y <= topLimit + 15f) {
+                    if (!cursor.isEdgeZone() && cursor.minY > 0 && cursor.y <= topLimit + 15f) {
                         if (event.action == KeyEvent.ACTION_DOWN) {
                             enterTopBar()
                         }

@@ -31,25 +31,34 @@ class CursorController(
     /** Fare en ust sinira ulastiginda cagrilan callback */
     var onReachedTop: (() -> Unit)? = null
 
+    /** Fare her hareket ettiginde cagrilan callback (auto-hide sifirlama icin) */
+    var onCursorMove: ((Float, Float) -> Unit)? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private var dirX = 0
     private var dirY = 0
     private var holdStart = 0L
     private val edgeZonePx get() = webView.resources.displayMetrics.density * 48f
+    private val sideZonePx get() = webView.resources.displayMetrics.density * 120f
+
+    fun isEdgeZone(checkX: Float = x): Boolean =
+        checkX < sideZonePx || checkX > (webView.width - sideZonePx).coerceAtLeast(0f)
 
     private val mover = object : Runnable {
         override fun run() {
             if (dirX == 0 && dirY == 0) return
             val held = SystemClock.uptimeMillis() - holdStart
             val speed = CursorGeometry.speedForHoldMs(held, speedMultiplier())
+            val effectiveMinY = if (isEdgeZone(x)) 0f else minY
             val p = CursorGeometry.step(
-                CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, minY
+                CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, effectiveMinY
             )
-            val reachedTop = dirY < 0 && p.y <= minY + 2f && y <= minY + 2f
+            val reachedTop = !isEdgeZone(p.x) && minY > 0 && dirY < 0 && p.y <= minY + 2f && y <= minY + 2f
             x = p.x
             y = p.y
+            onCursorMove?.invoke(x, y)
             val ticks = CursorGeometry.wheelStep(
-                dirY, y, webView.height, edgeZonePx, WHEEL_TICKS_PER_FRAME, minY
+                dirY, y, webView.height, edgeZonePx, WHEEL_TICKS_PER_FRAME, effectiveMinY
             )
             if (ticks != 0f) {
                 wheel(ticks)
@@ -67,17 +76,20 @@ class CursorController(
     fun center(width: Int, height: Int) {
         x = width / 2f
         y = ((height - minY) / 2f + minY).coerceAtLeast(minY + 20f)
+        onCursorMove?.invoke(x, y)
         invalidate()
     }
 
     fun moveTo(newX: Float, newY: Float) {
         x = newX
-        y = newY.coerceAtLeast(minY)
+        val effectiveMinY = if (isEdgeZone(newX)) 0f else minY
+        y = newY.coerceAtLeast(effectiveMinY)
+        onCursorMove?.invoke(x, y)
         invalidate()
     }
 
     fun startMove(dx: Int, dy: Int) {
-        if (dy < 0 && y <= minY + 2f) {
+        if (!isEdgeZone(x) && minY > 0 && dy < 0 && y <= minY + 2f) {
             onReachedTop?.invoke()
             return
         }

@@ -878,4 +878,11 @@
     <string name="browser_mode_cursor">Fare Modu: D-Pad ile sanal imleç yönetimi</string>
     <string name="browser_mode_focus">Tuş Modu: Sayfa içi bağlantılara odaklanma</string>
     <string name="browser_select_stream">Oynatılacak Akışı Seçin</string>
+    <string name="browser_favorites">Favoriler</string>
+    <string name="browser_add_favorite">Favorilere Ekle</string>
+    <string name="browser_favorite_added">Favorilere eklendi.</string>
+    <string name="browser_favorite_removed">Favorilerden çıkarıldı.</string>
+    <string name="browser_no_favorites">Henüz kayıtlı favori bulunmuyor.</string>
+    <string name="browser_delete_favorite">Favoriyi Sil</string>
+    <string name="browser_open_favorite">Aç</string>
 </resources>

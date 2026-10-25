@@ -32,9 +32,11 @@ class TvBrowserActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var topBar: LinearLayout
     private lateinit var urlInput: EditText
+    private lateinit var btnExitTv: ImageButton
     private lateinit var btnNavBack: ImageButton
     private lateinit var btnReload: ImageButton
     private lateinit var btnGo: Button
+    private lateinit var btnFavorite: ImageButton
     private lateinit var btnSettings: ImageButton
     private lateinit var btnPlayStream: Button
     private lateinit var floatingPlayChip: TextView
@@ -46,6 +48,10 @@ class TvBrowserActivity : Activity() {
     private var currentPlaybackRequest: PlaybackRequest? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private var currentSpeedMultiplier = 1.0f
+
+    private var topBarVisible = true
+    private val autoHideDelayMs = 3500L
+    private val autoHideRunnable = Runnable { hideTopBar() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +67,7 @@ class TvBrowserActivity : Activity() {
 
         val initialUrl = intent.getStringExtra(EXTRA_URL) ?: DEFAULT_HOME_URL
         loadUrl(initialUrl)
+        resetAutoHideTimer()
     }
 
     private fun loadPreferences() {
@@ -78,15 +85,58 @@ class TvBrowserActivity : Activity() {
         webView = findViewById(R.id.browser_web_view)
         topBar = findViewById(R.id.browser_top_bar)
         urlInput = findViewById(R.id.edit_browser_url)
+        btnExitTv = findViewById(R.id.btn_browser_exit_tv)
         btnNavBack = findViewById(R.id.btn_browser_nav_back)
         btnReload = findViewById(R.id.btn_browser_reload)
         btnGo = findViewById(R.id.btn_browser_go)
+        btnFavorite = findViewById(R.id.btn_browser_favorite)
         btnSettings = findViewById(R.id.btn_browser_settings)
         btnPlayStream = findViewById(R.id.btn_play_stream)
         floatingPlayChip = findViewById(R.id.browser_floating_play_chip)
         progressBar = findViewById(R.id.browser_progress_bar)
 
         layout.topBar = topBar
+    }
+
+    private fun showTopBar() {
+        if (topBarVisible && topBar.translationY == 0f && topBar.alpha == 1f) {
+            resetAutoHideTimer()
+            return
+        }
+        topBarVisible = true
+        topBar.animate()
+            .translationY(0f)
+            .alpha(1f)
+            .setDuration(220)
+            .withEndAction {
+                cursor.minY = layout.getTopBarBottomLimit()
+            }
+            .start()
+        resetAutoHideTimer()
+    }
+
+    private fun hideTopBar() {
+        if (layout.isTopBarFocused() || urlInput.hasFocus()) {
+            resetAutoHideTimer()
+            return
+        }
+        topBarVisible = false
+        val barH = if (topBar.height > 0) topBar.height.toFloat() else 80f
+        topBar.animate()
+            .translationY(-barH - 40f)
+            .alpha(0f)
+            .setDuration(250)
+            .withEndAction {
+                cursor.minY = 0f
+            }
+            .start()
+    }
+
+    private fun resetAutoHideTimer() {
+        uiHandler.removeCallbacks(autoHideRunnable)
+        if (!layout.isTopBarFocused() && !urlInput.hasFocus()) {
+            uiHandler.postDelayed(autoHideRunnable, autoHideDelayMs)
+        }
     }
 
     private fun setupSniffer() {
@@ -134,9 +184,13 @@ class TvBrowserActivity : Activity() {
             sniffer = sniffer,
             onNavigate = { url ->
                 urlInput.setText(url)
+                updateFavoriteIcon()
+                resetAutoHideTimer()
             },
             onLoaded = { _ ->
                 progressBar.visibility = View.GONE
+                updateFavoriteIcon()
+                resetAutoHideTimer()
             }
         )
 
@@ -157,6 +211,15 @@ class TvBrowserActivity : Activity() {
             layout.invalidate()
         }
 
+        cursor.onCursorMove = { _, y ->
+            val barLimit = layout.getTopBarBottomLimit()
+            if (y < barLimit + 40f && !topBarVisible) {
+                showTopBar()
+            } else {
+                resetAutoHideTimer()
+            }
+        }
+
         layout.webView = webView
         layout.cursor = cursor
         layout.playChip = floatingPlayChip
@@ -174,6 +237,9 @@ class TvBrowserActivity : Activity() {
         layout.onExitPage = {
             finish()
         }
+        layout.onTopBarRequested = {
+            showTopBar()
+        }
 
         // Mod degistiginde (OK uzun basilinca) TV bildirimini goster
         layout.onModeChanged = { mode ->
@@ -183,10 +249,12 @@ class TvBrowserActivity : Activity() {
                 R.string.browser_mode_focus
             }
             Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
+            showTopBar()
         }
 
         // Fare en tepeye ulastiginda dogrudan ust bara odaklan
         cursor.onReachedTop = {
+            showTopBar()
             layout.enterTopBar()
         }
 
@@ -199,6 +267,10 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun setupListeners() {
+        btnExitTv.setOnClickListener {
+            finish()
+        }
+
         btnNavBack.setOnClickListener {
             if (webView.canGoBack()) {
                 webView.goBack()
@@ -207,18 +279,25 @@ class TvBrowserActivity : Activity() {
             }
         }
 
-        btnNavBack.setOnLongClickListener {
-            finish()
-            true
-        }
-
         btnReload.setOnClickListener {
             webView.reload()
+            resetAutoHideTimer()
         }
 
         btnGo.setOnClickListener {
             val text = urlInput.text.toString()
             loadUrl(text)
+            resetAutoHideTimer()
+        }
+
+        btnFavorite.setOnClickListener {
+            toggleFavorite()
+            resetAutoHideTimer()
+        }
+
+        btnFavorite.setOnLongClickListener {
+            showFavoritesDialog()
+            true
         }
 
         btnSettings.setOnClickListener {
@@ -230,6 +309,7 @@ class TvBrowserActivity : Activity() {
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
             ) {
                 loadUrl(urlInput.text.toString())
+                resetAutoHideTimer()
                 true
             } else {
                 false
@@ -243,6 +323,106 @@ class TvBrowserActivity : Activity() {
         floatingPlayChip.setOnClickListener {
             onPlayStreamClicked()
         }
+    }
+
+    private fun getSavedFavorites(): MutableList<Pair<String, String>> {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val rawJson = prefs.getString(KEY_FAVORITES, null) ?: return mutableListOf()
+        val list = mutableListOf<Pair<String, String>>()
+        try {
+            val array = org.json.JSONArray(rawJson)
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                val u = obj.optString("url")
+                val t = obj.optString("title")
+                if (u.isNotBlank()) list.add(t to u)
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+        return list
+    }
+
+    private fun saveFavorites(list: List<Pair<String, String>>) {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val array = org.json.JSONArray()
+        list.forEach { (t, u) ->
+            val obj = org.json.JSONObject()
+            obj.put("title", t)
+            obj.put("url", u)
+            array.put(obj)
+        }
+        prefs.edit().putString(KEY_FAVORITES, array.toString()).apply()
+    }
+
+    private fun updateFavoriteIcon() {
+        val currentUrl = webView.url ?: urlInput.text.toString()
+        val favs = getSavedFavorites()
+        val isFav = favs.any { it.second.equals(currentUrl, ignoreCase = true) }
+        if (isFav) {
+            btnFavorite.setColorFilter(getColor(R.color.accent))
+        } else {
+            btnFavorite.setColorFilter(getColor(R.color.text_primary))
+        }
+    }
+
+    private fun toggleFavorite() {
+        val currentUrl = webView.url ?: urlInput.text.toString()
+        if (currentUrl.isBlank()) return
+        val title = webView.title?.takeIf { it.isNotBlank() } ?: currentUrl
+        val favs = getSavedFavorites()
+        val existingIndex = favs.indexOfFirst { it.second.equals(currentUrl, ignoreCase = true) }
+        if (existingIndex >= 0) {
+            favs.removeAt(existingIndex)
+            saveFavorites(favs)
+            Toast.makeText(this, R.string.browser_favorite_removed, Toast.LENGTH_SHORT).show()
+        } else {
+            favs.add(0, title to currentUrl)
+            saveFavorites(favs)
+            Toast.makeText(this, R.string.browser_favorite_added, Toast.LENGTH_SHORT).show()
+        }
+        updateFavoriteIcon()
+    }
+
+    private fun showFavoritesDialog() {
+        val favs = getSavedFavorites()
+        if (favs.isEmpty()) {
+            Toast.makeText(this, R.string.browser_no_favorites, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = favs.map { "${it.first}\n${it.second}" }.toTypedArray()
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.browser_favorites)
+            .setItems(labels) { _, which ->
+                val selected = favs.getOrNull(which) ?: return@setItems
+                showFavoriteActionsDialog(selected.first, selected.second)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showFavoriteActionsDialog(title: String, url: String) {
+        val options = arrayOf(
+            getString(R.string.browser_open_favorite),
+            getString(R.string.browser_delete_favorite)
+        )
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(title)
+            .setItems(options) { dialog, which ->
+                dialog.dismiss()
+                when (which) {
+                    0 -> loadUrl(url)
+                    1 -> {
+                        val favs = getSavedFavorites()
+                        favs.removeAll { it.second.equals(url, ignoreCase = true) }
+                        saveFavorites(favs)
+                        updateFavoriteIcon()
+                        Toast.makeText(this, R.string.browser_favorite_removed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun onPlayStreamClicked() {
@@ -318,6 +498,7 @@ class TvBrowserActivity : Activity() {
             "${getString(R.string.browser_cursor_speed)}: $speedLabel",
             "${getString(R.string.browser_block_ads)}: ${if (blockAds) "✓" else "✗"}",
             "${getString(R.string.browser_desktop_mode)}: ${if (desktopMode) "✓" else "✗"}",
+            getString(R.string.browser_favorites),
             getString(R.string.browser_clear_cache)
         )
 
@@ -338,7 +519,8 @@ class TvBrowserActivity : Activity() {
                         webView.settings.userAgentString = if (next) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
                         webView.reload()
                     }
-                    3 -> {
+                    3 -> showFavoritesDialog()
+                    4 -> {
                         webView.clearCache(true)
                         CookieManager.getInstance().removeAllCookies(null)
                         CookieManager.getInstance().flush()
@@ -423,6 +605,7 @@ class TvBrowserActivity : Activity() {
         private const val KEY_CURSOR_SPEED = "cursor_speed"
         private const val KEY_BLOCK_ADS = "block_ads"
         private const val KEY_DESKTOP_MODE = "desktop_mode"
+        private const val KEY_FAVORITES = "browser_favorites"
 
         private const val DEFAULT_HOME_URL = "https://www.google.com"
         private const val DESKTOP_USER_AGENT =

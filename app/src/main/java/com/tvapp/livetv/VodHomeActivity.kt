@@ -709,7 +709,27 @@ class VodHomeActivity : TvRemoteActivity() {
         lastPlayedSourceKey = item.sourceKey
         lifecycleScope.launch {
             val (url, logo) = withContext(Dispatchers.IO) {
-                val meta = database.vodDao().metadata(item.sourceKey)
+                var meta = database.vodDao().metadata(item.sourceKey)
+                if (meta == null && item.sourceKey.contains(":ep:")) {
+                    val parentKey = item.sourceKey.substringBefore(":ep:")
+                    val parentMeta = database.vodDao().metadata(parentKey)
+                    if (parentMeta != null && !parentMeta.streamUrl.isNullOrBlank() && parentMeta.streamUrl.startsWith("[")) {
+                        try {
+                            val epArray = org.json.JSONArray(parentMeta.streamUrl)
+                            val epPart = item.sourceKey.substringAfter(":ep:")
+                            val epIdx = epPart.substringBefore('_').toIntOrNull() ?: 0
+                            if (epIdx in 0 until epArray.length()) {
+                                val epObj = epArray.optJSONObject(epIdx)
+                                val epUrl = epObj?.optString("videoUrl")?.trim()?.ifEmpty { epObj.optString("url").trim() }
+                                if (!epUrl.isNullOrEmpty()) {
+                                    meta = parentMeta.copy(sourceKey = item.sourceKey, streamUrl = epUrl)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            debugLog.recordDebug("Parse dynamic JSON episode in playItem failed: ${e.message}")
+                        }
+                    }
+                }
                 if (meta != null && !meta.streamUrl.isNullOrBlank()) {
                     Pair(meta.streamUrl, meta.logoUrl ?: item.logoUrl)
                 } else {

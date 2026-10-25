@@ -31,11 +31,29 @@
             android:background="@drawable/bg_browser_capsule_bar"
             android:elevation="10dp">
 
-            <!-- Sadece Geri Simgesi (Sade ve sik Mrowser tasarimi) -->
+            <!-- TV'ye Don Butonu (Mrowser Stili TV Simgesi) -->
+            <ImageButton
+                android:id="@+id/btn_browser_exit_tv"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_browser_bar_icon"
+                android:src="@drawable/ic_tv"
+                android:tint="@color/text_primary"
+                android:contentDescription="@string/browser_back_to_tv"
+                android:scaleType="center"
+                android:focusable="true"
+                android:clickable="true"
+                android:nextFocusLeft="@id/btn_browser_exit_tv"
+                android:nextFocusRight="@id/btn_browser_nav_back"
+                android:nextFocusUp="@id/btn_browser_exit_tv"
+                android:nextFocusDown="@id/browser_cursor_layout" />
+
+            <!-- Sayfa Geri Butonu (Sadece tarayici sayfa gecmisi icin) -->
             <ImageButton
                 android:id="@+id/btn_browser_nav_back"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
+                android:layout_marginStart="6dp"
                 android:background="@drawable/bg_browser_bar_icon"
                 android:src="@drawable/ic_arrow_back"
                 android:tint="@color/text_primary"
@@ -43,7 +61,7 @@
                 android:scaleType="center"
                 android:focusable="true"
                 android:clickable="true"
-                android:nextFocusLeft="@id/btn_browser_nav_back"
+                android:nextFocusLeft="@id/btn_browser_exit_tv"
                 android:nextFocusRight="@id/btn_browser_reload"
                 android:nextFocusUp="@id/btn_browser_nav_back"
                 android:nextFocusDown="@id/browser_cursor_layout" />
@@ -115,8 +133,26 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:nextFocusLeft="@id/edit_browser_url"
-                android:nextFocusRight="@id/btn_browser_settings"
+                android:nextFocusRight="@id/btn_browser_favorite"
                 android:nextFocusUp="@id/btn_browser_go"
+                android:nextFocusDown="@id/browser_cursor_layout" />
+
+            <!-- Favoriler Butonu (Yildiz Simgesi) -->
+            <ImageButton
+                android:id="@+id/btn_browser_favorite"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_browser_bar_icon"
+                android:src="@drawable/ic_star"
+                android:tint="@color/text_primary"
+                android:contentDescription="@string/browser_favorites"
+                android:scaleType="center"
+                android:focusable="true"
+                android:clickable="true"
+                android:nextFocusLeft="@id/btn_browser_go"
+                android:nextFocusRight="@id/btn_browser_settings"
+                android:nextFocusUp="@id/btn_browser_favorite"
                 android:nextFocusDown="@id/browser_cursor_layout" />
 
             <!-- Ayarlar Butonu (Mrowser Stili) -->
@@ -132,7 +168,7 @@
                 android:scaleType="center"
                 android:focusable="true"
                 android:clickable="true"
-                android:nextFocusLeft="@id/btn_browser_go"
+                android:nextFocusLeft="@id/btn_browser_favorite"
                 android:nextFocusRight="@id/btn_play_stream"
                 android:nextFocusUp="@id/btn_browser_settings"
                 android:nextFocusDown="@id/browser_cursor_layout" />

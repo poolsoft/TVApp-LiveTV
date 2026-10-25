@@ -878,4 +878,11 @@
     <string name="browser_mode_cursor">Cursor Mode: Virtual pointer with D-Pad</string>
     <string name="browser_mode_focus">Focus Mode: D-Pad navigation for links</string>
     <string name="browser_select_stream">Select Stream to Play</string>
+    <string name="browser_favorites">Favorites</string>
+    <string name="browser_add_favorite">Add to Favorites</string>
+    <string name="browser_favorite_added">Added to favorites.</string>
+    <string name="browser_favorite_removed">Removed from favorites.</string>
+    <string name="browser_no_favorites">No favorites saved yet.</string>
+    <string name="browser_delete_favorite">Delete Favorite</string>
+    <string name="browser_open_favorite">Open</string>
 </resources>
