@@ -5104,6 +5104,20 @@ class MainActivity : TvRemoteActivity() {
 
     private fun updateInfoColorActions() {
         binding.infoColorActions.removeAllViews()
+        if (!iptvControlsInteractive && catchUpReturnChannel == null) {
+            binding.infoColorActions.addView(TextView(this).apply {
+                text = getString(R.string.ok_long_mode_hint)
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                textSize = 9f
+                setPadding(dp(6), 0, dp(6), 0)
+                setSingleLine(true)
+                if (BuildConfig.MOBILE_UI_ENABLED) {
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { showPlaybackModeDialog() }
+                }
+            })
+        }
         if (binding.iptvPlaybackContainer.visibility == View.VISIBLE) {
             catchUpReturnChannel?.let { liveChannel ->
                 binding.infoColorActions.addView(

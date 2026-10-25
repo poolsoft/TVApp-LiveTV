@@ -132,192 +132,6 @@
                         android:focusable="true" />
                 </LinearLayout>
 
-                <!-- Populer Siteler Bolumu -->
-                <TextView
-                    android:layout_width="760dp"
-                    android:layout_height="wrap_content"
-                    android:text="@string/browser_popular_sites"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="16dp" />
-
-                <!-- Populer Kartlar 1. Satir -->
-                <LinearLayout
-                    android:layout_width="760dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="14dp">
-
-                    <!-- Google -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_google"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Google"
-                            android:textColor="#60A5FA"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Arama Motoru"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <!-- HDFilmcehennemi -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_hdfilm"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="HDFilmcehennemi"
-                            android:textColor="#F59E0B"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Film &amp; Dizi İzle"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <!-- YouTube -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_youtube"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="YouTube"
-                            android:textColor="#EF4444"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Video Portalı"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Populer Kartlar 2. Satir -->
-                <LinearLayout
-                    android:layout_width="760dp"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="32dp">
-
-                    <!-- Filmmodu -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_filmmodu"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Filmmodu"
-                            android:textColor="#10B981"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Online Sinema"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <!-- DiziBOX -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_dizibox"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="DiziBOX"
-                            android:textColor="#A855F7"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Yabancı Diziler"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <!-- Diziwatch -->
-                    <LinearLayout
-                        android:id="@+id/card_popular_diziwatch"
-                        android:layout_width="0dp"
-                        android:layout_height="72dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:background="@drawable/bg_browser_card"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:focusable="true"
-                        android:clickable="true">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Diziwatch"
-                            android:textColor="#06B6D4"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Dizi &amp; Anime"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
                 <!-- Favoriler Bolumu -->
                 <TextView
                     android:id="@+id/home_favorites_title"
@@ -365,11 +179,26 @@
                 android:gravity="center_vertical"
                 android:background="@drawable/bg_browser_capsule_bar">
 
+                <!-- TV'ye Don Butonu (Mrowser Stili TV Simgesi) -->
+                <ImageButton
+                    android:id="@+id/btn_browser_exit_tv"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/bg_browser_bar_icon"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_tv"
+                    android:tint="@color/text_primary"
+                    android:contentDescription="@string/browser_back_to_tv"
+                    android:scaleType="fitCenter"
+                    android:focusable="true"
+                    android:clickable="true" />
+
                 <!-- Sanal Mouse Modu Butonu (Fare / Tus Modu) -->
                 <ImageButton
                     android:id="@+id/btn_browser_mouse_mode"
                     android:layout_width="42dp"
                     android:layout_height="42dp"
+                    android:layout_marginStart="6dp"
                     android:background="@drawable/bg_browser_bar_icon"
                     android:padding="9dp"
                     android:src="@drawable/ic_mouse"
@@ -553,7 +382,8 @@
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:visibility="gone">
 
                 <!-- Temizle Butonu -->
                 <Button

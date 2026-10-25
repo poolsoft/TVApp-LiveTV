@@ -31,6 +31,7 @@ class CursorLayout @JvmOverloads constructor(
     var playChip: View? = null
     var onChipClick: () -> Unit = {}
     var onModeChanged: ((CursorController.Mode) -> Unit)? = null
+    var dashboard: View? = null
 
     private val density = resources.displayMetrics.density
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#00E5FF") }
@@ -83,8 +84,12 @@ class CursorLayout @JvmOverloads constructor(
     }
 
     fun leaveTopBarToCursor() {
+        topBar?.findViewById<View>(R.id.browser_url_action_bar)?.visibility = View.GONE
         topBar?.clearFocus()
-        if (cursor.mode == CursorController.Mode.FOCUS) {
+        val dash = dashboard
+        if (dash != null && dash.visibility == View.VISIBLE) {
+            dash.requestFocus()
+        } else if (cursor.mode == CursorController.Mode.FOCUS) {
             webView.requestFocus()
         } else {
             this.requestFocus()
@@ -134,10 +139,12 @@ class CursorLayout @JvmOverloads constructor(
             // Alta basildiginda
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                 val urlEdit = topBar?.findViewById<View>(R.id.edit_browser_url)
+                val actionBar = topBar?.findViewById<View>(R.id.browser_url_action_bar)
                 val actionClear = topBar?.findViewById<View>(R.id.btn_action_clear)
-                // Eger adres cubugu odaktaysa, alt eylem barindaki Temizle butonuna gec
-                if (urlEdit?.hasFocus() == true && actionClear != null && actionClear.visibility == View.VISIBLE) {
+                // Eger adres cubugu odaktaysa, alt eylem barini ac ve Temizle butonuna gec
+                if (urlEdit?.hasFocus() == true && actionClear != null) {
                     if (event.action == KeyEvent.ACTION_DOWN) {
+                        actionBar?.visibility = View.VISIBLE
                         actionClear.requestFocus()
                     }
                     return true

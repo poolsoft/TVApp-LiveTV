@@ -35,6 +35,7 @@ class TvBrowserActivity : Activity() {
     private lateinit var topBar: LinearLayout
     private lateinit var urlInput: EditText
     private lateinit var btnClearUrl: ImageButton
+    private lateinit var btnExitTv: ImageButton
     private lateinit var btnTopMouseMode: ImageButton
     private lateinit var btnHome: ImageButton
     private lateinit var btnNavBack: ImageButton
@@ -50,12 +51,6 @@ class TvBrowserActivity : Activity() {
     private lateinit var homeDashboard: ScrollView
     private lateinit var homeSearchInput: EditText
     private lateinit var btnHomeSearch: Button
-    private lateinit var cardPopularGoogle: LinearLayout
-    private lateinit var cardPopularHdfilm: LinearLayout
-    private lateinit var cardPopularYoutube: LinearLayout
-    private lateinit var cardPopularFilmmodu: LinearLayout
-    private lateinit var cardPopularDizibox: LinearLayout
-    private lateinit var cardPopularDiziwatch: LinearLayout
     private lateinit var homeFavoritesTitle: TextView
     private lateinit var homeFavoritesContainer: LinearLayout
 
@@ -119,6 +114,7 @@ class TvBrowserActivity : Activity() {
         topBar = findViewById(R.id.browser_top_bar)
         urlInput = findViewById(R.id.edit_browser_url)
         btnClearUrl = findViewById(R.id.btn_browser_clear_url)
+        btnExitTv = findViewById(R.id.btn_browser_exit_tv)
         btnTopMouseMode = findViewById(R.id.btn_browser_mouse_mode)
         btnHome = findViewById(R.id.btn_browser_home)
         btnNavBack = findViewById(R.id.btn_browser_nav_back)
@@ -134,12 +130,6 @@ class TvBrowserActivity : Activity() {
         homeDashboard = findViewById(R.id.browser_home_dashboard)
         homeSearchInput = findViewById(R.id.home_search_input)
         btnHomeSearch = findViewById(R.id.btn_home_search)
-        cardPopularGoogle = findViewById(R.id.card_popular_google)
-        cardPopularHdfilm = findViewById(R.id.card_popular_hdfilm)
-        cardPopularYoutube = findViewById(R.id.card_popular_youtube)
-        cardPopularFilmmodu = findViewById(R.id.card_popular_filmmodu)
-        cardPopularDizibox = findViewById(R.id.card_popular_dizibox)
-        cardPopularDiziwatch = findViewById(R.id.card_popular_diziwatch)
         homeFavoritesTitle = findViewById(R.id.home_favorites_title)
         homeFavoritesContainer = findViewById(R.id.home_favorites_container)
 
@@ -155,6 +145,7 @@ class TvBrowserActivity : Activity() {
         btnActionPlay = findViewById(R.id.btn_action_play)
 
         layout.topBar = topBar
+        layout.dashboard = homeDashboard
     }
 
     private fun showHomeDashboard() {
@@ -287,6 +278,7 @@ class TvBrowserActivity : Activity() {
         cursor = CursorController(webView, speedMultiplier = { currentSpeedMultiplier }) {
             layout.invalidate()
         }
+        cursor.dashboard = homeDashboard
 
         cursor.onCursorMove = { _, y ->
             val barLimit = layout.getTopBarBottomLimit()
@@ -349,6 +341,10 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun setupListeners() {
+        btnExitTv.setOnClickListener {
+            finish()
+        }
+
         btnTopMouseMode.setOnClickListener {
             cursor.toggleMode()
             updateMouseModeButton()
@@ -360,6 +356,40 @@ class TvBrowserActivity : Activity() {
             Toast.makeText(this, msgRes, Toast.LENGTH_SHORT).show()
             resetAutoHideTimer()
         }
+
+        // URL Alanina girildiginde alt eylem cubugunu ac, odak cikinca kapat
+        val checkActionBarFocus: () -> Unit = {
+            topBar.postDelayed({
+                val hasActionFocus = btnActionClear.hasFocus() || btnActionGo.hasFocus() ||
+                    btnActionMouse.hasFocus() || btnActionCom.hasFocus() || btnActionHttps.hasFocus() ||
+                    btnActionFavorite.hasFocus() || btnActionReload.hasFocus() || btnActionPlay.hasFocus()
+                if (!hasActionFocus && !urlInput.hasFocus()) {
+                    actionBar.visibility = View.GONE
+                }
+            }, 120)
+        }
+
+        urlInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                actionBar.visibility = View.VISIBLE
+            } else {
+                checkActionBarFocus()
+            }
+        }
+
+        val actionFocusListener = View.OnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                checkActionBarFocus()
+            }
+        }
+        btnActionClear.onFocusChangeListener = actionFocusListener
+        btnActionGo.onFocusChangeListener = actionFocusListener
+        btnActionMouse.onFocusChangeListener = actionFocusListener
+        btnActionCom.onFocusChangeListener = actionFocusListener
+        btnActionHttps.onFocusChangeListener = actionFocusListener
+        btnActionFavorite.onFocusChangeListener = actionFocusListener
+        btnActionReload.onFocusChangeListener = actionFocusListener
+        btnActionPlay.onFocusChangeListener = actionFocusListener
 
         btnHome.setOnClickListener {
             showHomeDashboard()
@@ -502,14 +532,6 @@ class TvBrowserActivity : Activity() {
                 } else false
             } else false
         }
-
-        // Populer siteler kart dinleyicileri
-        cardPopularGoogle.setOnClickListener { loadUrl("https://www.google.com") }
-        cardPopularHdfilm.setOnClickListener { loadUrl("https://www.hdfilmcehennemi.life") }
-        cardPopularYoutube.setOnClickListener { loadUrl("https://www.youtube.com") }
-        cardPopularFilmmodu.setOnClickListener { loadUrl("https://www.filmmodu.cx") }
-        cardPopularDizibox.setOnClickListener { loadUrl("https://www.dizibox.tv") }
-        cardPopularDiziwatch.setOnClickListener { loadUrl("https://diziwatch.net") }
 
         btnPlayStream.setOnClickListener {
             onPlayStreamClicked()

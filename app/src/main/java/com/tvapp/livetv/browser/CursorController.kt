@@ -5,6 +5,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
+import android.view.View
 import android.webkit.WebView
 
 /**
@@ -27,6 +28,9 @@ class CursorController(
 
     /** Fare imlecinin cikamayacagi ust bar siniri */
     var minY: Float = 0f
+
+    /** Dashboard ScrollView referansi (fare kaydirma ve tiklama icin) */
+    var dashboard: View? = null
 
     /** Fare en ust sinira ulastiginda cagrilan callback */
     var onReachedTop: (() -> Unit)? = null
@@ -127,6 +131,12 @@ class CursorController(
      * Sayfayi fare tekerlegi gibi kaydirir.
      */
     private fun wheel(ticks: Float) {
+        val dash = dashboard
+        if (dash != null && dash.visibility == View.VISIBLE) {
+            val scrollDelta = -(ticks * 160f).toInt()
+            dash.scrollBy(0, scrollDelta)
+            return
+        }
         val t = SystemClock.uptimeMillis()
         dispatch(MotionEvent.ACTION_HOVER_MOVE, t, t)
         val props = arrayOf(MotionEvent.PointerProperties().apply {
@@ -148,10 +158,15 @@ class CursorController(
 
     private fun dispatch(action: Int, down: Long, event: Long) {
         val e = MotionEvent.obtain(down, event, action, x, y, 0)
-        if (action == MotionEvent.ACTION_HOVER_MOVE) {
-            webView.dispatchGenericMotionEvent(e)
+        val dash = dashboard
+        if (dash != null && dash.visibility == View.VISIBLE) {
+            dash.dispatchTouchEvent(e)
         } else {
-            webView.dispatchTouchEvent(e)
+            if (action == MotionEvent.ACTION_HOVER_MOVE) {
+                webView.dispatchGenericMotionEvent(e)
+            } else {
+                webView.dispatchTouchEvent(e)
+            }
         }
         e.recycle()
     }
