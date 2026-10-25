@@ -1255,6 +1255,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:background="@drawable/bg_status"
+        android:descendantFocusability="afterDescendants"
+        android:elevation="25dp"
+        android:focusable="false"
         android:orientation="vertical"
         android:padding="24dp"
         android:visibility="gone">
@@ -1295,6 +1298,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_focusable"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/retry_button"
+                android:nextFocusRight="@id/close_button"
                 android:text="@string/retry"
                 android:textColor="@color/text_primary" />
 
@@ -1304,6 +1311,10 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
                 android:background="@drawable/bg_focusable"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/retry_button"
+                android:nextFocusRight="@id/close_button"
                 android:text="@string/close"
                 android:textColor="@color/text_primary" />
         </LinearLayout>

@@ -885,4 +885,21 @@
     <string name="browser_no_favorites">Henüz kayıtlı favori bulunmuyor.</string>
     <string name="browser_delete_favorite">Favoriyi Sil</string>
     <string name="browser_open_favorite">Aç</string>
+    <string name="quick_hub_title">Hızlı Menü</string>
+    <string name="quick_hub_live_tv">Canlı TV</string>
+    <string name="quick_hub_live_tv_hint">Kanal listesini açar ve canlı yayına geçer</string>
+    <string name="quick_hub_vod">VOD Arşivi</string>
+    <string name="quick_hub_vod_hint">Film ve dizi kütüphanesini açar</string>
+    <string name="quick_hub_iptv">IPTV Listeleri</string>
+    <string name="quick_hub_iptv_hint">IPTV çalma listelerini ve kaynaklarını yönetin</string>
+    <string name="quick_hub_xmltv">XMLTV / EPG</string>
+    <string name="quick_hub_xmltv_hint">Elektronik program rehberi kaynaklarını yapılandırın</string>
+    <string name="quick_hub_browser">Web Tarayıcı</string>
+    <string name="quick_hub_browser_hint">Mrowser TV web tarayıcısını açar</string>
+    <string name="quick_hub_guide">Program Rehberi</string>
+    <string name="quick_hub_guide_hint">Tam ekran yayın akışı ve rehberini görüntüler</string>
+    <string name="quick_hub_multiview">Çoklu Ekran</string>
+    <string name="quick_hub_multiview_hint">Birden fazla kanalı aynı anda izleyin</string>
+    <string name="quick_hub_settings">Ayarlar</string>
+    <string name="quick_hub_settings_hint">Görüntü ve uygulama tercihlerini özelleştirin</string>
 </resources>

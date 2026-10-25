@@ -885,4 +885,21 @@
     <string name="browser_no_favorites">No favorites saved yet.</string>
     <string name="browser_delete_favorite">Delete Favorite</string>
     <string name="browser_open_favorite">Open</string>
+    <string name="quick_hub_title">Quick Hub</string>
+    <string name="quick_hub_live_tv">Live TV</string>
+    <string name="quick_hub_live_tv_hint">Opens the channel list and switches to live TV</string>
+    <string name="quick_hub_vod">VOD Archive</string>
+    <string name="quick_hub_vod_hint">Opens movies and series library</string>
+    <string name="quick_hub_iptv">IPTV Playlists</string>
+    <string name="quick_hub_iptv_hint">Manage IPTV playlists and sources</string>
+    <string name="quick_hub_xmltv">XMLTV / EPG</string>
+    <string name="quick_hub_xmltv_hint">Configure electronic program guide sources</string>
+    <string name="quick_hub_browser">Web Browser</string>
+    <string name="quick_hub_browser_hint">Opens Mrowser TV web browser</string>
+    <string name="quick_hub_guide">TV Guide</string>
+    <string name="quick_hub_guide_hint">View full-screen TV program guide</string>
+    <string name="quick_hub_multiview">Multi-View</string>
+    <string name="quick_hub_multiview_hint">Watch multiple channels simultaneously</string>
+    <string name="quick_hub_settings">Settings</string>
+    <string name="quick_hub_settings_hint">Customize display and app preferences</string>
 </resources>

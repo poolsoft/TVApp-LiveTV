@@ -305,6 +305,8 @@ class MainActivity : TvRemoteActivity() {
     private var settingsLongPressHandled = false
     private var lastChannelLongPressJob: Job? = null
     private var lastChannelLongPressHandled = false
+    private var okLongPressJob: Job? = null
+    private var okLongPressHandled = false
     private val unlockedChannels = mutableSetOf<String>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
@@ -658,10 +660,7 @@ class MainActivity : TvRemoteActivity() {
             statusRetryAction?.invoke() ?: ensurePermissionAndLoad()
         }
         binding.closeButton.setOnClickListener {
-            osdCoordinator.hideStatus()
-            if (vodMode) {
-                openVodLibrary()
-            }
+            dismissStatusDialog()
         }
         binding.scanButton.setOnClickListener { openTunerSetup() }
         binding.allFilter.setOnClickListener {
@@ -1506,7 +1505,10 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showPlaybackError(channel: LiveChannel?, detail: String) {
         endBlackout("PLAYBACK_ERROR")
-        if (binding.channelPanel.visibility == View.VISIBLE || osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL) {
+        if (binding.channelPanel.visibility == View.VISIBLE ||
+            osdCoordinator.state.primaryOsd == PrimaryOsd.CHANNEL_PANEL ||
+            (vodMode && !isFinishing && currentChannel == null)
+        ) {
             showIptvNotice(R.string.iptv_stream_failed)
             return
         }
@@ -1517,7 +1519,22 @@ class MainActivity : TvRemoteActivity() {
         statusRetryAction = channel?.let { failedChannel ->
             { selectChannel(failedChannel, recordHistory = !currentPlaybackUsesIptvLibrary) }
         }
-        binding.retryButton.requestFocus()
+        binding.statusPanel.post {
+            binding.retryButton.requestFocus()
+        }
+    }
+
+    private fun dismissStatusDialog() {
+        vodResolveJob?.cancel()
+        vodResolveJob = null
+        iptvPlayback.stop()
+        binding.iptvBufferingContainer.visibility = View.GONE
+        statusRetryAction = null
+        osdCoordinator.hideStatus()
+        modePreferences.edit().remove(LAST_VOD_KEY).apply()
+        if (vodMode) {
+            openVodLibrary()
+        }
     }
 
     private fun confirmListChannel(channel: LiveChannel) {
@@ -3088,6 +3105,89 @@ class MainActivity : TvRemoteActivity() {
 
     private fun openTvBrowser() {
         startActivity(Intent(this, com.tvapp.livetv.browser.TvBrowserActivity::class.java))
+    }
+
+    private var quickHubDialog: AlertDialog? = null
+
+    private fun showQuickHubDialog() {
+        if (isFinishing || isDestroyed) return
+        quickHubDialog?.dismiss()
+
+        val dialogView = layoutInflater.inflate(R.layout.dialog_quick_hub, null)
+        val hintText = dialogView.findViewById<TextView>(R.id.hub_hint_text)
+
+        val itemLiveTv = dialogView.findViewById<View>(R.id.hub_item_live_tv)
+        val itemVod = dialogView.findViewById<View>(R.id.hub_item_vod)
+        val itemIptv = dialogView.findViewById<View>(R.id.hub_item_iptv)
+        val itemXmltv = dialogView.findViewById<View>(R.id.hub_item_xmltv)
+        val itemBrowser = dialogView.findViewById<View>(R.id.hub_item_browser)
+        val itemGuide = dialogView.findViewById<View>(R.id.hub_item_guide)
+        val itemMultiview = dialogView.findViewById<View>(R.id.hub_item_multiview)
+        val itemSettings = dialogView.findViewById<View>(R.id.hub_item_settings)
+
+        fun bindFocusHint(view: View, hintResId: Int) {
+            view.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    hintText.setText(hintResId)
+                }
+            }
+        }
+
+        bindFocusHint(itemLiveTv, R.string.quick_hub_live_tv_hint)
+        bindFocusHint(itemVod, R.string.quick_hub_vod_hint)
+        bindFocusHint(itemIptv, R.string.quick_hub_iptv_hint)
+        bindFocusHint(itemXmltv, R.string.quick_hub_xmltv_hint)
+        bindFocusHint(itemBrowser, R.string.quick_hub_browser_hint)
+        bindFocusHint(itemGuide, R.string.quick_hub_guide_hint)
+        bindFocusHint(itemMultiview, R.string.quick_hub_multiview_hint)
+        bindFocusHint(itemSettings, R.string.quick_hub_settings_hint)
+
+        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setView(dialogView)
+            .create()
+
+        itemLiveTv.setOnClickListener {
+            dialog.dismiss()
+            if (vodMode) switchToLiveMode()
+            showChannelPanel(expanded = false)
+        }
+        itemVod.setOnClickListener {
+            dialog.dismiss()
+            openVodLibrary()
+        }
+        itemIptv.setOnClickListener {
+            dialog.dismiss()
+            openIptvEditor()
+        }
+        itemXmltv.setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, XmlTvSourcesActivity::class.java))
+        }
+        itemBrowser.setOnClickListener {
+            dialog.dismiss()
+            openTvBrowser()
+        }
+        itemGuide.setOnClickListener {
+            dialog.dismiss()
+            val intent = Intent(this, ProgramGuideActivity::class.java).apply {
+                putExtra(ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY, currentChannel?.sourceKey)
+            }
+            programGuide.launch(intent)
+        }
+        itemMultiview.setOnClickListener {
+            dialog.dismiss()
+            showIptvGridPicker()
+        }
+        itemSettings.setOnClickListener {
+            dialog.dismiss()
+            openDisplaySettings()
+        }
+
+        dialog.setOnShowListener {
+            itemLiveTv.post { itemLiveTv.requestFocus() }
+        }
+        quickHubDialog = dialog
+        dialog.show()
     }
 
     private fun switchToLiveMode(targetSource: String? = null) {
@@ -5668,7 +5768,7 @@ class MainActivity : TvRemoteActivity() {
             } else {
                 stopIptvGrid(resumePrevious = true)
             }
-            RemoteAction.DISMISS_STATUS -> osdCoordinator.hideStatus()
+            RemoteAction.DISMISS_STATUS -> dismissStatusDialog()
             RemoteAction.HANDLE_CHANNEL_PANEL -> if (channelPanelExpanded) {
                 showChannelPanel(expanded = false)
             } else {
@@ -5837,7 +5937,7 @@ class MainActivity : TvRemoteActivity() {
         ) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    osdCoordinator.hideStatus()
+                    dismissStatusDialog()
                 }
                 return true
             }
@@ -5889,6 +5989,26 @@ class MainActivity : TvRemoteActivity() {
             binding.recentChannelsPanel.visibility != View.VISIBLE &&
             binding.parentalLockPanel.visibility != View.VISIBLE &&
             numberInput.isEmpty()
+
+        val isOkKey = event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)
+        if (isOkKey && hasNoBlockingPlaybackOsd && !vodMode && currentIptvContentKind != IptvContentKind.VOD && !iptvControlsInteractive) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                okLongPressHandled = false
+                okLongPressJob?.cancel()
+                okLongPressJob = lifecycleScope.launch {
+                    delay(ViewConfiguration.getLongPressTimeout().toLong())
+                    okLongPressHandled = true
+                    showQuickHubDialog()
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                okLongPressJob?.cancel()
+                if (!okLongPressHandled) {
+                    toggleChannelPanel()
+                }
+                okLongPressHandled = false
+            }
+            return true
+        }
 
         if (
             event.action == KeyEvent.ACTION_DOWN &&

@@ -1,5 +1,22 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-25 - Quick Hub 2x4 Menüsü, VOD Hata Döngüsü Koruması ve Odak İyileştirmeleri
+
+- **Canlı TV Ekranında OK Tuşuna Uzun Basma ile Modern Quick Hub Menüsü (`MainActivity` & `dialog_quick_hub.xml`):**
+  - Canlı TV oynatılırken OK tuşuna basılı tutulduğunda (500 ms) açılan modern, koyu cam zeminli 2 satır x 4 sütun Quick Hub menüsü eklendi.
+  - 8 TV kısayolu entegre edildi: Canlı TV (Kanal Paneli), VOD Arşivi, IPTV Listeleri, XMLTV / EPG Ayarları, Web Tarayıcı (Mrowser), Program Rehberi, Çoklu Ekran (Multi-View), Görüntü ve Sistem Ayarları.
+  - Odaklanan karta göre dinamik güncellenen 1 satırlık bilgilendirici ipucu (hint) metni eklendi.
+- **VOD Hata Döngüsünün Kesilmesi ve Mod Koruma (`MainActivity`):**
+  - VOD akışlarının açılamaması veya oynatılamaması durumunda player hatalarının ana sayfalara sızarak arayüzü kilitlemesi engellendi; arka plan işlemleri temizce sonlandırıldı.
+  - Status diyaloğunda "Kapat" butonuna veya kumandadan "Geri (Back)" tuşuna basıldığında çalışan merkezi `dismissStatusDialog()` mekanizması kuruldu:
+    - Arka plandaki stream çözümleme (`vodResolveJob`), oynatıcı akışı (`iptvPlayback.stop()`) ve arabelleğe alma animasyonu derhal durdurulur.
+    - Hata diyaloğu kapatılır ve kullanıcının mevcut modu korunur (VOD'dan gelindiyse VOD kütüphanesine, Canlı TV'de ise canlı yayına temiz dönüş yapılır).
+- **Status Diyaloğunda ("Yeniden Dene / Kapat") Odaklanma Probleminin Giderilmesi (`activity_main.xml` & `MainActivity`):**
+  - `status_panel` için `descendantFocusability="afterDescendants"`, butonlar için açık `isFocusable = true`, `focusableInTouchMode = true` ve `nextFocus` yönlendirmeleri tanımlandı.
+  - Panel açıldığında `binding.statusPanel.post { binding.retryButton.requestFocus() }` ile kumanda odağının buton üzerinde hazır bulunması garanti altına alındı.
+- **Mrowser Web Tarayıcısı Live TV Dönüş Butonu İyileştirmesi (`activity_tv_browser.xml`):**
+  - TV'ye dön butonu (`btn_browser_exit_tv`) diğer yuvarlak kapsül butonlarla aynı boyuta (`bg_browser_bar_icon`), `padding="9dp"` ve ortalanmış TV simgesine kavuşturuldu.
+
 ## 2026-10-24 - VOD Akış Çözümleme, Çerez (Cookie) Desteği, SSL Bypass ve Loop Önleme
 
 - **ExoPlayer HTTP Veri Kaynağına Cookie ve SSL Trust-All Desteği (`IptvDataSourceFactory` & `LiveChannel`):**
