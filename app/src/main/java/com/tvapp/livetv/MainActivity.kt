@@ -204,6 +204,7 @@ class MainActivity : TvRemoteActivity() {
     private enum class IptvControlRow { TIMELINE, BUTTONS }
     private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
     private var vodPlayerOverlayController: VodPlayerOverlayController? = null
+    private var currentVodHasEpisodes: Boolean = false
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -594,6 +595,9 @@ class MainActivity : TvRemoteActivity() {
                 currentChannel?.let { channel ->
                     recordTuneReady(channel)
                     updateTechnicalBadgesForIptv(channel)
+                }
+                if (vodMode) {
+                    vodPlayerOverlayController?.scheduleAutoHide()
                 }
             }
         }
@@ -2279,6 +2283,7 @@ class MainActivity : TvRemoteActivity() {
             formatPlaybackTime = { ms -> formatPlaybackTime(ms) },
             getString = { resId -> getString(resId) },
             onOpenEpisodeList = { showEpisodePickerForActiveVod() },
+            hasEpisodes = { currentVodHasEpisodes || currentChannel?.episodeTitle?.isNotBlank() == true },
         )
         controller.setup()
         vodPlayerOverlayController = controller
@@ -6474,6 +6479,7 @@ class MainActivity : TvRemoteActivity() {
         intent?.removeExtra(EXTRA_VOD_SOURCE_KEY)
 
         enterVodMode()
+        showVodPlayerControls(autoHide = false)
         val requestGeneration = ++channelResolutionGeneration
         val startOver = intent?.getBooleanExtra(EXTRA_VOD_START_OVER, false) == true
         intent?.removeExtra(EXTRA_VOD_START_OVER)
@@ -6487,6 +6493,7 @@ class MainActivity : TvRemoteActivity() {
             val mainTitle = intent?.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
             val subTitle = intent?.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
             val logo = intent?.getStringExtra(EXTRA_VOD_LOGO_URL)
+            currentVodHasEpisodes = !subTitle.isNullOrBlank() || sourceKey.contains(":ep:")
             intent?.removeExtra(EXTRA_VOD_TITLE)
             intent?.removeExtra(EXTRA_VOD_EPISODE_TITLE)
             intent?.removeExtra(EXTRA_VOD_LOGO_URL)
@@ -6626,6 +6633,12 @@ class MainActivity : TvRemoteActivity() {
                     }
 
                     if (meta != null && !meta.streamUrl.isNullOrBlank()) {
+                        val hasEp = meta.parentKey != null || meta.kind == "SERIES" ||
+                            (!meta.streamUrl.isNullOrBlank() && meta.streamUrl.startsWith("[")) ||
+                            sourceKey.contains(":ep:")
+                        withContext(Dispatchers.Main) {
+                            currentVodHasEpisodes = hasEp
+                        }
                         val parentTitle = meta.parentKey?.let { pKey ->
                             runCatching { appDb.vodDao().metadata(pKey)?.name }.getOrNull()
                         }

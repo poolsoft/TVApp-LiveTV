@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Modern Koyu Gradyan Zemin (Beyaz arkaplanlarda da net kontrast saglar) -->
+    <!-- Modern Koyu Gradyan Zemin (Tüm TV launcher arkaplanlarında belirgin kontrast) -->
     <item>
         <shape android:shape="rectangle">
             <size android:width="108dp" android:height="108dp" />
@@ -17,52 +17,36 @@
         </shape>
     </item>
 
-    <!-- TV Ekran Cercevesi ve Canli Yayin Isiltisi -->
+    <!-- Klasik TV İkonu - Renklendirilmiş & Katmanlı -->
     <item
-        android:width="60dp"
-        android:height="60dp"
+        android:width="64dp"
+        android:height="64dp"
         android:gravity="center">
         <vector
-            android:width="60dp"
-            android:height="60dp"
-            android:viewportWidth="64"
-            android:viewportHeight="64">
-            <!-- TV Antenleri -->
-            <path
-                android:strokeColor="#00E5FF"
-                android:strokeWidth="2.5"
-                android:strokeLineCap="round"
-                android:pathData="M24,14 L32,22 L40,14" />
+            android:width="64dp"
+            android:height="64dp"
+            android:viewportWidth="24"
+            android:viewportHeight="24">
 
-            <!-- TV Dis Cerceve -->
+            <!-- TV Ekran İçi Dolgusu (Canlı Okyanus Mavisi) -->
             <path
-                android:fillColor="#1E293B"
-                android:strokeColor="#FFFFFF"
-                android:strokeWidth="2.5"
-                android:strokeLineJoin="round"
-                android:pathData="M14,22 L50,22 A4,4 0 0,1 54,26 L54,48 A4,4 0 0,1 50,52 L14,52 A4,4 0 0,1 10,48 L10,26 A4,4 0 0,1 14,22 Z" />
+                android:fillColor="#0284C7"
+                android:pathData="M3,8 h18 v12 H3 z" />
 
-            <!-- TV Ekran Ic Alani (Canli Mavi Gradyan) -->
-            <path
-                android:fillColor="#0D9488"
-                android:pathData="M14,25 L43,25 L43,49 L14,49 Z" />
-
-            <!-- Oynat (Play) Ucgeni -->
+            <!-- Ekran İçi Işıltı / Canlı Oynat İkonu -->
             <path
                 android:fillColor="#00E5FF"
-                android:pathData="M25,31 L35,37 L25,43 Z" />
+                android:pathData="M10,10.5 L16,14 L10,17.5 Z" />
 
-            <!-- Sag Kontrol Dugmeleri -->
+            <!-- Canlı Neon Antenler -->
             <path
-                android:fillColor="#94A3B8"
-                android:pathData="M48,28 A2,2 0 1,1 48,32 A2,2 0 1,1 48,28 M48,35 A2,2 0 1,1 48,39 A2,2 0 1,1 48,35 M46,44 L50,44 L50,46 L46,46 Z" />
+                android:fillColor="#00E5FF"
+                android:pathData="M13.41,6 l3.29,-3.29 L16,2 l-4,4 -4,-4 -0.71,0.71 L10.59,6 Z" />
 
-            <!-- TV Ayaklari -->
+            <!-- Klasik TV Dış Kasası ve Ekran Çerçevesi (Beyaz/Açık Gri) -->
             <path
-                android:strokeColor="#FFFFFF"
-                android:strokeWidth="2.5"
-                android:strokeLineCap="round"
-                android:pathData="M18,52 L14,57 M46,52 L50,57" />
+                android:fillColor="#F8FAFC"
+                android:pathData="M21,6 h-7.59 l3.29,-3.29 L16,2 l-4,4 -4,-4 -0.71,0.71 L10.59,6 H3 c-1.1,0 -2,0.89 -2,2 v12 c0,1.1 0.9,2 2,2 h18 c1.1,0 2,-0.9 2,-2 V8 c0,-1.11 -0.9,-2 -2,-2 z m0,14 H3 V8 h18 v12 z" />
         </vector>
     </item>
 </layer-list>

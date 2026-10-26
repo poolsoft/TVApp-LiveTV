@@ -1,5 +1,7 @@
 package com.tvapp.livetv.playback
 
+import android.content.Context
+import android.media.AudioManager
 import android.view.KeyEvent
 import android.view.View
 import androidx.lifecycle.LifecycleCoroutineScope
@@ -19,10 +21,11 @@ enum class VodControlTarget {
     AUDIO_SUB,
     SPEED,
     FULLSCREEN,
-    PLAY_PAUSE,
     TIMELINE,
+    PLAY_PAUSE,
     REWIND,
     FORWARD,
+    VOLUME,
     LIST,
 }
 
@@ -39,6 +42,7 @@ class VodPlayerOverlayController(
     private val formatPlaybackTime: (Long) -> String,
     private val getString: (Int) -> String,
     private val onOpenEpisodeList: (() -> Boolean)? = null,
+    private val hasEpisodes: (() -> Boolean)? = null,
 ) {
     var selectedTarget = VodControlTarget.PLAY_PAUSE
         private set
@@ -89,6 +93,11 @@ class VodPlayerOverlayController(
             activateSelectedTarget()
             showControls()
         }
+        binding.vodVolumeContainer.setOnClickListener {
+            selectedTarget = VodControlTarget.VOLUME
+            activateSelectedTarget()
+            showControls()
+        }
         binding.vodBtnList.setOnClickListener {
             selectedTarget = VodControlTarget.LIST
             activateSelectedTarget()
@@ -126,6 +135,13 @@ class VodPlayerOverlayController(
 
     fun scheduleAutoHide() {
         controlsJob?.cancel()
+        if (binding.iptvBufferingContainer.visibility == View.VISIBLE) {
+            return
+        }
+        val snapshot = iptvPlayback.playbackSnapshot()
+        if (!snapshot.isPlaying && snapshot.playbackSpeed == null) {
+            return
+        }
         controlsJob = scope.launch {
             delay(8_000L)
             hideControls()
@@ -173,6 +189,40 @@ class VodPlayerOverlayController(
         binding.vodBtnPlayPause.setImageResource(
             if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
         )
+
+        val episodesAvailable = hasEpisodes?.invoke() == true
+        binding.vodBtnList.visibility = if (episodesAvailable) View.VISIBLE else View.GONE
+
+        updateVolumeUi()
+    }
+
+    private fun getAudioManager(): AudioManager? {
+        return binding.root.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    }
+
+    private fun updateVolumeUi() {
+        val am = getAudioManager() ?: return
+        val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        binding.vodVolumeBar.progress = (current * 100 / max).coerceIn(0, 100)
+    }
+
+    fun adjustVolume(delta: Int) {
+        val am = getAudioManager() ?: return
+        val dir = if (delta > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI)
+        updateVolumeUi()
+    }
+
+    fun toggleVolumeMute() {
+        val am = getAudioManager() ?: return
+        val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (current > 0) {
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, AudioManager.FLAG_SHOW_UI)
+        } else {
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, AudioManager.FLAG_SHOW_UI)
+        }
+        updateVolumeUi()
     }
 
     fun renderSelection() {
@@ -187,7 +237,6 @@ class VodPlayerOverlayController(
         highlight(binding.vodBtnSpeed, selectedTarget == VodControlTarget.SPEED)
         highlight(binding.vodBtnFullscreen, selectedTarget == VodControlTarget.FULLSCREEN)
 
-        highlight(binding.vodBtnPlayPause, selectedTarget == VodControlTarget.PLAY_PAUSE)
         if (selectedTarget == VodControlTarget.TIMELINE) {
             binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline_selected)
             binding.vodTimelineRow.requestFocus()
@@ -195,8 +244,10 @@ class VodPlayerOverlayController(
             binding.vodTimelineRow.background = null
         }
 
+        highlight(binding.vodBtnPlayPause, selectedTarget == VodControlTarget.PLAY_PAUSE)
         highlight(binding.vodBtnRewind, selectedTarget == VodControlTarget.REWIND)
         highlight(binding.vodBtnForward, selectedTarget == VodControlTarget.FORWARD)
+        highlight(binding.vodVolumeContainer, selectedTarget == VodControlTarget.VOLUME)
         highlight(binding.vodBtnList, selectedTarget == VodControlTarget.LIST)
     }
 
@@ -213,6 +264,7 @@ class VodPlayerOverlayController(
             VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()
             VodControlTarget.REWIND -> iptvPlayback.seekBy(-10_000L)
             VodControlTarget.FORWARD -> iptvPlayback.seekBy(10_000L)
+            VodControlTarget.VOLUME -> toggleVolumeMute()
             VodControlTarget.SPEED -> onShowSpeedChoices()
             VodControlTarget.AUDIO_SUB -> onShowAudioTracks()
         }
@@ -280,10 +332,11 @@ class VodPlayerOverlayController(
                     }
                     KeyEvent.KEYCODE_DPAD_UP -> {
                         selectedTarget = when (selectedTarget) {
+                            VodControlTarget.PLAY_PAUSE,
                             VodControlTarget.REWIND,
                             VodControlTarget.FORWARD,
-                            VodControlTarget.LIST -> VodControlTarget.PLAY_PAUSE
-                            VodControlTarget.PLAY_PAUSE,
+                            VodControlTarget.VOLUME,
+                            VodControlTarget.LIST -> VodControlTarget.TIMELINE
                             VodControlTarget.TIMELINE -> VodControlTarget.BACK
                             else -> selectedTarget
                         }
@@ -296,9 +349,8 @@ class VodPlayerOverlayController(
                             VodControlTarget.BACK,
                             VodControlTarget.AUDIO_SUB,
                             VodControlTarget.SPEED,
-                            VodControlTarget.FULLSCREEN -> VodControlTarget.PLAY_PAUSE
-                            VodControlTarget.PLAY_PAUSE,
-                            VodControlTarget.TIMELINE -> VodControlTarget.REWIND
+                            VodControlTarget.FULLSCREEN -> VodControlTarget.TIMELINE
+                            VodControlTarget.TIMELINE -> VodControlTarget.PLAY_PAUSE
                             else -> selectedTarget
                         }
                         renderSelection()
@@ -314,13 +366,12 @@ class VodPlayerOverlayController(
                                 iptvPlayback.seekBy(-10_000L)
                                 updateControls()
                             }
-                            VodControlTarget.PLAY_PAUSE -> {
-                                // Solunda eleman yok
-                            }
-                            VodControlTarget.LIST -> selectedTarget = VodControlTarget.FORWARD
+                            VodControlTarget.LIST -> selectedTarget = VodControlTarget.VOLUME
+                            VodControlTarget.VOLUME -> selectedTarget = VodControlTarget.FORWARD
                             VodControlTarget.FORWARD -> selectedTarget = VodControlTarget.REWIND
-                            VodControlTarget.REWIND -> {
-                                // Solunda eleman yok
+                            VodControlTarget.REWIND -> selectedTarget = VodControlTarget.PLAY_PAUSE
+                            VodControlTarget.PLAY_PAUSE -> {
+                                // Sol sınır
                             }
                             else -> Unit
                         }
@@ -333,19 +384,34 @@ class VodPlayerOverlayController(
                             VodControlTarget.BACK -> selectedTarget = VodControlTarget.AUDIO_SUB
                             VodControlTarget.AUDIO_SUB -> selectedTarget = VodControlTarget.SPEED
                             VodControlTarget.SPEED -> selectedTarget = VodControlTarget.FULLSCREEN
-                            VodControlTarget.PLAY_PAUSE -> selectedTarget = VodControlTarget.TIMELINE
                             VodControlTarget.TIMELINE -> {
                                 iptvPlayback.seekBy(10_000L)
                                 updateControls()
                             }
+                            VodControlTarget.PLAY_PAUSE -> selectedTarget = VodControlTarget.REWIND
                             VodControlTarget.REWIND -> selectedTarget = VodControlTarget.FORWARD
-                            VodControlTarget.FORWARD -> selectedTarget = VodControlTarget.LIST
+                            VodControlTarget.FORWARD -> selectedTarget = VodControlTarget.VOLUME
+                            VodControlTarget.VOLUME -> {
+                                if (hasEpisodes?.invoke() == true) {
+                                    selectedTarget = VodControlTarget.LIST
+                                }
+                            }
                             VodControlTarget.LIST -> {
-                                // Sağında eleman yok
+                                // Sağ sınır
                             }
                             else -> Unit
                         }
                         renderSelection()
+                        showControls()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_VOLUME_UP -> {
+                        adjustVolume(1)
+                        showControls()
+                        return true
+                    }
+                    KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                        adjustVolume(-1)
                         showControls()
                         return true
                     }

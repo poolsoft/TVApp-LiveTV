@@ -206,25 +206,12 @@ class VodHomeActivity : TvRemoteActivity() {
             showSearchDialog()
         }
 
-        // Sıralama Butonları
-        binding.vodSortDefault.setOnClickListener {
-            setGridSort("SOURCE", getString(R.string.vod_sort_default))
-            it.requestFocus()
-        }
-        binding.vodSortNameAsc.setOnClickListener {
-            setGridSort("NAME", getString(R.string.vod_sort_name_asc))
-            it.requestFocus()
-        }
-        binding.vodSortNameDesc.setOnClickListener {
-            setGridSort("NAME_DESC", getString(R.string.vod_sort_name_desc))
-            it.requestFocus()
-        }
-        binding.vodSortRecent.setOnClickListener {
-            setGridSort("ORDINAL_DESC", getString(R.string.vod_sort_recent))
-            it.requestFocus()
+        // Sıralama Combo Butonu
+        binding.vodSortCombo.setOnClickListener {
+            showSortSelectionDialog()
         }
 
-        updateSortButtonsUi()
+        updateSortComboText()
     }
 
     private fun loadSourcesAndInitialData() {
@@ -236,13 +223,7 @@ class VodHomeActivity : TvRemoteActivity() {
                     preferences.edit().putLong("source", -1L).apply()
                 }
                 updateSourceComboText()
-                updateSortButtonsUi()
-                binding.vodGridSelectedOrderLabel.text = when (gridOrder) {
-                    "NAME" -> getString(R.string.vod_sort_name_asc)
-                    "NAME_DESC" -> getString(R.string.vod_sort_name_desc)
-                    "ORDINAL_DESC" -> getString(R.string.vod_sort_recent)
-                    else -> getString(R.string.vod_sort_default)
-                }
+                updateSortComboText()
                 debugLog.recordDebug("VOD_LOAD_INIT | activeSourceId=$sourceId, availableSources=${sources.size}")
                 loadGridCategories()
                 reloadGridData()
@@ -380,27 +361,43 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
+    private fun showSortSelectionDialog() {
+        val options = arrayOf(
+            getString(R.string.vod_sort_default),
+            getString(R.string.vod_sort_name_asc),
+            getString(R.string.vod_sort_name_desc),
+            getString(R.string.vod_sort_recent),
+        )
+        val orders = arrayOf("SOURCE", "NAME", "NAME_DESC", "ORDINAL_DESC")
+        val currentIndex = orders.indexOf(gridOrder).coerceAtLeast(0)
+
+        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.vod_sort_title)
+            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
+                setGridSort(orders[which], options[which])
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
     private fun setGridSort(order: String, label: String) {
         if (gridOrder == order) return
         gridOrder = order
         preferences.edit().putString("order", gridOrder).apply()
-        binding.vodGridSelectedOrderLabel.text = label
-        updateSortButtonsUi()
+        updateSortComboText()
         reloadGridData()
     }
 
-    private fun updateSortButtonsUi() {
-        binding.vodSortDefault.isSelected = (gridOrder == "SOURCE")
-        binding.vodSortNameAsc.isSelected = (gridOrder == "NAME")
-        binding.vodSortNameDesc.isSelected = (gridOrder == "NAME_DESC")
-        binding.vodSortRecent.isSelected = (gridOrder == "ORDINAL_DESC")
-
-        val accentColor = getColor(R.color.accent)
-        val defaultColor = getColor(R.color.text_primary)
-        binding.vodSortDefault.setTextColor(if (gridOrder == "SOURCE") accentColor else defaultColor)
-        binding.vodSortNameAsc.setTextColor(if (gridOrder == "NAME") accentColor else defaultColor)
-        binding.vodSortNameDesc.setTextColor(if (gridOrder == "NAME_DESC") accentColor else defaultColor)
-        binding.vodSortRecent.setTextColor(if (gridOrder == "ORDINAL_DESC") accentColor else defaultColor)
+    private fun updateSortComboText() {
+        val label = when (gridOrder) {
+            "NAME" -> getString(R.string.vod_sort_name_asc)
+            "NAME_DESC" -> getString(R.string.vod_sort_name_desc)
+            "ORDINAL_DESC" -> getString(R.string.vod_sort_recent)
+            else -> getString(R.string.vod_sort_default)
+        }
+        binding.vodSortComboText.text = label
+        binding.vodGridSelectedOrderLabel.text = label
     }
 
     private fun reloadGridData() {

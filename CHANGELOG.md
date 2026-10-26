@@ -1,5 +1,25 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-26 - VOD Player Yükleme UI Kararlılığı, Bağımsız Seekbar, Ses Odağı, Kompakt Sıralama ve Renkli Klasik İkon
+
+- **VOD Player Yükleme ve Hazırlık Sırasında UI Görünürlüğü (`VodPlayerOverlayController.kt` & `MainActivity.kt`):**
+  - İçerik yüklenirken veya arabelleğe alınırken ("Açılıyor..." / buffering göstergesi) oynatıcı kontrol arayüzünün otomatik gizlenmesi engellendi; yükleme diyaloğu ekrandayken oynatıcı başlığı, üst bar ve zaman çubuğu açık kalır.
+  - Video hazır olup akıcı biçimde oynamaya başladığında (`IptvPlaybackPhase.READY`) 8 saniyelik otomatik gizleme (`scheduleAutoHide`) devreye girerek ekranı temizler.
+- **Play/Pause Butonunun Alt Kontrol Satırına Taşınması ve Bağımsız Seek Çubuğu (`activity_main.xml` & `VodPlayerOverlayController.kt`):**
+  - Play/Pause butonu zaman çubuğu satırından çıkarılarak aşağıdaki kontrol butonları satırının başına taşındı.
+  - Zaman çubuğunda (seek) kumanda ile sağa/sola sarma yaparken oynat butonuna takılma veya yanlışlıkla durdurma sorunu tamamen giderildi; zaman çubuğu bağımsız ve akıcı hale getirildi.
+- **Ses Kontrolü Odaklanması ve D-Pad Entegrasyonu (`VodPlayerOverlayController.kt` & `activity_main.xml`):**
+  - Alt bardaki ses çubuğu kapsülü (`vod_volume_container`) odaklanabilir hale getirildi ve `VodControlTarget.VOLUME` hedefiyle D-pad navigasyonuna dahil edildi.
+  - Odaklandığında belirgin vurgu alır; kumandadan ses tuşları veya OK ile mute/unmute yapılabilir ve ses çubuğu anlık olarak güncellenir.
+- **Bölüm Listesi Butonu İyileştirmesi (`activity_main.xml` & `VodPlayerOverlayController.kt`):**
+  - Raw metin oku (`⌄`) yerine modern vektör ikon (`ic_arrow_drop_down`) eklendi.
+  - Tekil filmlerde veya dizi bölümü olmayan içeriklerde buton tamamen gizlenerek (`View.GONE`) gereksiz arayüz kalabalığı önlendi.
+- **VOD Kütüphanesinde Kompakt Sıralama Combobox'ı (`activity_vod_home.xml` & `VodHomeActivity.kt`):**
+  - Sol panelde 120dp yer kaplayan 4 dikey sıralama butonu kaldırılarak tek satırlık şık ve modern `vod_sort_combo` açılır menüsüne dönüştürüldü.
+  - Tıklandığında diyalog ile sıralama seçimi sunulur; sol panelde kategoriler listesi için geniş dikey alan kazanıldı.
+- **Klasik TV Uygulama Simgesinin Renklendirilmesi (`ic_app_launcher.xml`):**
+  - Sevilen klasik TV ikonu formu korunarak koyu gece mavisi zemin, neon turkuaz antenler, canlı okyanus mavisi ekran ve oynat üçgeni ile modern ve göz alıcı bir launcher simgesine dönüştürüldü.
+
 ## 2026-10-26 - VOD Oynatıcı Doğrudan Akış İzolasyonu, HTTP 403 ve UI Titremesi (Flash) Düzeltmesi
 
 - **VOD Oynatıcının Web Çözümleyiciden İzolasyonu & HTTP 403 Koruması (`MainActivity.kt` & `WebVideoResolver.kt`):**

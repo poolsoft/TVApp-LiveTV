@@ -154,75 +154,51 @@
                 android:textColor="@color/text_primary"
                 android:textSize="11sp" />
 
-            <!-- Sıralama Başlığı -->
+            <!-- Sıralama Combo Butonu -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:text="⚡ Sıralama"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
             <LinearLayout
+                android:id="@+id/vod_sort_combo"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="32dp"
                 android:layout_marginTop="3dp"
-                android:orientation="vertical">
+                android:background="@drawable/bg_vod_panel_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="10dp">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_sort"
+                    app:tint="@color/accent" />
 
                 <TextView
-                    android:id="@+id/vod_sort_default"
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:background="@drawable/bg_vod_chip_btn"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="10dp"
+                    android:id="@+id/vod_sort_combo_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="Varsayılan"
                     android:textColor="@color/text_primary"
-                    android:textSize="11sp" />
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/vod_sort_name_asc"
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_vod_chip_btn"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="10dp"
-                    android:text="A - Z (İsme Göre)"
-                    android:textColor="@color/text_primary"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/vod_sort_name_desc"
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_vod_chip_btn"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="10dp"
-                    android:text="Z - A (Ters)"
-                    android:textColor="@color/text_primary"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/vod_sort_recent"
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_vod_chip_btn"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:paddingHorizontal="10dp"
-                    android:text="En Yeni Eklenenler"
-                    android:textColor="@color/text_primary"
-                    android:textSize="11sp" />
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_arrow_drop_down"
+                    app:tint="@color/accent" />
             </LinearLayout>
 
             <!-- Kategoriler Başlığı -->
@@ -244,7 +220,7 @@
                 android:layout_weight="1"
                 android:descendantFocusability="afterDescendants"
                 android:nextFocusRight="@+id/vod_recycler_grid"
-                android:nextFocusUp="@+id/vod_sort_recent"
+                android:nextFocusUp="@+id/vod_sort_combo"
                 android:scrollbars="vertical" />
         </LinearLayout>
 
