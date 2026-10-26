@@ -6492,25 +6492,6 @@ class MainActivity : TvRemoteActivity() {
             intent?.removeExtra(EXTRA_VOD_LOGO_URL)
 
             iptvPlayback.stop()
-            val pendingChannel = LiveChannel(
-                id = sourceKey.hashCode().toLong(),
-                sourceKey = sourceKey,
-                inputId = "iptv:direct_vod",
-                displayNumber = "VOD",
-                displayName = mainTitle,
-                source = LiveChannel.Source.IPTV,
-                uri = directStreamUrl,
-                logoUrl = logo,
-                iptvContentType = "VOD",
-            ).apply {
-                episodeTitle = subTitle
-            }
-            currentChannel = pendingChannel
-            showVodPlayerControls(autoHide = false)
-            binding.iptvBufferingSpinner.visibility = View.VISIBLE
-            binding.iptvBufferingContainer.visibility = View.VISIBLE
-            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
-
             val customReferrer = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_REFERRER)
             val customOrigin = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_ORIGIN)
             val customUserAgent = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
@@ -6520,6 +6501,35 @@ class MainActivity : TvRemoteActivity() {
             intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
             intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_COOKIE)
 
+            val baseChannel = LiveChannel(
+                id = sourceKey.hashCode().toLong(),
+                sourceKey = sourceKey,
+                inputId = "iptv:direct_vod",
+                displayNumber = "VOD",
+                displayName = mainTitle,
+                source = LiveChannel.Source.IPTV,
+                uri = directStreamUrl,
+                logoUrl = logo,
+                iptvContentType = "VOD",
+                userAgent = customUserAgent,
+                referrer = customReferrer,
+                origin = customOrigin,
+            ).apply {
+                episodeTitle = subTitle
+                cookie = customCookie
+            }
+
+            // Dogrudan medya akisi ise (mp4, m3u8, mkv vs.) web resolver'a girmeden direkt oynat
+            if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(directStreamUrl)) {
+                selectChannel(baseChannel, recordHistory = true)
+                return
+            }
+
+            // Web sayfasi / sniffer gerektiren URL ise cozumle
+            binding.iptvBufferingSpinner.visibility = View.VISIBLE
+            binding.iptvBufferingContainer.visibility = View.VISIBLE
+            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+
             vodResolveJob?.cancel()
             vodResolveJob = lifecycleScope.launch {
                 val resolved = withContext(Dispatchers.IO) {
@@ -6528,7 +6538,7 @@ class MainActivity : TvRemoteActivity() {
                 binding.iptvBufferingContainer.visibility = View.GONE
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
                 val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else directStreamUrl
-                val playChannel = pendingChannel.copy(
+                val playChannel = baseChannel.copy(
                     uri = finalStreamUrl,
                     userAgent = customUserAgent ?: resolved.userAgent,
                     referrer = customReferrer ?: resolved.referrer,
@@ -6564,19 +6574,20 @@ class MainActivity : TvRemoteActivity() {
 
                 if (direct != null) {
                     val vodPending = direct.copy(iptvContentType = "VOD")
-                    withContext(Dispatchers.Main) {
-                        currentChannel = vodPending
-                        showVodPlayerControls(autoHide = false)
-                    }
-                    val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(vodPending.uri, this@MainActivity)
-                    val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else vodPending.uri
-                    vodPending.copy(
-                        uri = finalStreamUrl,
-                        userAgent = resolved.userAgent,
-                        referrer = resolved.referrer,
-                        origin = resolved.origin,
-                    ).apply {
-                        cookie = resolved.cookie
+                    if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(vodPending.uri)) {
+                        vodPending
+                    } else {
+                        // Web tabanli VOD icerigi (JSON listeleri, web sayfasi embedleri):
+                        val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(vodPending.uri, this@MainActivity)
+                        val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else vodPending.uri
+                        vodPending.copy(
+                            uri = finalStreamUrl,
+                            userAgent = resolved.userAgent ?: vodPending.userAgent,
+                            referrer = resolved.referrer ?: vodPending.referrer,
+                            origin = resolved.origin ?: vodPending.origin,
+                        ).apply {
+                            cookie = resolved.cookie ?: vodPending.cookie
+                        }
                     }
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
@@ -6638,21 +6649,22 @@ class MainActivity : TvRemoteActivity() {
                         ).apply {
                             episodeTitle = subTitle
                         }
-                        withContext(Dispatchers.Main) {
-                            currentChannel = pendingChannel
-                            showVodPlayerControls(autoHide = false)
-                        }
 
-                        val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
-                        val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else meta.streamUrl
-                        pendingChannel.copy(
-                            uri = finalStreamUrl,
-                            userAgent = resolved.userAgent,
-                            referrer = resolved.referrer,
-                            origin = resolved.origin,
-                        ).apply {
-                            episodeTitle = subTitle
-                            cookie = resolved.cookie
+                        // Eger dogrudan medya akisi ise web resolver calistirma
+                        if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(meta.streamUrl)) {
+                            pendingChannel
+                        } else {
+                            val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
+                            val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else meta.streamUrl
+                            pendingChannel.copy(
+                                uri = finalStreamUrl,
+                                userAgent = resolved.userAgent ?: pendingChannel.userAgent,
+                                referrer = resolved.referrer ?: pendingChannel.referrer,
+                                origin = resolved.origin ?: pendingChannel.origin,
+                            ).apply {
+                                episodeTitle = subTitle
+                                cookie = resolved.cookie ?: pendingChannel.cookie
+                            }
                         }
                     } else null
                 }

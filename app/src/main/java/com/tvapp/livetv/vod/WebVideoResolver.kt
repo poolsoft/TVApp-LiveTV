@@ -19,7 +19,7 @@ object WebVideoResolver {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     private val DIRECT_STREAM_PATTERN =
-        Pattern.compile(".*\\.(m3u8|mp4|mkv|ts|mpd)(\\?.*)?$", Pattern.CASE_INSENSITIVE)
+        Pattern.compile(".*\\.(m3u8|mp4|mkv|ts|mpd|avi|webm|flv)(\\?.*)?$", Pattern.CASE_INSENSITIVE)
 
     private val M3U8_REGEX =
         Pattern.compile("https?://[^\\s\"'<>]+\\.m3u8[^\\s\"'<>]*", Pattern.CASE_INSENSITIVE)
@@ -53,7 +53,8 @@ object WebVideoResolver {
         if (clean.isEmpty()) return false
         val lower = clean.lowercase()
         if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
-            lower.contains("/hls/") || lower.contains("playlist.m3u8")
+            lower.contains("/hls/") || lower.contains("playlist.m3u8") ||
+            lower.contains("/movie/") || lower.contains("/series/") || lower.contains("/live/")
         ) {
             return true
         }
@@ -81,13 +82,15 @@ object WebVideoResolver {
         // Check for media extensions or streaming paths
         if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
             lower.contains("/hls/") || lower.contains("/dash/") || lower.contains("playlist.m3u8") ||
-            lower.contains("master.m3u8") || lower.contains("manifest")
+            lower.contains("master.m3u8") || lower.contains("manifest") ||
+            lower.contains("/movie/") || lower.contains("/series/")
         ) {
             return true
         }
 
         // Direct video files (excluding short ad videos)
-        if (lower.contains(".mp4") && !lower.contains("ad_") && !lower.contains("banner") && !lower.contains("preview_")) {
+        if ((lower.contains(".mp4") || lower.contains(".mkv") || lower.contains(".webm") || lower.contains(".ts")) &&
+            !lower.contains("ad_") && !lower.contains("banner") && !lower.contains("preview_")) {
             return true
         }
 
@@ -96,7 +99,7 @@ object WebVideoResolver {
 
     data class ResolvedStream(
         val streamUrl: String,
-        val userAgent: String? = USER_AGENT,
+        val userAgent: String? = null,
         val referrer: String? = null,
         val origin: String? = null,
         val cookie: String? = null,
@@ -116,7 +119,7 @@ object WebVideoResolver {
     suspend fun resolveStream(rawUrl: String, context: android.content.Context? = null): ResolvedStream = withContext(Dispatchers.IO) {
         val targetUrl = rawUrl.trim()
         if (targetUrl.isEmpty()) return@withContext ResolvedStream(targetUrl, isPlayable = false)
-        if (isDirectStream(targetUrl)) return@withContext ResolvedStream(targetUrl, isPlayable = true)
+        if (isDirectStream(targetUrl)) return@withContext ResolvedStream(targetUrl, userAgent = null, isPlayable = true)
 
         val pageOrigin = originOf(targetUrl)
 
@@ -129,6 +132,7 @@ object WebVideoResolver {
             val cookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fastResolved) }.getOrNull()
             return@withContext ResolvedStream(
                 streamUrl = fastResolved,
+                userAgent = USER_AGENT,
                 referrer = targetUrl,
                 origin = pageOrigin,
                 cookie = cookie,
@@ -150,6 +154,7 @@ object WebVideoResolver {
         val fallbackCookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fallback) }.getOrNull()
         ResolvedStream(
             streamUrl = fallback,
+            userAgent = if (fastResolved != null) USER_AGENT else null,
             referrer = targetUrl,
             origin = pageOrigin,
             cookie = fallbackCookie,

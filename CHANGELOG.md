@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-26 - VOD Oynatıcı Doğrudan Akış İzolasyonu, HTTP 403 ve UI Titremesi (Flash) Düzeltmesi
+
+- **VOD Oynatıcının Web Çözümleyiciden İzolasyonu & HTTP 403 Koruması (`MainActivity.kt` & `WebVideoResolver.kt`):**
+  - M3U ve IPTV listelerindeki doğrudan medya akışları (`.m3u8`, `.mp4`, `.mkv`, `.ts`, `.mpd`, `.avi`, `.webm`, `.flv`, `/movie/`, `/series/`, `/live/`), Web tarayıcısı / `WebVideoResolver` sürecine girmeden doğrudan ExoPlayer'a aktarılacak şekilde ayrıştırıldı.
+  - `WebVideoResolver`'ın doğrudan akışlara varsayılan Chrome Masaüstü `User-Agent` zorlaması kaldırıldı (`userAgent = null`). Böylece IPTV sağlayıcısının kendi User-Agent ve Referer başlıklarının ezilmesi ve sunucuların HTTP 403 Forbidden dönmesi engellendi.
+  - JSON listelerindeki web tabanlı VOD içerikleri (`ha.vixolity.com` vb.) arka planda izole biçimde çözümlenmeye ve ExoPlayer'a aktarılmaya devam eder.
+- **VOD Başlatılırken Oluşan Arayüz Titremesinin (Flash Aç/Kapa) Giderilmesi (`MainActivity.kt`):**
+  - Film açılırken kanal henüz arka planda çözümlenirken yapılan erken `currentChannel = pendingChannel` ataması ve zamansız `showVodPlayerControls` çağrısı kaldırıldı.
+  - Oynatıcı yükleme esnasında yalnızca arabelleğe alma animasyonu gösterilir ve akış hazır olduğunda `selectChannel` tek seferde kararlı biçimde başlatılarak arayüzdeki çift açılıp kapanma etkisi tamamen ortadan kaldırıldı.
+
 ## 2026-10-26 - VOD Player Kapanma Düzeltmesi, Web Tarayıcı Üst Bar Auto-Hide, Fare Silikleşme & Modern İkon
 
 - **VOD Player Anında Kapanma / Kütüphaneye Geri Dönme Sorununun Giderilmesi (`MainActivity.kt`):**
