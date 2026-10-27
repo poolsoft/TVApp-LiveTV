@@ -84,6 +84,7 @@ class TvBrowserActivity : Activity() {
     private var topBarVisible = true
     private val autoHideDelayMs = 3500L
     private val autoHideRunnable = Runnable { hideTopBar() }
+    @Volatile private var cachedUserAgent: String = DESKTOP_USER_AGENT
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,6 +92,10 @@ class TvBrowserActivity : Activity() {
         setContentView(R.layout.activity_tv_browser)
 
         loadPreferences()
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val desktopMode = prefs.getBoolean(KEY_DESKTOP_MODE, true)
+        cachedUserAgent = if (desktopMode) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+
         initViews()
         setupSniffer()
         setupWebView()
@@ -203,7 +208,7 @@ class TvBrowserActivity : Activity() {
 
     private fun setupSniffer() {
         sniffer = StreamSniffer(
-            userAgent = { webView.settings.userAgentString },
+            userAgent = { cachedUserAgent },
             onStreamAvailable = { request ->
                 uiHandler.post {
                     currentPlaybackRequest = request
@@ -228,6 +233,8 @@ class TvBrowserActivity : Activity() {
 
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val desktopMode = prefs.getBoolean(KEY_DESKTOP_MODE, true)
+        val ua = if (desktopMode) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+        cachedUserAgent = ua
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -239,7 +246,7 @@ class TvBrowserActivity : Activity() {
             setSupportMultipleWindows(false)
             allowFileAccess = false
             allowContentAccess = false
-            userAgentString = if (desktopMode) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+            userAgentString = ua
         }
 
         webView.webViewClient = SniffingWebViewClient(
@@ -894,7 +901,9 @@ class TvBrowserActivity : Activity() {
                     3 -> {
                         val next = !desktopMode
                         prefs.edit().putBoolean(KEY_DESKTOP_MODE, next).apply()
-                        webView.settings.userAgentString = if (next) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+                        val ua = if (next) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
+                        cachedUserAgent = ua
+                        webView.settings.userAgentString = ua
                         webView.reload()
                     }
                     4 -> showFavoritesDialog()

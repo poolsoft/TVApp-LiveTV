@@ -32,6 +32,7 @@ class StreamSniffer(
     fun onRequest(url: String, headers: Map<String, String> = emptyMap()) {
         val kind = MediaUrlClassifier.classify(url)
         if (kind !in COLLECTED) return
+        android.util.Log.d("StreamSniffer", "SNIFFER_DETECT | kind=$kind, url=$url")
         candidates.add(StreamCandidate(url, kind, seq.incrementAndGet(), headers))
         when (kind) {
             MediaKind.MANIFEST_HLS,
@@ -50,6 +51,7 @@ class StreamSniffer(
         if (hasStream()) {
             val req = bestRequest()
             if (req != null) {
+                android.util.Log.d("StreamSniffer", "SNIFFER_ANNOUNCE | url=${req.url}, headersCount=${req.headers.size}")
                 onStreamAvailable(req)
             }
         }

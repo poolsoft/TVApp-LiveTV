@@ -192,6 +192,7 @@
     <string name="permission_denied_title">TV listeleri izni verilmedi</string>
     <string name="permission_denied_message">Kanal listesini okuyabilmek için Yeniden dene seçeneğine basıp TV listeleri iznini verin.</string>
     <string name="playback_error_title">Kanal açılamadı</string>
+    <string name="playback_error_hint">OK: Yeniden Dene • Geri: Çık</string>
     <string name="channel_number_entry">Kanal numarası</string>
     <string name="channel_not_found">Kanal bulunamadı</string>
     <string name="add_favorite">Favorilere ekle</string>

@@ -42,6 +42,48 @@ class RemoteInputRouter(
      * Tuketildiyse true, tuketilmediyse fallbackSuper cagrilip sonucu doner.
      */
     fun dispatch(event: KeyEvent, fallbackSuper: (KeyEvent) -> Boolean): Boolean {
+        if (env.isPlaybackErrorVisible()) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.dismissStatusDialog()
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.retryPlaybackFromError()
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.zap(1)
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.zap(-1)
+                return true
+            }
+            return when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT -> true
+                else -> true
+            }
+        }
+
+        if (env.isStatusOsd()) {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.dismissStatusDialog()
+                return true
+            }
+            return when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> fallbackSuper(event)
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN -> true
+                else -> true
+            }
+        }
+
         if (env.isVodPlaybackActive()) {
             if (env.handleVodPlayerOverlay(event)) return true
         }
@@ -88,7 +130,7 @@ class RemoteInputRouter(
             return true
         }
 
-        if (routedAction == RemoteAction.DISMISS_STATUS || env.isStatusOsd()) {
+        if (routedAction == RemoteAction.DISMISS_STATUS) {
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) env.dismissStatusDialog()
                 return true
@@ -414,5 +456,7 @@ interface RemoteInputEnv {
     fun dismissStatusDialog()
     fun hideRecentChannels()
     fun openVodLibrary()
+    fun isPlaybackErrorVisible(): Boolean
+    fun retryPlaybackFromError()
     val channelPanelContentIsIptvLibrary: Boolean
 }

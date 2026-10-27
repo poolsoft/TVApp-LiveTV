@@ -45,6 +45,9 @@ class VodHostTest {
         override fun beginGeneration(): Int = ++generation
         override fun enterVodMode() { events += "enterVod" }
         override fun switchToLiveMode(targetSource: String?) { events += "live:$targetSource" }
+        override fun setPendingVodTitle(title: String?, episodeTitle: String?) {
+            events += "pendingTitle:$title"
+        }
         override fun showVodPlayerControls(autoHide: Boolean) { events += "controls:$autoHide" }
         override fun saveResumePosition() { events += "saveResume" }
         override fun stopIptvPlayback() { events += "stop" }

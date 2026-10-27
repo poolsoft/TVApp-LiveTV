@@ -192,6 +192,7 @@
     <string name="permission_denied_title">TV listings permission denied</string>
     <string name="permission_denied_message">Press Retry and grant TV listings permission to read the channel list.</string>
     <string name="playback_error_title">Unable to play channel</string>
+    <string name="playback_error_hint">OK: Retry • Back: Exit</string>
     <string name="channel_number_entry">Channel number</string>
     <string name="channel_not_found">Channel not found</string>
     <string name="add_favorite">Add to favorites</string>

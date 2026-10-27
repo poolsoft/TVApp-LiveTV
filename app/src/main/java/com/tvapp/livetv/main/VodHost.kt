@@ -193,6 +193,7 @@ class VodHost(
             ?: return
 
         env.enterVodMode()
+        env.setPendingVodTitle(payload.title, payload.episodeTitle)
         env.showVodPlayerControls(autoHide = false)
         val requestGeneration = env.beginGeneration()
         if (payload.startOver) {
@@ -448,6 +449,7 @@ interface VodHostEnv {
     fun beginGeneration(): Int
     fun enterVodMode()
     fun switchToLiveMode(targetSource: String?)
+    fun setPendingVodTitle(title: String?, episodeTitle: String?)
     fun showVodPlayerControls(autoHide: Boolean)
     fun saveResumePosition()
     fun stopIptvPlayback()

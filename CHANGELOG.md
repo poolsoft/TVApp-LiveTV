@@ -1,5 +1,18 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-28 - Browser Crash ve Sniffer Düzeltmesi, VOD Başlık Senkronizasyonu, Lottie Yükleniyor Durumu ve Ortalanmış Hata Arayüzü
+
+- **Browser Video Oynatma Crash'i ve Sniffer Düzeltmesi (`TvBrowserActivity.kt` & `StreamSniffer.kt`):**
+  - Chromium `shouldInterceptRequest` arka plan iş parçacığından `webView.settings` okunması nedeniyle oluşan `RuntimeException` (crash) kökten giderildi; User-Agent ana iş parçacığında güvenli olarak önbelleğe alındı (`cachedUserAgent`).
+  - Sayfadaki video adaylarının yakalanması ve duyurulması anlık debug loglarıyla (`SNIFFER_DETECT`, `SNIFFER_ANNOUNCE`) kayıt altına alındı.
+- **VOD Player Başlığı Anında Senkronizasyonu (`VodHost.kt` & `VodPlayerOverlayController.kt`):**
+  - VOD oynatıcı ilk açıldığında arka plandaki DB çözümlemesi tamamlanana kadar başlığın boş veya önceki içeriği göstermesi engellendi; aktarılan `payload.title` ve `payload.episodeTitle` bilgisi `pendingTitle` ile oynatıcı arayüzüne anında basıldı.
+- **Lottie Yükleniyor Animasyonu ve Tek Satır Bilgilendirme Metni (`activity_main.xml` & `MainActivity.kt`):**
+  - Kanal değişimi ve VOD yükleme karartması (`blackout_view`) sırasında ortada yer alan `LottieAnimationView` (`channel_tuning.json`) altına tek satırlık modern durum metni (`blackout_status_text`) eklendi ("VOD açılıyor...", "Bağlanıyor...", kanal adı).
+- **Modern Ortalanmış Hata & Yeniden Dene Arayüzü (`activity_main.xml`, `MainActivity.kt` & `RemoteInputRouter.kt`):**
+  - Kutu şeklindeki eski modal hata diyaloğu (`status_panel`) tamamen kaldırılarak yerine video ortasında odaklanabilir büyük dairesel Yeniden Dene/Play butonu ve hata sebebi metni (`playback_error_container`) getirildi.
+  - Hata oluştuğunda kumanda odağı doğrudan ortadaki butona konumlanır; `OK` basıldığında akış hemen yeniden bağlanır, `Back` basıldığında VOD kütüphanesine veya TV'ye temiz dönüş sağlanır, `CH+`/`CH-` ile canlı TV'de zap yapılabilir.
+
 ## 2026-10-27 - Ayarlar Ekranı Modernizasyonu, Dikey Telefon Dokunmatik ve D-Pad Chip Tasarımı
 
 - **TV İçin Master-Detail (Çift Sütun) Mimarisi ve Dikey Telefon Portre Ayrımı (`layout/` & `layout-port/`):**

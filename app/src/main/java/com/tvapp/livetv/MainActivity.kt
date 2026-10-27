@@ -338,6 +338,12 @@ class MainActivity : TvRemoteActivity() {
         override fun enterVodMode() = this@MainActivity.enterVodMode()
         override fun switchToLiveMode(targetSource: String?) =
             this@MainActivity.switchToLiveMode(targetSource)
+        override fun setPendingVodTitle(title: String?, episodeTitle: String?) {
+            if (vodPlayerOverlayController == null) {
+                setupVodPlayerControls()
+            }
+            vodPlayerOverlayController?.setPendingTitle(title, episodeTitle)
+        }
         override fun showVodPlayerControls(autoHide: Boolean) =
             this@MainActivity.showVodPlayerControls(autoHide)
         override fun saveResumePosition() = saveCurrentIptvResumePosition()
@@ -356,9 +362,11 @@ class MainActivity : TvRemoteActivity() {
         override fun showResolvingFeedback() = showVodResolvingFeedback()
         override fun hideResolvingFeedback() = hideVodResolvingFeedback()
         override fun showBufferingPreparing() {
+            val preparingText = getString(R.string.vod_archive_preparing)
+            updateBlackoutStatus(preparingText)
             binding.iptvBufferingSpinner.visibility = View.VISIBLE
             binding.iptvBufferingContainer.visibility = View.VISIBLE
-            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+            binding.iptvBufferingText.text = preparingText
         }
         override fun hideBuffering() {
             binding.iptvBufferingContainer.visibility = View.GONE
@@ -1237,12 +1245,14 @@ class MainActivity : TvRemoteActivity() {
      *  read what they switched to. While the blackout is active the previous
      *  channel's audio is muted too, and playback.unmutedByPlayback restores
      *  the level when the new channel renders (or on a failure path). */
-    private fun startBlackout() {
+    private fun startBlackout(statusMessage: String? = null) {
         if (!displayPreferences.blackScreenWhileTuning) return
         if (blackScreenActive) return
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE
+        hidePlaybackError()
+        updateBlackoutStatus(statusMessage)
         binding.blackoutAnimation.apply {
             if (composition == null) {
                 setFailureListener { error ->
@@ -1258,11 +1268,22 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
     }
 
+    private fun updateBlackoutStatus(message: String?) {
+        val target = binding.blackoutStatusText
+        if (!message.isNullOrBlank()) {
+            target.text = message
+            target.visibility = View.VISIBLE
+        } else {
+            target.visibility = View.GONE
+        }
+    }
+
     private fun endBlackout(reason: String) {
         if (!blackScreenActive) return
         blackScreenActive = false
         binding.blackoutView.visibility = View.GONE
         binding.blackoutAnimation.cancelAnimation()
+        binding.blackoutStatusText.visibility = View.GONE
         playback.setMuted(false)
         debugLog.recordDebug("BLACKOUT_END | reason=$reason")
     }
@@ -1335,6 +1356,7 @@ class MainActivity : TvRemoteActivity() {
         updateTechnicalBadges(channel, emptyList())
         updateAudioOnlyPanel(channel, channel.isRadioChannel())
         osdCoordinator.hideStatus()
+        hidePlaybackError()
         statusRetryAction = null
         if (channel.isVodContent()) {
             setInfoBarVisible(false)
@@ -1393,7 +1415,7 @@ class MainActivity : TvRemoteActivity() {
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean, compact: Boolean = false) {
-        val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
+        val shouldShow = visible && (!blackScreenActive || vodMode) && currentChannel?.source == LiveChannel.Source.IPTV
         binding.iptvBufferingCorner.visibility = if (shouldShow && compact) View.VISIBLE else View.GONE
         if (compact) {
             binding.iptvBufferingContainer.visibility = View.GONE
@@ -1415,9 +1437,11 @@ class MainActivity : TvRemoteActivity() {
             ?.displayName
             ?.trim()
             ?.takeIf(String::isNotBlank)
-        binding.iptvBufferingText.text = channelName?.let {
+        val fullStatus = channelName?.let {
             getString(R.string.iptv_playback_status, it, status)
         } ?: status
+        binding.iptvBufferingText.text = fullStatus
+        updateBlackoutStatus(fullStatus)
     }
 
     private fun prepareIptvAlternatives(channel: LiveChannel) {
@@ -1543,13 +1567,7 @@ class MainActivity : TvRemoteActivity() {
     private fun showIptvPlaybackFailure(error: Throwable? = null) {
         endBlackout("IPTV_FAILURE")
         iptvPlaybackFailed = true
-        osdCoordinator.hideStatus()
-        showIptvPlaybackControls(R.string.iptv_stream_failed, autoHide = false)
-        if (currentChannel?.source == LiveChannel.Source.IPTV) {
-            binding.iptvBufferingSpinner.visibility = View.GONE
-            binding.iptvBufferingText.text = formatIptvErrorMessage(error)
-            binding.iptvBufferingContainer.visibility = View.VISIBLE
-        }
+        showPlaybackError(currentChannel, formatIptvErrorMessage(error))
     }
 
     private fun formatIptvErrorMessage(error: Throwable?): String {
@@ -1625,22 +1643,37 @@ class MainActivity : TvRemoteActivity() {
             showIptvNotice(R.string.iptv_stream_failed)
             return
         }
-        osdCoordinator.showStatus()
-        binding.statusTitle.setText(R.string.playback_error_title)
-        binding.inputSummary.text = channel?.displayName.orEmpty()
-        binding.statusMessage.text = detail
+        binding.iptvBufferingContainer.visibility = View.GONE
+        osdCoordinator.hideStatus()
+
+        val channelName = channel?.displayName?.trim().orEmpty()
+        binding.playbackErrorTitle.text = if (channelName.isNotBlank()) channelName else getString(R.string.playback_error_title)
+        binding.playbackErrorMessage.text = detail
+        binding.playbackErrorContainer.visibility = View.VISIBLE
+
         statusRetryAction = channel?.let { failedChannel ->
             { selectChannel(failedChannel, recordHistory = !currentPlaybackUsesIptvLibrary) }
         }
-        binding.statusPanel.post {
-            binding.retryButton.requestFocus()
+
+        binding.playbackErrorRetryBtn.setOnClickListener {
+            hidePlaybackError()
+            statusRetryAction?.invoke()
         }
+
+        binding.playbackErrorContainer.post {
+            binding.playbackErrorRetryBtn.requestFocus()
+        }
+    }
+
+    private fun hidePlaybackError() {
+        binding.playbackErrorContainer.visibility = View.GONE
     }
 
     private fun dismissStatusDialog() {
         vodHost.cancelResolve()
         iptvPlayback.stop()
         binding.iptvBufferingContainer.visibility = View.GONE
+        hidePlaybackError()
         statusRetryAction = null
         osdCoordinator.hideStatus()
         modePreferences.edit().remove(LAST_VOD_KEY).apply()
@@ -5758,7 +5791,8 @@ class MainActivity : TvRemoteActivity() {
         override fun isIptvControlsInteractive(): Boolean = iptvControlsInteractive
         override fun isIptvPlaybackContainerVisible(): Boolean =
             binding.iptvPlaybackContainer.visibility == View.VISIBLE
-        override fun isStatusOsd(): Boolean = osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS
+        override fun isStatusOsd(): Boolean =
+            osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS || binding.statusPanel.visibility == View.VISIBLE
         override fun isRecentChannelsOsd(): Boolean =
             osdCoordinator.state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
         override fun hasNoBlockingPlaybackOsd(): Boolean =
@@ -5852,6 +5886,12 @@ class MainActivity : TvRemoteActivity() {
         override fun dismissStatusDialog() = this@MainActivity.dismissStatusDialog()
         override fun hideRecentChannels() = this@MainActivity.hideRecentChannels()
         override fun openVodLibrary() = this@MainActivity.openVodLibrary()
+        override fun isPlaybackErrorVisible(): Boolean =
+            binding.playbackErrorContainer.visibility == View.VISIBLE
+        override fun retryPlaybackFromError() {
+            hidePlaybackError()
+            statusRetryAction?.invoke()
+        }
         override val channelPanelContentIsIptvLibrary: Boolean
             get() = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
     }
