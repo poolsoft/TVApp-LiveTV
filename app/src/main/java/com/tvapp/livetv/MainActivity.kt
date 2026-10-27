@@ -69,8 +69,11 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
+import com.tvapp.livetv.main.EpgHost
+import com.tvapp.livetv.main.EpgHostEnv
 import com.tvapp.livetv.main.IptvLibraryPagingRules
 import com.tvapp.livetv.main.LongPressKeyGate
+import com.tvapp.livetv.main.MainDialogs
 import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.main.RemoteInputEnv
 import com.tvapp.livetv.main.RemoteInputRouter
@@ -435,8 +438,21 @@ class MainActivity : TvRemoteActivity() {
     private var focusedAutoTuneTargetKey: String? = null
     private var visibleProgramsJob: Job? = null
     private var visibleProgramsRequestId = 0L
-    private var epgRefreshJob: Job? = null
-    private var epgAutoRefreshJob: Job? = null
+    private val epgHost by lazy {
+        EpgHost(
+            scope = lifecycleScope,
+            env = object : EpgHostEnv {
+                override fun getContext(): android.content.Context = this@MainActivity
+                override suspend fun onRefreshTick() = refreshCurrentPrograms()
+                override fun onAutoRefreshComplete() {
+                    currentChannel?.let(::loadPrograms)
+                }
+                override fun recordDebug(message: String) {
+                    if (::debugLog.isInitialized) debugLog.recordDebug(message)
+                }
+            },
+        )
+    }
     private var sleepTimerJob: Job? = null
     private var iptvControlsJob: Job? = null
     private var iptvNoticeJob: Job? = null
@@ -1932,36 +1948,11 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun startEpgRefresh() {
-        epgRefreshJob?.cancel()
-        epgRefreshJob = lifecycleScope.launch {
-            while (true) {
-                delay(EPG_REFRESH_INTERVAL_MS)
-                refreshCurrentPrograms()
-            }
-        }
+        epgHost.startEpgRefresh()
     }
 
     private fun checkAndScheduleEpgAutoRefresh() {
-        if (epgAutoRefreshJob?.isActive == true) return
-        epgAutoRefreshJob = lifecycleScope.launch(Dispatchers.IO) {
-            delay(25_000L)
-            val xmlTvRepo = XmlTvRepository(this@MainActivity)
-            if (xmlTvRepo.shouldAutoRefresh()) {
-                debugLog.recordDebug("EPG_AUTO_REFRESH_START | source=xmltv")
-                val activeKeys = xmlTvRepo.activeChannelKeys()
-                runCatching {
-                    val count = xmlTvRepo.refreshSavedUrls(activeKeys)
-                    debugLog.recordDebug("EPG_AUTO_REFRESH_SUCCESS | count=$count")
-                    withContext(Dispatchers.Main) {
-                        currentChannel?.let(::loadPrograms)
-                    }
-                }.onFailure { error ->
-                    debugLog.recordDebug(
-                        "EPG_AUTO_REFRESH_FAILURE | ${error.javaClass.simpleName}: ${error.message}",
-                    )
-                }
-            }
-        }
+        epgHost.checkAndScheduleAutoRefresh()
     }
 
     private suspend fun refreshCurrentPrograms() {
@@ -3119,11 +3110,7 @@ class MainActivity : TvRemoteActivity() {
         }
         actions += (getString(R.string.open_browser) to { openTvBrowser() })
 
-        AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(R.string.playback_mode_title)
-            .setItems(actions.map { it.first }.toTypedArray()) { _, which ->
-                actions.getOrNull(which)?.second?.invoke()
-            }.setNegativeButton(R.string.close, null).show()
+        MainDialogs.showPlaybackModeDialog(this, actions)
     }
 
     private fun openTvBrowser() {
@@ -3136,78 +3123,29 @@ class MainActivity : TvRemoteActivity() {
         if (isFinishing || isDestroyed) return
         quickHubDialog?.dismiss()
 
-        val dialogView = layoutInflater.inflate(R.layout.dialog_quick_hub, null)
-        val hintText = dialogView.findViewById<TextView>(R.id.hub_hint_text)
-
-        val itemLiveTv = dialogView.findViewById<View>(R.id.hub_item_live_tv)
-        val itemVod = dialogView.findViewById<View>(R.id.hub_item_vod)
-        val itemIptv = dialogView.findViewById<View>(R.id.hub_item_iptv)
-        val itemXmltv = dialogView.findViewById<View>(R.id.hub_item_xmltv)
-        val itemBrowser = dialogView.findViewById<View>(R.id.hub_item_browser)
-        val itemGuide = dialogView.findViewById<View>(R.id.hub_item_guide)
-        val itemMultiview = dialogView.findViewById<View>(R.id.hub_item_multiview)
-        val itemSettings = dialogView.findViewById<View>(R.id.hub_item_settings)
-
-        fun bindFocusHint(view: View, hintResId: Int) {
-            view.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    hintText.setText(hintResId)
+        val dialog = MainDialogs.createQuickHubDialog(
+            activity = this,
+            onLiveTv = {
+                if (vodMode) switchToLiveMode()
+                showChannelPanel(expanded = false)
+            },
+            onVod = { openVodLibrary() },
+            onIptv = { openIptvEditor() },
+            onXmltv = { startActivity(Intent(this, XmlTvSourcesActivity::class.java)) },
+            onBrowser = { openTvBrowser() },
+            onGuide = {
+                val intent = Intent(this, ProgramGuideActivity::class.java).apply {
+                    putExtra(ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY, currentChannel?.sourceKey)
                 }
-            }
-        }
-
-        bindFocusHint(itemLiveTv, R.string.quick_hub_live_tv_hint)
-        bindFocusHint(itemVod, R.string.quick_hub_vod_hint)
-        bindFocusHint(itemIptv, R.string.quick_hub_iptv_hint)
-        bindFocusHint(itemXmltv, R.string.quick_hub_xmltv_hint)
-        bindFocusHint(itemBrowser, R.string.quick_hub_browser_hint)
-        bindFocusHint(itemGuide, R.string.quick_hub_guide_hint)
-        bindFocusHint(itemMultiview, R.string.quick_hub_multiview_hint)
-        bindFocusHint(itemSettings, R.string.quick_hub_settings_hint)
-
-        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setView(dialogView)
-            .create()
-
-        itemLiveTv.setOnClickListener {
-            dialog.dismiss()
-            if (vodMode) switchToLiveMode()
-            showChannelPanel(expanded = false)
-        }
-        itemVod.setOnClickListener {
-            dialog.dismiss()
-            openVodLibrary()
-        }
-        itemIptv.setOnClickListener {
-            dialog.dismiss()
-            openIptvEditor()
-        }
-        itemXmltv.setOnClickListener {
-            dialog.dismiss()
-            startActivity(Intent(this, XmlTvSourcesActivity::class.java))
-        }
-        itemBrowser.setOnClickListener {
-            dialog.dismiss()
-            openTvBrowser()
-        }
-        itemGuide.setOnClickListener {
-            dialog.dismiss()
-            val intent = Intent(this, ProgramGuideActivity::class.java).apply {
-                putExtra(ProgramGuideActivity.EXTRA_CURRENT_SOURCE_KEY, currentChannel?.sourceKey)
-            }
-            programGuide.launch(intent)
-        }
-        itemMultiview.setOnClickListener {
-            dialog.dismiss()
-            showIptvGridPicker()
-        }
-        itemSettings.setOnClickListener {
-            dialog.dismiss()
-            openDisplaySettings()
-        }
-
+                programGuide.launch(intent)
+            },
+            onMultiview = { showIptvGridPicker() },
+            onSettings = { openDisplaySettings() },
+        )
         dialog.setOnShowListener {
-            itemLiveTv.post { itemLiveTv.requestFocus() }
+            dialog.findViewById<View>(R.id.hub_item_live_tv)?.post {
+                dialog.findViewById<View>(R.id.hub_item_live_tv)?.requestFocus()
+            }
         }
         quickHubDialog = dialog
         dialog.show()
@@ -4902,19 +4840,7 @@ class MainActivity : TvRemoteActivity() {
         input: EditText,
         onSave: (String) -> Unit,
     ) {
-        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(title)
-            .setView(input)
-            .setPositiveButton(R.string.save, null)
-            .setNegativeButton(R.string.close, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                dialog.dismiss()
-                onSave(input.text.toString())
-            }
-        }
-        dialog.show()
+        MainDialogs.showTextEditor(this, title, input, onSave)
     }
 
     private fun showEditorError(message: Int) {
@@ -4926,30 +4852,12 @@ class MainActivity : TvRemoteActivity() {
 
     private fun showChannelSearchDialog() {
         focusedTuneJob?.cancel()
-        val input = EditText(ContextThemeWrapper(this, R.style.Theme_TVApp_Dialog)).apply {
-            inputType = InputType.TYPE_CLASS_TEXT
-            hint = getString(R.string.channel_search_hint)
-            setText(channelSearchQuery)
-            selectAll()
-        }
-        val dialog = AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle(R.string.search_channels)
-            .setView(input)
-            .setPositiveButton(R.string.apply, null)
-            .setNeutralButton(R.string.clear_search, null)
-            .setNegativeButton(R.string.close, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                applyChannelSearch(input.text.toString())
-                dialog.dismiss()
-            }
-            dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
-                applyChannelSearch("")
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
+        MainDialogs.showChannelSearchDialog(
+            context = this,
+            currentQuery = channelSearchQuery,
+            onApply = { applyChannelSearch(it) },
+            onClear = { applyChannelSearch("") },
+        )
     }
 
     private fun applyChannelSearch(value: String) {
@@ -6157,19 +6065,17 @@ class MainActivity : TvRemoteActivity() {
         infoBarJob?.cancel()
         alphabetLoadJob?.cancel()
         alphabetFilterJob?.cancel()
-        alphabetRightKeyGate.cancel()
+        remoteInputRouter.cancelAllGates()
         alphabetRail?.close()
         channelPanelJob?.cancel()
         programJob?.cancel()
         visibleProgramsJob?.cancel()
         channelLoadJob?.cancel()
-        epgRefreshJob?.cancel()
+        epgHost.cancelAll()
         sleepTimerJob?.cancel()
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
-        greenKeyGate.cancel()
         iptvInfoTickerJob?.cancel()
-        settingsKeyGate.cancel()
         clockJob?.cancel()
         playback.stop()
         iptvPlayback.release()
