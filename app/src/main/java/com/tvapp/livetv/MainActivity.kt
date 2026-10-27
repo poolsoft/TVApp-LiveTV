@@ -67,6 +67,7 @@ import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
+import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.gridProfileForCellCount
@@ -1109,7 +1110,7 @@ class MainActivity : TvRemoteActivity() {
     private fun selectChannel(channel: LiveChannel) = selectChannel(channel, recordHistory = true)
 
     private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
-        if (vodMode && !channel.isVodContent()) return
+        if (PlaybackRules.blockedByVodMode(vodMode, channel)) return
         if (channel.sourceKey != currentChannel?.sourceKey) saveCurrentIptvResumePosition()
         if (channel.isVodContent()) {
             enterVodMode()
@@ -1245,7 +1246,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
-        if (vodMode && !channel.isVodContent()) return
+        if (PlaybackRules.blockedByVodMode(vodMode, channel)) return
         if (channel.source == LiveChannel.Source.IPTV && !hasIptvAccess {
                 playSelectedChannel(channel, recordHistory)
             }
@@ -1254,14 +1255,17 @@ class MainActivity : TvRemoteActivity() {
         if (iptvGridActive) stopIptvGrid(resumePrevious = false)
         // Repeat OK presses on the channel that is already connecting must not
         // restart playback and reset the retry/alternative-stream cycle.
-        if (channel.sourceKey == currentChannel?.sourceKey) {
-            val phase = iptvPlayback.healthSnapshot().phase
-            if (phase == IptvPlaybackPhase.PREPARING || phase == IptvPlaybackPhase.BUFFERING) {
-                debugLog.recordDebug(
-                    "CHANNEL_SELECT_IGNORED | key=${channel.sourceKey}, phase=$phase",
-                )
-                return
-            }
+        val activeKey = currentChannel?.sourceKey
+        val repeatPhase = if (activeKey == channel.sourceKey) {
+            iptvPlayback.healthSnapshot().phase
+        } else {
+            null
+        }
+        if (repeatPhase != null && PlaybackRules.ignoreRepeatSelect(channel, activeKey, repeatPhase)) {
+            debugLog.recordDebug(
+                "CHANNEL_SELECT_IGNORED | key=${channel.sourceKey}, phase=$repeatPhase",
+            )
+            return
         }
         saveCurrentIptvResumePosition()
         debugLog.recordDebug(
@@ -1340,10 +1344,8 @@ class MainActivity : TvRemoteActivity() {
                     binding.iptvPlayerView.visibility = View.VISIBLE
                     updateIptvBufferingStatus(R.string.iptv_connecting)
                     setIptvBufferingVisible(true)
-                    val resumePosition = if (channel.iptvContentType == "VOD") {
+                    val resumePosition = PlaybackRules.resumePosition(channel) {
                         iptvResumeStore.position(channel.sourceKey)
-                    } else {
-                        0L
                     }
                     prepareIptvAlternatives(channel)
                     updateTechnicalBadgesForIptv(channel)
@@ -1425,40 +1427,40 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         lifecycleScope.launch {
-            val alternatives = if (iptvAlternativeLoadKey == channel.sourceKey &&
-                iptvAlternativeStreams.isNotEmpty()
-            ) {
-                iptvAlternativeStreams
-            } else {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        iptvRepository.alternativeStreams(channel.sourceKey)
-                    }
-                }.getOrElse { fetchError ->
-                    debugLog.recordDebug(
-                        "IPTV_ALTERNATIVES_FAILURE | key=${channel.sourceKey}, " +
-                            "${fetchError.javaClass.simpleName}: ${fetchError.message}",
-                    )
-                    showIptvPlaybackFailure(fetchError)
-                    recoverIptvExhaustedTune(channel)
-                    return@launch
-                }.also {
-                    iptvAlternativeLoadKey = channel.sourceKey
-                    iptvAlternativeStreams = it
-                    iptvAlternativeIndex = 0
+            val alternatives = PlaybackRules.cachedAlternatives(
+                iptvAlternativeLoadKey,
+                channel.sourceKey,
+                iptvAlternativeStreams,
+            ) ?: runCatching {
+                withContext(Dispatchers.IO) {
+                    iptvRepository.alternativeStreams(channel.sourceKey)
                 }
+            }.getOrElse { fetchError ->
+                debugLog.recordDebug(
+                    "IPTV_ALTERNATIVES_FAILURE | key=${channel.sourceKey}, " +
+                        "${fetchError.javaClass.simpleName}: ${fetchError.message}",
+                )
+                showIptvPlaybackFailure(fetchError)
+                recoverIptvExhaustedTune(channel)
+                return@launch
+            }.also {
+                iptvAlternativeLoadKey = channel.sourceKey
+                iptvAlternativeStreams = it
+                iptvAlternativeIndex = 0
             }
             if (currentChannel?.sourceKey != channel.sourceKey) return@launch
-            val alternative = alternatives.getOrNull(iptvAlternativeIndex++)
-            if (alternative == null) {
+            val choice = PlaybackRules.nextAlternative(alternatives, iptvAlternativeIndex)
+            if (choice == null) {
                 showIptvPlaybackFailure(error)
                 recoverIptvExhaustedTune(channel)
                 return@launch
             }
-            val snapshot = iptvPlayback.playbackSnapshot()
-            val startPosition = snapshot.positionMillis.takeIf {
-                channel.iptvContentType == "VOD"
-            } ?: 0L
+            iptvAlternativeIndex = choice.nextIndex
+            val alternative = choice.channel
+            val startPosition = PlaybackRules.alternativeStartPosition(
+                channel,
+                iptvPlayback.playbackSnapshot().positionMillis,
+            )
             debugLog.recordDebug(
                 "IPTV_ALTERNATIVE_PLAY | key=${channel.sourceKey}, " +
                     "index=$iptvAlternativeIndex/${alternatives.size}",
@@ -1468,14 +1470,7 @@ class MainActivity : TvRemoteActivity() {
             // exception is contained here and surfaces as the failure OSD.
             runCatching {
                 iptvPlayback.play(
-                    channel.copy(
-                        uri = alternative.uri,
-                        inputId = alternative.inputId,
-                        userAgent = alternative.userAgent,
-                        referrer = alternative.referrer,
-                        origin = alternative.origin,
-                        subtitleUrl = alternative.subtitleUrl,
-                    ),
+                    PlaybackRules.applyAlternative(channel, alternative),
                     startPosition,
                 )
             }.onFailure {
