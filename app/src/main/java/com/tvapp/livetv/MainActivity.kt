@@ -320,12 +320,68 @@ class MainActivity : TvRemoteActivity() {
         set(value) { channelZapper.numberInput = value }
     private var focusedTuneJob: Job? = null
     private var channelResolutionGeneration = 0
-    private var vodResolveJob: Job? = null
-    private val vodHostCallbacks = object : com.tvapp.livetv.main.VodHostCallbacks {
+    private lateinit var vodHost: com.tvapp.livetv.main.VodHost
+    private val vodHostEnv = object : com.tvapp.livetv.main.VodHostEnv {
         override fun isVodMode(): Boolean = vodMode
         override fun currentGeneration(): Int = channelResolutionGeneration
+        override fun beginGeneration(): Int = ++channelResolutionGeneration
+        override fun enterVodMode() = this@MainActivity.enterVodMode()
+        override fun switchToLiveMode(targetSource: String?) =
+            this@MainActivity.switchToLiveMode(targetSource)
+        override fun showVodPlayerControls(autoHide: Boolean) =
+            this@MainActivity.showVodPlayerControls(autoHide)
+        override fun saveResumePosition() = saveCurrentIptvResumePosition()
+        override fun stopIptvPlayback() = iptvPlayback.stop()
+        override fun resumeIptvPlayback() = iptvPlayback.play()
+        override fun clearResume(sourceKey: String) = iptvResumeStore.clear(sourceKey)
+        override fun setVodHasEpisodes(hasEpisodes: Boolean) {
+            currentVodHasEpisodes = hasEpisodes
+        }
+        override fun currentChannelKey(): String? = currentChannel?.sourceKey
+        override fun isTunedAndReady(sourceKey: String): Boolean =
+            iptvPlayback.tunedSourceKey() == sourceKey &&
+                iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY
+        override fun selectChannel(channel: LiveChannel) =
+            this@MainActivity.selectChannel(channel, recordHistory = true)
+        override fun showResolvingFeedback() = showVodResolvingFeedback()
+        override fun hideResolvingFeedback() = hideVodResolvingFeedback()
+        override fun showBufferingPreparing() {
+            binding.iptvBufferingSpinner.visibility = View.VISIBLE
+            binding.iptvBufferingContainer.visibility = View.VISIBLE
+            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+        }
+        override fun hideBuffering() {
+            binding.iptvBufferingContainer.visibility = View.GONE
+        }
+        override fun string(resId: Int): String = getString(resId)
+        override fun seasonEpisodeLabel(season: Int, episode: Int): String =
+            getString(R.string.vod_season_episode_fmt, season, episode)
+        override fun showStreamChoice(
+            resolved: com.tvapp.livetv.vod.VodPageResolver.Resolved,
+            baseChannel: LiveChannel,
+        ) = showVodStreamChoice(resolved, baseChannel)
+        override fun showChannelNotFound() = showIptvNotice(R.string.channel_not_found)
+        override fun clearLastVodKey() {
+            modePreferences.edit().remove(LAST_VOD_KEY).apply()
+        }
+        override fun log(message: String) = debugLog.recordDebug(message)
+        override fun findChannelInList(sourceKey: String): LiveChannel? =
+            channels.firstOrNull { it.sourceKey == sourceKey }
+        override suspend fun loadIptvChannel(sourceKey: String): LiveChannel? =
+            iptvRepository.channel(sourceKey)
+        override suspend fun loadMetadata(
+            sourceKey: String,
+        ): com.tvapp.livetv.data.local.VodMetadataEntity? =
+            com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                .vodDao().metadata(sourceKey)
+        override suspend fun loadParentName(parentKey: String): String? =
+            com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                .vodDao().metadata(parentKey)?.name
+        override suspend fun resolvePageWithContext(
+            url: String,
+        ): com.tvapp.livetv.vod.VodPageResolver.Resolved =
+            com.tvapp.livetv.vod.VodPageResolver.resolve(url, this@MainActivity)
     }
-    private val vodHost = com.tvapp.livetv.main.VodHost(vodHostCallbacks)
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
@@ -460,6 +516,7 @@ class MainActivity : TvRemoteActivity() {
         vodMode = savedInstanceState?.getBoolean("vod-mode") == true
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        vodHost = com.tvapp.livetv.main.VodHost(lifecycleScope, vodHostEnv)
         osdCoordinator = OsdCoordinator(::renderPlaybackUiState)
         renderPlaybackUiState(osdCoordinator.state)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1534,8 +1591,7 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun dismissStatusDialog() {
-        vodResolveJob?.cancel()
-        vodResolveJob = null
+        vodHost.cancelResolve()
         iptvPlayback.stop()
         binding.iptvBufferingContainer.visibility = View.GONE
         statusRetryAction = null
@@ -3214,8 +3270,7 @@ class MainActivity : TvRemoteActivity() {
     private fun switchToLiveMode(targetSource: String? = null) {
         saveCurrentIptvResumePosition()
         vodMode = false
-        vodResolveJob?.cancel()
-        vodResolveJob = null
+        vodHost.cancelResolve()
         binding.iptvBufferingContainer.visibility = View.GONE
         intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
         intent.removeExtra(EXTRA_VOD_STREAM_URL)
@@ -6439,6 +6494,7 @@ class MainActivity : TvRemoteActivity() {
         }
         channelZapper.cancel()
         focusedTuneJob?.cancel()
+        if (::vodHost.isInitialized) vodHost.cancelResolve()
         infoBarJob?.cancel()
         alphabetLoadJob?.cancel()
         alphabetFilterJob?.cancel()
@@ -6476,197 +6532,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     /** Handles the VOD_SOURCE_KEY deep link from VodHomeActivity on both cold
-     *  start (onCreate) and warm delivery (onNewIntent, singleTop). */
+     *  start (onCreate) and warm delivery (onNewIntent, singleTop).
+     *  Govde com.tvapp.livetv.main.VodHost'a tasindi (Faz 1); burasi ince delegedir. */
     private fun handleVodSourceDeepLink(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_LIVE_MODE, false) == true) {
-            intent.removeExtra(EXTRA_LIVE_MODE)
-            val targetSource = intent.getStringExtra(EXTRA_LIVE_TARGET_SOURCE)
-            intent.removeExtra(EXTRA_LIVE_TARGET_SOURCE)
-            switchToLiveMode(targetSource)
-            return
-        }
-        val directStreamUrl = intent?.getStringExtra(EXTRA_VOD_STREAM_URL)
-        val sourceKey = intent?.getStringExtra(EXTRA_VOD_SOURCE_KEY)
-            ?: if (!directStreamUrl.isNullOrBlank()) "direct_vod_${System.currentTimeMillis()}" else null
-            ?: return
-
-        // Consume intent extras immediately so that re-entering onResume / focus does not re-trigger deep link loop
-        intent?.removeExtra(EXTRA_VOD_STREAM_URL)
-        intent?.removeExtra(EXTRA_VOD_SOURCE_KEY)
-
-        enterVodMode()
-        showVodPlayerControls(autoHide = false)
-        val requestGeneration = ++channelResolutionGeneration
-        val startOver = intent?.getBooleanExtra(EXTRA_VOD_START_OVER, false) == true
-        intent?.removeExtra(EXTRA_VOD_START_OVER)
-        if (startOver) {
-            saveCurrentIptvResumePosition()
-            iptvPlayback.stop()
-            iptvResumeStore.clear(sourceKey)
-        }
-
-        if (!directStreamUrl.isNullOrBlank()) {
-            val mainTitle = intent?.getStringExtra(EXTRA_VOD_TITLE) ?: getString(R.string.vod_archive_label)
-            val subTitle = intent?.getStringExtra(EXTRA_VOD_EPISODE_TITLE)
-            val logo = intent?.getStringExtra(EXTRA_VOD_LOGO_URL)
-            currentVodHasEpisodes = !subTitle.isNullOrBlank() || sourceKey.contains(":ep:")
-            intent?.removeExtra(EXTRA_VOD_TITLE)
-            intent?.removeExtra(EXTRA_VOD_EPISODE_TITLE)
-            intent?.removeExtra(EXTRA_VOD_LOGO_URL)
-
-            iptvPlayback.stop()
-            val customReferrer = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_REFERRER)
-            val customOrigin = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_ORIGIN)
-            val customUserAgent = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
-            val customCookie = intent?.getStringExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_COOKIE)
-            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_REFERRER)
-            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_ORIGIN)
-            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_USER_AGENT)
-            intent?.removeExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_COOKIE)
-
-            val baseChannel = LiveChannel(
-                id = sourceKey.hashCode().toLong(),
-                sourceKey = sourceKey,
-                inputId = "iptv:direct_vod",
-                displayNumber = "VOD",
-                displayName = mainTitle,
-                source = LiveChannel.Source.IPTV,
-                uri = directStreamUrl,
-                logoUrl = logo,
-                iptvContentType = "VOD",
-                userAgent = customUserAgent,
-                referrer = customReferrer,
-                origin = customOrigin,
-            ).apply {
-                episodeTitle = subTitle
-                cookie = customCookie
-            }
-
-            // Dogrudan medya akisi ise (mp4, m3u8, mkv vs.) web resolver'a girmeden direkt oynat
-            if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(directStreamUrl)) {
-                selectChannel(baseChannel, recordHistory = true)
-                return
-            }
-
-            // Web sayfasi / sniffer gerektiren URL ise cozumle (tek/çok adayli)
-            showVodResolvingFeedback()
-            vodResolveJob?.cancel()
-            vodResolveJob = lifecycleScope.launch {
-                val resolved = withContext(Dispatchers.IO) {
-                    com.tvapp.livetv.vod.VodPageResolver.resolve(directStreamUrl, this@MainActivity)
-                }
-                hideVodResolvingFeedback()
-                if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-                // Aday karari VodHost'ta (Faz 1); dallar burada korunur, sadece karar tasindi.
-                when (val decision = vodHost.decideCandidates(baseChannel, resolved)) {
-                    is com.tvapp.livetv.main.VodCandidateDecision.PlayBase ->
-                        selectChannel(decision.channel, recordHistory = true)
-                    is com.tvapp.livetv.main.VodCandidateDecision.ShowChoice ->
-                        showVodStreamChoice(decision.resolved, decision.baseChannel)
-                }
-            }
-            return
-        }
-
-        if (currentChannel?.sourceKey == sourceKey && iptvPlayback.tunedSourceKey() == sourceKey &&
-            iptvPlayback.healthSnapshot().phase == IptvPlaybackPhase.READY
-        ) {
-            iptvPlayback.play()
-            showVodPlayerControls(autoHide = true)
-            return
-        }
-
-        // VOD items resolution directly from repository/DB
-        iptvPlayback.stop()
-        binding.iptvBufferingSpinner.visibility = View.VISIBLE
-        binding.iptvBufferingContainer.visibility = View.VISIBLE
-        binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
-
-        vodResolveJob?.cancel()
-        vodResolveJob = lifecycleScope.launch {
-            val channel = withContext(Dispatchers.IO) {
-                val direct = channels.firstOrNull { it.sourceKey == sourceKey }
-                    ?: runCatching { iptvRepository.channel(sourceKey) }.getOrNull()
-
-                if (direct != null) {
-                    val vodPending = direct.copy(iptvContentType = "VOD")
-                    if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(vodPending.uri)) {
-                        vodPending
-                    } else {
-                        // Web tabanli VOD icerigi (JSON listeleri, web sayfasi embedleri):
-                        // Web tabanli VOD icerigi (JSON listeleri, web sayfasi embedleri).
-                        // Tek aday dogrudan oynar; cok adayda kilitlenmeyi onlemek icin
-                        // liste yolunda ilk guclu aday kullanilir (DB yolunda diyalog yok).
-                        val resolved = com.tvapp.livetv.vod.VodPageResolver.resolve(vodPending.uri, null)
-                        val chosen = resolved.single
-                            ?: resolved.candidates.firstOrNull()
-                        if (chosen != null) resolved.applyTo(vodPending, chosen) else vodPending
-                    }
-                } else {
-                    val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
-                    var meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
-
-                    // JSON VOD dizi bolumu cozumlemesi (sourceKey format: parentKey:ep:index_hash)
-                    // Karar kurallari VodLibraryResolver'da (Faz 1); IO burada kalir.
-                    var dynamicEpTitle: String? = null
-                    if (meta == null && sourceKey.contains(":ep:")) {
-                        val parentKey = sourceKey.substringBefore(":ep:")
-                        val parentMeta = runCatching { appDb.vodDao().metadata(parentKey) }.getOrNull()
-                        val dyn = runCatching {
-                            com.tvapp.livetv.main.VodLibraryResolver.resolveDynamicEpisode(
-                                sourceKey,
-                                meta,
-                                parentMeta,
-                            )
-                        }.getOrNull()
-                        if (dyn == null && parentMeta?.streamUrl?.startsWith("[") == true) {
-                            debugLog.recordDebug("Parse dynamic JSON episode in resolve failed for $sourceKey")
-                        }
-                        if (dyn != null) {
-                            meta = dyn.meta
-                            dynamicEpTitle = dyn.dynamicEpTitle
-                        }
-                    }
-
-                    if (meta != null && !meta.streamUrl.isNullOrBlank()) {
-                        val hasEp = com.tvapp.livetv.main.VodLibraryResolver.hasEpisodes(meta, sourceKey)
-                        withContext(Dispatchers.Main) {
-                            currentVodHasEpisodes = hasEp
-                        }
-                        val parentTitle = meta.parentKey?.let { pKey ->
-                            runCatching { appDb.vodDao().metadata(pKey)?.name }.getOrNull()
-                        }
-                        val (mainTitle, subTitle) = com.tvapp.livetv.main.VodLibraryResolver.titles(
-                            meta,
-                            parentTitle,
-                            dynamicEpTitle,
-                        ) { sNum, epNum -> getString(R.string.vod_season_episode_fmt, sNum, epNum) }
-
-                        val pendingChannel = com.tvapp.livetv.main.VodLibraryResolver.buildChannel(
-                            meta,
-                            mainTitle,
-                            subTitle,
-                        )
-
-                        // Eger dogrudan medya akisi ise web resolver calistirma
-                        if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(meta.streamUrl)) {
-                            pendingChannel
-                        } else {
-                            val resolved = com.tvapp.livetv.vod.VodPageResolver.resolve(meta.streamUrl, null)
-                            com.tvapp.livetv.main.VodLibraryResolver.applyDbResolve(pendingChannel, resolved)
-                        }
-                    } else null
-                }
-            }
-            binding.iptvBufferingContainer.visibility = View.GONE
-            if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-            if (channel != null) {
-                selectChannel(channel, recordHistory = true)
-            } else {
-                modePreferences.edit().remove(LAST_VOD_KEY).apply()
-                showIptvNotice(R.string.channel_not_found)
-            }
-        }
+        vodHost.handleDeepLink(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
