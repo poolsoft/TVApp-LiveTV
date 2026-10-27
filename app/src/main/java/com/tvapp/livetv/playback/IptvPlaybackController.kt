@@ -499,6 +499,12 @@ class IptvPlaybackController(
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(channel.uri)
             .setMediaId(channel.sourceKey)
+        // Kiliga girmis dagitimlar (`master.txt` HLS, `.smil/.m3u8`) uzantidan
+        // anlasilamaz; turu acikca soylemezsek oyuncu manifest yerine
+        // progressive sanip parsing hatasi verir.
+        com.tvapp.livetv.vod.VodUrlClassifier.mimeType(channel.uri)?.let { mime ->
+            mediaItemBuilder.setMimeType(mime)
+        }
         if (channel.iptvContentType.equals("LIVE", ignoreCase = true)) {
             mediaItemBuilder.setLiveConfiguration(
                 MediaItem.LiveConfiguration.Builder()

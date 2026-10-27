@@ -55,6 +55,8 @@ object MediaUrlClassifier {
         val path = url.substringBefore('?').substringBefore('#').lowercase()
         val lowerUrl = url.lowercase()
         return when {
+            com.tvapp.livetv.vod.VodUrlClassifier.isHlsUrl(url) -> MediaKind.MANIFEST_HLS
+            com.tvapp.livetv.vod.VodUrlClassifier.isDashUrl(url) -> MediaKind.MANIFEST_DASH
             path.endsWith(".ts") || path.endsWith(".m4s") -> MediaKind.SEGMENT
             path.endsWith(".vtt") || path.endsWith(".srt") || lowerUrl.contains(".vtt") -> MediaKind.SUBTITLE
             path.endsWith(".m3u8") || lowerUrl.contains(".m3u8") || lowerUrl.contains("playlist.m3u8") || lowerUrl.contains("manifest.m3u8") -> MediaKind.MANIFEST_HLS

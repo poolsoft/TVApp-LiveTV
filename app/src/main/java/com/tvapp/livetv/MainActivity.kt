@@ -2397,6 +2397,64 @@ class MainActivity : TvRemoteActivity() {
         vodPlayerOverlayController?.showControls(autoHide)
     }
 
+    /** Web sayfasi cozumlenirken VOD buffering gostergesini acar. */
+    private fun showVodResolvingFeedback() {
+        binding.iptvBufferingSpinner.visibility = View.VISIBLE
+        binding.iptvBufferingContainer.visibility = View.VISIBLE
+        binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+    }
+
+    private fun hideVodResolvingFeedback() {
+        binding.iptvBufferingContainer.visibility = View.GONE
+    }
+
+    /**
+     * Birden cok oynatilabilir aday bulundugunda uzaktan kumandayla secim sunar.
+     * Tek aday yolu sessizce oynar; cok adayda ilk siradakini dayatmaz.
+     */
+    private fun showVodStreamChoice(
+        resolved: com.tvapp.livetv.vod.VodPageResolver.Resolved,
+        baseChannel: LiveChannel,
+    ) {
+        val candidates = resolved.candidates
+        if (candidates.isEmpty()) {
+            selectChannel(baseChannel, recordHistory = true)
+            return
+        }
+        val labels = candidates.mapIndexed { index, item ->
+            buildVodStreamLabel(index + 1, item.streamUrl)
+        }.toTypedArray()
+        AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+            .setTitle(getString(R.string.browser_select_stream))
+            .setItems(labels) { dialog, which ->
+                dialog.dismiss()
+                val chosen = candidates.getOrNull(which) ?: return@setItems
+                selectChannel(resolved.applyTo(baseChannel, chosen), recordHistory = true)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun buildVodStreamLabel(index: Int, url: String): String {
+        val cleanUrl = url.substringBefore('?')
+        val ext = cleanUrl.substringAfterLast('.', "")
+        val quality = when {
+            url.contains("1080", ignoreCase = true) -> " [1080p]"
+            url.contains("720", ignoreCase = true) -> " [720p]"
+            url.contains("480", ignoreCase = true) -> " [480p]"
+            url.contains("360", ignoreCase = true) -> " [360p]"
+            else -> ""
+        }
+        val type = when {
+            com.tvapp.livetv.vod.VodUrlClassifier.isHlsUrl(url) -> "HLS"
+            com.tvapp.livetv.vod.VodUrlClassifier.isDashUrl(url) -> "DASH"
+            url.contains(".mp4", ignoreCase = true) -> "MP4"
+            else -> ext.uppercase().take(4)
+        }
+        val domain = runCatching { java.net.URI(url).host }.getOrNull().orEmpty()
+        return "$index. $type$quality - $domain"
+    }
+
     private fun openVod(sourceKey: String, startOver: Boolean = false) {
         val vodIntent = Intent().apply {
             putExtra(EXTRA_VOD_SOURCE_KEY, sourceKey)
@@ -6532,29 +6590,23 @@ class MainActivity : TvRemoteActivity() {
                 return
             }
 
-            // Web sayfasi / sniffer gerektiren URL ise cozumle
-            binding.iptvBufferingSpinner.visibility = View.VISIBLE
-            binding.iptvBufferingContainer.visibility = View.VISIBLE
-            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
-
+            // Web sayfasi / sniffer gerektiren URL ise cozumle (tek/çok adayli)
+            showVodResolvingFeedback()
             vodResolveJob?.cancel()
             vodResolveJob = lifecycleScope.launch {
                 val resolved = withContext(Dispatchers.IO) {
-                    com.tvapp.livetv.vod.WebVideoResolver.resolveStream(directStreamUrl, this@MainActivity)
+                    com.tvapp.livetv.vod.VodPageResolver.resolve(directStreamUrl, this@MainActivity)
                 }
-                binding.iptvBufferingContainer.visibility = View.GONE
+                hideVodResolvingFeedback()
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-                val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else directStreamUrl
-                val playChannel = baseChannel.copy(
-                    uri = finalStreamUrl,
-                    userAgent = customUserAgent ?: resolved.userAgent,
-                    referrer = customReferrer ?: resolved.referrer,
-                    origin = customOrigin ?: resolved.origin,
-                ).apply {
-                    episodeTitle = subTitle
-                    cookie = customCookie ?: resolved.cookie
+                val single = resolved.playable()
+                if (single != null) {
+                    selectChannel(resolved.applyTo(baseChannel, single), recordHistory = true)
+                } else if (resolved.candidates.isNotEmpty()) {
+                    showVodStreamChoice(resolved, baseChannel)
+                } else {
+                    selectChannel(baseChannel, recordHistory = true)
                 }
-                selectChannel(playChannel, recordHistory = true)
             }
             return
         }
@@ -6585,16 +6637,13 @@ class MainActivity : TvRemoteActivity() {
                         vodPending
                     } else {
                         // Web tabanli VOD icerigi (JSON listeleri, web sayfasi embedleri):
-                        val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(vodPending.uri, this@MainActivity)
-                        val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else vodPending.uri
-                        vodPending.copy(
-                            uri = finalStreamUrl,
-                            userAgent = resolved.userAgent ?: vodPending.userAgent,
-                            referrer = resolved.referrer ?: vodPending.referrer,
-                            origin = resolved.origin ?: vodPending.origin,
-                        ).apply {
-                            cookie = resolved.cookie ?: vodPending.cookie
-                        }
+                        // Web tabanli VOD icerigi (JSON listeleri, web sayfasi embedleri).
+                        // Tek aday dogrudan oynar; cok adayda kilitlenmeyi onlemek icin
+                        // liste yolunda ilk guclu aday kullanilir (DB yolunda diyalog yok).
+                        val resolved = com.tvapp.livetv.vod.VodPageResolver.resolve(vodPending.uri, null)
+                        val chosen = resolved.single
+                            ?: resolved.candidates.firstOrNull()
+                        if (chosen != null) resolved.applyTo(vodPending, chosen) else vodPending
                     }
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
@@ -6667,16 +6716,13 @@ class MainActivity : TvRemoteActivity() {
                         if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(meta.streamUrl)) {
                             pendingChannel
                         } else {
-                            val resolved = com.tvapp.livetv.vod.WebVideoResolver.resolveStream(meta.streamUrl, this@MainActivity)
-                            val finalStreamUrl = if (resolved.isPlayable && resolved.streamUrl.isNotBlank()) resolved.streamUrl else meta.streamUrl
-                            pendingChannel.copy(
-                                uri = finalStreamUrl,
-                                userAgent = resolved.userAgent ?: pendingChannel.userAgent,
-                                referrer = resolved.referrer ?: pendingChannel.referrer,
-                                origin = resolved.origin ?: pendingChannel.origin,
-                            ).apply {
-                                episodeTitle = subTitle
-                                cookie = resolved.cookie ?: pendingChannel.cookie
+                            val resolved = com.tvapp.livetv.vod.VodPageResolver.resolve(meta.streamUrl, null)
+                            val chosen = resolved.single
+                                ?: resolved.candidates.firstOrNull()
+                            if (chosen != null) {
+                                resolved.applyTo(pendingChannel, chosen)
+                            } else {
+                                pendingChannel
                             }
                         }
                     } else null
