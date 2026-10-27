@@ -70,6 +70,7 @@ import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
 import com.tvapp.livetv.main.IptvLibraryPagingRules
+import com.tvapp.livetv.main.LongPressKeyGate
 import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
@@ -300,16 +301,15 @@ class MainActivity : TvRemoteActivity() {
         get() = multiViewController.gridFullscreenIndex
     private val gridChannels: List<LiveChannel>
         get() = multiViewController.gridChannels
-    private var yellowLongPressJob: Job? = null
-    private var yellowLongPressHandled = false
-    private var greenLongPressJob: Job? = null
-    private var greenLongPressHandled = false
-    private var settingsLongPressJob: Job? = null
-    private var settingsLongPressHandled = false
-    private var lastChannelLongPressJob: Job? = null
-    private var lastChannelLongPressHandled = false
-    private var okLongPressJob: Job? = null
-    private var okLongPressHandled = false
+    /** Uzun basim zamanlayicisi; cihaz timeout'u her basista okunur. */
+    private fun newLongPressGate() = LongPressKeyGate(lifecycleScope) {
+        ViewConfiguration.getLongPressTimeout().toLong()
+    }
+    private val settingsKeyGate by lazy { newLongPressGate() }
+    private val lastChannelKeyGate by lazy { newLongPressGate() }
+    private val okKeyGate by lazy { newLongPressGate() }
+    private val greenKeyGate by lazy { newLongPressGate() }
+    private val yellowKeyGate by lazy { newLongPressGate() }
     private val unlockedChannels = mutableSetOf<String>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
@@ -5863,29 +5863,29 @@ class MainActivity : TvRemoteActivity() {
         )
         if (isSettingsKey) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                settingsLongPressHandled = false
-                settingsLongPressJob?.cancel()
-                settingsLongPressJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    settingsLongPressHandled = true
-                    if (::debugLog.isInitialized) {
-                        debugLog.recordDebug(
-                            "SETTINGS_KEY | long_press -> openSystemSettings, code=${event.keyCode}, name=${KeyEvent.keyCodeToString(event.keyCode)}",
-                        )
-                    }
-                    openSystemSettings()
-                }
+                settingsKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { code ->
+                        if (::debugLog.isInitialized) {
+                            debugLog.recordDebug(
+                                "SETTINGS_KEY | long_press -> openSystemSettings, " +
+                                    "code=$code, name=${KeyEvent.keyCodeToString(code)}",
+                            )
+                        }
+                        openSystemSettings()
+                    },
+                    onShortPress = { code ->
+                        if (::debugLog.isInitialized) {
+                            debugLog.recordDebug(
+                                "SETTINGS_KEY | short_press -> openDisplaySettings, " +
+                                    "code=$code, name=${KeyEvent.keyCodeToString(code)}",
+                            )
+                        }
+                        openDisplaySettings()
+                    },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                settingsLongPressJob?.cancel()
-                if (!settingsLongPressHandled) {
-                    if (::debugLog.isInitialized) {
-                        debugLog.recordDebug(
-                            "SETTINGS_KEY | short_press -> openDisplaySettings, code=${event.keyCode}, name=${KeyEvent.keyCodeToString(event.keyCode)}",
-                        )
-                    }
-                    openDisplaySettings()
-                }
-                settingsLongPressHandled = false
+                settingsKeyGate.onUp()
             }
             return true
         }
@@ -5927,17 +5927,13 @@ class MainActivity : TvRemoteActivity() {
         }
         if (event.keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                lastChannelLongPressHandled = false
-                lastChannelLongPressJob?.cancel()
-                lastChannelLongPressJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    lastChannelLongPressHandled = true
-                    showRecentChannels()
-                }
+                lastChannelKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { showRecentChannels() },
+                    onShortPress = { openPreviousChannel() },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                lastChannelLongPressJob?.cancel()
-                if (!lastChannelLongPressHandled) openPreviousChannel()
-                lastChannelLongPressHandled = false
+                lastChannelKeyGate.onUp()
             }
             return true
         }
@@ -5966,19 +5962,13 @@ class MainActivity : TvRemoteActivity() {
         val isOkKey = event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)
         if (isOkKey && hasNoBlockingPlaybackOsd && !vodMode && currentIptvContentKind != IptvContentKind.VOD && !iptvControlsInteractive) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                okLongPressHandled = false
-                okLongPressJob?.cancel()
-                okLongPressJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    okLongPressHandled = true
-                    showQuickHubDialog()
-                }
+                okKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { showQuickHubDialog() },
+                    onShortPress = { toggleChannelPanel() },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                okLongPressJob?.cancel()
-                if (!okLongPressHandled) {
-                    toggleChannelPanel()
-                }
-                okLongPressHandled = false
+                okKeyGate.onUp()
             }
             return true
         }
@@ -6109,21 +6099,17 @@ class MainActivity : TvRemoteActivity() {
             binding.iptvPlaybackContainer.visibility == View.VISIBLE
         if (event.keyCode == KeyEvent.KEYCODE_PROG_GREEN && !greenOwnedByIptvControls) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                greenLongPressHandled = false
-                greenLongPressJob?.cancel()
                 focusedTuneJob?.cancel()
-                greenLongPressJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    greenLongPressHandled = true
-                    showIptvGridPicker()
-                }
+                greenKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { showIptvGridPicker() },
+                    onShortPress = {
+                        focusedTuneJob?.cancel()
+                        showIptvGridPicker()
+                    },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                greenLongPressJob?.cancel()
-                if (!greenLongPressHandled) {
-                    focusedTuneJob?.cancel()
-                    showIptvGridPicker()
-                }
-                greenLongPressHandled = false
+                greenKeyGate.onUp()
             }
             return true
         }
@@ -6132,17 +6118,13 @@ class MainActivity : TvRemoteActivity() {
             binding.channelPanel.visibility == View.VISIBLE
         ) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                yellowLongPressHandled = false
-                yellowLongPressJob?.cancel()
-                yellowLongPressJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    yellowLongPressHandled = true
-                    showChannelListModeDialog()
-                }
+                yellowKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { showChannelListModeDialog() },
+                    onShortPress = { cycleChannelListMode() },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                yellowLongPressJob?.cancel()
-                if (!yellowLongPressHandled) cycleChannelListMode()
-                yellowLongPressHandled = false
+                yellowKeyGate.onUp()
             }
             return true
         }
@@ -6397,9 +6379,9 @@ class MainActivity : TvRemoteActivity() {
         sleepTimerJob?.cancel()
         iptvControlsJob?.cancel()
         iptvLiveHealthJob?.cancel()
-        greenLongPressJob?.cancel()
+        greenKeyGate.cancel()
         iptvInfoTickerJob?.cancel()
-        settingsLongPressJob?.cancel()
+        settingsKeyGate.cancel()
         clockJob?.cancel()
         playback.stop()
         iptvPlayback.release()
