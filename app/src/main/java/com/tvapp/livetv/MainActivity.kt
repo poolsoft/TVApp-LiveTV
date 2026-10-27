@@ -72,6 +72,9 @@ import com.tvapp.livetv.main.ChannelListRules
 import com.tvapp.livetv.main.IptvLibraryPagingRules
 import com.tvapp.livetv.main.LongPressKeyGate
 import com.tvapp.livetv.main.PlaybackRules
+import com.tvapp.livetv.main.RemoteInputEnv
+import com.tvapp.livetv.main.RemoteInputRouter
+import com.tvapp.livetv.main.RemoteInputRules
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.gridProfileForCellCount
@@ -299,16 +302,19 @@ class MainActivity : TvRemoteActivity() {
         get() = multiViewController.gridFullscreenIndex
     private val gridChannels: List<LiveChannel>
         get() = multiViewController.gridChannels
-    /** Uzun basim zamanlayicisi; cihaz timeout'u her basista okunur. */
-    private fun newLongPressGate() = LongPressKeyGate(lifecycleScope) {
-        ViewConfiguration.getLongPressTimeout().toLong()
+    private val remoteInputRouter by lazy {
+        RemoteInputRouter(
+            scope = lifecycleScope,
+            longPressTimeoutMillis = { ViewConfiguration.getLongPressTimeout().toLong() },
+            env = createRemoteInputEnv(),
+        )
     }
-    private val alphabetRightKeyGate by lazy { newLongPressGate() }
-    private val settingsKeyGate by lazy { newLongPressGate() }
-    private val lastChannelKeyGate by lazy { newLongPressGate() }
-    private val okKeyGate by lazy { newLongPressGate() }
-    private val greenKeyGate by lazy { newLongPressGate() }
-    private val yellowKeyGate by lazy { newLongPressGate() }
+    private val alphabetRightKeyGate get() = remoteInputRouter.alphabetRightKeyGate
+    private val settingsKeyGate get() = remoteInputRouter.settingsKeyGate
+    private val lastChannelKeyGate get() = remoteInputRouter.lastChannelKeyGate
+    private val okKeyGate get() = remoteInputRouter.okKeyGate
+    private val greenKeyGate get() = remoteInputRouter.greenKeyGate
+    private val yellowKeyGate get() = remoteInputRouter.yellowKeyGate
     private val unlockedChannels = mutableSetOf<String>()
     private var favoriteFilter = false
     private var sourceFilter = ChannelSourceFilter.ALL
@@ -5814,6 +5820,225 @@ class MainActivity : TvRemoteActivity() {
         binding.recentChannelsContainer.removeAllViews()
     }
 
+    private fun createRemoteInputEnv(): RemoteInputEnv = object : RemoteInputEnv {
+        override fun isVodPlaybackActive(): Boolean = this@MainActivity.isVodPlaybackActive()
+        override fun handleVodPlayerOverlay(event: KeyEvent): Boolean =
+            vodPlayerOverlayController?.handleDispatchKeyEvent(event) == true
+        override fun isVodMode(): Boolean = vodMode
+        override fun isVodContentKind(): Boolean = currentIptvContentKind == IptvContentKind.VOD
+        override fun isIptvChannel(): Boolean = currentChannel?.source == LiveChannel.Source.IPTV
+        override fun handleIptvMediaKey(keyCode: Int) = this@MainActivity.handleIptvMediaKey(keyCode)
+        override fun quickSeek(offsetMs: Long) {
+            iptvControlRow = IptvControlRow.TIMELINE
+            showIptvPlaybackControls(activateControls = true)
+            iptvPlayback.seekBy(offsetMs)
+            updateIptvPlaybackControls()
+            renderIptvControlSelection()
+            debugLog.recordDebug(
+                "IPTV_VOD_QUICK_SEEK | direction=${if (offsetMs < 0) "back" else "forward"}, " +
+                    "offsetMs=$offsetMs, channel=${currentChannel?.sourceKey}",
+            )
+        }
+        override fun handleIptvControlsKey(keyCode: Int): Boolean =
+            this@MainActivity.handleIptvControlsKey(keyCode)
+
+        override fun routeRemoteAction(event: KeyEvent): RemoteAction =
+            remoteActionRouter.route(remoteUiContext(), event.toRemoteKey(), event.toRemoteKeyPhase())
+
+        override fun isChannelPanelVisible(): Boolean = binding.channelPanel.visibility == View.VISIBLE
+        override fun isChannelListFocused(): Boolean = binding.channelList.hasFocus()
+        override fun isIptvControlsInteractive(): Boolean = iptvControlsInteractive
+        override fun isIptvPlaybackContainerVisible(): Boolean =
+            binding.iptvPlaybackContainer.visibility == View.VISIBLE
+        override fun isStatusOsd(): Boolean = osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS
+        override fun isRecentChannelsOsd(): Boolean =
+            osdCoordinator.state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
+        override fun hasNoBlockingPlaybackOsd(): Boolean =
+            RemoteInputRules.hasNoBlockingPlaybackOsd(
+                isChannelPanelClosed = binding.channelPanel.visibility != View.VISIBLE,
+                isStatusVisible = binding.statusPanel.visibility == View.VISIBLE,
+                isRecentVisible = binding.recentChannelsPanel.visibility == View.VISIBLE,
+                isParentalVisible = binding.parentalLockPanel.visibility == View.VISIBLE,
+                numberInputEmpty = numberInput.isEmpty(),
+            )
+        override fun returnToCatchUpChannel(): Boolean {
+            val liveChannel = catchUpReturnChannel ?: return false
+            catchUpReturnChannel = null
+            selectChannel(liveChannel)
+            return true
+        }
+        override fun isMultiViewAdding(): Boolean = multiViewAdding
+        override fun getMultiViewDraft(): List<LiveChannel> = multiViewDraft.values.toList()
+        override fun isIptvGridActive(): Boolean = iptvGridActive
+        override fun handleGridKeyEvent(event: KeyEvent): Boolean {
+            multiViewController.handleGridKeyEvent(event)
+            return true
+        }
+        override fun isChannelAlphabetNavigationEnabled(): Boolean =
+            displayPreferences.channelAlphabetNavigation
+
+        override fun openSystemSettings(keyCode: Int) {
+            if (::debugLog.isInitialized) {
+                debugLog.recordDebug(
+                    "SETTINGS_KEY | long_press -> openSystemSettings, code=$keyCode, name=${KeyEvent.keyCodeToString(keyCode)}",
+                )
+            }
+            this@MainActivity.openSystemSettings()
+        }
+        override fun openDisplaySettings(keyCode: Int) {
+            if (::debugLog.isInitialized) {
+                debugLog.recordDebug(
+                    "SETTINGS_KEY | short_press -> openDisplaySettings, code=$keyCode, name=${KeyEvent.keyCodeToString(keyCode)}",
+                )
+            }
+            this@MainActivity.openDisplaySettings()
+        }
+        override fun showRecentChannels() = this@MainActivity.showRecentChannels()
+        override fun openPreviousChannel() = this@MainActivity.openPreviousChannel()
+        override fun showQuickHubDialog() = this@MainActivity.showQuickHubDialog()
+        override fun toggleChannelPanel() = this@MainActivity.toggleChannelPanel()
+        override fun showIptvGridPicker(draft: List<LiveChannel>?) {
+            if (draft != null) {
+                this@MainActivity.showIptvGridPicker(draft)
+            } else {
+                this@MainActivity.showIptvGridPicker()
+            }
+        }
+        override fun showChannelListModeDialog() = this@MainActivity.showChannelListModeDialog()
+        override fun cycleChannelListMode() = this@MainActivity.cycleChannelListMode()
+        override fun openChannelAlphabet() = this@MainActivity.openChannelAlphabet()
+        override fun cancelFocusedTune() { focusedTuneJob?.cancel() }
+
+        override fun scheduleChannelPanelClose() = this@MainActivity.scheduleChannelPanelClose()
+        override fun handleBackNavigation() = this@MainActivity.handleBackNavigation()
+        override fun zap(direction: Int) = this@MainActivity.zap(direction)
+        override fun pageChannelList(direction: Int) = this@MainActivity.pageChannelList(direction)
+        override fun wrapChannelList(direction: Int): Boolean = this@MainActivity.wrapChannelList(direction)
+        override fun hasNumberInput(): Boolean = numberInput.isNotEmpty()
+        override fun commitChannelNumber() = this@MainActivity.commitChannelNumber()
+        override fun isParentalLockVisible(): Boolean =
+            binding.parentalLockPanel.visibility == View.VISIBLE
+        override fun hasCurrentChannel(): Boolean = currentChannel != null
+        override fun requestChannelPin() {
+            currentChannel?.let { this@MainActivity.requestChannelPin(it) }
+        }
+        override fun showIptvPlaybackControls(activateControls: Boolean) =
+            this@MainActivity.showIptvPlaybackControls(activateControls = activateControls)
+        override fun openChannelEditor() = this@MainActivity.openChannelEditor()
+        override fun openIptvEditor() = this@MainActivity.openIptvEditor()
+        override fun showPlaybackModeDialog() = this@MainActivity.showPlaybackModeDialog()
+        override fun showIptvLibraryFilterDialog() = this@MainActivity.showIptvLibraryFilterDialog()
+        override fun showChannelSearchDialog() = this@MainActivity.showChannelSearchDialog()
+        override fun enterTvPictureInPicture() = this@MainActivity.enterTvPictureInPicture()
+        override fun showAudioTracks() = this@MainActivity.showAudioTracks()
+        override fun showSubtitleTracks() = this@MainActivity.showSubtitleTracks()
+        override fun showTxtTracks() = this@MainActivity.showTxtTracks()
+        override fun showPhysicalInputSelector() = this@MainActivity.showPhysicalInputSelector()
+        override fun openProgramGuide() = this@MainActivity.openProgramGuide()
+        override fun showChannelPanel(expanded: Boolean) = this@MainActivity.showChannelPanel(expanded)
+        override fun isInfoBarVisible(): Boolean = binding.infoBar.visibility == View.VISIBLE
+        override fun showInfoBarOrChannel() {
+            currentChannel?.let(::showInfoBarForChannel) ?: showInfoBar()
+        }
+        override fun appendChannelDigit(digit: Int) = this@MainActivity.appendChannelDigit(digit)
+        override fun dismissStatusDialog() = this@MainActivity.dismissStatusDialog()
+        override fun hideRecentChannels() = this@MainActivity.hideRecentChannels()
+        override fun openVodLibrary() = this@MainActivity.openVodLibrary()
+        override val channelPanelContentIsIptvLibrary: Boolean
+            get() = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY
+    }
+
+    private fun handleIptvControlsKey(keyCode: Int): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_PROG_RED -> {
+                val liveChannel = catchUpReturnChannel
+                if (liveChannel != null) {
+                    catchUpReturnChannel = null
+                    selectChannel(liveChannel)
+                } else if (iptvPlaybackFailed) {
+                    iptvPlayback.retry()
+                } else if (currentIptvContentKind == IptvContentKind.LIVE) {
+                    iptvManualTimeshift = false
+                    iptvPlayback.goLive()
+                } else {
+                    iptvPlayback.restartVod()
+                }
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_GREEN -> {
+                showAudioTracks()
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_YELLOW -> {
+                showSubtitleTracks()
+                return true
+            }
+            KeyEvent.KEYCODE_PROG_BLUE -> {
+                showIptvVideoOptions()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                iptvControlRow = if (showsVodTimeline()) IptvControlRow.TIMELINE else IptvControlRow.BUTTONS
+                renderIptvControlSelection()
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                iptvControlRow = IptvControlRow.BUTTONS
+                renderIptvControlSelection()
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (iptvControlRow == IptvControlRow.TIMELINE) {
+                    val offset = -IPTV_VOD_SEEK_STEP_MS
+                    if (iptvPlayback.seekBy(offset) && currentIptvContentKind == IptvContentKind.LIVE) {
+                        iptvManualTimeshift = true
+                    }
+                } else {
+                    cycleIptvButton(-1)
+                }
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (iptvControlRow == IptvControlRow.TIMELINE) {
+                    val offset = IPTV_VOD_SEEK_STEP_MS
+                    if (iptvPlayback.seekBy(offset) && currentIptvContentKind == IptvContentKind.LIVE) {
+                        iptvManualTimeshift = true
+                    }
+                } else {
+                    cycleIptvButton(1)
+                }
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                if (iptvControlRow == IptvControlRow.TIMELINE) {
+                    iptvControlRow = IptvControlRow.BUTTONS
+                } else {
+                    activateSelectedIptvButton()
+                }
+                showIptvPlaybackControls()
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_UP -> {
+                zap(1)
+                return true
+            }
+            KeyEvent.KEYCODE_CHANNEL_DOWN -> {
+                zap(-1)
+                return true
+            }
+            KeyEvent.KEYCODE_BACK -> {
+                hideIptvPlaybackControls()
+                return true
+            }
+            else -> return false
+        }
+    }
+
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()
         if (
@@ -5828,440 +6053,7 @@ class MainActivity : TvRemoteActivity() {
                     "code=${event.keyCode}, scan=${event.scanCode}, repeat=${event.repeatCount}, device=${event.deviceId}",
             )
         }
-        val isVodActive = isVodPlaybackActive()
-
-        if (isVodActive) {
-            if (vodPlayerOverlayController?.handleDispatchKeyEvent(event) == true) {
-                return true
-            }
-        }
-
-        val routedAction = remoteActionRouter.route(
-            remoteUiContext(),
-            event.toRemoteKey(),
-            event.toRemoteKeyPhase(),
-        )
-        if (routedAction == RemoteAction.FORWARD_TO_DIALOG) {
-            return super.dispatchKeyEvent(event)
-        }
-        if (routedAction == RemoteAction.IGNORE_CHANNEL_NAVIGATION) return true
-        if (routedAction == RemoteAction.OPEN_VOD_LIBRARY) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) openVodLibrary()
-            return true
-        }
-        if (multiViewAdding && binding.channelPanel.visibility == View.VISIBLE &&
-            event.keyCode == KeyEvent.KEYCODE_BACK
-        ) {
-            if (event.action == KeyEvent.ACTION_DOWN) showIptvGridPicker(multiViewDraft.values.toList())
-            return true
-        }
-        val isSettingsKey = event.keyCode in setOf(
-            KeyEvent.KEYCODE_SETTINGS,
-            KeyEvent.KEYCODE_TV_CONTENTS_MENU,
-            312, // KEYCODE_QUICK_SETTINGS fallback on some Android TV builds
-        )
-        if (isSettingsKey) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                settingsKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { code ->
-                        if (::debugLog.isInitialized) {
-                            debugLog.recordDebug(
-                                "SETTINGS_KEY | long_press -> openSystemSettings, " +
-                                    "code=$code, name=${KeyEvent.keyCodeToString(code)}",
-                            )
-                        }
-                        openSystemSettings()
-                    },
-                    onShortPress = { code ->
-                        if (::debugLog.isInitialized) {
-                            debugLog.recordDebug(
-                                "SETTINGS_KEY | short_press -> openDisplaySettings, " +
-                                    "code=$code, name=${KeyEvent.keyCodeToString(code)}",
-                            )
-                        }
-                        openDisplaySettings()
-                    },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                settingsKeyGate.onUp()
-            }
-            return true
-        }
-        if (
-            event.action == KeyEvent.ACTION_DOWN &&
-            event.keyCode == KeyEvent.KEYCODE_PROG_RED &&
-            binding.channelPanel.visibility != View.VISIBLE &&
-            !iptvGridActive
-        ) {
-            catchUpReturnChannel?.let { liveChannel ->
-                catchUpReturnChannel = null
-                selectChannel(liveChannel)
-                return true
-            }
-        }
-        if (routedAction == RemoteAction.HANDLE_GRID) {
-            multiViewController.handleGridKeyEvent(event)
-            return true
-        }
-        if (routedAction == RemoteAction.DISMISS_STATUS ||
-            osdCoordinator.state.primaryOsd == PrimaryOsd.STATUS
-        ) {
-            if (event.keyCode == KeyEvent.KEYCODE_BACK) {
-                if (event.action == KeyEvent.ACTION_DOWN) {
-                    dismissStatusDialog()
-                }
-                return true
-            }
-            return super.dispatchKeyEvent(event)
-        }
-        if (routedAction == RemoteAction.DISMISS_RECENT_CHANNELS ||
-            osdCoordinator.state.primaryOsd == PrimaryOsd.RECENT_CHANNELS
-        ) {
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
-                hideRecentChannels()
-                return true
-            }
-            return super.dispatchKeyEvent(event)
-        }
-        if (event.keyCode == KeyEvent.KEYCODE_LAST_CHANNEL) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                lastChannelKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { showRecentChannels() },
-                    onShortPress = { openPreviousChannel() },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                lastChannelKeyGate.onUp()
-            }
-            return true
-        }
-        val isIptvMediaKey = event.keyCode in setOf(
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-            KeyEvent.KEYCODE_MEDIA_PLAY,
-            KeyEvent.KEYCODE_MEDIA_PAUSE,
-            KeyEvent.KEYCODE_MEDIA_STOP,
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-            KeyEvent.KEYCODE_MEDIA_REWIND,
-            KeyEvent.KEYCODE_MEDIA_NEXT,
-            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-        ) && currentChannel?.source == LiveChannel.Source.IPTV
-        if (isIptvMediaKey) {
-            if (event.action == KeyEvent.ACTION_DOWN) handleIptvMediaKey(event.keyCode)
-            return true
-        }
-        val isIptv = currentChannel?.source == LiveChannel.Source.IPTV
-        val isChannelPanelClosed = binding.channelPanel.visibility != View.VISIBLE
-        val hasNoBlockingPlaybackOsd = isChannelPanelClosed &&
-            binding.statusPanel.visibility != View.VISIBLE &&
-            binding.recentChannelsPanel.visibility != View.VISIBLE &&
-            binding.parentalLockPanel.visibility != View.VISIBLE &&
-            numberInput.isEmpty()
-
-        val isOkKey = event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)
-        if (isOkKey && hasNoBlockingPlaybackOsd && !vodMode && currentIptvContentKind != IptvContentKind.VOD && !iptvControlsInteractive) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                okKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { showQuickHubDialog() },
-                    onShortPress = { toggleChannelPanel() },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                okKeyGate.onUp()
-            }
-            return true
-        }
-
-        if (
-            event.action == KeyEvent.ACTION_DOWN &&
-            event.repeatCount == 0 &&
-            isIptv &&
-            (vodMode || currentIptvContentKind == IptvContentKind.VOD) &&
-            hasNoBlockingPlaybackOsd && !iptvControlsInteractive &&
-            event.keyCode in setOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)
-        ) {
-            iptvControlRow = IptvControlRow.TIMELINE
-            showIptvPlaybackControls(activateControls = true)
-            val offset = if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                -IPTV_VOD_SEEK_STEP_MS
-            } else {
-                IPTV_VOD_SEEK_STEP_MS
-            }
-            iptvPlayback.seekBy(offset)
-            updateIptvPlaybackControls()
-            renderIptvControlSelection()
-            debugLog.recordDebug(
-                "IPTV_VOD_QUICK_SEEK | direction=${if (offset < 0) "back" else "forward"}, " +
-                    "offsetMs=$offset, channel=${currentChannel?.sourceKey}",
-            )
-            return true
-        }
-
-        if (
-            event.action == KeyEvent.ACTION_DOWN &&
-            isIptv &&
-            isChannelPanelClosed &&
-            iptvControlsInteractive &&
-            binding.iptvPlaybackContainer.visibility == View.VISIBLE
-        ) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_PROG_RED -> {
-                    val liveChannel = catchUpReturnChannel
-                    if (liveChannel != null) {
-                        catchUpReturnChannel = null
-                        selectChannel(liveChannel)
-                    } else if (iptvPlaybackFailed) {
-                        iptvPlayback.retry()
-                    } else if (currentIptvContentKind == IptvContentKind.LIVE) {
-                        iptvManualTimeshift = false
-                        iptvPlayback.goLive()
-                    } else {
-                        iptvPlayback.restartVod()
-                    }
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_PROG_GREEN -> {
-                    showAudioTracks()
-                    return true
-                }
-                KeyEvent.KEYCODE_PROG_YELLOW -> {
-                    showSubtitleTracks()
-                    return true
-                }
-                KeyEvent.KEYCODE_PROG_BLUE -> {
-                    showIptvVideoOptions()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    iptvControlRow = if (showsVodTimeline()) IptvControlRow.TIMELINE else IptvControlRow.BUTTONS
-                    renderIptvControlSelection()
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    iptvControlRow = IptvControlRow.BUTTONS
-                    renderIptvControlSelection()
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    if (iptvControlRow == IptvControlRow.TIMELINE) {
-                        val offset = -IPTV_VOD_SEEK_STEP_MS
-                        if (iptvPlayback.seekBy(offset) && currentIptvContentKind == IptvContentKind.LIVE) {
-                            iptvManualTimeshift = true
-                        }
-                    } else {
-                        cycleIptvButton(-1)
-                    }
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    if (iptvControlRow == IptvControlRow.TIMELINE) {
-                        val offset = IPTV_VOD_SEEK_STEP_MS
-                        if (iptvPlayback.seekBy(offset) && currentIptvContentKind == IptvContentKind.LIVE) {
-                            iptvManualTimeshift = true
-                        }
-                    } else {
-                        cycleIptvButton(1)
-                    }
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    if (iptvControlRow == IptvControlRow.TIMELINE) {
-                        iptvControlRow = IptvControlRow.BUTTONS
-                    } else {
-                        activateSelectedIptvButton()
-                    }
-                    showIptvPlaybackControls()
-                    return true
-                }
-                KeyEvent.KEYCODE_CHANNEL_UP -> {
-                    zap(1)
-                    return true
-                }
-                KeyEvent.KEYCODE_CHANNEL_DOWN -> {
-                    zap(-1)
-                    return true
-                }
-                KeyEvent.KEYCODE_BACK -> {
-                    hideIptvPlaybackControls()
-                    return true
-                }
-            }
-        }
-        val greenOwnedByIptvControls = isIptv &&
-            isChannelPanelClosed &&
-            iptvControlsInteractive &&
-            binding.iptvPlaybackContainer.visibility == View.VISIBLE
-        if (event.keyCode == KeyEvent.KEYCODE_PROG_GREEN && !greenOwnedByIptvControls) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                focusedTuneJob?.cancel()
-                greenKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { showIptvGridPicker() },
-                    onShortPress = {
-                        focusedTuneJob?.cancel()
-                        showIptvGridPicker()
-                    },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                greenKeyGate.onUp()
-            }
-            return true
-        }
-        if (
-            event.keyCode == KeyEvent.KEYCODE_PROG_YELLOW &&
-            binding.channelPanel.visibility == View.VISIBLE
-        ) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                yellowKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { showChannelListModeDialog() },
-                    onShortPress = { cycleChannelListMode() },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                yellowKeyGate.onUp()
-            }
-            return true
-        }
-        if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT &&
-            displayPreferences.channelAlphabetNavigation &&
-            binding.channelPanel.visibility == View.VISIBLE && binding.channelList.hasFocus()
-        ) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                alphabetRightKeyGate.onDown(
-                    event.keyCode,
-                    onLongPress = { openChannelAlphabet() },
-                    onShortPress = { if (!event.isCanceled) pageChannelList(1) },
-                )
-            } else if (event.action == KeyEvent.ACTION_UP) {
-                alphabetRightKeyGate.onUp()
-            }
-            return true
-        }
-        val isPictureInPictureKey = event.keyCode == KeyEvent.KEYCODE_WINDOW
-        if (event.action != KeyEvent.ACTION_DOWN && isPictureInPictureKey) return true
-        if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) {
-            return true
-        }
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            if (binding.channelPanel.visibility == View.VISIBLE) scheduleChannelPanelClose()
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_BACK -> handleBackNavigation()
-                KeyEvent.KEYCODE_CHANNEL_UP -> zap(1)
-                KeyEvent.KEYCODE_CHANNEL_DOWN -> zap(-1)
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER -> if (numberInput.isNotEmpty()) {
-                    commitChannelNumber()
-                } else if (
-                    binding.parentalLockPanel.visibility == View.VISIBLE &&
-                    currentChannel != null
-                ) {
-                    requestChannelPin(requireNotNull(currentChannel))
-                } else if (vodMode || currentIptvContentKind == IptvContentKind.VOD) {
-                    showIptvPlaybackControls(activateControls = true)
-                } else if (binding.channelPanel.visibility != View.VISIBLE) {
-                    toggleChannelPanel()
-                } else {
-                    focusedTuneJob?.cancel()
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_DPAD_UP -> if (binding.channelPanel.visibility != View.VISIBLE) {
-                    zap(1)
-                } else if (wrapChannelList(-1)) {
-                    Unit
-                } else {
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> if (binding.channelPanel.visibility != View.VISIBLE) {
-                    zap(-1)
-                } else if (wrapChannelList(1)) {
-                    Unit
-                } else {
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (
-                    binding.channelPanel.visibility == View.VISIBLE &&
-                    binding.channelList.hasFocus()
-                ) {
-                    pageChannelList(-1)
-                } else {
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_DPAD_RIGHT -> if (
-                    binding.channelPanel.visibility == View.VISIBLE &&
-                    binding.channelList.hasFocus()
-                ) {
-                    pageChannelList(1)
-                } else {
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_PROG_RED -> if (binding.channelPanel.visibility == View.VISIBLE) {
-                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-                        openIptvEditor()
-                    } else {
-                        openChannelEditor()
-                    }
-                } else {
-                    showPlaybackModeDialog()
-                }
-                KeyEvent.KEYCODE_PROG_GREEN -> showIptvGridPicker()
-                KeyEvent.KEYCODE_PROG_YELLOW -> if (binding.channelPanel.visibility != View.VISIBLE) {
-                    return super.dispatchKeyEvent(event)
-                }
-                KeyEvent.KEYCODE_PROG_BLUE -> if (
-                    binding.channelPanel.visibility == View.VISIBLE
-                ) {
-                    if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
-                        showIptvLibraryFilterDialog()
-                    } else {
-                        showChannelSearchDialog()
-                    }
-                } else {
-                    openDisplaySettings()
-                }
-                KeyEvent.KEYCODE_WINDOW -> enterTvPictureInPicture()
-                KeyEvent.KEYCODE_LANGUAGE_SWITCH,
-                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
-                KeyEvent.KEYCODE_TV_AUDIO_DESCRIPTION -> showAudioTracks()
-                KeyEvent.KEYCODE_CAPTIONS,
-                175 -> showSubtitleTracks()
-                KeyEvent.KEYCODE_TV_TELETEXT, 233 -> showTxtTracks()
-                KeyEvent.KEYCODE_TV_INPUT -> showPhysicalInputSelector()
-                KeyEvent.KEYCODE_GUIDE -> openProgramGuide()
-                KeyEvent.KEYCODE_SEARCH -> {
-                    if (binding.channelPanel.visibility != View.VISIBLE) showChannelPanel(expanded = false)
-                    showChannelSearchDialog()
-                }
-                KeyEvent.KEYCODE_INFO -> if (binding.infoBar.visibility == View.VISIBLE) {
-                    openProgramGuide()
-                } else {
-                    currentChannel?.let(::showInfoBarForChannel) ?: showInfoBar()
-                }
-                KeyEvent.KEYCODE_MENU -> toggleChannelPanel()
-                else -> {
-                    val digit = when (event.keyCode) {
-                        KeyEvent.KEYCODE_0 -> 0
-                        KeyEvent.KEYCODE_1 -> 1
-                        KeyEvent.KEYCODE_2 -> 2
-                        KeyEvent.KEYCODE_3 -> 3
-                        KeyEvent.KEYCODE_4 -> 4
-                        KeyEvent.KEYCODE_5 -> 5
-                        KeyEvent.KEYCODE_6 -> 6
-                        KeyEvent.KEYCODE_7 -> 7
-                        KeyEvent.KEYCODE_8 -> 8
-                        KeyEvent.KEYCODE_9 -> 9
-                        else -> return super.dispatchKeyEvent(event)
-                    }
-                    appendChannelDigit(digit)
-                }
-            }
-            return true
-        }
-        return super.dispatchKeyEvent(event)
+        return remoteInputRouter.dispatch(event) { super.dispatchKeyEvent(it) }
     }
 
     private fun KeyEvent.toRemoteKeyPhase(): RemoteKeyPhase = when {
