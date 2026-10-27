@@ -69,6 +69,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
 import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
+import com.tvapp.livetv.main.IptvLibraryPagingRules
 import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
@@ -3877,26 +3878,23 @@ class MainActivity : TvRemoteActivity() {
                 iptvLibraryGeneration != generation
             ) return@launch
             val previousSize = iptvLibraryChannels.size
-            iptvLibraryWindowStart = when (direction) {
-                IptvPageDirection.FIRST -> 0
-                IptvPageDirection.NEXT -> iptvLibraryWindowStart + previousSize
-                IptvPageDirection.PREVIOUS ->
-                    (iptvLibraryWindowStart - page.channels.size).coerceAtLeast(0)
-                IptvPageDirection.LAST ->
-                    (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0)
-                IptvPageDirection.AT_INDEX -> targetIndex.coerceIn(
-                    0,
-                    (iptvLibraryTotalCount - page.channels.size).coerceAtLeast(0),
-                )
-            }
+            val window = IptvLibraryPagingRules.window(
+                direction = direction,
+                currentWindowStart = iptvLibraryWindowStart,
+                previousWindowSize = previousSize,
+                loadedSize = page.channels.size,
+                totalCount = iptvLibraryTotalCount,
+                targetIndex = targetIndex,
+            )
+            iptvLibraryWindowStart = window.windowStart
             iptvLibraryFirstAnchor = page.firstAnchor
             iptvLibraryLastAnchor = page.lastAnchor
-            iptvLibraryHasPrevious = iptvLibraryWindowStart > 0
-            iptvLibraryHasNext =
-                iptvLibraryWindowStart + page.channels.size < iptvLibraryTotalCount
-            iptvLibraryChannels = page.channels.mapIndexed { index, channel ->
-                channel.copy(displayNumber = (iptvLibraryWindowStart + index + 1).toString())
-            }
+            iptvLibraryHasPrevious = window.hasPrevious
+            iptvLibraryHasNext = window.hasNext
+            iptvLibraryChannels = IptvLibraryPagingRules.renumber(
+                page.channels,
+                iptvLibraryWindowStart,
+            )
             adapter.submitList(iptvLibraryChannels)
             currentChannel?.let { adapter.select(it.sourceKey) }
             updateIptvLibraryCount()
@@ -3907,11 +3905,7 @@ class MainActivity : TvRemoteActivity() {
                     "hasNext=$iptvLibraryHasNext, " +
                     "durationMs=${SystemClock.elapsedRealtime() - startedAt}",
             )
-            val target = when (direction) {
-                IptvPageDirection.PREVIOUS, IptvPageDirection.LAST ->
-                    iptvLibraryChannels.lastIndex.coerceAtLeast(0)
-                else -> 0
-            }
+            val target = IptvLibraryPagingRules.focusTarget(direction, iptvLibraryChannels.size)
             if (alphabetBrowsing) {
                 alphabetTargetPosition = target
                 binding.channelList.scrollToPosition(target)
