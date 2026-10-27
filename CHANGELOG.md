@@ -1,5 +1,14 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-27 - Ayarlar Ekranı Modernizasyonu, Dikey Telefon Dokunmatik ve D-Pad Chip Tasarımı
+
+- **Ayarlar Ekranı Chip/Pill Sekme Çubuğu ve Kart Düzeni (`DisplaySettingsActivity.kt` & `activity_display_settings.xml`):**
+  - Üst sekmeler (`Görünüm`, `Kanallar`, `IPTV & EPG`, `Sistem`) yatay kaydırılabilir modern çip (chip/pill) çubuğuna dönüştürüldü (`bg_settings_chip.xml`).
+  - Dikey telefonda sekmeler dar ekranlarda sıkışmaz, taşma yapmaz ve dokunarak akıcı biçimde kaydırılabilir; TV kumandasında ise D-pad Sol/Sağ gezinimi aktif çipi otomatik ortalar (`smoothScrollTo`).
+  - Ayar grupları modern yarı saydam koyu cam kartlar (`bg_settings_card.xml`) ve ince ayırıcılar içine alındı.
+  - Açık/Kapalı anahtarları renkli durum hapları (`bg_settings_pill_on.xml` / `bg_settings_pill_off.xml`), değer seçiciler ve aksiyon butonları modern kapsül etiketler (`bg_settings_pill_neutral.xml`) ile görselleştirildi.
+  - Başlık alanına şık ayarlar ikonu eklendi; kumanda ipucu yazısı mobil dokunmatik modda ekranda yer kaplamaması için otomatik gizlendi.
+
 ## 2026-10-26 - VOD Player Yükleme UI Kararlılığı, Bağımsız Seekbar, Ses Odağı, Kompakt Sıralama ve Renkli Klasik İkon
 
 - **VOD Player Yükleme ve Hazırlık Sırasında UI Görünürlüğü (`VodPlayerOverlayController.kt` & `MainActivity.kt`):**

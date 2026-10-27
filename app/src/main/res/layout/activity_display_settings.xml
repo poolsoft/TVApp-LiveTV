@@ -5,14 +5,23 @@
     android:background="@drawable/bg_settings_osd"
     android:orientation="vertical">
 
+    <!-- Header bar with Icon, Title and Close Button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="26dp"
-        android:paddingTop="22dp"
-        android:paddingEnd="26dp">
+        android:paddingStart="22dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="12dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_settings" />
 
         <TextView
             android:layout_width="0dp"
@@ -20,7 +29,7 @@
             android:layout_weight="1"
             android:text="@string/settings_title"
             android:textColor="@color/text_primary"
-            android:textSize="27sp"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
         <ImageView
@@ -34,32 +43,46 @@
             android:src="@drawable/ic_close" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/settings_tabs"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginStart="18dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="18dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal" />
-
-    <TextView
+    <!-- Horizontal scrollable chip tabs for mobile & D-pad -->
+    <HorizontalScrollView
+        android:id="@+id/settings_tabs_scroll"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="26dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingStart="18dp"
         android:paddingTop="4dp"
-        android:paddingEnd="26dp"
-        android:paddingBottom="12dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/settings_tabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Remote hint (hidden in mobile touch mode) -->
+    <TextView
+        android:id="@+id/settings_remote_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="22dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="8dp"
         android:text="@string/settings_remote_hint"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+        android:textSize="12.5sp" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#445D7180" />
+        android:background="#265D7180" />
 
+    <!-- Content area with cards -->
     <ScrollView
         android:id="@+id/settings_scroll"
         android:layout_width="match_parent"
@@ -67,7 +90,10 @@
         android:layout_weight="1"
         android:clipToPadding="false"
         android:fillViewport="true"
-        android:paddingBottom="18dp">
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
 
         <LinearLayout
             android:id="@+id/settings_content"

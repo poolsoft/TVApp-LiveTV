@@ -1,6 +1,8 @@
 package com.tvapp.livetv
 
 import android.app.Activity
+import android.graphics.Color
+import android.graphics.Typeface
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -61,6 +63,8 @@ import kotlin.math.abs
 class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var content: LinearLayout
     private lateinit var tabs: LinearLayout
+    private lateinit var tabsScroll: HorizontalScrollView
+    private var currentCard: LinearLayout? = null
     private lateinit var displayStore: DisplayPreferencesStore
     private lateinit var sleepTimerStore: SleepTimerStore
     private lateinit var languageStore: AppLanguageStore
@@ -113,6 +117,11 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
         tabs = findViewById(R.id.settings_tabs)
+        tabsScroll = findViewById(R.id.settings_tabs_scroll)
+        val remoteHint = findViewById<View>(R.id.settings_remote_hint)
+        if (BuildConfig.MOBILE_UI_ENABLED) {
+            remoteHint?.visibility = View.GONE
+        }
         selectedPage = SettingsPage.entries.getOrElse(
             savedInstanceState?.getInt(STATE_PAGE) ?: 0,
         ) { SettingsPage.APPEARANCE }
@@ -150,22 +159,31 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         SettingsPage.entries.forEachIndexed { index, page ->
             val tab = TextView(this).apply {
                 id = View.generateViewId()
-                layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                    if (index > 0) marginStart = dp(5)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(38),
+                ).apply {
+                    if (index > 0) marginStart = dp(8)
                 }
                 background = AppCompatResources.getDrawable(
                     this@DisplaySettingsActivity,
-                    R.drawable.bg_settings_tab,
+                    R.drawable.bg_settings_chip,
                 )
                 gravity = Gravity.CENTER
                 isFocusable = true
                 isClickable = true
                 setText(page.titleRes)
-                setTextColor(getColorStateList(R.color.settings_tab_text))
-                textSize = 12.5f
+                setTextColor(getColorStateList(R.color.settings_chip_text))
+                textSize = 13.5f
+                typeface = Typeface.DEFAULT_BOLD
                 maxLines = 1
-                setPadding(dp(4), 0, dp(4), 0)
+                setPadding(dp(18), 0, dp(18), 0)
                 setOnClickListener { showPage(page, moveFocusToTab = true) }
+                setOnFocusChangeListener { _, focused ->
+                    if (focused) {
+                        tabsScroll.smoothScrollTo((left - dp(24)).coerceAtLeast(0), 0)
+                    }
+                }
                 setOnKeyListener { _, keyCode, event ->
                     if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
                     when (keyCode) {
@@ -194,13 +212,19 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         }
         buildSettings(page)
         findViewById<View>(R.id.settings_scroll).scrollTo(0, 0)
-        if (moveFocusToTab) {
-            tabs.post { tabViews.getOrNull(page.ordinal)?.requestFocus() }
+        tabs.post {
+            tabViews.getOrNull(page.ordinal)?.let { selectedTab ->
+                tabsScroll.smoothScrollTo((selectedTab.left - dp(24)).coerceAtLeast(0), 0)
+                if (moveFocusToTab) {
+                    selectedTab.requestFocus()
+                }
+            }
         }
     }
 
     private fun buildSettings(page: SettingsPage) {
         content.removeAllViews()
+        currentCard = null
         firstContentFocusable = null
         xmlTvSettingRow = null
         when (page) {
@@ -597,12 +621,34 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun section(titleRes: Int) {
-        content.addView(TextView(this).apply {
+        val titleView = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(dp(6), if (content.childCount == 0) dp(4) else dp(16), dp(6), dp(6))
+            }
             text = getString(titleRes)
             setTextColor(getColor(R.color.accent))
-            textSize = 15f
-            setPadding(dp(18), dp(22), dp(18), dp(7))
-        })
+            textSize = 13.5f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.04f
+        }
+        content.addView(titleView)
+
+        val card = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(0, 0, 0, dp(6))
+            }
+            background = AppCompatResources.getDrawable(this@DisplaySettingsActivity, R.drawable.bg_settings_card)
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        content.addView(card)
+        currentCard = card
     }
 
     private fun horizontalActionRow(actions: List<Pair<Int, () -> Unit>>) {
@@ -610,39 +656,61 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         val strip = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(3), dp(8), dp(7))
+            setPadding(dp(4), dp(2), dp(4), dp(4))
         }
         actions.forEach { (titleRes, clicked) ->
             val actionView = TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(190), dp(62)).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(170), dp(52)).apply {
                     marginEnd = dp(8)
                 }
-                TvUiComponents.applyFocusableRow(this)
+                background = AppCompatResources.getDrawable(this@DisplaySettingsActivity, R.drawable.bg_settings_chip)
                 gravity = Gravity.CENTER
                 isFocusable = true
                 isClickable = true
                 setText(titleRes)
-                setTextColor(getColorStateList(R.color.settings_title_text))
-                textSize = 15f
+                setTextColor(getColorStateList(R.color.settings_chip_text))
+                textSize = 13.5f
                 maxLines = 2
-                setPadding(dp(12), dp(6), dp(12), dp(6))
+                setPadding(dp(12), dp(4), dp(12), dp(4))
                 setOnClickListener { clicked() }
+                setOnFocusChangeListener { target, focused ->
+                    target.animate()
+                        .scaleX(if (focused) 1.02f else 1f)
+                        .scaleY(if (focused) 1.02f else 1f)
+                        .setDuration(80L)
+                        .start()
+                }
             }
             if (firstContentFocusable == null) firstContentFocusable = actionView
             strip.addView(actionView)
         }
-        content.addView(HorizontalScrollView(this).apply {
+        val scrollStrip = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             isFocusable = false
+            clipToPadding = false
             addView(strip)
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)))
+        }
+        val parent = currentCard ?: content
+        parent.addView(scrollStrip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)).apply {
+            setMargins(dp(4), dp(4), dp(4), dp(4))
+        })
     }
 
     private fun toggle(titleRes: Int, initial: Boolean, changed: (Boolean) -> Unit) {
         var enabled = initial
         val row = settingRow(titleRes)
         fun render() {
-            row.value.text = getString(if (enabled) R.string.on else R.string.off)
+            if (enabled) {
+                row.value.text = getString(R.string.on)
+                row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_on)
+                row.value.setTextColor(Color.parseColor("#26D97F"))
+                row.value.setPadding(dp(14), dp(4), dp(14), dp(4))
+            } else {
+                row.value.text = getString(R.string.off)
+                row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_off)
+                row.value.setTextColor(Color.parseColor("#88A0B0"))
+                row.value.setPadding(dp(14), dp(4), dp(14), dp(4))
+            }
         }
         row.root.setOnClickListener {
             enabled = !enabled
@@ -667,6 +735,8 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     ) {
         var index = initialIndex.coerceIn(labels.indices)
         val row = settingRow(titleRes)
+        row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
+        row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         fun select(direction: Int) {
             index = (index + direction + labels.size) % labels.size
             row.value.text = "<  ${labels[index]}  >"
@@ -695,6 +765,8 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     ) {
         var number = initial.coerceIn(minimum, maximum)
         val row = settingRow(titleRes)
+        row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
+        row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         fun adjust(direction: Int) {
             number = (number + direction * step).coerceIn(minimum, maximum)
             row.value.text = "<  ${label(number)}  >"
@@ -727,23 +799,59 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     )
 
     private fun settingRow(titleRes: Int): SettingRow {
+        val parent = currentCard ?: LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                setMargins(0, 0, 0, dp(6))
+            }
+            background = AppCompatResources.getDrawable(this@DisplaySettingsActivity, R.drawable.bg_settings_card)
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            content.addView(this)
+            currentCard = this
+        }
+
+        if (parent.childCount > 0) {
+            val divider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(1),
+                ).apply {
+                    setMargins(dp(14), 0, dp(14), 0)
+                }
+                setBackgroundColor(Color.parseColor("#155D7180"))
+            }
+            parent.addView(divider)
+        }
+
         val row = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(58),
-            ).apply { setMargins(dp(8), dp(2), dp(8), dp(2)) }
-            TvUiComponents.applyFocusableRow(this)
+                dp(54),
+            ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
+            background = AppCompatResources.getDrawable(this@DisplaySettingsActivity, R.drawable.bg_settings_row)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             isFocusable = true
             isClickable = true
-            setPadding(dp(18), 0, dp(16), 0)
+            setPadding(dp(14), 0, dp(12), 0)
+            setOnFocusChangeListener { target, focused ->
+                target.animate()
+                    .scaleX(if (focused) 1.012f else 1f)
+                    .scaleY(if (focused) 1.012f else 1f)
+                    .setDuration(80L)
+                    .start()
+            }
         }
         val title = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(10)
+            }
             text = getString(titleRes)
             setTextColor(getColorStateList(R.color.settings_title_text))
-            textSize = 17f
+            textSize = 15.5f
             maxLines = 2
             isDuplicateParentStateEnabled = true
         }
@@ -752,20 +860,22 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
-            gravity = Gravity.END
+            gravity = Gravity.CENTER
             setTextColor(getColorStateList(R.color.settings_value_text))
-            textSize = 15f
+            textSize = 13.5f
             isDuplicateParentStateEnabled = true
         }
         row.addView(title)
         row.addView(value)
-        content.addView(row)
+        parent.addView(row)
         if (firstContentFocusable == null) firstContentFocusable = row
         return SettingRow(row, value)
     }
 
     private fun action(titleRes: Int, initialValue: String, clicked: (SettingRow) -> Unit) {
         val row = settingRow(titleRes)
+        row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
+        row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         row.value.text = initialValue
         row.root.setOnClickListener { clicked(row) }
     }
@@ -773,6 +883,8 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun info(titleRes: Int, value: String) {
         val row = settingRow(titleRes)
         row.value.text = value
+        row.value.background = null
+        row.value.setPadding(dp(4), dp(4), dp(4), dp(4))
         row.root.isFocusable = false
         row.root.isClickable = false
     }
