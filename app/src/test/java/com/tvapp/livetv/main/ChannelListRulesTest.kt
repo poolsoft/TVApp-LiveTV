@@ -203,4 +203,40 @@ class ChannelListRulesTest {
             }
         }
     }
+
+    @Test
+    fun filterByAlphabetRenumbersVisibleRows() {
+        val channels = listOf(
+            channel("Alpha", number = "5"),
+            channel("Beta", number = "6"),
+            channel("Akasya", number = "7"),
+        )
+        val filtered = ChannelListRules.filterByAlphabet(channels, "A")
+        assertEquals(listOf("Alpha", "Akasya"), filtered.map { it.displayName })
+        assertEquals(listOf("1", "2"), filtered.map { it.displayNumber })
+
+        val all = ChannelListRules.filterByAlphabet(channels, null)
+        assertEquals(listOf("1", "2", "3"), all.map { it.displayNumber })
+    }
+
+    @Test
+    fun alphabetRailPlanPutsAllEntryFirst() {
+        val plan = ChannelListRules.alphabetRailPlan(listOf("B", "A", "#"), allLabel = "Tümü")
+
+        assertEquals(listOf("A", "B", "#"), plan.letters.map { it.letter })
+        assertEquals(listOf("Tümü", "A", "B", "#"), plan.targets.map { it.letter })
+        assertEquals(-1, plan.targets.first().position)
+        // Harf hedefleri kendi sira numarasini tasir; ray geri cagrisi bu degeri verir.
+        assertEquals(listOf(0, 1, 2), plan.targets.drop(1).map { it.position })
+    }
+
+    @Test
+    fun alphabetRailJumpResolvesLetterFromPlan() {
+        val plan = ChannelListRules.alphabetRailPlan(listOf("A", "B"), allLabel = "Tümü")
+        // "Tümü" secimi -1 dondurur -> harf filtresi kapanir.
+        assertEquals(null, plan.letters.getOrNull(plan.targets.first().position)?.letter)
+        // Harf secimi 0..n-1 dondurur -> ilgili harf uygulanir.
+        assertEquals("A", plan.letters.getOrNull(plan.targets[1].position)?.letter)
+        assertEquals("B", plan.letters.getOrNull(plan.targets[2].position)?.letter)
+    }
 }

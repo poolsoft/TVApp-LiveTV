@@ -3,6 +3,7 @@ package com.tvapp.livetv.main
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.settings.ChannelSourceFilter
 import com.tvapp.livetv.ui.AlphabetJump
+import com.tvapp.livetv.ui.AlphabetTarget
 import com.tvapp.livetv.ui.isRadioChannel
 import java.text.Normalizer
 import java.util.Locale
@@ -67,6 +68,37 @@ object ChannelListRules {
         }
         .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
         .toList()
+
+    /**
+     * Alfabe harfine gore filtreleyip gorunen siraya gore yeniden numaralandirir.
+     * `letter` null ise yalnizca numaralandirma yapilir.
+     */
+    fun filterByAlphabet(channels: List<LiveChannel>, letter: String?): List<LiveChannel> =
+        channels
+            .filter { letter == null || AlphabetJump.letter(it.displayName) == letter }
+            .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+
+    /** Alfabe rayi icin harf listesi ve ray hedefleri. */
+    data class AlphabetRailPlan(
+        /** Sirali harfler; `position` alani harfin kendi sirasidir. */
+        val letters: List<AlphabetTarget>,
+        /** Raya yerlestirilen hedefler: basa "Tumu" (-1), sonra harfler. */
+        val targets: List<AlphabetTarget>,
+    )
+
+    /**
+     * Alfabe rayi plani: harf listesi + "Tumu" girisi.
+     *
+     * Ray geri cagrisi `AlphabetTarget.position` degerini verir; "Tumu" -1,
+     * harfler ise 0..n-1 tasir. Boylece cagiran taraf `letters.getOrNull(position)`
+     * ile harfi bulur (tasima oncesi davranisin aynisi).
+     */
+    fun alphabetRailPlan(initials: Collection<String>, allLabel: String): AlphabetRailPlan {
+        val letters = AlphabetJump.targets(initials.map { it to 0 })
+        val targets = listOf(AlphabetTarget(allLabel, -1)) +
+            letters.mapIndexed { index, target -> target.copy(position = index) }
+        return AlphabetRailPlan(letters, targets)
+    }
 
     /**
      * Liste modu dongusu (Sari kisabasim) icin sonraki adim.

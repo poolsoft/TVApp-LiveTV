@@ -3959,9 +3959,12 @@ class MainActivity : TvRemoteActivity() {
                 scheduleChannelPanelClose()
                 return@launch
             }
-            val letters = com.tvapp.livetv.ui.AlphabetJump.targets(initialsByLetter.keys.map { it to 0 })
-            val targets = listOf(com.tvapp.livetv.ui.AlphabetTarget(getString(R.string.all_channels), -1)) +
-                letters.mapIndexed { index, target -> target.copy(position = index) }
+            val railPlan = ChannelListRules.alphabetRailPlan(
+                initialsByLetter.keys,
+                getString(R.string.all_channels),
+            )
+            val letters = railPlan.letters
+            val targets = railPlan.targets
             alphabetTargetPosition = panelChannels().indexOfFirst { it.sourceKey == focusedListSourceKey }.coerceAtLeast(0)
             alphabetBrowsing = true
             alphabetRail = com.tvapp.livetv.ui.AlphabetRail(binding.channelList, targets, initialLetter, onJump = { position ->
@@ -3989,9 +3992,7 @@ class MainActivity : TvRemoteActivity() {
                         loadIptvLibraryWindow(IptvPageDirection.FIRST)
                     }
                 } else if (isContinue) {
-                    iptvLibraryChannels = channels.filter {
-                        alphabetLetter == null || com.tvapp.livetv.ui.AlphabetJump.letter(it.displayName) == alphabetLetter
-                    }.mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+                    iptvLibraryChannels = ChannelListRules.filterByAlphabet(channels, alphabetLetter)
                     iptvLibraryTotalCount = iptvLibraryChannels.size
                     adapter.submitList(iptvLibraryChannels)
                     updateIptvLibraryCount()
