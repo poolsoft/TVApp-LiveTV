@@ -6605,78 +6605,55 @@ class MainActivity : TvRemoteActivity() {
                 } else {
                     val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
                     var meta = runCatching { appDb.vodDao().metadata(sourceKey) }.getOrNull()
-                    var dynamicEpTitle: String? = null
-                    var dynamicEpUrl: String? = null
 
                     // JSON VOD dizi bolumu cozumlemesi (sourceKey format: parentKey:ep:index_hash)
+                    // Karar kurallari VodLibraryResolver'da (Faz 1); IO burada kalir.
+                    var dynamicEpTitle: String? = null
                     if (meta == null && sourceKey.contains(":ep:")) {
                         val parentKey = sourceKey.substringBefore(":ep:")
                         val parentMeta = runCatching { appDb.vodDao().metadata(parentKey) }.getOrNull()
-                        if (parentMeta != null && !parentMeta.streamUrl.isNullOrBlank() && parentMeta.streamUrl.startsWith("[")) {
-                            try {
-                                val epArray = org.json.JSONArray(parentMeta.streamUrl)
-                                val epPart = sourceKey.substringAfter(":ep:")
-                                val epIdx = epPart.substringBefore('_').toIntOrNull() ?: 0
-                                if (epIdx in 0 until epArray.length()) {
-                                    val parsed = com.tvapp.livetv.vod.VodUiSupport.dynamicEpisode(
-                                        epArray.optJSONObject(epIdx),
-                                        epIdx,
-                                    )
-                                    if (parsed != null) {
-                                        dynamicEpTitle = parsed.title
-                                        dynamicEpUrl = parsed.url
-                                        meta = parentMeta.copy(sourceKey = sourceKey, streamUrl = dynamicEpUrl)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                debugLog.recordDebug("Parse dynamic JSON episode in resolve failed: ${e.message}")
-                            }
+                        val dyn = runCatching {
+                            com.tvapp.livetv.main.VodLibraryResolver.resolveDynamicEpisode(
+                                sourceKey,
+                                meta,
+                                parentMeta,
+                            )
+                        }.getOrNull()
+                        if (dyn == null && parentMeta?.streamUrl?.startsWith("[") == true) {
+                            debugLog.recordDebug("Parse dynamic JSON episode in resolve failed for $sourceKey")
+                        }
+                        if (dyn != null) {
+                            meta = dyn.meta
+                            dynamicEpTitle = dyn.dynamicEpTitle
                         }
                     }
 
                     if (meta != null && !meta.streamUrl.isNullOrBlank()) {
-                        val hasEp = meta.parentKey != null || meta.kind == "SERIES" ||
-                            (!meta.streamUrl.isNullOrBlank() && meta.streamUrl.startsWith("[")) ||
-                            sourceKey.contains(":ep:")
+                        val hasEp = com.tvapp.livetv.main.VodLibraryResolver.hasEpisodes(meta, sourceKey)
                         withContext(Dispatchers.Main) {
                             currentVodHasEpisodes = hasEp
                         }
                         val parentTitle = meta.parentKey?.let { pKey ->
                             runCatching { appDb.vodDao().metadata(pKey)?.name }.getOrNull()
                         }
-                        val mainTitle = parentTitle ?: meta.name
-                        val subTitle = dynamicEpTitle ?: if (parentTitle != null) {
-                            val sNum = meta.seasonNumber ?: 1
-                            val epNum = meta.episodeNumber
-                            if (epNum != null) getString(R.string.vod_season_episode_fmt, sNum, epNum) else meta.name
-                        } else null
+                        val (mainTitle, subTitle) = com.tvapp.livetv.main.VodLibraryResolver.titles(
+                            meta,
+                            parentTitle,
+                            dynamicEpTitle,
+                        ) { sNum, epNum -> getString(R.string.vod_season_episode_fmt, sNum, epNum) }
 
-                        val pendingChannel = LiveChannel(
-                            id = meta.sourceKey.hashCode().toLong(),
-                            sourceKey = meta.sourceKey,
-                            inputId = "iptv:${meta.sourceId}",
-                            displayNumber = "VOD",
-                            displayName = mainTitle,
-                            source = LiveChannel.Source.IPTV,
-                            uri = meta.streamUrl,
-                            logoUrl = meta.logoUrl,
-                            iptvContentType = "VOD",
-                        ).apply {
-                            episodeTitle = subTitle
-                        }
+                        val pendingChannel = com.tvapp.livetv.main.VodLibraryResolver.buildChannel(
+                            meta,
+                            mainTitle,
+                            subTitle,
+                        )
 
                         // Eger dogrudan medya akisi ise web resolver calistirma
                         if (com.tvapp.livetv.vod.WebVideoResolver.isDirectStream(meta.streamUrl)) {
                             pendingChannel
                         } else {
                             val resolved = com.tvapp.livetv.vod.VodPageResolver.resolve(meta.streamUrl, null)
-                            val chosen = resolved.single
-                                ?: resolved.candidates.firstOrNull()
-                            if (chosen != null) {
-                                resolved.applyTo(pendingChannel, chosen)
-                            } else {
-                                pendingChannel
-                            }
+                            com.tvapp.livetv.main.VodLibraryResolver.applyDbResolve(pendingChannel, resolved)
                         }
                     } else null
                 }
