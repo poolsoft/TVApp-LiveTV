@@ -321,6 +321,11 @@ class MainActivity : TvRemoteActivity() {
     private var focusedTuneJob: Job? = null
     private var channelResolutionGeneration = 0
     private var vodResolveJob: Job? = null
+    private val vodHostCallbacks = object : com.tvapp.livetv.main.VodHostCallbacks {
+        override fun isVodMode(): Boolean = vodMode
+        override fun currentGeneration(): Int = channelResolutionGeneration
+    }
+    private val vodHost = com.tvapp.livetv.main.VodHost(vodHostCallbacks)
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
@@ -2394,28 +2399,18 @@ class MainActivity : TvRemoteActivity() {
     /**
      * Birden cok oynatilabilir aday bulundugunda uzaktan kumandayla secim sunar.
      * Tek aday yolu sessizce oynar; cok adayda ilk siradakini dayatmaz.
+     * Govde com.tvapp.livetv.main.VodDialogs'a tasindi (Faz 1); burasi ince delegedir.
      */
     private fun showVodStreamChoice(
         resolved: com.tvapp.livetv.vod.VodPageResolver.Resolved,
         baseChannel: LiveChannel,
     ) {
-        val candidates = resolved.candidates
-        if (candidates.isEmpty()) {
-            selectChannel(baseChannel, recordHistory = true)
-            return
-        }
-        val labels = candidates.mapIndexed { index, item ->
-            com.tvapp.livetv.vod.VodUiSupport.buildVodStreamLabel(index + 1, item.streamUrl)
-        }.toTypedArray()
-        AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
-            .setTitle(getString(R.string.browser_select_stream))
-            .setItems(labels) { dialog, which ->
-                dialog.dismiss()
-                val chosen = candidates.getOrNull(which) ?: return@setItems
-                selectChannel(resolved.applyTo(baseChannel, chosen), recordHistory = true)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        com.tvapp.livetv.main.VodDialogs.showVodStreamChoice(
+            this@MainActivity,
+            resolved,
+            baseChannel,
+            onSelectChannel = { selectChannel(it, recordHistory = true) },
+        )
     }
 
     private fun openVod(sourceKey: String, startOver: Boolean = false) {
@@ -6562,13 +6557,12 @@ class MainActivity : TvRemoteActivity() {
                 }
                 hideVodResolvingFeedback()
                 if (!vodMode || requestGeneration != channelResolutionGeneration) return@launch
-                val single = resolved.playable()
-                if (single != null) {
-                    selectChannel(resolved.applyTo(baseChannel, single), recordHistory = true)
-                } else if (resolved.candidates.isNotEmpty()) {
-                    showVodStreamChoice(resolved, baseChannel)
-                } else {
-                    selectChannel(baseChannel, recordHistory = true)
+                // Aday karari VodHost'ta (Faz 1); dallar burada korunur, sadece karar tasindi.
+                when (val decision = vodHost.decideCandidates(baseChannel, resolved)) {
+                    is com.tvapp.livetv.main.VodCandidateDecision.PlayBase ->
+                        selectChannel(decision.channel, recordHistory = true)
+                    is com.tvapp.livetv.main.VodCandidateDecision.ShowChoice ->
+                        showVodStreamChoice(decision.resolved, decision.baseChannel)
                 }
             }
             return
