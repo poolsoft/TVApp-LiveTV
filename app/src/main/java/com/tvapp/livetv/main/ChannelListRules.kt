@@ -67,4 +67,47 @@ object ChannelListRules {
         }
         .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
         .toList()
+
+    /**
+     * Liste modu dongusu (Sari kisabasim) icin sonraki adim.
+     *
+     * Hibrit olmayan deneyimde kaynak filtreleri arasinda gezinilmez:
+     * ALL -> FAVORITES -> IPTV kutuphanesi -> ALL.
+     * Hibritte ise ALL -> SATELLITE -> RADIO -> IPTV -> FAVORITES -> kutuphane.
+     * IPTV kutuphanesi acikken her zaman ALL'a donulur.
+     */
+    fun nextListMode(
+        inIptvLibrary: Boolean,
+        sourceFilter: ChannelSourceFilter,
+        hybrid: Boolean,
+    ): ChannelListModeAction {
+        if (inIptvLibrary) return ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL)
+        return if (!hybrid) {
+            when (sourceFilter) {
+                ChannelSourceFilter.ALL -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.FAVORITES)
+                ChannelSourceFilter.FAVORITES -> ChannelListModeAction.OpenIptvLibrary
+                else -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL)
+            }
+        } else {
+            when (sourceFilter) {
+                ChannelSourceFilter.ALL -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.SATELLITE)
+                ChannelSourceFilter.SATELLITE -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.RADIO)
+                ChannelSourceFilter.RADIO -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.IPTV)
+                ChannelSourceFilter.IPTV -> ChannelListModeAction.ApplyFilter(ChannelSourceFilter.FAVORITES)
+                ChannelSourceFilter.FAVORITES -> ChannelListModeAction.OpenIptvLibrary
+            }
+        }
+    }
+}
+
+/** Liste modu dongusunun urettigi eylem. */
+sealed interface ChannelListModeAction {
+    /** Verilen kaynak filtresini uygular (favori filtresi her zaman kapanir). */
+    data class ApplyFilter(
+        val source: ChannelSourceFilter,
+        val showFavorites: Boolean = false,
+    ) : ChannelListModeAction
+
+    /** Kayitli IPTV kutuphanesi penceresini acar. */
+    data object OpenIptvLibrary : ChannelListModeAction
 }

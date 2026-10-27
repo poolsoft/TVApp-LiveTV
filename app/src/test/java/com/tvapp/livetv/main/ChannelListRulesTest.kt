@@ -135,4 +135,72 @@ class ChannelListRulesTest {
         // Bu, tasima oncesi MainActivity davranisinin aynisidir; degistirilmedi.
         assertFalse(ChannelListRules.matchesSearch(cagri, ChannelListRules.normalizeSearch("cagri")))
     }
+
+    @Test
+    fun hybridCycleWalksAllSources() {
+        fun next(filter: ChannelSourceFilter) =
+            ChannelListRules.nextListMode(inIptvLibrary = false, sourceFilter = filter, hybrid = true)
+
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.SATELLITE),
+            next(ChannelSourceFilter.ALL),
+        )
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.RADIO),
+            next(ChannelSourceFilter.SATELLITE),
+        )
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.IPTV),
+            next(ChannelSourceFilter.RADIO),
+        )
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.FAVORITES),
+            next(ChannelSourceFilter.IPTV),
+        )
+        assertEquals(ChannelListModeAction.OpenIptvLibrary, next(ChannelSourceFilter.FAVORITES))
+    }
+
+    @Test
+    fun simpleModeCycleSkipsSatelliteAndRadio() {
+        fun next(filter: ChannelSourceFilter) =
+            ChannelListRules.nextListMode(inIptvLibrary = false, sourceFilter = filter, hybrid = false)
+
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.FAVORITES),
+            next(ChannelSourceFilter.ALL),
+        )
+        assertEquals(ChannelListModeAction.OpenIptvLibrary, next(ChannelSourceFilter.FAVORITES))
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL),
+            next(ChannelSourceFilter.SATELLITE),
+        )
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL),
+            next(ChannelSourceFilter.IPTV),
+        )
+    }
+
+    @Test
+    fun iptvLibraryAlwaysReturnsToAllChannels() {
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL),
+            ChannelListRules.nextListMode(true, ChannelSourceFilter.FAVORITES, hybrid = true),
+        )
+        assertEquals(
+            ChannelListModeAction.ApplyFilter(ChannelSourceFilter.ALL),
+            ChannelListRules.nextListMode(true, ChannelSourceFilter.IPTV, hybrid = false),
+        )
+    }
+
+    @Test
+    fun cycleNeverEnablesFavoriteFilter() {
+        ChannelSourceFilter.entries.forEach { filter ->
+            listOf(true, false).forEach { hybrid ->
+                val action = ChannelListRules.nextListMode(false, filter, hybrid)
+                if (action is ChannelListModeAction.ApplyFilter) {
+                    assertFalse(action.showFavorites)
+                }
+            }
+        }
+    }
 }

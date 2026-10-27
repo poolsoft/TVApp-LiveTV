@@ -67,6 +67,7 @@ import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
+import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
 import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.playback.TifPlaybackController
@@ -5581,43 +5582,15 @@ class MainActivity : TvRemoteActivity() {
 
     private fun cycleChannelListMode() {
         focusedTuneJob?.cancel()
-        if (experienceMode != ExperienceMode.HYBRID_TV) {
-            when {
-                channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> applyChannelFilter(
-                    showFavorites = false,
-                    source = ChannelSourceFilter.ALL,
-                )
-                sourceFilter == ChannelSourceFilter.ALL -> applyChannelFilter(
-                    showFavorites = false,
-                    source = ChannelSourceFilter.FAVORITES,
-                )
-                sourceFilter == ChannelSourceFilter.FAVORITES -> openSavedIptvLibrary()
-                else -> applyChannelFilter(showFavorites = false, source = ChannelSourceFilter.ALL)
-            }
-            return
-        }
-        when {
-            channelPanelContent == ChannelPanelContent.IPTV_LIBRARY -> applyChannelFilter(
-                showFavorites = false,
-                source = ChannelSourceFilter.ALL,
-            )
-            sourceFilter == ChannelSourceFilter.ALL -> applyChannelFilter(
-                showFavorites = false,
-                source = ChannelSourceFilter.SATELLITE,
-            )
-            sourceFilter == ChannelSourceFilter.SATELLITE -> applyChannelFilter(
-                showFavorites = false,
-                source = ChannelSourceFilter.RADIO,
-            )
-            sourceFilter == ChannelSourceFilter.RADIO -> applyChannelFilter(
-                showFavorites = false,
-                source = ChannelSourceFilter.IPTV,
-            )
-            sourceFilter == ChannelSourceFilter.IPTV -> applyChannelFilter(
-                showFavorites = false,
-                source = ChannelSourceFilter.FAVORITES,
-            )
-            else -> openSavedIptvLibrary()
+        val action = ChannelListRules.nextListMode(
+            inIptvLibrary = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY,
+            sourceFilter = sourceFilter,
+            hybrid = experienceMode == ExperienceMode.HYBRID_TV,
+        )
+        when (action) {
+            is ChannelListModeAction.ApplyFilter ->
+                applyChannelFilter(showFavorites = action.showFavorites, source = action.source)
+            ChannelListModeAction.OpenIptvLibrary -> openSavedIptvLibrary()
         }
     }
 
