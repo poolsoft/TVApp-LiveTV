@@ -17,6 +17,27 @@ import com.tvapp.livetv.vod.VodUiSupport
 object VodDialogs {
 
     /**
+     * Bolum secici (eski showEpisodePickerForActiveVod diyalogu).
+     * Uzaktan kumandayla secim, Back ile kapatma davranisi aynidir.
+     */
+    fun showEpisodePicker(
+        activity: Activity,
+        title: String,
+        labels: List<String>,
+        selectedIndex: Int,
+        onPick: (Int) -> Unit,
+    ) {
+        AlertDialog.Builder(activity, R.style.Theme_TVApp_Dialog)
+            .setTitle(title)
+            .setSingleChoiceItems(labels.toTypedArray(), selectedIndex) { dialog, which ->
+                onPick(which)
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    /**
      * Birden cok oynatilabilir aday bulundugunda uzaktan kumandayla secim sunar.
      * Tek aday yolu sessizce oynar; cok adayda ilk siradakini dayatmaz.
      */

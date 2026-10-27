@@ -33,6 +33,12 @@ class VodHostTest {
         var libraryChannel: LiveChannel? = null
         var metadata: VodMetadataEntity? = null
         var resolved: VodPageResolver.Resolved = VodPageResolver.Resolved(emptyList())
+        var active: LiveChannel? = null
+        var episodes: List<VodMetadataEntity> = emptyList()
+        var pickerTitle: String? = null
+        var pickerLabels: List<String> = emptyList()
+        var pickerIndex: Int = -1
+        var pickerPick: ((Int) -> Unit)? = null
 
         override fun isVodMode() = vodMode
         override fun currentGeneration() = generation
@@ -65,6 +71,22 @@ class VodHostTest {
         override suspend fun loadMetadata(sourceKey: String): VodMetadataEntity? = metadata
         override suspend fun loadParentName(parentKey: String): String? = null
         override suspend fun resolvePageWithContext(url: String): VodPageResolver.Resolved = resolved
+        override fun activeChannel(): LiveChannel? = active
+        override fun openVodLibrary() { events += "library" }
+        override fun playVodKey(sourceKey: String) { events += "play:$sourceKey" }
+        override fun playVodDeepLink(payload: VodDeepLinkPayload) { events += "payload:${payload.sourceKey}" }
+        override fun showEpisodeChoices(
+            title: String,
+            labels: List<String>,
+            selectedIndex: Int,
+            onPick: (Int) -> Unit,
+        ) {
+            pickerTitle = title
+            pickerLabels = labels
+            pickerIndex = selectedIndex
+            pickerPick = onPick
+        }
+        override suspend fun loadSeriesEpisodes(seriesKey: String): List<VodMetadataEntity> = episodes
     }
 
     private fun newHost(env: FakeEnv) =
@@ -192,4 +214,84 @@ class VodHostTest {
         host.cancelResolve()
         host.cancelResolve()
     }
+
+    @Test
+    fun episodePickerWithoutActiveChannelReturnsFalse() {
+        val env = FakeEnv()
+        assertFalse(newHost(env).showEpisodePicker())
+        assertTrue(env.events.isEmpty())
+    }
+
+    @Test
+    fun episodePickerWithoutMetadataOpensLibrary() {
+        val env = FakeEnv()
+        env.active = testChannel("https://cdn/a.mp4", key = "ep1")
+        val host = newHost(env)
+        runBlocking {
+            assertTrue(host.showEpisodePicker())
+            host.awaitResolve()
+        }
+        assertTrue(env.events.contains("library"))
+        assertNull(env.pickerTitle)
+    }
+
+    @Test
+    fun episodePickerListsSeriesEpisodes() {
+        val env = FakeEnv()
+        env.active = testChannel("https://cdn/a.mp4", key = "series1")
+        env.metadata = metaRecord("series1", kind = "SERIES", parentKey = null)
+        env.episodes = listOf(
+            metaRecord("e1", kind = "EPISODE", parentKey = "series1", episode = 1, name = "Pilot"),
+            metaRecord("e2", kind = "EPISODE", parentKey = "series1", episode = 2, name = "Final"),
+        )
+        val host = newHost(env)
+        runBlocking {
+            host.showEpisodePicker()
+            host.awaitResolve()
+        }
+        assertEquals(listOf("1. Sezon 1. Bolum - Pilot", "1. Sezon 2. Bolum - Final"), env.pickerLabels)
+        assertEquals(0, env.pickerIndex)
+        env.pickerPick?.invoke(1)
+        assertTrue(env.events.contains("play:e2"))
+    }
+
+    @Test
+    fun episodePickerFallsBackToJsonEpisodes() {
+        val env = FakeEnv()
+        env.active = testChannel("https://cdn/a.mp4", key = "series1")
+        env.metadata = metaRecord(
+            "series1",
+            kind = "SERIES",
+            parentKey = null,
+            streamUrl = "[{\"episode\":1,\"title\":\"Pilot\",\"videoUrl\":\"https://cdn/e1.mp4\"}]",
+        )
+        val host = newHost(env)
+        runBlocking {
+            host.showEpisodePicker()
+            host.awaitResolve()
+        }
+        assertEquals(listOf("Pilot"), env.pickerLabels)
+        env.pickerPick?.invoke(0)
+        assertTrue(env.events.any { it.startsWith("payload:series1:ep:0_") })
+    }
+
+    private fun metaRecord(
+        key: String,
+        kind: String,
+        parentKey: String?,
+        episode: Int? = null,
+        name: String = "Dizi",
+        streamUrl: String? = null,
+    ) = VodMetadataEntity(
+        sourceKey = key,
+        sourceId = 1L,
+        kind = kind,
+        providerId = "p",
+        parentKey = parentKey,
+        seasonNumber = 1,
+        episodeNumber = episode,
+        name = name,
+        streamUrl = streamUrl,
+        updatedAt = 0L,
+    )
 }

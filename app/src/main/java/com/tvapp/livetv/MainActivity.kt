@@ -365,6 +365,36 @@ class MainActivity : TvRemoteActivity() {
             modePreferences.edit().remove(LAST_VOD_KEY).apply()
         }
         override fun log(message: String) = debugLog.recordDebug(message)
+        override fun activeChannel(): LiveChannel? = currentChannel
+        override fun openVodLibrary() = this@MainActivity.openVodLibrary()
+        override fun playVodKey(sourceKey: String) = openVod(sourceKey)
+        override fun playVodDeepLink(payload: com.tvapp.livetv.main.VodDeepLinkPayload) {
+            val vodIntent = Intent().apply {
+                payload.sourceKey?.let { putExtra(EXTRA_VOD_SOURCE_KEY, it) }
+                payload.streamUrl?.let { putExtra(EXTRA_VOD_STREAM_URL, it) }
+                payload.title?.let { putExtra(EXTRA_VOD_TITLE, it) }
+                payload.episodeTitle?.let { putExtra(EXTRA_VOD_EPISODE_TITLE, it) }
+                payload.logoUrl?.let { putExtra(EXTRA_VOD_LOGO_URL, it) }
+            }
+            handleVodSourceDeepLink(vodIntent)
+        }
+        override fun showEpisodeChoices(
+            title: String,
+            labels: List<String>,
+            selectedIndex: Int,
+            onPick: (Int) -> Unit,
+        ) = com.tvapp.livetv.main.VodDialogs.showEpisodePicker(
+            this@MainActivity,
+            title,
+            labels,
+            selectedIndex,
+            onPick,
+        )
+        override suspend fun loadSeriesEpisodes(
+            seriesKey: String,
+        ): List<com.tvapp.livetv.data.local.VodMetadataEntity> =
+            com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                .vodDao().episodesForSeries(seriesKey)
         override fun findChannelInList(sourceKey: String): LiveChannel? =
             channels.firstOrNull { it.sourceKey == sourceKey }
         override suspend fun loadIptvChannel(sourceKey: String): LiveChannel? =
@@ -2350,92 +2380,7 @@ class MainActivity : TvRemoteActivity() {
         vodPlayerOverlayController = controller
     }
 
-    private fun showEpisodePickerForActiveVod(): Boolean {
-        val active = currentChannel ?: return false
-        val activeKey = active.sourceKey
-        lifecycleScope.launch {
-            val appDb = com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
-            val currentMeta = withContext(Dispatchers.IO) {
-                runCatching { appDb.vodDao().metadata(activeKey) }.getOrNull()
-            } ?: run {
-                openVodLibrary()
-                return@launch
-            }
-
-            val seriesKey = currentMeta.parentKey ?: if (currentMeta.kind == "SERIES") currentMeta.sourceKey else null
-            if (seriesKey == null) {
-                openVodLibrary()
-                return@launch
-            }
-
-            val episodes = withContext(Dispatchers.IO) {
-                appDb.vodDao().episodesForSeries(seriesKey)
-            }
-
-            if (episodes.isNotEmpty()) {
-                val episodeNames = episodes.map { ep ->
-                    val epNum = ep.episodeNumber
-                    val sNum = ep.seasonNumber ?: 1
-                    if (epNum != null) {
-                        getString(R.string.vod_season_episode_fmt, sNum, epNum) +
-                            (if (ep.name.isNotBlank() && !ep.name.startsWith("$epNum")) " - ${ep.name}" else "")
-                    } else ep.name
-                }.toTypedArray()
-
-                val currentIndex = episodes.indexOfFirst { it.sourceKey == activeKey }.coerceAtLeast(0)
-
-                AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
-                    .setTitle(currentChannel?.displayName ?: getString(R.string.vod_select_episode))
-                    .setSingleChoiceItems(episodeNames, currentIndex) { dialog, which ->
-                        val chosen = episodes.getOrNull(which)
-                        if (chosen != null && chosen.sourceKey != activeKey) {
-                            openVod(chosen.sourceKey)
-                        }
-                        dialog.dismiss()
-                    }
-                    .setNegativeButton(R.string.close, null)
-                    .show()
-                return@launch
-            }
-
-            // Check if series has episodes JSON in streamUrl
-            val seriesMeta = withContext(Dispatchers.IO) {
-                if (currentMeta.kind == "SERIES") currentMeta else appDb.vodDao().metadata(seriesKey)
-            }
-            val rawEpisodes = seriesMeta?.streamUrl
-            val parsedEpisodes = com.tvapp.livetv.vod.VodUiSupport.parseEpisodesJson(rawEpisodes)
-            val safeSeriesMeta = seriesMeta
-            if (parsedEpisodes.isNotEmpty() && safeSeriesMeta != null) {
-                try {
-                    val titles = parsedEpisodes.map { it.title }.toTypedArray()
-                    val currentIndex = parsedEpisodes.indexOfFirst { it.title == active.episodeTitle }.coerceAtLeast(0)
-                    AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
-                        .setTitle(currentChannel?.displayName ?: safeSeriesMeta.name)
-                        .setSingleChoiceItems(titles, currentIndex) { dialog, which ->
-                            val ep = parsedEpisodes[which]
-                            val epKey = "${seriesKey}:ep:${which}_${ep.url.hashCode()}"
-                            val vodIntent = Intent().apply {
-                                putExtra(EXTRA_VOD_SOURCE_KEY, epKey)
-                                putExtra(EXTRA_VOD_STREAM_URL, ep.url)
-                                putExtra(EXTRA_VOD_TITLE, safeSeriesMeta.name)
-                                putExtra(EXTRA_VOD_EPISODE_TITLE, ep.title)
-                                putExtra(EXTRA_VOD_LOGO_URL, safeSeriesMeta.logoUrl)
-                            }
-                            handleVodSourceDeepLink(vodIntent)
-                            dialog.dismiss()
-                        }
-                        .setNegativeButton(R.string.close, null)
-                        .show()
-                    return@launch
-                } catch (e: Exception) {
-                    debugLog.recordDebug("Parse episodes JSON failed: ${e.message}")
-                }
-            }
-
-            openVodLibrary()
-        }
-        return true
-    }
+    private fun showEpisodePickerForActiveVod(): Boolean = vodHost.showEpisodePicker()
 
     private fun showVodPlayerControls(autoHide: Boolean = true) {
         vodPlayerOverlayController?.showControls(autoHide)

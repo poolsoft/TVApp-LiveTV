@@ -5,6 +5,7 @@ import com.tvapp.livetv.R
 import com.tvapp.livetv.data.local.VodMetadataEntity
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.vod.VodPageResolver
+import com.tvapp.livetv.vod.VodUiSupport
 import com.tvapp.livetv.vod.WebVideoResolver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ class VodHost(
 ) {
 
     private var resolveJob: Job? = null
+    private var episodeJob: Job? = null
 
     /** Devam eden cozumlemeyi iptal eder (mod degisimi / kapatma / yeni istek). */
     fun cancelResolve() {
@@ -40,6 +42,7 @@ class VodHost(
     /** Devam eden cozumlemenin bitmesini bekler (testler ve kapanis icin). */
     suspend fun awaitResolve() {
         resolveJob?.join()
+        episodeJob?.join()
     }
 
     /**
@@ -87,6 +90,95 @@ class VodHost(
     fun handleDeepLink(intent: Intent?) {
         val payload = VodDeepLinkPayload.fromIntent(intent) ?: return
         handlePayload(payload)
+    }
+
+    /**
+     * Aktif VOD icerigi icin bolum secicisini acar.
+     * Eski `showEpisodePickerForActiveVod` govdesinin karsiligidir.
+     *
+     * @return aktif kanal yoksa false (cagiran taraf ayni sekilde kullanir).
+     */
+    fun showEpisodePicker(): Boolean {
+        val active = env.activeChannel() ?: return false
+        val activeKey = active.sourceKey
+        val activeEpisodeTitle = active.episodeTitle
+        episodeJob = scope.launch {
+            val currentMeta = withContext(Dispatchers.IO) {
+                runCatching { env.loadMetadata(activeKey) }.getOrNull()
+            }
+            if (currentMeta == null) {
+                env.openVodLibrary()
+                return@launch
+            }
+
+            val seriesKey = currentMeta.parentKey
+                ?: if (currentMeta.kind == "SERIES") currentMeta.sourceKey else null
+            if (seriesKey == null) {
+                env.openVodLibrary()
+                return@launch
+            }
+
+            val episodes = withContext(Dispatchers.IO) {
+                runCatching { env.loadSeriesEpisodes(seriesKey) }.getOrDefault(emptyList())
+            }
+
+            if (episodes.isNotEmpty()) {
+                val labels = episodes.map { episode ->
+                    VodLibraryResolver.episodeLabel(episode) { season, number ->
+                        env.seasonEpisodeLabel(season, number)
+                    }
+                }
+                val currentIndex = episodes.indexOfFirst { it.sourceKey == activeKey }.coerceAtLeast(0)
+                env.showEpisodeChoices(
+                    env.activeChannel()?.displayName ?: env.string(R.string.vod_select_episode),
+                    labels,
+                    currentIndex,
+                ) { which ->
+                    val chosen = episodes.getOrNull(which)
+                    if (chosen != null && chosen.sourceKey != activeKey) {
+                        env.playVodKey(chosen.sourceKey)
+                    }
+                }
+                return@launch
+            }
+
+            // Seri kaydinda gomulu JSON bolum listesi var mi?
+            val seriesMeta = withContext(Dispatchers.IO) {
+                if (currentMeta.kind == "SERIES") currentMeta else env.loadMetadata(seriesKey)
+            } ?: run {
+                env.openVodLibrary()
+                return@launch
+            }
+            val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl)
+            if (parsedEpisodes.isNotEmpty()) {
+                val labels = parsedEpisodes.map { it.title }
+                val currentIndex = parsedEpisodes
+                    .indexOfFirst { it.title == activeEpisodeTitle }
+                    .coerceAtLeast(0)
+                env.showEpisodeChoices(
+                    env.activeChannel()?.displayName ?: seriesMeta.name,
+                    labels,
+                    currentIndex,
+                ) { which ->
+                    val episode = parsedEpisodes.getOrNull(which)
+                    if (episode != null) {
+                        env.playVodDeepLink(
+                            VodDeepLinkPayload(
+                                sourceKey = "${seriesKey}:ep:${which}_${episode.url.hashCode()}",
+                                streamUrl = episode.url,
+                                title = seriesMeta.name,
+                                episodeTitle = episode.title,
+                                logoUrl = seriesMeta.logoUrl,
+                            ),
+                        )
+                    }
+                }
+                return@launch
+            }
+
+            env.openVodLibrary()
+        }
+        return true
     }
 
     /** Saf is mantigi: Android Intent'i olmadan da cagrilabilir. */
@@ -375,6 +467,17 @@ interface VodHostEnv {
     fun showChannelNotFound()
     fun clearLastVodKey()
     fun log(message: String)
+    fun activeChannel(): LiveChannel?
+    fun openVodLibrary()
+    fun playVodKey(sourceKey: String)
+    fun playVodDeepLink(payload: VodDeepLinkPayload)
+    fun showEpisodeChoices(
+        title: String,
+        labels: List<String>,
+        selectedIndex: Int,
+        onPick: (Int) -> Unit,
+    )
+    suspend fun loadSeriesEpisodes(seriesKey: String): List<VodMetadataEntity>
     fun findChannelInList(sourceKey: String): LiveChannel?
     suspend fun loadIptvChannel(sourceKey: String): LiveChannel?
     suspend fun loadMetadata(sourceKey: String): VodMetadataEntity?

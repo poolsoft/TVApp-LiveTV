@@ -56,6 +56,24 @@ object VodLibraryResolver {
     }
 
     /**
+     * Bolum secici satir etiketi.
+     * Kural MainActivity ile aynidir: `S. Sezon E. Bolum` + ad (tekrarlanan numara atlanir).
+     */
+    fun episodeLabel(
+        episode: VodMetadataEntity,
+        seasonEpisodeFmt: (season: Int, episode: Int) -> String,
+    ): String {
+        val epNum = episode.episodeNumber ?: return episode.name
+        val sNum = episode.seasonNumber ?: 1
+        val suffix = if (episode.name.isNotBlank() && !episode.name.startsWith("$epNum")) {
+            " - ${episode.name}"
+        } else {
+            ""
+        }
+        return seasonEpisodeFmt(sNum, epNum) + suffix
+    }
+
+    /**
      * Baslik kurali: parent varsa `parentAdi` + bolum alt-basligi, yoksa meta adi.
      * Alt-baslik icin once dinamik bolum basligi, sonra `vod_season_episode_fmt` kullanilir.
      */
