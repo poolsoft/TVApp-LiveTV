@@ -78,6 +78,21 @@ object ChannelListRules {
             .filter { letter == null || AlphabetJump.letter(it.displayName) == letter }
             .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
 
+    /**
+     * "Devam edenler" listesi: kaynak + VOD filtresi, arama ve gorunen siraya
+     * gore yeniden numaralandirma. Bu kural hem kutuphane acilisinda hem arama
+     * uygulanirken ayni sekilde kullanilir.
+     */
+    fun continueChannels(
+        channels: List<LiveChannel>,
+        sourceId: Long,
+        normalizedQuery: String = "",
+    ): List<LiveChannel> =
+        channels
+            .filter { it.inputId == "iptv:$sourceId" && it.iptvContentType == "VOD" }
+            .filter { matchesSearch(it, normalizedQuery) }
+            .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+
     /** Alfabe rayi icin harf listesi ve ray hedefleri. */
     data class AlphabetRailPlan(
         /** Sirali harfler; `position` alani harfin kendi sirasidir. */

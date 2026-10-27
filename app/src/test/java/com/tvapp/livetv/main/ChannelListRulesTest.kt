@@ -239,4 +239,32 @@ class ChannelListRulesTest {
         assertEquals("A", plan.letters.getOrNull(plan.targets[1].position)?.letter)
         assertEquals("B", plan.letters.getOrNull(plan.targets[2].position)?.letter)
     }
+
+    @Test
+    fun continueChannelsFilterSourceVodAndSearch() {
+        val channels = listOf(
+            channel("Dizi 1", key = "c1", source = LiveChannel.Source.IPTV, contentType = "VOD")
+                .copy(inputId = "iptv:7"),
+            channel("Dizi 2", key = "c2", source = LiveChannel.Source.IPTV, contentType = "VOD")
+                .copy(inputId = "iptv:7"),
+            // Baska kaynak
+            channel("Dizi 3", key = "c3", source = LiveChannel.Source.IPTV, contentType = "VOD")
+                .copy(inputId = "iptv:9"),
+            // Canli yayin
+            channel("Canli", key = "c4", source = LiveChannel.Source.IPTV, contentType = "LIVE")
+                .copy(inputId = "iptv:7"),
+        )
+
+        val continued = ChannelListRules.continueChannels(channels, sourceId = 7)
+        assertEquals(listOf("Dizi 1", "Dizi 2"), continued.map { it.displayName })
+        assertEquals(listOf("1", "2"), continued.map { it.displayNumber })
+
+        val searched = ChannelListRules.continueChannels(
+            channels,
+            sourceId = 7,
+            normalizedQuery = ChannelListRules.normalizeSearch("dizi 2"),
+        )
+        assertEquals(listOf("Dizi 2"), searched.map { it.displayName })
+        assertEquals(listOf("1"), searched.map { it.displayNumber })
+    }
 }

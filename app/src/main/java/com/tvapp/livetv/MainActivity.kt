@@ -3782,15 +3782,13 @@ class MainActivity : TvRemoteActivity() {
         val generation = iptvLibraryGeneration
         lifecycleScope.launch {
             if (contentType == IptvLibraryContentType.CONTINUE) {
-                val sourceInputId = "iptv:$sourceId"
                 val continued = withContext(Dispatchers.IO) {
-                    iptvResumeStore.entries().mapNotNull { entry ->
-                        iptvRepository.channel(entry.sourceKey)
-                    }.filter { channel ->
-                        channel.inputId == sourceInputId && channel.iptvContentType == "VOD"
-                    }
-                }.mapIndexed { index, channel ->
-                    channel.copy(displayNumber = (index + 1).toString())
+                    ChannelListRules.continueChannels(
+                        iptvResumeStore.entries().mapNotNull { entry ->
+                            iptvRepository.channel(entry.sourceKey)
+                        },
+                        sourceId,
+                    )
                 }
                 if (
                     channelPanelContent != ChannelPanelContent.IPTV_LIBRARY ||
@@ -4965,12 +4963,13 @@ class MainActivity : TvRemoteActivity() {
             val generation = ++iptvLibraryGeneration
             val query = channelSearchQuery
             lifecycleScope.launch {
-                val sourceInputId = "iptv:$sourceId"
                 val filtered = withContext(Dispatchers.IO) {
-                    iptvResumeStore.entries().mapNotNull { iptvRepository.channel(it.sourceKey) }
-                        .filter { it.inputId == sourceInputId && it.iptvContentType == "VOD" }
-                        .filter(::matchesChannelSearch)
-                }.mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
+                    ChannelListRules.continueChannels(
+                        iptvResumeStore.entries().mapNotNull { iptvRepository.channel(it.sourceKey) },
+                        sourceId,
+                        normalizedChannelSearchQuery,
+                    )
+                }
                 if (generation != iptvLibraryGeneration || query != channelSearchQuery) return@launch
                 continuedAlphabetChannels = filtered
                 iptvLibraryChannels = filtered
