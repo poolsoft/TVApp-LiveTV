@@ -278,8 +278,6 @@ class MainActivity : TvRemoteActivity() {
     private var iptvLibraryLoadJob: Job? = null
     private var alphabetRail: com.tvapp.livetv.ui.AlphabetRail? = null
     private var alphabetLoadJob: Job? = null
-    private var alphabetRightJob: Job? = null
-    private var alphabetRightHandled = false
     private var alphabetBrowsing = false
     private var alphabetFilterJob: Job? = null
     private var alphabetLetter: String? = null
@@ -305,6 +303,7 @@ class MainActivity : TvRemoteActivity() {
     private fun newLongPressGate() = LongPressKeyGate(lifecycleScope) {
         ViewConfiguration.getLongPressTimeout().toLong()
     }
+    private val alphabetRightKeyGate by lazy { newLongPressGate() }
     private val settingsKeyGate by lazy { newLongPressGate() }
     private val lastChannelKeyGate by lazy { newLongPressGate() }
     private val okKeyGate by lazy { newLongPressGate() }
@@ -5351,7 +5350,7 @@ class MainActivity : TvRemoteActivity() {
         multiViewAdding = false
         adapter.showMultiViewSelection(emptyList())
         alphabetLoadJob?.cancel()
-        alphabetRightJob?.cancel()
+        alphabetRightKeyGate.cancel()
         alphabetRail?.close()
         focusedTuneJob?.cancel()
         channelPanelJob?.cancel()
@@ -6133,16 +6132,13 @@ class MainActivity : TvRemoteActivity() {
             binding.channelPanel.visibility == View.VISIBLE && binding.channelList.hasFocus()
         ) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                alphabetRightHandled = false
-                alphabetRightJob?.cancel()
-                alphabetRightJob = lifecycleScope.launch {
-                    delay(ViewConfiguration.getLongPressTimeout().toLong())
-                    alphabetRightHandled = true
-                    openChannelAlphabet()
-                }
+                alphabetRightKeyGate.onDown(
+                    event.keyCode,
+                    onLongPress = { openChannelAlphabet() },
+                    onShortPress = { if (!event.isCanceled) pageChannelList(1) },
+                )
             } else if (event.action == KeyEvent.ACTION_UP) {
-                alphabetRightJob?.cancel()
-                if (!alphabetRightHandled && !event.isCanceled) pageChannelList(1)
+                alphabetRightKeyGate.onUp()
             }
             return true
         }
@@ -6336,7 +6332,7 @@ class MainActivity : TvRemoteActivity() {
 
     override fun onStop() {
         alphabetLoadJob?.cancel()
-        alphabetRightJob?.cancel()
+        alphabetRightKeyGate.cancel()
         alphabetRail?.close()
         binding.blackoutAnimation.pauseAnimation()
         saveCurrentIptvResumePosition()
@@ -6369,7 +6365,7 @@ class MainActivity : TvRemoteActivity() {
         infoBarJob?.cancel()
         alphabetLoadJob?.cancel()
         alphabetFilterJob?.cancel()
-        alphabetRightJob?.cancel()
+        alphabetRightKeyGate.cancel()
         alphabetRail?.close()
         channelPanelJob?.cancel()
         programJob?.cancel()
