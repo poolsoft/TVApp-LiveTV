@@ -67,6 +67,7 @@ import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
+import com.tvapp.livetv.main.ChannelListRules
 import com.tvapp.livetv.main.PlaybackRules
 import com.tvapp.livetv.playback.TifPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackController
@@ -132,7 +133,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import java.text.SimpleDateFormat
-import java.text.Normalizer
 import java.util.Date
 import java.util.Locale
 
@@ -187,7 +187,6 @@ class MainActivity : TvRemoteActivity() {
         private const val IPTV_LIBRARY_CATEGORY = "category"
         private const val IPTV_LIBRARY_PAGE_SIZE = 250
         private const val MOBILE_SWIPE_DISTANCE_DP = 56
-        private val SEARCH_COMBINING_MARKS = Regex("\\p{M}+")
     }
 
     private enum class ChannelPanelContent { NORMAL, IPTV_LIBRARY }
@@ -5008,17 +5007,10 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
-    private fun matchesChannelSearch(channel: LiveChannel): Boolean {
-        val query = normalizedChannelSearchQuery
-        if (query.isBlank()) return true
-        return listOf(channel.displayNumber, channel.displayName, channel.groupTitle.orEmpty())
-            .any { normalizeSearchText(it).contains(query) }
-    }
+    private fun matchesChannelSearch(channel: LiveChannel): Boolean =
+        ChannelListRules.matchesSearch(channel, normalizedChannelSearchQuery)
 
-    private fun normalizeSearchText(value: String): String = Normalizer
-        .normalize(value, Normalizer.Form.NFD)
-        .replace(SEARCH_COMBINING_MARKS, "")
-        .lowercase(Locale.ROOT)
+    private fun normalizeSearchText(value: String): String = ChannelListRules.normalizeSearch(value)
 
     private fun updateChannel(action: suspend () -> Unit) {
         lifecycleScope.launch {
@@ -5034,25 +5026,15 @@ class MainActivity : TvRemoteActivity() {
         return normalPanelChannels
     }
 
-    private fun buildNormalPanelChannels(includeAlphabet: Boolean = true): List<LiveChannel> {
-        return channels.asSequence()
-        .filterNot { it.isVodContent() }
-        .filter { channel ->
-            when (sourceFilter) {
-                ChannelSourceFilter.ALL -> true
-                ChannelSourceFilter.SATELLITE ->
-                    channel.source == LiveChannel.Source.TIF && !channel.isRadioChannel()
-                ChannelSourceFilter.RADIO -> channel.isRadioChannel()
-                ChannelSourceFilter.IPTV -> channel.source == LiveChannel.Source.IPTV
-                ChannelSourceFilter.FAVORITES -> channel.favorite
-            }
-        }
-        .filter { channel -> !favoriteFilter || channel.favorite }
-        .filter(::matchesChannelSearch)
-        .filter { !includeAlphabet || alphabetLetter == null || com.tvapp.livetv.ui.AlphabetJump.letter(it.displayName) == alphabetLetter }
-        .mapIndexed { index, channel -> channel.copy(displayNumber = (index + 1).toString()) }
-        .toList()
-    }
+    private fun buildNormalPanelChannels(includeAlphabet: Boolean = true): List<LiveChannel> =
+        ChannelListRules.normalPanelChannels(
+            channels = channels,
+            sourceFilter = sourceFilter,
+            favoriteFilter = favoriteFilter,
+            normalizedQuery = normalizedChannelSearchQuery,
+            alphabetLetter = alphabetLetter,
+            includeAlphabet = includeAlphabet,
+        )
 
     private fun applyChannelFilter(
         showFavorites: Boolean = favoriteFilter,
