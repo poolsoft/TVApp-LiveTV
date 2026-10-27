@@ -17,6 +17,7 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,7 +64,8 @@ import kotlin.math.abs
 class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var content: LinearLayout
     private lateinit var tabs: LinearLayout
-    private lateinit var tabsScroll: HorizontalScrollView
+    private lateinit var tabsScroll: View
+    private var isMasterDetail = false
     private var currentCard: LinearLayout? = null
     private lateinit var displayStore: DisplayPreferencesStore
     private lateinit var sleepTimerStore: SleepTimerStore
@@ -102,6 +104,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_display_settings)
+        isMasterDetail = findViewById<View>(R.id.settings_master_panel) != null
         configureWindow()
         displayStore = DisplayPreferencesStore(this)
         sleepTimerStore = SleepTimerStore(this)
@@ -119,7 +122,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         tabs = findViewById(R.id.settings_tabs)
         tabsScroll = findViewById(R.id.settings_tabs_scroll)
         val remoteHint = findViewById<View>(R.id.settings_remote_hint)
-        if (BuildConfig.MOBILE_UI_ENABLED) {
+        if (BuildConfig.MOBILE_UI_ENABLED && !isMasterDetail) {
             remoteHint?.visibility = View.GONE
         }
         selectedPage = SettingsPage.entries.getOrElse(
@@ -131,7 +134,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun configureWindow() {
-        if (BuildConfig.MOBILE_UI_ENABLED) {
+        if (BuildConfig.MOBILE_UI_ENABLED && !isMasterDetail) {
             window.setGravity(Gravity.CENTER)
             window.setLayout(
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -153,50 +156,95 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
     }
 
+    private fun scrollTabIntoView(tab: View) {
+        val scroll = tabsScroll
+        if (scroll is HorizontalScrollView) {
+            scroll.smoothScrollTo((tab.left - dp(24)).coerceAtLeast(0), 0)
+        } else if (scroll is ScrollView) {
+            scroll.smoothScrollTo(0, (tab.top - dp(24)).coerceAtLeast(0))
+        }
+    }
+
     private fun buildTabs() {
         tabs.removeAllViews()
         tabViews.clear()
         SettingsPage.entries.forEachIndexed { index, page ->
             val tab = TextView(this).apply {
                 id = View.generateViewId()
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    dp(38),
-                ).apply {
-                    if (index > 0) marginStart = dp(8)
+                if (isMasterDetail) {
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(48),
+                    ).apply {
+                        if (index > 0) topMargin = dp(6)
+                    }
+                    background = AppCompatResources.getDrawable(
+                        this@DisplaySettingsActivity,
+                        R.drawable.bg_settings_master_tab,
+                    )
+                    gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                    setPadding(dp(16), 0, dp(16), 0)
+                    textSize = 15f
+                } else {
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        dp(38),
+                    ).apply {
+                        if (index > 0) marginStart = dp(8)
+                    }
+                    background = AppCompatResources.getDrawable(
+                        this@DisplaySettingsActivity,
+                        R.drawable.bg_settings_chip,
+                    )
+                    gravity = Gravity.CENTER
+                    setPadding(dp(18), 0, dp(18), 0)
+                    textSize = 13.5f
                 }
-                background = AppCompatResources.getDrawable(
-                    this@DisplaySettingsActivity,
-                    R.drawable.bg_settings_chip,
-                )
-                gravity = Gravity.CENTER
                 isFocusable = true
                 isClickable = true
                 setText(page.titleRes)
-                setTextColor(getColorStateList(R.color.settings_chip_text))
-                textSize = 13.5f
+                setTextColor(getColorStateList(if (isMasterDetail) R.color.settings_tab_text else R.color.settings_chip_text))
                 typeface = Typeface.DEFAULT_BOLD
                 maxLines = 1
-                setPadding(dp(18), 0, dp(18), 0)
                 setOnClickListener { showPage(page, moveFocusToTab = true) }
                 setOnFocusChangeListener { _, focused ->
                     if (focused) {
-                        tabsScroll.smoothScrollTo((left - dp(24)).coerceAtLeast(0), 0)
+                        scrollTabIntoView(this)
+                        if (isMasterDetail && selectedPage != page) {
+                            showPage(page, moveFocusToTab = false)
+                        }
                     }
                 }
                 setOnKeyListener { _, keyCode, event ->
                     if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-                    when (keyCode) {
-                        KeyEvent.KEYCODE_DPAD_LEFT -> true.also {
-                            showPage(page.offset(-1), moveFocusToTab = true)
+                    if (isMasterDetail) {
+                        when (keyCode) {
+                            KeyEvent.KEYCODE_DPAD_UP -> true.also {
+                                val prevIndex = (index - 1 + SettingsPage.entries.size) % SettingsPage.entries.size
+                                tabViews.getOrNull(prevIndex)?.requestFocus()
+                            }
+                            KeyEvent.KEYCODE_DPAD_DOWN -> true.also {
+                                val nextIndex = (index + 1) % SettingsPage.entries.size
+                                tabViews.getOrNull(nextIndex)?.requestFocus()
+                            }
+                            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> true.also {
+                                firstContentFocusable?.requestFocus()
+                            }
+                            else -> false
                         }
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> true.also {
-                            showPage(page.offset(1), moveFocusToTab = true)
+                    } else {
+                        when (keyCode) {
+                            KeyEvent.KEYCODE_DPAD_LEFT -> true.also {
+                                showPage(page.offset(-1), moveFocusToTab = true)
+                            }
+                            KeyEvent.KEYCODE_DPAD_RIGHT -> true.also {
+                                showPage(page.offset(1), moveFocusToTab = true)
+                            }
+                            KeyEvent.KEYCODE_DPAD_DOWN -> true.also {
+                                firstContentFocusable?.requestFocus()
+                            }
+                            else -> false
                         }
-                        KeyEvent.KEYCODE_DPAD_DOWN -> true.also {
-                            firstContentFocusable?.requestFocus()
-                        }
-                        else -> false
                     }
                 }
             }
@@ -207,18 +255,21 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     private fun showPage(page: SettingsPage, moveFocusToTab: Boolean) {
         selectedPage = page
+        findViewById<TextView>(R.id.settings_detail_title)?.setText(page.titleRes)
         tabViews.forEachIndexed { index, tab ->
             tab.isSelected = index == page.ordinal
         }
         buildSettings(page)
         findViewById<View>(R.id.settings_scroll).scrollTo(0, 0)
-        tabs.post {
-            tabViews.getOrNull(page.ordinal)?.let { selectedTab ->
-                tabsScroll.smoothScrollTo((selectedTab.left - dp(24)).coerceAtLeast(0), 0)
-                if (moveFocusToTab) {
+        if (moveFocusToTab) {
+            tabs.post {
+                tabViews.getOrNull(page.ordinal)?.let { selectedTab ->
+                    scrollTabIntoView(selectedTab)
                     selectedTab.requestFocus()
                 }
             }
+        } else {
+            tabViews.getOrNull(page.ordinal)?.let { scrollTabIntoView(it) }
         }
     }
 
@@ -699,6 +750,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private fun toggle(titleRes: Int, initial: Boolean, changed: (Boolean) -> Unit) {
         var enabled = initial
         val row = settingRow(titleRes)
+        row.root.tag = "TOGGLE_ROW"
         fun render() {
             if (enabled) {
                 row.value.text = getString(R.string.on)
@@ -735,6 +787,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     ) {
         var index = initialIndex.coerceIn(labels.indices)
         val row = settingRow(titleRes)
+        row.root.tag = "CHOICE_ROW"
         row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
         row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         fun select(direction: Int) {
@@ -765,6 +818,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     ) {
         var number = initial.coerceIn(minimum, maximum)
         val row = settingRow(titleRes)
+        row.root.tag = "NUMBER_ROW"
         row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
         row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         fun adjust(direction: Int) {
@@ -874,6 +928,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     private fun action(titleRes: Int, initialValue: String, clicked: (SettingRow) -> Unit) {
         val row = settingRow(titleRes)
+        row.root.tag = "ACTION_ROW"
         row.value.background = AppCompatResources.getDrawable(this, R.drawable.bg_settings_pill_neutral)
         row.value.setPadding(dp(12), dp(5), dp(12), dp(5))
         row.value.text = initialValue
@@ -1188,15 +1243,43 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()
-        if (
-            event.action == KeyEvent.ACTION_DOWN &&
-            event.keyCode == KeyEvent.KEYCODE_DPAD_UP &&
-            firstContentFocusable?.hasFocus() == true
-        ) {
-            tabViews.getOrNull(selectedPage.ordinal)?.requestFocus()
-            return true
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            if (isMasterDetail) {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+                    val focused = currentFocus
+                    if (focused != null && isDescendantOf(focused, findViewById(R.id.settings_scroll))) {
+                        tabViews.getOrNull(selectedPage.ordinal)?.requestFocus()
+                        return true
+                    }
+                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    val focused = currentFocus
+                    if (focused != null && isDescendantOf(focused, findViewById(R.id.settings_scroll))) {
+                        val isAdjuster = focused.tag == "CHOICE_ROW" || focused.tag == "NUMBER_ROW"
+                        if (!isAdjuster) {
+                            tabViews.getOrNull(selectedPage.ordinal)?.requestFocus()
+                            return true
+                        }
+                    }
+                }
+            } else {
+                if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP && firstContentFocusable?.hasFocus() == true) {
+                    tabViews.getOrNull(selectedPage.ordinal)?.requestFocus()
+                    return true
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun isDescendantOf(child: View, parent: View?): Boolean {
+        if (parent == null) return false
+        var current: View? = child
+        while (current != null) {
+            if (current == parent) return true
+            val p = current.parent
+            current = if (p is View) p else null
+        }
+        return false
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

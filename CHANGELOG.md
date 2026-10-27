@@ -2,6 +2,12 @@
 
 ## 2026-10-27 - Ayarlar Ekranı Modernizasyonu, Dikey Telefon Dokunmatik ve D-Pad Chip Tasarımı
 
+- **TV İçin Master-Detail (Çift Sütun) Mimarisi ve Dikey Telefon Portre Ayrımı (`layout/` & `layout-port/`):**
+  - TV ve yatay ekranlarda ayarlar ekranı gerçek Master-Detail düzenine kavuşturuldu: Sol sütunda dikey kategoriler (`bg_settings_master_tab.xml`), sağ sütunda ise seçili kategorinin detay ayarları listelenir.
+  - OSD genişliği %58'e (`SETTINGS_PANEL_WIDTH_FRACTION = 0.58f`) optimize edildi; sol %42 alanda arka plan TV videosu kesintisiz izlenmeye devam eder.
+  - Kumanda D-pad Yukarı/Aşağı ile kategoriler gezilirken sağ panel anında güncellenir; D-pad Sağ veya OK ile ayarlara inilir.
+  - Ayarlar listesindeyken `BACK` veya değer değiştirmeyen satırlarda Sol tuşuna basıldığında odak sol kategori menüsüne döner; sol menüde `BACK` ayarları kapatır.
+  - Dikey telefonda (`layout-port`) ise üstte yatay kayan çip çubuğu + altta kartlar yapısı korunarak ergonomik mobil kullanım sağlandı.
 - **Ayarlar Ekranı Chip/Pill Sekme Çubuğu ve Kart Düzeni (`DisplaySettingsActivity.kt` & `activity_display_settings.xml`):**
   - Üst sekmeler (`Görünüm`, `Kanallar`, `IPTV & EPG`, `Sistem`) yatay kaydırılabilir modern çip (chip/pill) çubuğuna dönüştürüldü (`bg_settings_chip.xml`).
   - Dikey telefonda sekmeler dar ekranlarda sıkışmaz, taşma yapmaz ve dokunarak akıcı biçimde kaydırılabilir; TV kumandasında ise D-pad Sol/Sağ gezinimi aktif çipi otomatik ortalar (`smoothScrollTo`).

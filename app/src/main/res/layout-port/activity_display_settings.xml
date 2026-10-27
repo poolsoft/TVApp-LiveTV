@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_settings_osd"
+    android:orientation="vertical">
+
+    <!-- Header bar with Icon, Title and Close Button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_settings" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/settings_btn_close"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_focusable"
+            android:contentDescription="@string/close"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
+
+    <!-- Horizontal scrollable chip tabs for mobile portrait -->
+    <HorizontalScrollView
+        android:id="@+id/settings_tabs_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingStart="16dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/settings_tabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Remote hint (hidden in mobile) -->
+    <TextView
+        android:id="@+id/settings_remote_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#265D7180" />
+
+    <!-- Content area with cards -->
+    <ScrollView
+        android:id="@+id/settings_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:id="@+id/settings_content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:orientation="vertical" />
+    </ScrollView>
+</LinearLayout>
