@@ -749,6 +749,8 @@ class MainActivity : TvRemoteActivity() {
                 }
                 if (vodMode) {
                     vodPlayerOverlayController?.scheduleAutoHide()
+                } else if (binding.infoBar.visibility == View.VISIBLE) {
+                    scheduleInfoBarDismiss()
                 }
             }
         }
@@ -1771,10 +1773,18 @@ class MainActivity : TvRemoteActivity() {
         binding.playbackErrorContainer.post {
             binding.playbackErrorRetryBtn.requestFocus()
         }
+
+        if (!vodMode && !isVodPlaybackActive()) {
+            showInfoBar()
+            infoBarJob?.cancel()
+        }
     }
 
     private fun hidePlaybackError() {
         binding.playbackErrorContainer.visibility = View.GONE
+        if (!vodMode && !isVodPlaybackActive() && binding.infoBar.visibility == View.VISIBLE) {
+            scheduleInfoBarDismiss()
+        }
     }
 
     private fun dismissStatusDialog() {
@@ -2202,6 +2212,20 @@ class MainActivity : TvRemoteActivity() {
             if (displayPreferences.showCurrentProgram) View.VISIBLE else View.GONE
     }
 
+    private fun scheduleInfoBarDismiss() {
+        if (isVodPlaybackActive() || channelPanelExpanded) return
+        if (binding.playbackErrorContainer.visibility == View.VISIBLE || iptvPlaybackFailed) return
+        infoBarJob?.cancel()
+        val seconds = displayPreferences.infoBarDurationSeconds
+        if (seconds == 0) return
+        infoBarJob = lifecycleScope.launch {
+            delay(seconds * 1_000L)
+            if (numberInput.isEmpty()) {
+                setInfoBarVisible(false)
+            }
+        }
+    }
+
     private fun showInfoBar() {
         if (isVodPlaybackActive()) {
             setInfoBarVisible(false)
@@ -2215,16 +2239,7 @@ class MainActivity : TvRemoteActivity() {
             hideIptvPlaybackControls(hideInfoBar = false)
         }
         setInfoBarVisible(true)
-        infoBarJob?.cancel()
-        if (channelPanelExpanded) return
-        val seconds = displayPreferences.infoBarDurationSeconds
-        if (seconds == 0) return
-        infoBarJob = lifecycleScope.launch {
-            delay(seconds * 1_000L)
-            if (numberInput.isEmpty()) {
-                setInfoBarVisible(false)
-            }
-        }
+        scheduleInfoBarDismiss()
     }
 
     private fun startIptvPlaybackMonitor(kind: IptvContentKind) {

@@ -15,6 +15,11 @@
 - **Gelişmiş Tanılama ve Hata Detayı OSD'si (`MainActivity.kt` & `DisplaySettingsActivity.kt`):**
   - Ayarlar > Gelişmiş Tanılama açıkken hata ekranına yayının çalıştığı metot (`[Metot: Web Sniffer]`, `[Metot: HLS (m3u8)]`, `[Metot: Dosya (MP4/MKV)]`, `[Metot: DVB/TIF]`), tam HTTP durum kodu (`[HTTP 404 (Bulunamadı)]`, `[HTTP 403]`, `[HTTP 500]`), hata kodu adı ve maskelenmiş kaynak URL'si eklenir.
   - Ayar kapalıyken sade ve temiz kullanıcı dostu hata mesajı gösterilir.
+- **Hata Anında Canlı TV Infobar'ının Kalıcı Gösterimi ve Otomatik Gizlenme Dengesi (`MainActivity.kt`):**
+  - Hata oluştuğunda infobar'ın zaman aşımıyla kaybolması engellendi; hata ekranda kaldığı sürece infobar kalıcı olarak görünür ve kullanıcı kanal ile yayın akışı bilgisini altta her an görebilir.
+  - Yayın başarıyla oynamaya başladığında veya hata kapandığında infobar normal süre (5-8 sn) sonunda otomatik olarak kaybolur.
+- **Modern ve Sade Yenileme Simgesi (`ic_replay_modern.xml`, `bg_replay_play_focused.xml` & `activity_main.xml`):**
+  - Ortadaki kaba bileşik ok-üçgen simgesi yerine modern, estetik, yuvarlatılmış kıvrımlı TV standartlarında dairesel yenileme ikonu (`ic_replay_modern.xml`) ve cam efektli zarif odak seçicisi yerleştirildi.
 
 ## 2026-10-28 - VOD Yüklenirken Stop Butonu, Sağ Bölümler Paneli, Yenileme Odak Tuzağının Çözümü ve Dizi Resume Desteği
 
