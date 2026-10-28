@@ -33,11 +33,19 @@ object PlaybackRules {
      * gereksiz depolama sorgusu yapilmaz.
      */
     fun resumePosition(channel: LiveChannel, storedPosition: () -> Long): Long =
-        if (channel.iptvContentType == "VOD") storedPosition() else 0L
+        if (channel.isVodContent() || channel.iptvContentType.equals("VOD", ignoreCase = true)) {
+            storedPosition()
+        } else {
+            0L
+        }
 
     /** Hata sonrasi alternatif akisa gecerken korunacak konum. */
     fun alternativeStartPosition(channel: LiveChannel, snapshotPositionMillis: Long): Long =
-        if (channel.iptvContentType == "VOD") snapshotPositionMillis else 0L
+        if (channel.isVodContent() || channel.iptvContentType.equals("VOD", ignoreCase = true)) {
+            snapshotPositionMillis
+        } else {
+            0L
+        }
 
     /**
      * Onbellekteki alternatif listesi bu kanal icin kullanilabilir mi?

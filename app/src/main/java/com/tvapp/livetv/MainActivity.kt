@@ -214,6 +214,9 @@ class MainActivity : TvRemoteActivity() {
     private enum class IptvControlButton { PLAY_PAUSE, BUFFER, SPEED, MORE, CONNECTION }
     private var vodPlayerOverlayController: VodPlayerOverlayController? = null
     private var currentVodHasEpisodes: Boolean = false
+    private var cachedActiveSeriesKey: String? = null
+    private var lastSavedResumePositionMs: Long = 0L
+    private var lastSavedResumeTimeMs: Long = 0L
     private data class ChannelListModeOption(
         val label: String,
         val selected: Boolean,
@@ -1430,7 +1433,21 @@ class MainActivity : TvRemoteActivity() {
                     binding.tvView.visibility = View.GONE
                     binding.iptvPlayerView.visibility = View.VISIBLE
                     updateIptvBufferingStatus(R.string.iptv_connecting)
-                    setIptvBufferingVisible(true)
+                    val directSeriesKey = if (channel.sourceKey.contains(":ep:")) {
+                        channel.sourceKey.substringBefore(":ep:")
+                    } else null
+                    cachedActiveSeriesKey = directSeriesKey
+                    if (directSeriesKey == null && channel.isVodContent()) {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            cachedActiveSeriesKey = runCatching {
+                                com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                                    .vodDao().metadata(channel.sourceKey)?.parentKey
+                            }.getOrNull()
+                        }
+                    }
+                    lastSavedResumePositionMs = 0L
+                    lastSavedResumeTimeMs = 0L
+
                     val resumePosition = PlaybackRules.resumePosition(channel) {
                         iptvResumeStore.position(channel.sourceKey)
                     }
@@ -2186,47 +2203,61 @@ class MainActivity : TvRemoteActivity() {
                         ) {
                             debugLog.recordDebug("IPTV_LIVE_EDGE_CORRECTED | channel=$sourceKey")
                         }
+                        // Sure bilgisi olan canli veya timeshift/arsiv yayinlarinda da hafif resume
+                        val snapshot = iptvPlayback.playbackSnapshot()
+                        if (snapshot.durationMillis > 60_000L) {
+                            saveCurrentIptvResumePosition(force = false)
+                        }
                     }
-                    IptvContentKind.VOD -> saveCurrentIptvResumePosition()
+                    IptvContentKind.VOD -> saveCurrentIptvResumePosition(force = false)
                     IptvContentKind.UNKNOWN -> Unit
                 }
             }
         }
     }
 
-    private fun saveCurrentIptvResumePosition() {
+    private fun saveCurrentIptvResumePosition(force: Boolean = false) {
         val channel = currentChannel ?: return
-        if (!channel.isVodContent() || iptvPlayback.tunedSourceKey() != channel.sourceKey) return
-        if (channel.source != LiveChannel.Source.IPTV || currentIptvContentKind != IptvContentKind.VOD) {
+        if (iptvPlayback.tunedSourceKey() != channel.sourceKey) return
+        if (channel.source != LiveChannel.Source.IPTV) return
+
+        val snapshot = iptvPlayback.playbackSnapshot()
+        val isSeekable = channel.isVodContent() || currentIptvContentKind == IptvContentKind.VOD || snapshot.durationMillis > 60_000L
+        if (!isSeekable || snapshot.positionMillis < 5_000L) return
+
+        val now = System.currentTimeMillis()
+        val timeDelta = now - lastSavedResumeTimeMs
+        val posDelta = kotlin.math.abs(snapshot.positionMillis - lastSavedResumePositionMs)
+
+        // Force degilse: en az 25 sn gecmeli ve pozisyon en az 10 sn ilerlemis olmali (sisteme sifir disk I/O yuku)
+        if (!force && timeDelta < 25_000L && posDelta < 10_000L) {
             return
         }
-        val snapshot = iptvPlayback.playbackSnapshot()
+
+        lastSavedResumePositionMs = snapshot.positionMillis
+        lastSavedResumeTimeMs = now
+
         iptvResumeStore.save(channel.sourceKey, snapshot.positionMillis, snapshot.durationMillis)
 
-        val directSeriesKey = if (channel.sourceKey.contains(":ep:")) {
-            channel.sourceKey.substringBefore(":ep:")
-        } else null
+        val seriesKey = cachedActiveSeriesKey
+        if (!seriesKey.isNullOrBlank()) {
+            iptvResumeStore.saveSeriesEpisode(
+                seriesKey = seriesKey,
+                episodeKey = channel.sourceKey,
+                episodeTitle = channel.episodeTitle ?: channel.displayName,
+                positionMillis = snapshot.positionMillis,
+                durationMillis = snapshot.durationMillis,
+            )
+        }
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            val seriesKey = directSeriesKey ?: runCatching {
-                com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
-                    .vodDao().metadata(channel.sourceKey)?.parentKey
-            }.getOrNull()
-
-            if (!seriesKey.isNullOrBlank()) {
-                iptvResumeStore.saveSeriesEpisode(
-                    seriesKey = seriesKey,
-                    episodeKey = channel.sourceKey,
-                    episodeTitle = channel.episodeTitle ?: channel.displayName,
-                    positionMillis = snapshot.positionMillis,
-                    durationMillis = snapshot.durationMillis,
-                )
-            }
-
-            if (snapshot.durationMillis > 0L && snapshot.positionMillis >= snapshot.durationMillis - 60_000L) {
-                homeRecentChannelsPublisher.removeVod(channel.sourceKey)
-            } else {
-                homeRecentChannelsPublisher.publishVod(channel, snapshot.positionMillis, snapshot.durationMillis)
+        // Home channels guncellemesi yalnizca force aninda veya 60 sn'de bir calisir
+        if (channel.isVodContent() && (force || timeDelta >= 60_000L)) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (snapshot.durationMillis > 0L && snapshot.positionMillis >= snapshot.durationMillis - 60_000L) {
+                    homeRecentChannelsPublisher.removeVod(channel.sourceKey)
+                } else {
+                    homeRecentChannelsPublisher.publishVod(channel, snapshot.positionMillis, snapshot.durationMillis)
+                }
             }
         }
     }
@@ -2478,6 +2509,7 @@ class MainActivity : TvRemoteActivity() {
                     currentChannel?.sourceKey?.contains(":ep:") == true
             },
             onStopPlayback = {
+                saveCurrentIptvResumePosition(force = true)
                 iptvPlayback.stop()
                 endBlackout("USER_STOP")
                 vodHost.cancelResolve()
@@ -6176,7 +6208,7 @@ class MainActivity : TvRemoteActivity() {
         alphabetRightKeyGate.cancel()
         alphabetRail?.close()
         binding.blackoutAnimation.pauseAnimation()
-        saveCurrentIptvResumePosition()
+        saveCurrentIptvResumePosition(force = true)
         if (!vodMode && !isChangingConfigurations &&
             (activePassthroughInputId != null || currentChannel?.source == LiveChannel.Source.TIF)
         ) {
@@ -6276,4 +6308,8 @@ class MainActivity : TvRemoteActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        saveCurrentIptvResumePosition(force = true)
+    }
 }

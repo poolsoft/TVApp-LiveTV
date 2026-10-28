@@ -12,6 +12,13 @@
   - Eski ilkel `AlertDialog` kaldırıldı; Bölümler butonuna tıklandığında ekranın sağ tarafından kayan şık `vod_episodes_panel` açılır.
   - Panelde aktif izlenen bölüm ("Oynatılıyor" rozeti) belirginleştirilir; D-pad Yukarı/Aşağı ile liste içi akıcı kaydırma, D-pad Sol veya Back ile paneli kapatıp oynatıcıya dönme sağlandı.
   - Tekil filmlerde veya bölümü olmayan VOD içeriklerinde `Bölümler` butonu otomatik gizlenir (`View.GONE`).
+- **Tüm Yayınlar İçin Evrensel Resume & Sıfır Yükle Hafif Kayıt Stratejisi (`MainActivity.kt`, `PlaybackRules.kt`):**
+  - Sadece dizi değil; süresi olan veya VOD olan tüm yayınlar (filmler, diziler, arşiv/timeshift) için izleme pozisyonu otomatik hatırlanır ve açılışta kalınan yerden devam edilir.
+  - Her 5 saniyede bir çalışan SQL sorguları kaldırıldı; dizi bilgisi oynatmanın başında 1 defa önbelleğe alınır.
+  - Oynatma sırasında diske yazma işlemi 25-30 saniyelik aralıklara çekildi (throttle); duraklatma, durdurma ve çıkış anlarında `force = true` ile tek seferde güvenle kaydedilerek sistem işlemcisi ve flash depolaması korunur.
+- **Afiş Kartlarında İzleme İlerleme Çubuğu (`item_vod_poster_card.xml`, `VodPosterAdapter.kt`, `VodHomeActivity.kt`):**
+  - VOD afişlerinin alt tabanına modern, şık bir ilerleme çubuğu (`vod_card_resume_progress`, `bg_vod_card_progress.xml`) eklendi.
+  - Hem "Devam Et" rayında hem de ana ızgara/katalogda izlenen yayının yüzde kaçında kalındığı anında görsel olarak gösterilir.
 - **Dizi İzleme Pozisyonu ve Bölüm Hatırlama (Continue Watching) (`IptvResumeStore.kt`, `MainActivity.kt` & `VodHomeActivity.kt`):**
   - Dizi bölümleri izlenirken kalınan saniye ve son izlenen bölüm bilgisi ana dizi kaydıyla (`saveSeriesEpisode`) ilişkilendirilerek kalıcı olarak saklanır.
   - VOD Ana Ekranı'nda veya Devam Et rayında bir diziye tıklandığında doğrudan son kalınan bölüme ve son saniyesine kesintisiz devam edilir (`playLastWatchedEpisodeOrDialog`).

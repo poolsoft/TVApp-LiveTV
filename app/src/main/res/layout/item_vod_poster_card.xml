@@ -24,6 +24,16 @@
             android:layout_height="match_parent"
             android:contentDescription="@null"
             android:scaleType="centerCrop" />
+
+        <ProgressBar
+            android:id="@+id/vod_card_resume_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_gravity="bottom"
+            android:max="100"
+            android:progressDrawable="@drawable/bg_vod_card_progress"
+            android:visibility="gone" />
     </FrameLayout>
 
     <TextView

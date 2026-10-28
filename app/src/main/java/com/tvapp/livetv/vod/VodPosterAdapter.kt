@@ -15,6 +15,7 @@ import com.tvapp.livetv.databinding.ItemVodPosterCardBinding
 data class VodDisplayItem(
     val catalogItem: VodCatalogItem,
     val tmdb: VodTmdbEntity? = null,
+    val resumeProgressPercent: Int = 0,
 )
 
 class VodPosterAdapter(
@@ -102,6 +103,13 @@ class VodPosterAdapter(
                 }
             } else {
                 binding.vodCardPoster.setImageResource(R.drawable.bg_vod_default_poster)
+            }
+
+            if (item.resumeProgressPercent in 1..99) {
+                binding.vodCardResumeProgress.visibility = View.VISIBLE
+                binding.vodCardResumeProgress.progress = item.resumeProgressPercent
+            } else {
+                binding.vodCardResumeProgress.visibility = View.GONE
             }
         }
     }

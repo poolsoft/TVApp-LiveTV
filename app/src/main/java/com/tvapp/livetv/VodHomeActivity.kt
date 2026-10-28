@@ -312,7 +312,13 @@ class VodHomeActivity : TvRemoteActivity() {
                 val cachedTmdb = withContext(Dispatchers.IO) {
                     database.vodTmdbDao().getBySourceKeys(allKeys).associateBy { it.sourceKey }
                 }
-                val displayItems = items.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
+                val resumeStore = com.tvapp.livetv.playback.IptvResumeStore(this@VodHomeActivity)
+                val displayItems = items.map { item ->
+                    val pos = resumeStore.position(item.sourceKey)
+                    val dur = resumeStore.duration(item.sourceKey).takeIf { it > 0L } ?: item.durationMillis ?: 0L
+                    val percent = if (dur > 0L && pos > 0L) ((pos * 100L) / dur).toInt().coerceIn(0, 100) else 0
+                    VodDisplayItem(item, cachedTmdb[item.sourceKey], percent)
+                }
                 binding.vodContinueContainer.visibility = View.VISIBLE
                 continueAdapter.submitList(displayItems) {
                     if (isFinishing || isDestroyed) return@submitList
@@ -432,7 +438,13 @@ class VodHomeActivity : TvRemoteActivity() {
                     val cachedTmdb = withContext(Dispatchers.IO) {
                         database.vodTmdbDao().getBySourceKeys(keys).associateBy { it.sourceKey }
                     }
-                    val displayItems = pageData.map { VodDisplayItem(it, cachedTmdb[it.sourceKey]) }
+                    val resumeStore = com.tvapp.livetv.playback.IptvResumeStore(this@VodHomeActivity)
+                    val displayItems = pageData.map { item ->
+                        val pos = resumeStore.position(item.sourceKey)
+                        val dur = resumeStore.duration(item.sourceKey).takeIf { it > 0L } ?: item.durationMillis ?: 0L
+                        val percent = if (dur > 0L && pos > 0L) ((pos * 100L) / dur).toInt().coerceIn(0, 100) else 0
+                        VodDisplayItem(item, cachedTmdb[item.sourceKey], percent)
+                    }
                     gridItems.addAll(displayItems)
                     gridAdapter.submitList(gridItems.toList())
                     gridCurrentPage++
