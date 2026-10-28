@@ -11,7 +11,7 @@ import androidx.core.content.ContextCompat
 import com.tvapp.livetv.R
 
 object TvUiMetrics {
-    const val SETTINGS_PANEL_WIDTH_FRACTION = 0.58f
+    const val SETTINGS_PANEL_WIDTH_FRACTION = 0.48f
     const val SETTINGS_PANEL_HEIGHT_FRACTION = 0.94f
     const val SAFE_EDGE_FRACTION = 0.012f
     const val ICON_SLOT_DP = 20

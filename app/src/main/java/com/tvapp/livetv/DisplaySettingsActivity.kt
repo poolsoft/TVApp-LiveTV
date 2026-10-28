@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Build
 import android.provider.Settings
 import android.text.InputType
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -101,10 +102,12 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let { importXmlTv { xmlTvRepository.importDocument(it) } } }
 
+    private var isUpdateChecking = false
+    private var isSyncingInput = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_display_settings)
-        isMasterDetail = findViewById<View>(R.id.settings_master_panel) != null
         configureWindow()
         displayStore = DisplayPreferencesStore(this)
         sleepTimerStore = SleepTimerStore(this)
@@ -255,7 +258,6 @@ class DisplaySettingsActivity : TvRemoteActivity() {
 
     private fun showPage(page: SettingsPage, moveFocusToTab: Boolean) {
         selectedPage = page
-        findViewById<TextView>(R.id.settings_detail_title)?.setText(page.titleRes)
         tabViews.forEachIndexed { index, tab ->
             tab.isSelected = index == page.ordinal
         }
@@ -901,12 +903,13 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         }
         val title = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(10)
+                marginEnd = dp(12)
             }
             text = getString(titleRes)
             setTextColor(getColorStateList(R.color.settings_title_text))
-            textSize = 15.5f
-            maxLines = 2
+            textSize = 15f
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.END
             isDuplicateParentStateEnabled = true
         }
         val value = TextView(this).apply {
@@ -914,6 +917,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             )
+            maxWidth = dp(240)
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER
             setTextColor(getColorStateList(R.color.settings_value_text))
             textSize = 13.5f
@@ -945,59 +951,65 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     }
 
     private fun checkForUpdates(row: SettingRow) {
-        if (!row.root.isEnabled) return
-        row.root.isEnabled = false
+        if (isUpdateChecking) return
+        isUpdateChecking = true
         row.value.text = getString(R.string.update_checking)
         lifecycleScope.launch {
-            runCatching {
-                val manager = AppUpdateManager(this@DisplaySettingsActivity)
-                val update = manager.check() ?: return@runCatching null
-                row.value.text = getString(R.string.update_downloading, update.versionName)
-                update to manager.download(update)
-            }.onSuccess { result ->
-                if (result == null) {
-                    row.value.text = getString(R.string.update_not_available)
-                } else {
-                    row.value.text = getString(R.string.update_installing, result.first.versionName)
-                    installUpdate(result.second)
+            try {
+                runCatching {
+                    val manager = AppUpdateManager(this@DisplaySettingsActivity)
+                    val update = manager.check() ?: return@runCatching null
+                    row.value.text = getString(R.string.update_downloading, update.versionName)
+                    update to manager.download(update)
+                }.onSuccess { result ->
+                    if (result == null) {
+                        row.value.text = getString(R.string.update_not_available)
+                    } else {
+                        row.value.text = getString(R.string.update_installing, result.first.versionName)
+                        installUpdate(result.second)
+                    }
+                }.onFailure { error ->
+                    row.value.text = getString(
+                        R.string.update_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
-            }.onFailure { error ->
-                row.value.text = getString(
-                    R.string.update_failed,
-                    error.message ?: error.javaClass.simpleName,
-                )
+            } finally {
+                isUpdateChecking = false
             }
-            row.root.isEnabled = true
         }
     }
 
     private fun syncIptvInput(row: SettingRow) {
-        if (!row.root.isEnabled) return
+        if (isSyncingInput) return
         val inputId = IptvInputResolver.findInputId(this)
         if (inputId == null) {
             row.value.setText(R.string.iptv_input_not_found)
             return
         }
-        row.root.isEnabled = false
+        isSyncingInput = true
         row.value.setText(R.string.iptv_input_syncing)
         lifecycleScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    IptvInputChannelSyncRepository(this@DisplaySettingsActivity).sync(inputId)
+            try {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        IptvInputChannelSyncRepository(this@DisplaySettingsActivity).sync(inputId)
+                    }
+                }.onSuccess { result ->
+                    row.value.text = getString(
+                        R.string.iptv_input_sync_complete,
+                        result.synced,
+                        result.removed,
+                    )
+                }.onFailure { error ->
+                    row.value.text = getString(
+                        R.string.iptv_input_sync_failed,
+                        error.message ?: error.javaClass.simpleName,
+                    )
                 }
-            }.onSuccess { result ->
-                row.value.text = getString(
-                    R.string.iptv_input_sync_complete,
-                    result.synced,
-                    result.removed,
-                )
-            }.onFailure { error ->
-                row.value.text = getString(
-                    R.string.iptv_input_sync_failed,
-                    error.message ?: error.javaClass.simpleName,
-                )
+            } finally {
+                isSyncingInput = false
             }
-            row.root.isEnabled = true
         }
     }
 

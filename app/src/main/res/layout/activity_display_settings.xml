@@ -3,148 +3,102 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_settings_osd"
-    android:baselineAligned="false"
-    android:orientation="horizontal">
+    android:orientation="vertical">
 
-    <!-- MASTER PANEL (Left Sidebar with Categories) -->
+    <!-- Header bar with Icon, Title and Close Button -->
     <LinearLayout
-        android:id="@+id/settings_master_panel"
-        android:layout_width="220dp"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingStart="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="22dp"
         android:paddingTop="18dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="16dp">
+        android:paddingEnd="20dp"
+        android:paddingBottom="12dp">
 
-        <!-- Master Title Header -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+        <ImageView
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_settings" />
 
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginEnd="10dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_settings" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/settings_title"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="14dp"
-            android:layout_marginBottom="14dp"
-            android:background="#265D7180" />
-
-        <!-- Vertical Category Tabs -->
-        <ScrollView
-            android:id="@+id/settings_tabs_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:id="@+id/settings_tabs"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </ScrollView>
-
-        <!-- Remote D-pad Hint -->
         <TextView
-            android:id="@+id/settings_remote_hint"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/settings_remote_hint"
-            android:textColor="@color/text_secondary"
-            android:textSize="11.5sp" />
+            android:layout_weight="1"
+            android:text="@string/settings_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/settings_btn_close"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_focusable"
+            android:contentDescription="@string/close"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_close" />
     </LinearLayout>
 
-    <!-- Master / Detail Vertical Divider -->
+    <!-- Horizontal scrollable chip tabs for categories -->
+    <HorizontalScrollView
+        android:id="@+id/settings_tabs_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingStart="18dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="8dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/settings_tabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Remote D-pad Hint -->
+    <TextView
+        android:id="@+id/settings_remote_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="22dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="6dp"
+        android:text="@string/settings_remote_hint"
+        android:textColor="@color/text_secondary"
+        android:textSize="11.5sp" />
+
     <View
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
         android:background="#265D7180" />
 
-    <!-- DETAIL PANEL (Right Content Area) -->
-    <LinearLayout
-        android:id="@+id/settings_detail_panel"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
+    <!-- Content area with cards -->
+    <ScrollView
+        android:id="@+id/settings_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical">
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
 
-        <!-- Detail Header with Category Title and Close Button -->
         <LinearLayout
+            android:id="@+id/settings_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="22dp"
-            android:paddingTop="12dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="10dp">
-
-            <TextView
-                android:id="@+id/settings_detail_title"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_title"
-                android:textColor="@color/accent"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:id="@+id/settings_btn_close"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_focusable"
-                android:contentDescription="@string/close"
-                android:focusable="true"
-                android:padding="8dp"
-                android:src="@drawable/ic_close" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#265D7180" />
-
-        <!-- Detail Settings Scroll View -->
-        <ScrollView
-            android:id="@+id/settings_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:paddingStart="18dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="24dp">
-
-            <LinearLayout
-                android:id="@+id/settings_content"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:focusable="false"
-                android:orientation="vertical" />
-        </ScrollView>
-    </LinearLayout>
+            android:focusable="false"
+            android:orientation="vertical" />
+    </ScrollView>
 </LinearLayout>

@@ -16,6 +16,14 @@
 - **VOD Kontrollerinin Yalnızca Oynatılırken Gizlenmesi Kuralı (`VodPlayerOverlayController.kt`, `IptvPlaybackController.kt` & `MainActivity.kt`):**
   - VOD oynatıcı kontrolleri artık yalnızca video aktif olarak çalarken (`isPlaying == true && phase == READY`) 8 saniye sonra otomatik gizlenir.
   - Video duraklatıldığında (PAUSE), tamponlanırken, yüklenirken veya hata durumunda kontroller asla otomatik gizlenmez, ekranda sabit ve görünür kalır (`onIsPlayingChanged`).
+- **Ayarlar Ekranının Üst Sekmeli Sade Düzenine Kavuşturulması (`DisplaySettingsActivity.kt` & `activity_display_settings.xml`):**
+  - Çift sütun (master-detail) yapısı kaldırılarak kategoriler ekranın üst tarafında yatay kayan çip çubuğuna alındı; TV panel genişliği %48'e (`SETTINGS_PANEL_WIDTH_FRACTION = 0.48f`) optimize edildi.
+  - Değerleri D-pad Sol/Sağ ile değiştirilen ayarlarda odak karmaşası giderildi; Sol/Sağ tuşları ayarın değerini değiştirir, D-pad Yukarı ile üst sekmelere geçilir.
+  - Satır başlıklarının kelime ortasından hecelenerek iki satıra bölünmesi engellendi (`isSingleLine = true`, `ellipsize = END`); değer kapsülüne maksimum 240dp genişlik sınırı verildi.
+  - Güncelleme ve eşitleme butonlarına tıklandığında görünümün devre dışı bırakılması (`isEnabled = false`) kaldırılarak odağın kilitli kalması sağlandı, odağın üstteki `X` kapat butonuna fırlaması engellendi.
+- **GitHub Actions ve Release 7 Gün Budama Kuralı (`release.yml`):**
+  - 7 günden eski tüm geçmiş workflow çalıştırmaları, loglar, eski release'ler ve içindeki APK artifact'leri temizlendi.
+  - `release.yml` CI/CD hattına 7 günden eski release'leri otomatik silen adım eklenerek GitHub depolama kotası güvenceye alındı.
 
 ## 2026-10-27 - Ayarlar Ekranı Modernizasyonu, Dikey Telefon Dokunmatik ve D-Pad Chip Tasarımı
 
