@@ -407,13 +407,29 @@ class MainActivity : TvRemoteActivity() {
             labels: List<String>,
             selectedIndex: Int,
             onPick: (Int) -> Unit,
-        ) = com.tvapp.livetv.main.VodDialogs.showEpisodePicker(
-            this@MainActivity,
-            title,
-            labels,
-            selectedIndex,
-            onPick,
-        )
+        ) {
+            val controller = vodPlayerOverlayController
+            if (controller != null) {
+                val episodeItems = labels.mapIndexed { idx, label ->
+                    com.tvapp.livetv.vod.VodEpisodeItem(
+                        index = idx,
+                        title = label,
+                        isCurrent = idx == selectedIndex,
+                    )
+                }
+                controller.showEpisodePanel(episodeItems, selectedIndex) { chosenItem ->
+                    onPick(chosenItem.index)
+                }
+            } else {
+                com.tvapp.livetv.main.VodDialogs.showEpisodePicker(
+                    this@MainActivity,
+                    title,
+                    labels,
+                    selectedIndex,
+                    onPick,
+                )
+            }
+        }
         override suspend fun loadSeriesEpisodes(
             seriesKey: String,
         ): List<com.tvapp.livetv.data.local.VodMetadataEntity> =
@@ -2186,7 +2202,27 @@ class MainActivity : TvRemoteActivity() {
         }
         val snapshot = iptvPlayback.playbackSnapshot()
         iptvResumeStore.save(channel.sourceKey, snapshot.positionMillis, snapshot.durationMillis)
+
+        val directSeriesKey = if (channel.sourceKey.contains(":ep:")) {
+            channel.sourceKey.substringBefore(":ep:")
+        } else null
+
         lifecycleScope.launch(Dispatchers.IO) {
+            val seriesKey = directSeriesKey ?: runCatching {
+                com.tvapp.livetv.data.local.TVAppDatabase.getInstance(this@MainActivity)
+                    .vodDao().metadata(channel.sourceKey)?.parentKey
+            }.getOrNull()
+
+            if (!seriesKey.isNullOrBlank()) {
+                iptvResumeStore.saveSeriesEpisode(
+                    seriesKey = seriesKey,
+                    episodeKey = channel.sourceKey,
+                    episodeTitle = channel.episodeTitle ?: channel.displayName,
+                    positionMillis = snapshot.positionMillis,
+                    durationMillis = snapshot.durationMillis,
+                )
+            }
+
             if (snapshot.durationMillis > 0L && snapshot.positionMillis >= snapshot.durationMillis - 60_000L) {
                 homeRecentChannelsPublisher.removeVod(channel.sourceKey)
             } else {
@@ -2436,7 +2472,23 @@ class MainActivity : TvRemoteActivity() {
             formatPlaybackTime = { ms -> formatPlaybackTime(ms) },
             getString = { resId -> getString(resId) },
             onOpenEpisodeList = { showEpisodePickerForActiveVod() },
-            hasEpisodes = { currentVodHasEpisodes || currentChannel?.episodeTitle?.isNotBlank() == true },
+            hasEpisodes = {
+                currentVodHasEpisodes ||
+                    currentChannel?.episodeTitle?.isNotBlank() == true ||
+                    currentChannel?.sourceKey?.contains(":ep:") == true
+            },
+            onStopPlayback = {
+                iptvPlayback.stop()
+                endBlackout("USER_STOP")
+                vodHost.cancelResolve()
+                binding.iptvBufferingContainer.visibility = View.GONE
+                binding.iptvBufferingCorner.visibility = View.GONE
+                vodPlayerOverlayController?.updateControls()
+                vodPlayerOverlayController?.showControls(autoHide = false)
+            },
+            onRetryPlayback = {
+                binding.playbackErrorRetryBtn.performClick()
+            },
         )
         controller.setup()
         vodPlayerOverlayController = controller

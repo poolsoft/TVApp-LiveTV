@@ -855,7 +855,10 @@
     <string name="vod_back_to_home">Ana Sayfaya Dön</string>
     <string name="vod_popular_movies">Popüler Filmler</string>
     <string name="vod_recent_movies">Son Eklenenler</string>
-    <string name="vod_btn_list_label">Liste</string>
+    <string name="vod_btn_list_label">Bölümler</string>
+    <string name="vod_now_playing">Oynatılıyor</string>
+    <string name="vod_episodes_hint">Bölüm seçin · Geri tuşu ile kapatın</string>
+    <string name="vod_stop">Durdur</string>
     <string name="vod_watch_later">Sonra İzle</string>
     <string name="vod_added_to_continue">İzlemeye Devam Et listesine eklendi</string>
     <string name="vod_fullscreen_label">Tam Ekran</string>

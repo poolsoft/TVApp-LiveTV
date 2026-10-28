@@ -74,17 +74,49 @@ class IptvResumeStore(context: Context) {
         .sortedByDescending(IptvResumeEntry::updatedAt)
         .toList()
 
+    fun saveSeriesEpisode(
+        seriesKey: String,
+        episodeKey: String,
+        episodeTitle: String?,
+        positionMillis: Long,
+        durationMillis: Long,
+    ) {
+        save(episodeKey, positionMillis, durationMillis)
+        preferences.edit()
+            .putString(seriesLastEpisodeKey(seriesKey), episodeKey)
+            .putString(seriesLastTitleKey(seriesKey), episodeTitle.orEmpty())
+            .putLong(positionKey(seriesKey), positionMillis)
+            .putLong(durationKey(seriesKey), durationMillis)
+            .putLong(updatedKey(seriesKey), System.currentTimeMillis())
+            .remove(seriesKey)
+            .apply()
+    }
+
+    fun lastEpisodeForSeries(seriesKey: String): String? {
+        return preferences.getString(seriesLastEpisodeKey(seriesKey), null)
+    }
+
+    fun lastEpisodeTitleForSeries(seriesKey: String): String? {
+        return preferences.getString(seriesLastTitleKey(seriesKey), null)?.takeIf { it.isNotBlank() }
+    }
+
     private fun positionKey(sourceKey: String) = "$POSITION_PREFIX$sourceKey"
 
     private fun durationKey(sourceKey: String) = "$DURATION_PREFIX$sourceKey"
 
     private fun updatedKey(sourceKey: String) = "$UPDATED_PREFIX$sourceKey"
 
+    private fun seriesLastEpisodeKey(seriesKey: String) = "$SERIES_LAST_EP_PREFIX$seriesKey"
+
+    private fun seriesLastTitleKey(seriesKey: String) = "$SERIES_LAST_TITLE_PREFIX$seriesKey"
+
     private companion object {
         const val PREFERENCES_NAME = "iptv-resume"
         const val POSITION_PREFIX = "position:"
         const val DURATION_PREFIX = "duration:"
         const val UPDATED_PREFIX = "updated:"
+        const val SERIES_LAST_EP_PREFIX = "series_last_ep:"
+        const val SERIES_LAST_TITLE_PREFIX = "series_last_title:"
         const val MINIMUM_RESUME_POSITION_MS = 30_000L
         const val RESUME_REWIND_MS = 5_000L
         const val FINISHED_MARGIN_MS = 60_000L

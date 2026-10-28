@@ -527,9 +527,58 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun onVodItemClicked(displayItem: VodDisplayItem) {
         val item = displayItem.catalogItem
         if (item.kind == "SERIES") {
+            val resumeStore = com.tvapp.livetv.playback.IptvResumeStore(this)
+            val lastEpKey = resumeStore.lastEpisodeForSeries(item.sourceKey)
+            if (!lastEpKey.isNullOrBlank()) {
+                playLastWatchedEpisodeOrDialog(item, lastEpKey)
+                return
+            }
             showEpisodesDialog(item)
         } else {
             playItem(item)
+        }
+    }
+
+    private fun playLastWatchedEpisodeOrDialog(seriesItem: VodCatalogItem, lastEpKey: String) {
+        lifecycleScope.launch {
+            val episodes = withContext(Dispatchers.IO) {
+                repository.episodesForSeries(seriesItem.sourceKey)
+            }
+            val match = episodes.firstOrNull { it.sourceKey == lastEpKey }
+            if (match != null) {
+                playEpisode(match)
+                return@launch
+            }
+
+            val meta = withContext(Dispatchers.IO) {
+                database.vodDao().metadata(seriesItem.sourceKey)
+            }
+            val rawEpisodes = meta?.streamUrl
+            if (!rawEpisodes.isNullOrBlank() && rawEpisodes.startsWith("[")) {
+                try {
+                    val jsonArray = org.json.JSONArray(rawEpisodes)
+                    for (i in 0 until jsonArray.length()) {
+                        val epObj = jsonArray.optJSONObject(i) ?: continue
+                        val epUrl = epObj.optString("videoUrl").trim().ifEmpty { epObj.optString("url").trim() }
+                        val generatedKey = "${seriesItem.sourceKey}:ep:${i}_${epUrl.hashCode()}"
+                        if (generatedKey == lastEpKey) {
+                            val season = epObj.optInt("season", epObj.optInt("season_number", 1)).coerceAtLeast(1)
+                            val epNumber = epObj.optInt("episode", epObj.optInt("episode_number", i + 1)).coerceAtLeast(1)
+                            val rawTitle = epObj.optString("title").trim().ifEmpty { epObj.optString("name").trim() }
+                            val epTitle = if (rawTitle.isNotEmpty() && !rawTitle.equals("$epNumber. Bölüm", true)) {
+                                "$season. Sezon $epNumber. Bölüm - $rawTitle"
+                            } else {
+                                "$season. Sezon $epNumber. Bölüm"
+                            }
+                            playDynamicEpisode(seriesItem, i, epTitle, epUrl)
+                            return@launch
+                        }
+                    }
+                } catch (_: Exception) {
+                    // JSON ayrıştırılamadıysa diyaloga devam et
+                }
+            }
+            showEpisodesDialog(seriesItem)
         }
     }
 

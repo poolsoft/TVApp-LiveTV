@@ -27,6 +27,7 @@ enum class VodControlTarget {
     FORWARD,
     VOLUME,
     LIST,
+    RETRY,
 }
 
 class VodPlayerOverlayController(
@@ -43,6 +44,8 @@ class VodPlayerOverlayController(
     private val getString: (Int) -> String,
     private val onOpenEpisodeList: (() -> Boolean)? = null,
     private val hasEpisodes: (() -> Boolean)? = null,
+    private val onStopPlayback: (() -> Unit)? = null,
+    private val onRetryPlayback: (() -> Unit)? = null,
 ) {
     var selectedTarget = VodControlTarget.PLAY_PAUSE
         private set
@@ -54,6 +57,7 @@ class VodPlayerOverlayController(
 
     private var pendingTitle: String? = null
     private var pendingEpisodeTitle: String? = null
+    private var episodePanelAdapter: com.tvapp.livetv.vod.VodEpisodePanelAdapter? = null
 
     fun setPendingTitle(title: String?, episodeTitle: String? = null) {
         pendingTitle = title
@@ -116,6 +120,44 @@ class VodPlayerOverlayController(
         }
     }
 
+    fun isEpisodePanelVisible(): Boolean {
+        return binding.vodEpisodesPanel.visibility == View.VISIBLE
+    }
+
+    fun showEpisodePanel(
+        episodes: List<com.tvapp.livetv.vod.VodEpisodeItem>,
+        currentActiveIndex: Int = -1,
+        onEpisodeSelected: (com.tvapp.livetv.vod.VodEpisodeItem) -> Unit,
+    ) {
+        val adapter = com.tvapp.livetv.vod.VodEpisodePanelAdapter { item ->
+            hideEpisodePanel()
+            onEpisodeSelected(item)
+        }
+        episodePanelAdapter = adapter
+        binding.vodEpisodesRecycler.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(binding.root.context)
+        binding.vodEpisodesRecycler.adapter = adapter
+        adapter.submitList(episodes, currentActiveIndex)
+
+        val seriesTitle = pendingTitle ?: getCurrentChannel()?.displayName ?: ""
+        binding.vodEpisodesTitle.text = seriesTitle
+        binding.vodEpisodesCount.text = "${episodes.size} ${getString(R.string.vod_btn_list_label)}"
+
+        binding.vodEpisodesPanel.visibility = View.VISIBLE
+        if (currentActiveIndex in episodes.indices) {
+            binding.vodEpisodesRecycler.scrollToPosition(currentActiveIndex)
+        }
+        binding.vodEpisodesRecycler.requestFocus()
+        controlsJob?.cancel() // Panel açıkken kontroller otomatik gizlenmesin
+    }
+
+    fun hideEpisodePanel() {
+        binding.vodEpisodesPanel.visibility = View.GONE
+        episodePanelAdapter = null
+        selectedTarget = VodControlTarget.LIST
+        renderSelection()
+        scheduleAutoHide()
+    }
+
     fun isOverlayVisible(): Boolean {
         return binding.vodPlayerOverlay.visibility == View.VISIBLE
     }
@@ -164,6 +206,21 @@ class VodPlayerOverlayController(
         }
     }
 
+    fun isBufferingOrConnecting(): Boolean {
+        if (binding.iptvBufferingContainer.visibility == View.VISIBLE ||
+            binding.blackoutView.visibility == View.VISIBLE
+        ) {
+            return true
+        }
+        val health = iptvPlayback.healthSnapshot()
+        return health.phase == IptvPlaybackPhase.PREPARING ||
+            health.phase == IptvPlaybackPhase.BUFFERING
+    }
+
+    private fun isErrorVisible(): Boolean {
+        return binding.playbackErrorContainer.visibility == View.VISIBLE
+    }
+
     fun updateControls() {
         val state = iptvPlayback.playbackSnapshot()
         val channel = getCurrentChannel()?.takeIf { it.isVodContent() }
@@ -203,13 +260,21 @@ class VodPlayerOverlayController(
             getString(R.string.unknown_value)
         }
 
-        val isPlaying = state.isPlaying
-        binding.vodBtnPlayPause.setImageResource(
-            if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
-        )
+        val isBuffering = isBufferingOrConnecting()
+        if (isBuffering) {
+            binding.vodBtnPlayPause.setImageResource(R.drawable.ic_stop)
+        } else {
+            val isPlaying = state.isPlaying
+            binding.vodBtnPlayPause.setImageResource(
+                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+            )
+        }
 
         val episodesAvailable = hasEpisodes?.invoke() == true
         binding.vodBtnList.visibility = if (episodesAvailable) View.VISIBLE else View.GONE
+        if (!episodesAvailable && selectedTarget == VodControlTarget.LIST) {
+            selectedTarget = VodControlTarget.PLAY_PAUSE
+        }
 
         updateVolumeUi()
     }
@@ -266,7 +331,13 @@ class VodPlayerOverlayController(
         highlight(binding.vodBtnRewind, selectedTarget == VodControlTarget.REWIND)
         highlight(binding.vodBtnForward, selectedTarget == VodControlTarget.FORWARD)
         highlight(binding.vodVolumeContainer, selectedTarget == VodControlTarget.VOLUME)
-        highlight(binding.vodBtnList, selectedTarget == VodControlTarget.LIST)
+        if (hasEpisodes?.invoke() == true) {
+            highlight(binding.vodBtnList, selectedTarget == VodControlTarget.LIST)
+        }
+
+        if (selectedTarget == VodControlTarget.RETRY) {
+            binding.playbackErrorRetryBtn.requestFocus()
+        }
     }
 
     fun activateSelectedTarget() {
@@ -279,17 +350,40 @@ class VodPlayerOverlayController(
             }
             VodControlTarget.FULLSCREEN -> hideControls()
             VodControlTarget.TIMELINE,
-            VodControlTarget.PLAY_PAUSE -> iptvPlayback.togglePlayPause()
+            VodControlTarget.PLAY_PAUSE -> {
+                if (isBufferingOrConnecting()) {
+                    onStopPlayback?.invoke()
+                } else {
+                    iptvPlayback.togglePlayPause()
+                }
+            }
             VodControlTarget.REWIND -> iptvPlayback.seekBy(-10_000L)
             VodControlTarget.FORWARD -> iptvPlayback.seekBy(10_000L)
             VodControlTarget.VOLUME -> toggleVolumeMute()
             VodControlTarget.SPEED -> onShowSpeedChoices()
             VodControlTarget.AUDIO_SUB -> onShowAudioTracks()
+            VodControlTarget.RETRY -> {
+                onRetryPlayback?.invoke()
+                    ?: binding.playbackErrorRetryBtn.performClick()
+            }
         }
         updateControls()
     }
 
     fun handleDispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isEpisodePanelVisible()) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_BACK,
+                    KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        hideEpisodePanel()
+                        return true
+                    }
+                }
+            }
+            return binding.vodEpisodesRecycler.dispatchKeyEvent(event)
+        }
+
         val isVisible = isOverlayVisible()
         if (event.action == KeyEvent.ACTION_UP) {
             when (event.keyCode) {
@@ -312,7 +406,7 @@ class VodPlayerOverlayController(
                 when (event.keyCode) {
                     KeyEvent.KEYCODE_DPAD_CENTER,
                     KeyEvent.KEYCODE_ENTER -> {
-                        selectedTarget = VodControlTarget.PLAY_PAUSE
+                        selectedTarget = if (isErrorVisible()) VodControlTarget.RETRY else VodControlTarget.PLAY_PAUSE
                         showControls()
                         return true
                     }
@@ -335,7 +429,11 @@ class VodPlayerOverlayController(
                     KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     KeyEvent.KEYCODE_MEDIA_PLAY,
                     KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                        iptvPlayback.togglePlayPause()
+                        if (isBufferingOrConnecting()) {
+                            onStopPlayback?.invoke()
+                        } else {
+                            iptvPlayback.togglePlayPause()
+                        }
                         selectedTarget = VodControlTarget.PLAY_PAUSE
                         showControls()
                         return true
@@ -355,7 +453,10 @@ class VodPlayerOverlayController(
                             VodControlTarget.FORWARD,
                             VodControlTarget.VOLUME,
                             VodControlTarget.LIST -> VodControlTarget.TIMELINE
-                            VodControlTarget.TIMELINE -> VodControlTarget.BACK
+                            VodControlTarget.TIMELINE -> {
+                                if (isErrorVisible()) VodControlTarget.RETRY else VodControlTarget.BACK
+                            }
+                            VodControlTarget.RETRY -> VodControlTarget.BACK
                             else -> selectedTarget
                         }
                         renderSelection()
@@ -367,7 +468,10 @@ class VodPlayerOverlayController(
                             VodControlTarget.BACK,
                             VodControlTarget.AUDIO_SUB,
                             VodControlTarget.SPEED,
-                            VodControlTarget.FULLSCREEN -> VodControlTarget.TIMELINE
+                            VodControlTarget.FULLSCREEN -> {
+                                if (isErrorVisible()) VodControlTarget.RETRY else VodControlTarget.TIMELINE
+                            }
+                            VodControlTarget.RETRY -> VodControlTarget.TIMELINE
                             VodControlTarget.TIMELINE -> VodControlTarget.PLAY_PAUSE
                             else -> selectedTarget
                         }
@@ -390,6 +494,9 @@ class VodPlayerOverlayController(
                             VodControlTarget.REWIND -> selectedTarget = VodControlTarget.PLAY_PAUSE
                             VodControlTarget.PLAY_PAUSE -> {
                                 // Sol sınır
+                            }
+                            VodControlTarget.RETRY -> {
+                                selectedTarget = VodControlTarget.BACK
                             }
                             else -> Unit
                         }
@@ -416,6 +523,9 @@ class VodPlayerOverlayController(
                             }
                             VodControlTarget.LIST -> {
                                 // Sağ sınır
+                            }
+                            VodControlTarget.RETRY -> {
+                                selectedTarget = if (hasEpisodes?.invoke() == true) VodControlTarget.LIST else VodControlTarget.VOLUME
                             }
                             else -> Unit
                         }
@@ -445,7 +555,11 @@ class VodPlayerOverlayController(
                     KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     KeyEvent.KEYCODE_MEDIA_PLAY,
                     KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                        iptvPlayback.togglePlayPause()
+                        if (isBufferingOrConnecting()) {
+                            onStopPlayback?.invoke()
+                        } else {
+                            iptvPlayback.togglePlayPause()
+                        }
                         updateControls()
                         showControls()
                         return true

@@ -1,6 +1,20 @@
 # Değişiklik Günlüğü (Changelog)
 
-## 2026-10-28 - Browser Crash ve Sniffer Düzeltmesi, VOD Başlık Senkronizasyonu, Lottie Yükleniyor Durumu ve Ortalanmış Hata Arayüzü
+## 2026-10-28 - VOD Yüklenirken Stop Butonu, Sağ Bölümler Paneli, Yenileme Odak Tuzağının Çözümü ve Dizi Resume Desteği
+
+- **Hata ve Yenile Butonunun Kumanda Odağından Çıkabilmesi (`VodPlayerOverlayController.kt` & `activity_main.xml`):**
+  - Yenile butonu (`playback_error_retry_btn`) üzerindeki hard-coded odak kilitleri temizlendi; buton kumanda navigasyonuna (`VodControlTarget.RETRY`) dahil edildi.
+  - Hata ikonundan D-pad Aşağı ile zaman çubuğu ve oynatma butonlarına, D-pad Yukarı ile üst bara, Sol/Sağ ile diğer butonlara serbestçe geçiş sağlandı.
+- **Yüklenirken Stop Butonu ve Bağlantıyı Kesme (`VodPlayerOverlayController.kt` & `MainActivity.kt`):**
+  - Akış yüklenirken (`PREPARING` / `BUFFERING` / `blackoutView`) alt kontrol çubuğundaki oynat butonu dinamik olarak kare `Stop` simgesine (`ic_stop.xml`) dönüşür.
+  - Yükleme esnasında Stop butonuna tıklandığında video bağlantısı iptal edilir (`iptvPlayback.stop()`, `endBlackout`, `cancelResolve`), oynatıcı açık kalır ve kullanıcı beklemeden sağdaki Bölümler butonuna geçebilir.
+- **Yandan Açılan Modern Dizi Bölümleri Paneli (`VodEpisodePanelAdapter.kt`, `activity_main.xml` & `VodPlayerOverlayController.kt`):**
+  - Eski ilkel `AlertDialog` kaldırıldı; Bölümler butonuna tıklandığında ekranın sağ tarafından kayan şık `vod_episodes_panel` açılır.
+  - Panelde aktif izlenen bölüm ("Oynatılıyor" rozeti) belirginleştirilir; D-pad Yukarı/Aşağı ile liste içi akıcı kaydırma, D-pad Sol veya Back ile paneli kapatıp oynatıcıya dönme sağlandı.
+  - Tekil filmlerde veya bölümü olmayan VOD içeriklerinde `Bölümler` butonu otomatik gizlenir (`View.GONE`).
+- **Dizi İzleme Pozisyonu ve Bölüm Hatırlama (Continue Watching) (`IptvResumeStore.kt`, `MainActivity.kt` & `VodHomeActivity.kt`):**
+  - Dizi bölümleri izlenirken kalınan saniye ve son izlenen bölüm bilgisi ana dizi kaydıyla (`saveSeriesEpisode`) ilişkilendirilerek kalıcı olarak saklanır.
+  - VOD Ana Ekranı'nda veya Devam Et rayında bir diziye tıklandığında doğrudan son kalınan bölüme ve son saniyesine kesintisiz devam edilir (`playLastWatchedEpisodeOrDialog`).
 
 - **Browser Video Oynatma Crash'i ve Sniffer Düzeltmesi (`TvBrowserActivity.kt` & `StreamSniffer.kt`):**
   - Chromium `shouldInterceptRequest` arka plan iş parçacığından `webView.settings` okunması nedeniyle oluşan `RuntimeException` (crash) kökten giderildi; User-Agent ana iş parçacığında güvenli olarak önbelleğe alındı (`cachedUserAgent`).

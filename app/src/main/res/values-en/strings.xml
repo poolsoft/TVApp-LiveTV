@@ -855,7 +855,10 @@
     <string name="vod_back_to_home">Back to Home</string>
     <string name="vod_popular_movies">Popular Movies</string>
     <string name="vod_recent_movies">Recently Added</string>
-    <string name="vod_btn_list_label">List</string>
+    <string name="vod_btn_list_label">Episodes</string>
+    <string name="vod_now_playing">Playing</string>
+    <string name="vod_episodes_hint">Select episode · Back to close</string>
+    <string name="vod_stop">Stop</string>
     <string name="vod_watch_later">Watch Later</string>
     <string name="vod_added_to_continue">Added to Continue Watching</string>
     <string name="vod_fullscreen_label">Fullscreen</string>
