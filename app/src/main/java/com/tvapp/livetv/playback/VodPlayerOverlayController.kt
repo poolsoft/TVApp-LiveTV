@@ -61,6 +61,9 @@ class VodPlayerOverlayController(
         updateControls()
     }
 
+    fun getPendingTitle(): String? = pendingTitle
+    fun getPendingEpisodeTitle(): String? = pendingEpisodeTitle
+
     fun setup() {
         binding.vodBtnBack.setOnClickListener {
             selectedTarget = VodControlTarget.BACK
@@ -163,9 +166,11 @@ class VodPlayerOverlayController(
 
     fun updateControls() {
         val state = iptvPlayback.playbackSnapshot()
-        val channel = getCurrentChannel()
-        val effectiveTitle = channel?.displayName?.takeIf { it.isNotBlank() } ?: pendingTitle
-        val episodeInfo: String? = channel?.episodeTitle?.takeIf { it.isNotBlank() } ?: pendingEpisodeTitle?.takeIf { it.isNotBlank() }
+        val channel = getCurrentChannel()?.takeIf { it.isVodContent() }
+        val effectiveTitle = pendingTitle?.takeIf { it.isNotBlank() }
+            ?: channel?.displayName?.takeIf { it.isNotBlank() }
+        val episodeInfo: String? = pendingEpisodeTitle?.takeIf { it.isNotBlank() }
+            ?: channel?.episodeTitle?.takeIf { it.isNotBlank() }
         if (episodeInfo != null && effectiveTitle != null) {
             binding.vodPlayerTitle.text = if (effectiveTitle.contains(episodeInfo, ignoreCase = true)) {
                 effectiveTitle
@@ -174,7 +179,7 @@ class VodPlayerOverlayController(
             }
             binding.vodPlayerSubtitle.text = episodeInfo
         } else {
-            binding.vodPlayerTitle.text = effectiveTitle.orEmpty()
+            binding.vodPlayerTitle.text = effectiveTitle ?: getString(R.string.iptv_library_vod)
             binding.vodPlayerSubtitle.text = channel?.let { getSourceName(it) } ?: getString(R.string.iptv_library_vod)
         }
         binding.vodPlayerClock.text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())

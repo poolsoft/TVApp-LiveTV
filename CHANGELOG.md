@@ -5,6 +5,10 @@
 - **Browser Video Oynatma Crash'i ve Sniffer Düzeltmesi (`TvBrowserActivity.kt` & `StreamSniffer.kt`):**
   - Chromium `shouldInterceptRequest` arka plan iş parçacığından `webView.settings` okunması nedeniyle oluşan `RuntimeException` (crash) kökten giderildi; User-Agent ana iş parçacığında güvenli olarak önbelleğe alındı (`cachedUserAgent`).
   - Sayfadaki video adaylarının yakalanması ve duyurulması anlık debug loglarıyla (`SNIFFER_DETECT`, `SNIFFER_ANNOUNCE`) kayıt altına alındı.
+- **Canlı Kanaldan VOD Açılışındaki Diyalog, Flash ve Başlık Çakışmasının Çözümü (`MainActivity.kt` & `VodPlayerOverlayController.kt`):**
+  - Canlı kanaldan VOD içeriğine geçildiğinde önceki kanal adının arayüzde kalması engellendi; `VodPlayerOverlayController` içinde `pendingTitle` önceliklendirildi ve canlı kanal adının sızması önlendi.
+  - VOD modunda eski gri arabelleğe alma kutusu (`iptv_buffering_container`) tamamen devre dışı bırakılarak ekrandaki titreme/flaş (flash) ortadan kaldırıldı.
+  - VOD açılışında `blackScreenWhileTuning` tercihi kapalı olsa dahi Lottie yükleniyor animasyonu (`channel_tuning.json`) ve film adıyla birlikte durum bilgilendirme metni ortalanmış olarak zorunlu çalıştırıldı.
 - **VOD Player Başlığı Anında Senkronizasyonu (`VodHost.kt` & `VodPlayerOverlayController.kt`):**
   - VOD oynatıcı ilk açıldığında arka plandaki DB çözümlemesi tamamlanana kadar başlığın boş veya önceki içeriği göstermesi engellendi; aktarılan `payload.title` ve `payload.episodeTitle` bilgisi `pendingTitle` ile oynatıcı arayüzüne anında basıldı.
 - **Lottie Yükleniyor Animasyonu ve Tek Satır Bilgilendirme Metni (`activity_main.xml` & `MainActivity.kt`):**

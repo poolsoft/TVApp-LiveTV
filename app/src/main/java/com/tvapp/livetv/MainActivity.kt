@@ -362,12 +362,20 @@ class MainActivity : TvRemoteActivity() {
         override fun showResolvingFeedback() = showVodResolvingFeedback()
         override fun hideResolvingFeedback() = hideVodResolvingFeedback()
         override fun showBufferingPreparing() {
-            val preparingText = getString(R.string.vod_archive_preparing)
-            updateBlackoutStatus(preparingText)
+            val title = vodPlayerOverlayController?.getPendingTitle()
+                ?: currentChannel?.displayName?.takeIf { it.isNotBlank() }
+            val preparingText = if (!title.isNullOrBlank()) {
+                getString(R.string.iptv_playback_status, title, getString(R.string.iptv_connecting))
+            } else {
+                getString(R.string.vod_archive_preparing)
+            }
+            startBlackout(preparingText, force = true)
             binding.iptvBufferingContainer.visibility = View.GONE
+            binding.iptvBufferingCorner.visibility = View.GONE
         }
         override fun hideBuffering() {
             binding.iptvBufferingContainer.visibility = View.GONE
+            binding.iptvBufferingCorner.visibility = View.GONE
         }
         override fun string(resId: Int): String = getString(resId)
         override fun seasonEpisodeLabel(season: Int, episode: Int): String =
@@ -1252,12 +1260,16 @@ class MainActivity : TvRemoteActivity() {
      *  read what they switched to. While the blackout is active the previous
      *  channel's audio is muted too, and playback.unmutedByPlayback restores
      *  the level when the new channel renders (or on a failure path). */
-    private fun startBlackout(statusMessage: String? = null) {
-        if (!displayPreferences.blackScreenWhileTuning) return
-        if (blackScreenActive) return
+    private fun startBlackout(statusMessage: String? = null, force: Boolean = false) {
+        if (!force && !vodMode && !displayPreferences.blackScreenWhileTuning) return
+        if (blackScreenActive) {
+            updateBlackoutStatus(statusMessage)
+            return
+        }
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE
+        binding.iptvBufferingCorner.visibility = View.GONE
         hidePlaybackError()
         updateBlackoutStatus(statusMessage)
         binding.blackoutAnimation.apply {
@@ -1276,6 +1288,10 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun updateBlackoutStatus(message: String?) {
+        if (!blackScreenActive && vodMode && !message.isNullOrBlank()) {
+            startBlackout(message, force = true)
+            return
+        }
         val target = binding.blackoutStatusText
         if (!message.isNullOrBlank()) {
             target.text = message
@@ -1324,7 +1340,15 @@ class MainActivity : TvRemoteActivity() {
         // Hide the old channel's video behind a black layer; the infobar above
         // it stays readable. If this tune renders nothing, the failure/error
         // paths end the blackout instead of leaving a permanent black screen.
-        startBlackout()
+        val preparingStatus = if (vodMode || channel.isVodContent()) {
+            val title = vodPlayerOverlayController?.getPendingTitle()
+                ?: channel.displayName.takeIf { it.isNotBlank() }
+                ?: getString(R.string.iptv_library_vod)
+            getString(R.string.iptv_playback_status, title, getString(R.string.iptv_connecting))
+        } else {
+            null
+        }
+        startBlackout(preparingStatus)
         focusedTuneJob?.cancel()
         activePassthroughInputId = null
         currentPlaybackUsesIptvLibrary = !recordHistory
@@ -1422,6 +1446,11 @@ class MainActivity : TvRemoteActivity() {
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean, compact: Boolean = false) {
+        if (vodMode) {
+            binding.iptvBufferingContainer.visibility = View.GONE
+            binding.iptvBufferingCorner.visibility = View.GONE
+            return
+        }
         val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
         binding.iptvBufferingCorner.visibility = if (shouldShow && compact) View.VISIBLE else View.GONE
         if (compact) {
@@ -1444,9 +1473,16 @@ class MainActivity : TvRemoteActivity() {
             ?.displayName
             ?.trim()
             ?.takeIf(String::isNotBlank)
-        val fullStatus = channelName?.let {
-            getString(R.string.iptv_playback_status, it, status)
-        } ?: status
+        val fullStatus = if (vodMode) {
+            val title = vodPlayerOverlayController?.getPendingTitle()
+                ?: channelName
+                ?: getString(R.string.iptv_library_vod)
+            getString(R.string.iptv_playback_status, title, status)
+        } else {
+            channelName?.let {
+                getString(R.string.iptv_playback_status, it, status)
+            } ?: status
+        }
         binding.iptvBufferingText.text = fullStatus
         updateBlackoutStatus(fullStatus)
     }
@@ -2418,13 +2454,21 @@ class MainActivity : TvRemoteActivity() {
 
     /** Web sayfasi cozumlenirken VOD durum gostergesini acar. */
     private fun showVodResolvingFeedback() {
-        val preparingText = getString(R.string.vod_archive_preparing)
-        updateBlackoutStatus(preparingText)
+        val title = vodPlayerOverlayController?.getPendingTitle()
+            ?: currentChannel?.displayName?.takeIf { it.isNotBlank() }
+        val statusText = if (!title.isNullOrBlank()) {
+            getString(R.string.iptv_playback_status, title, getString(R.string.vod_archive_preparing))
+        } else {
+            getString(R.string.vod_archive_preparing)
+        }
+        startBlackout(statusText, force = true)
         binding.iptvBufferingContainer.visibility = View.GONE
+        binding.iptvBufferingCorner.visibility = View.GONE
     }
 
     private fun hideVodResolvingFeedback() {
         binding.iptvBufferingContainer.visibility = View.GONE
+        binding.iptvBufferingCorner.visibility = View.GONE
     }
 
     /**
@@ -3111,6 +3155,8 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         vodMode = true
+        binding.iptvBufferingContainer.visibility = View.GONE
+        binding.iptvBufferingCorner.visibility = View.GONE
         channelZapper.clearNumberInput()
         focusedTuneJob?.cancel()
     }
@@ -3194,6 +3240,8 @@ class MainActivity : TvRemoteActivity() {
         vodMode = false
         vodHost.cancelResolve()
         binding.iptvBufferingContainer.visibility = View.GONE
+        binding.iptvBufferingCorner.visibility = View.GONE
+        endBlackout("SWITCH_TO_LIVE")
         intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
         intent.removeExtra(EXTRA_VOD_STREAM_URL)
         intent.removeExtra(EXTRA_VOD_TITLE)
