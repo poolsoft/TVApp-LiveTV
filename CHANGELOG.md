@@ -1,5 +1,21 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-28 - Hata Ekranı Kumanda Kilitlenmesinin Çözümü, İlk Açılış Animasyon Optimizasyonu, Sniffer Koruma & Gelişmiş Tanılama OSD
+
+- **Hata (Source Error) Ekranında Kumanda Kilitlenmesinin Çözümü (`RemoteInputRouter.kt`):**
+  - Hata ekranı (`isPlaybackErrorVisible`) açıkken kumanda yön tuşlarının (`DPAD_UP`, `DPAD_DOWN`, `DPAD_LEFT`, `DPAD_RIGHT`) yutulması engellendi.
+  - VOD modunda hata anında olaylar doğrudan `VodPlayerOverlayController`'a aktarılarak Yenile butonundan çıkıp alt çubuktaki Stop, Bölümler veya Çıkış butonlarına serbestçe geçilmesi sağlandı.
+  - Canlı TV modunda hata anında D-pad Sol veya Menü tuşuyla kanal panelinin açılabilmesi, Yukarı/Aşağı ile zap yapılabilmesi ve Geri tuşuyla hatadan güvenle çıkılabilmesi sağlandı.
+- **Oynatıcı İlk Açılışındaki Duraksamanın / Animasyon Donmasının Giderilmesi (`MainActivity.kt` & `activity_main.xml`):**
+  - `blackout_animation` için `app:lottie_rawRes="@raw/channel_tuning"` doğrudan layout XML'ine entegre edildi.
+  - `MainActivity.onCreate` anında `LottieCompositionFactory.fromRawRes` ile animasyon arka planda önceden ısıtıldı (preload). Böylece ilk açılışta ve karartma anında animasyon sıfır duraksama ile anında akıcı şekilde oynamaya başlar.
+- **Web Sniffer Akış Bulunamama Koruması (`VodHost.kt` & `values/strings.xml`):**
+  - Web sayfası veya sniffer geçerli bir video akışı (m3u8, mp4 vb.) yakalayamadığında ham HTML sayfasının ExoPlayer'a verilmesi engellendi (`VodCandidateDecision.Failure`).
+  - Çözümlenemeyen web sayfalarında gereksiz hata döngüsü yerine doğrudan "Web sayfasında oynatılabilir video akışı bulunamadı" açıklaması gösterilir.
+- **Gelişmiş Tanılama ve Hata Detayı OSD'si (`MainActivity.kt` & `DisplaySettingsActivity.kt`):**
+  - Ayarlar > Gelişmiş Tanılama açıkken hata ekranına yayının çalıştığı metot (`[Metot: Web Sniffer]`, `[Metot: HLS (m3u8)]`, `[Metot: Dosya (MP4/MKV)]`, `[Metot: DVB/TIF]`), tam HTTP durum kodu (`[HTTP 404 (Bulunamadı)]`, `[HTTP 403]`, `[HTTP 500]`), hata kodu adı ve maskelenmiş kaynak URL'si eklenir.
+  - Ayar kapalıyken sade ve temiz kullanıcı dostu hata mesajı gösterilir.
+
 ## 2026-10-28 - VOD Yüklenirken Stop Butonu, Sağ Bölümler Paneli, Yenileme Odak Tuzağının Çözümü ve Dizi Resume Desteği
 
 - **Hata ve Yenile Butonunun Kumanda Odağından Çıkabilmesi (`VodPlayerOverlayController.kt` & `activity_main.xml`):**

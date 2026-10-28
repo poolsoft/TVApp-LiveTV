@@ -89,6 +89,11 @@ class VodHostTest {
             pickerIndex = selectedIndex
             pickerPick = onPick
         }
+        var playbackError: Pair<LiveChannel?, String>? = null
+        override fun showPlaybackError(channel: LiveChannel?, message: String) {
+            playbackError = channel to message
+            events += "error:$message"
+        }
         override suspend fun loadSeriesEpisodes(seriesKey: String): List<VodMetadataEntity> = episodes
     }
 
@@ -139,10 +144,20 @@ class VodHostTest {
     }
 
     @Test
-    fun emptyCandidatesPlayBase() {
+    fun emptyCandidatesFailsForWebPage() {
         val host = newHost(FakeEnv())
         val decision = host.decideCandidates(
             testChannel("https://example.com/watch/1"),
+            VodPageResolver.Resolved(emptyList()),
+        )
+        assertTrue(decision is VodCandidateDecision.Failure)
+    }
+
+    @Test
+    fun directStreamWithEmptyCandidatesPlaysBase() {
+        val host = newHost(FakeEnv())
+        val decision = host.decideCandidates(
+            testChannel("https://cdn.example.com/video.mp4"),
             VodPageResolver.Resolved(emptyList()),
         )
         assertTrue(decision is VodCandidateDecision.PlayBase)

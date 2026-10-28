@@ -43,6 +43,9 @@ class RemoteInputRouter(
      */
     fun dispatch(event: KeyEvent, fallbackSuper: (KeyEvent) -> Boolean): Boolean {
         if (env.isPlaybackErrorVisible()) {
+            if (env.isVodPlaybackActive() && env.handleVodPlayerOverlay(event)) {
+                return true
+            }
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
                 if (event.action == KeyEvent.ACTION_DOWN) env.dismissStatusDialog()
                 return true
@@ -59,13 +62,19 @@ class RemoteInputRouter(
                 if (event.action == KeyEvent.ACTION_DOWN) env.zap(-1)
                 return true
             }
-            return when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP,
-                KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_DPAD_LEFT,
-                KeyEvent.KEYCODE_DPAD_RIGHT -> true
-                else -> true
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_MENU) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.showChannelPanel(false)
+                return true
             }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.zap(1)
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (event.action == KeyEvent.ACTION_DOWN) env.zap(-1)
+                return true
+            }
+            return fallbackSuper(event)
         }
 
         if (env.isStatusOsd()) {

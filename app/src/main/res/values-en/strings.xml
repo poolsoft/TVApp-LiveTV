@@ -631,6 +631,7 @@
     <string name="iptv_error_decoder">Audio/video decoding failed</string>
     <string name="iptv_error_format">Unsupported or malformed stream format</string>
     <string name="iptv_error_generic">Playback failed</string>
+    <string name="iptv_sniffer_stream_not_found">No playable video stream found on the web page</string>
     <string name="iptv_buffer_target">Buffer target: %1$d seconds</string>
     <string name="iptv_buffer_target_short">Target %1$d sec</string>
     <string name="iptv_buffer_target_auto">Buffer target: Auto (ABR)</string>

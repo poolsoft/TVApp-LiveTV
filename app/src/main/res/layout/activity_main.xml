@@ -52,6 +52,7 @@
                 android:layout_height="112dp"
                 android:contentDescription="@string/blackout_message"
                 android:focusable="false"
+                app:lottie_rawRes="@raw/channel_tuning"
                 app:lottie_loop="true" />
 
             <TextView

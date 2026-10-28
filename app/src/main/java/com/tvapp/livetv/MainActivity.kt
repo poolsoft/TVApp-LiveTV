@@ -454,6 +454,8 @@ class MainActivity : TvRemoteActivity() {
             url: String,
         ): com.tvapp.livetv.vod.VodPageResolver.Resolved =
             com.tvapp.livetv.vod.VodPageResolver.resolve(url, this@MainActivity)
+        override fun showPlaybackError(channel: LiveChannel?, message: String) =
+            this@MainActivity.showPlaybackError(channel, message)
     }
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
@@ -602,6 +604,7 @@ class MainActivity : TvRemoteActivity() {
         vodMode = savedInstanceState?.getBoolean("vod-mode") == true
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        com.airbnb.lottie.LottieCompositionFactory.fromRawRes(this, R.raw.channel_tuning)
         vodHost = com.tvapp.livetv.main.VodHost(lifecycleScope, vodHostEnv)
         osdCoordinator = OsdCoordinator(::renderPlaybackUiState)
         renderPlaybackUiState(osdCoordinator.state)
@@ -1649,9 +1652,10 @@ class MainActivity : TvRemoteActivity() {
             ?.trim()
             ?.takeIf(String::isNotBlank)
 
+        val httpCode = error?.let { findHttpErrorCode(it) }
+
         val baseReason = when (error) {
             is androidx.media3.common.PlaybackException -> {
-                val httpCode = findHttpErrorCode(error)
                 when {
                     httpCode == 403 || httpCode == 401 -> getString(R.string.iptv_error_http_forbidden, httpCode)
                     httpCode == 404 -> getString(R.string.iptv_error_http_not_found)
@@ -1683,16 +1687,50 @@ class MainActivity : TvRemoteActivity() {
             baseReason
         }
 
-        return if (displayPreferences.showDiagnosticsOverlay && error != null) {
-            val techDetail = if (error is androidx.media3.common.PlaybackException) {
-                "${error.errorCodeName} (${error.errorCode})"
-            } else {
-                "${error.javaClass.simpleName}: ${error.message}"
+        return if (displayPreferences.showDiagnosticsOverlay) {
+            val methodLabel = when {
+                currentChannel?.source == LiveChannel.Source.TIF -> "DVB / Tuner (TIF)"
+                currentChannel?.uri.orEmpty().contains(".m3u8", ignoreCase = true) -> "HLS (m3u8)"
+                currentChannel?.uri.orEmpty().contains(".mpd", ignoreCase = true) -> "DASH"
+                currentChannel?.uri.orEmpty().contains(".mp4", ignoreCase = true) ||
+                currentChannel?.uri.orEmpty().contains(".mkv", ignoreCase = true) ||
+                currentChannel?.uri.orEmpty().contains(".ts", ignoreCase = true) -> "Dosya (MP4/MKV/TS)"
+                currentChannel?.inputId == "iptv:direct_vod" -> "Web Sniffer"
+                else -> "IPTV HTTP Akışı"
             }
-            "$fullMessage\n[$techDetail]"
+            val techParts = mutableListOf<String>()
+            techParts.add("Metot: $methodLabel")
+            if (httpCode != null) {
+                techParts.add("HTTP: $httpCode (${getHttpCodeTitle(httpCode)})")
+            }
+            if (error != null) {
+                if (error is androidx.media3.common.PlaybackException) {
+                    techParts.add("Kod: ${error.errorCodeName} (${error.errorCode})")
+                } else {
+                    techParts.add("Hata: ${error.javaClass.simpleName} - ${error.message}")
+                }
+            }
+            val uriSanitized = currentChannel?.uri?.substringBefore('?')
+            if (!uriSanitized.isNullOrBlank()) {
+                techParts.add("Kaynak: $uriSanitized")
+            }
+            "$fullMessage\n\n[Tanılama OSD]\n" + techParts.joinToString(" | ")
         } else {
             fullMessage
         }
+    }
+
+    private fun getHttpCodeTitle(code: Int): String = when (code) {
+        400 -> "Geçersiz İstek (Bad Request)"
+        401 -> "Yetkisiz (Unauthorized)"
+        403 -> "Erişim Yasaklandı (Forbidden)"
+        404 -> "Bulunamadı (Not Found)"
+        408 -> "Zaman Aşımı (Request Timeout)"
+        500 -> "Sunucu Hatası (Internal Server Error)"
+        502 -> "Hatalı Ağ Geçidi (Bad Gateway)"
+        503 -> "Hizmet Kullanılamıyor (Service Unavailable)"
+        504 -> "Ağ Geçidi Zaman Aşımı (Gateway Timeout)"
+        else -> "HTTP Durum Kodu $code"
     }
 
     private fun findHttpErrorCode(throwable: Throwable): Int? {

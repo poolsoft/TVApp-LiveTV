@@ -79,11 +79,12 @@ class VodHost(
         baseChannel: LiveChannel,
         resolved: VodPageResolver.Resolved,
     ): VodCandidateDecision = when {
-        resolved.candidates.isEmpty() -> VodCandidateDecision.PlayBase(baseChannel)
-        resolved.playable() != null -> VodCandidateDecision.PlayBase(
+        resolved.candidates.isNotEmpty() && resolved.playable() != null -> VodCandidateDecision.PlayBase(
             resolved.applyTo(baseChannel, requireNotNull(resolved.playable())),
         )
-        else -> VodCandidateDecision.ShowChoice(resolved, baseChannel)
+        resolved.candidates.size > 1 -> VodCandidateDecision.ShowChoice(resolved, baseChannel)
+        WebVideoResolver.isDirectStream(baseChannel.uri) -> VodCandidateDecision.PlayBase(baseChannel)
+        else -> VodCandidateDecision.Failure("NO_STREAM_FOUND")
     }
 
     private fun sanitizeUrl(url: String): String = url.substringBefore('?').substringBefore('#')
@@ -286,6 +287,13 @@ class VodHost(
                     env.selectChannel(decision.channel)
                 }
                 is VodCandidateDecision.ShowChoice -> env.showStreamChoice(decision.resolved, decision.baseChannel)
+                is VodCandidateDecision.Failure -> {
+                    env.log("VOD_RESOLVE_FAILED | key=$sourceKey no stream found")
+                    env.showPlaybackError(
+                        baseChannel,
+                        env.string(R.string.iptv_sniffer_stream_not_found),
+                    )
+                }
             }
         }
     }
@@ -445,6 +453,7 @@ sealed interface VodCandidateDecision {
         val resolved: VodPageResolver.Resolved,
         val baseChannel: LiveChannel,
     ) : VodCandidateDecision
+    data class Failure(val reason: String) : VodCandidateDecision
 }
 
 /**
@@ -495,4 +504,5 @@ interface VodHostEnv {
     suspend fun loadMetadata(sourceKey: String): VodMetadataEntity?
     suspend fun loadParentName(parentKey: String): String?
     suspend fun resolvePageWithContext(url: String): VodPageResolver.Resolved
+    fun showPlaybackError(channel: LiveChannel?, message: String)
 }
