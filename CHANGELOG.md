@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - VOD Sniffer Çözümleyemediğinde Web Tarayıcısına Otomatik Fallback Desteği
+
+- **VOD Web Tarayıcı Fallback Mekanizması (`VodHost.kt` & `MainActivity.kt`):**
+  - Arka plandaki sniffer video akışı bulamadığında veya bot/etkileşim korumasına takıldığında oynatıcıyı hata ekranına kilitlemek yerine sayfayı otomatik olarak `TvBrowserActivity` içinde açma desteği getirildi.
+  - Kullanıcı TV kumandasıyla sayfadaki Oynat butonuna bastığında veya reklamı geçtiğinde, sniffer videoyu algıladığı anda sayfayı kapatıp doğrudan ana TVApp oynatıcısına devrederek tam ekran oynatır.
+- **Ayarlardan Yapılandırılabilirlik (`DisplayPreferencesStore.kt` & `DisplaySettingsActivity.kt`):**
+  - Ayarlar > Oynatma Ayarları altına "VOD Web Sayfası Tarayıcı Desteği" seçeneği eklendi. Kullanıcı bu davranışı dilediğinde açıp kapatabilir (varsayılan: açık).
+- **Tarayıcı İpuçları ve Temiz Geçiş (`TvBrowserActivity.kt` & `values/strings.xml`):**
+  - VOD fallback ile tarayıcı açıldığında kullanıcıya rehberlik eden bilgilendirici bildirim ("Video başlatmak için sayfadaki Oynat tuşuna basın") gösterilir.
+
 ## 2026-10-28 - Hata Ekranı Kumanda Kilitlenmesinin Çözümü, İlk Açılış Animasyon Optimizasyonu, Sniffer Koruma & Gelişmiş Tanılama OSD
 
 - **Hata (Source Error) Ekranında Kumanda Kilitlenmesinin Çözümü (`RemoteInputRouter.kt`):**

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,6 +96,13 @@ class VodHostTest {
             events += "error:$message"
         }
         override suspend fun loadSeriesEpisodes(seriesKey: String): List<VodMetadataEntity> = episodes
+        var fallbackToBrowserEnabled = false
+        var openedInBrowserUrl: String? = null
+        override fun isVodFallbackToBrowserEnabled(): Boolean = fallbackToBrowserEnabled
+        override fun openVodInBrowser(url: String, title: String?) {
+            openedInBrowserUrl = url
+            events += "browser:$url"
+        }
     }
 
     private fun newHost(env: FakeEnv) =
@@ -312,4 +320,43 @@ class VodHostTest {
         streamUrl = streamUrl,
         updatedAt = 0L,
     )
+
+    @Test
+    fun resolveFailureWithFallbackOpensBrowser() {
+        val env = FakeEnv()
+        env.fallbackToBrowserEnabled = true
+        val host = newHost(env)
+        runBlocking {
+            host.handlePayload(
+                VodDeepLinkPayload(
+                    sourceKey = "web_movie",
+                    streamUrl = "https://example.com/watch/999",
+                    title = "Web Film",
+                ),
+            )
+            host.awaitResolve()
+        }
+        assertEquals("https://example.com/watch/999", env.openedInBrowserUrl)
+        assertTrue(env.events.contains("browser:https://example.com/watch/999"))
+        assertNull(env.playbackError)
+    }
+
+    @Test
+    fun resolveFailureWithoutFallbackShowsPlaybackError() {
+        val env = FakeEnv()
+        env.fallbackToBrowserEnabled = false
+        val host = newHost(env)
+        runBlocking {
+            host.handlePayload(
+                VodDeepLinkPayload(
+                    sourceKey = "web_movie",
+                    streamUrl = "https://example.com/watch/999",
+                    title = "Web Film",
+                ),
+            )
+            host.awaitResolve()
+        }
+        assertNull(env.openedInBrowserUrl)
+        assertNotNull(env.playbackError)
+    }
 }

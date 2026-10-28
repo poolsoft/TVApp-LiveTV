@@ -546,6 +546,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         toggle(R.string.subtitles_default, current.subtitlesEnabled) {
             update { copy(subtitlesEnabled = it) }
         }
+        toggle(R.string.vod_fallback_browser_title, current.vodFallbackToBrowser) {
+            update { copy(vodFallbackToBrowser = it) }
+        }
         action(R.string.iptv_subtitle_appearance, getString(R.string.open_page)) {
             com.tvapp.livetv.ui.IptvSubtitleAppearanceDialog.show(this) { markChanged() }
         }

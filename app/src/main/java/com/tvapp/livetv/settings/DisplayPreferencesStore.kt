@@ -31,6 +31,7 @@ data class DisplayPreferences(
      *  until the new channel really renders; hides the previous channel's
      *  video freezing under the OSD. */
     val blackScreenWhileTuning: Boolean = false,
+    val vodFallbackToBrowser: Boolean = true,
 )
 
 class DisplayPreferencesStore(context: Context) {
@@ -77,6 +78,7 @@ class DisplayPreferencesStore(context: Context) {
         preferredSubtitleLanguage = preferences.getString(KEY_SUBTITLE_LANGUAGE, null),
         showDiagnosticsOverlay = preferences.getBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, false),
         blackScreenWhileTuning = preferences.getBoolean(KEY_BLACK_SCREEN_WHILE_TUNING, false),
+        vodFallbackToBrowser = preferences.getBoolean(KEY_VOD_FALLBACK_TO_BROWSER, true),
     )
 
     fun save(displayPreferences: DisplayPreferences) {
@@ -112,6 +114,7 @@ class DisplayPreferencesStore(context: Context) {
             .putString(KEY_SUBTITLE_LANGUAGE, displayPreferences.preferredSubtitleLanguage)
             .putBoolean(KEY_SHOW_DIAGNOSTICS_OVERLAY, displayPreferences.showDiagnosticsOverlay)
             .putBoolean(KEY_BLACK_SCREEN_WHILE_TUNING, displayPreferences.blackScreenWhileTuning)
+            .putBoolean(KEY_VOD_FALLBACK_TO_BROWSER, displayPreferences.vodFallbackToBrowser)
             .apply()
     }
 
@@ -154,5 +157,6 @@ class DisplayPreferencesStore(context: Context) {
         const val KEY_SUBTITLE_LANGUAGE = "subtitle-language"
         const val KEY_SHOW_DIAGNOSTICS_OVERLAY = "show-diagnostics-overlay"
         const val KEY_BLACK_SCREEN_WHILE_TUNING = "black-screen-while-tuning"
+        const val KEY_VOD_FALLBACK_TO_BROWSER = "vod-fallback-to-browser"
     }
 }

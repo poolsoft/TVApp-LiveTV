@@ -922,4 +922,7 @@
     <string name="quick_hub_settings">Ayarlar</string>
     <string name="quick_hub_settings_hint">Görüntü ve uygulama tercihlerini özelleştirin</string>
     <string name="browser_auto_hide_top_bar">Üst Çubuğu Otomatik Gizle</string>
+    <string name="vod_fallback_browser_title">VOD Web Sayfası Tarayıcı Desteği</string>
+    <string name="vod_fallback_browser_summary">Sniffer video bulamadığında sayfayı kumanda ile oynatabilmeniz için tarayıcıda açar</string>
+    <string name="browser_vod_fallback_hint">Video başlatmak için sayfadaki Oynat tuşuna basın veya reklamı geçin</string>
 </resources>

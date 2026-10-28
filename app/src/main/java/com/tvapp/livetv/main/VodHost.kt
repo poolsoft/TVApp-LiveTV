@@ -289,10 +289,15 @@ class VodHost(
                 is VodCandidateDecision.ShowChoice -> env.showStreamChoice(decision.resolved, decision.baseChannel)
                 is VodCandidateDecision.Failure -> {
                     env.log("VOD_RESOLVE_FAILED | key=$sourceKey no stream found")
-                    env.showPlaybackError(
-                        baseChannel,
-                        env.string(R.string.iptv_sniffer_stream_not_found),
-                    )
+                    if (env.isVodFallbackToBrowserEnabled() && directStreamUrl.startsWith("http", ignoreCase = true)) {
+                        env.log("VOD_FALLBACK_BROWSER | opening TvBrowserActivity for key=$sourceKey")
+                        env.openVodInBrowser(directStreamUrl, mainTitle)
+                    } else {
+                        env.showPlaybackError(
+                            baseChannel,
+                            env.string(R.string.iptv_sniffer_stream_not_found),
+                        )
+                    }
                 }
             }
         }
@@ -505,4 +510,6 @@ interface VodHostEnv {
     suspend fun loadParentName(parentKey: String): String?
     suspend fun resolvePageWithContext(url: String): VodPageResolver.Resolved
     fun showPlaybackError(channel: LiveChannel?, message: String)
+    fun isVodFallbackToBrowserEnabled(): Boolean
+    fun openVodInBrowser(url: String, title: String?)
 }

@@ -106,6 +106,9 @@ class TvBrowserActivity : Activity() {
         val initialUrl = intent.getStringExtra(EXTRA_URL)
         if (!initialUrl.isNullOrBlank()) {
             loadUrl(initialUrl)
+            if (intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)) {
+                Toast.makeText(this, R.string.browser_vod_fallback_hint, Toast.LENGTH_LONG).show()
+            }
         } else {
             showHomeDashboard()
         }
@@ -213,6 +216,9 @@ class TvBrowserActivity : Activity() {
                 uiHandler.post {
                     currentPlaybackRequest = request
                     showStreamDetected(request)
+                    if (intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)) {
+                        playDetectedStream(request)
+                    }
                 }
             },
             onCleared = {
@@ -1142,6 +1148,9 @@ class TvBrowserActivity : Activity() {
             request.headers["Cookie"]?.let { putExtra(EXTRA_VOD_COOKIE, it) }
         }
         startActivity(intent)
+        if (this.intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)) {
+            finish()
+        }
     }
 
     override fun onDestroy() {
@@ -1152,6 +1161,7 @@ class TvBrowserActivity : Activity() {
 
     companion object {
         const val EXTRA_URL = "extra_browser_url"
+        const val EXTRA_VOD_FALLBACK = "extra_vod_fallback"
         const val EXTRA_VOD_REFERRER = "com.tvapp.livetv.extra.VOD_REFERRER"
         const val EXTRA_VOD_ORIGIN = "com.tvapp.livetv.extra.VOD_ORIGIN"
         const val EXTRA_VOD_USER_AGENT = "com.tvapp.livetv.extra.VOD_USER_AGENT"

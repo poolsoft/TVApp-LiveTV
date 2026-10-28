@@ -456,6 +456,16 @@ class MainActivity : TvRemoteActivity() {
             com.tvapp.livetv.vod.VodPageResolver.resolve(url, this@MainActivity)
         override fun showPlaybackError(channel: LiveChannel?, message: String) =
             this@MainActivity.showPlaybackError(channel, message)
+        override fun isVodFallbackToBrowserEnabled(): Boolean =
+            displayPreferences.vodFallbackToBrowser
+        override fun openVodInBrowser(url: String, title: String?) {
+            endBlackout("VOD_FALLBACK_BROWSER")
+            val intent = Intent(this@MainActivity, com.tvapp.livetv.browser.TvBrowserActivity::class.java).apply {
+                putExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_URL, url)
+                putExtra(com.tvapp.livetv.browser.TvBrowserActivity.EXTRA_VOD_FALLBACK, true)
+            }
+            startActivity(intent)
+        }
     }
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
