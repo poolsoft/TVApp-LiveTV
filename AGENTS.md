@@ -16,6 +16,7 @@ and `MARKET_LISTING.md`; this file contains implementation and workflow constrai
 - After a requested implementation is verified, commit and push only the files belonging to that
   implementation to `main`, unless the user says not to push. If unrelated uncommitted changes
   make selective staging ambiguous, stop before committing and report it.
+- Testler (unit testler) geçer geçmez kullanıcıdan komut veya hatırlatma ("push ettin mi?", "neden push etmiyorsun?") beklemeden DERHAL commit ve push yap. Test bittikten sonra turu sonlandırma, aynı tur içerisinde commit ve push işlemini tamamla.
 - Delivery is not complete until the verified changes are committed and pushed to `main`.
   Do this without waiting for a separate push reminder so the TV can receive the update.
   After pushing, verify that the release workflow started; trigger it if needed and report its
