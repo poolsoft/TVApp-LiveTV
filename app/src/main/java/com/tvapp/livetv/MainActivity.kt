@@ -1266,6 +1266,9 @@ class MainActivity : TvRemoteActivity() {
             updateBlackoutStatus(statusMessage)
             return
         }
+        blackScreenActive = true
+        blackScreenTuneGeneration++
+        playback.setMuted(true)
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE
@@ -1281,17 +1284,10 @@ class MainActivity : TvRemoteActivity() {
             }
             playAnimation()
         }
-        blackScreenActive = true
-        blackScreenTuneGeneration++
-        playback.setMuted(true)
         debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
     }
 
     private fun updateBlackoutStatus(message: String?) {
-        if (!blackScreenActive && vodMode && !message.isNullOrBlank()) {
-            startBlackout(message, force = true)
-            return
-        }
         val target = binding.blackoutStatusText
         if (!message.isNullOrBlank()) {
             target.text = message
