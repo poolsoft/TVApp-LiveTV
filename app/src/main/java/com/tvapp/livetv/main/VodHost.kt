@@ -86,6 +86,8 @@ class VodHost(
         else -> VodCandidateDecision.ShowChoice(resolved, baseChannel)
     }
 
+    private fun sanitizeUrl(url: String): String = url.substringBefore('?').substringBefore('#')
+
     /** VOD_SOURCE_KEY deep link'ini isler (cold start + warm onNewIntent). */
     fun handleDeepLink(intent: Intent?) {
         val payload = VodDeepLinkPayload.fromIntent(intent) ?: return
@@ -151,29 +153,33 @@ class VodHost(
             }
             val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl)
             if (parsedEpisodes.isNotEmpty()) {
-                val labels = parsedEpisodes.map { it.title }
-                val currentIndex = parsedEpisodes
-                    .indexOfFirst { it.title == activeEpisodeTitle }
-                    .coerceAtLeast(0)
-                env.showEpisodeChoices(
-                    env.activeChannel()?.displayName ?: seriesMeta.name,
-                    labels,
-                    currentIndex,
-                ) { which ->
-                    val episode = parsedEpisodes.getOrNull(which)
-                    if (episode != null) {
-                        env.playVodDeepLink(
-                            VodDeepLinkPayload(
-                                sourceKey = "${seriesKey}:ep:${which}_${episode.url.hashCode()}",
-                                streamUrl = episode.url,
-                                title = seriesMeta.name,
-                                episodeTitle = episode.title,
-                                logoUrl = seriesMeta.logoUrl,
-                            ),
-                        )
+                try {
+                    val labels = parsedEpisodes.map { it.title }
+                    val currentIndex = parsedEpisodes
+                        .indexOfFirst { it.title == activeEpisodeTitle }
+                        .coerceAtLeast(0)
+                    env.showEpisodeChoices(
+                        env.activeChannel()?.displayName ?: seriesMeta.name,
+                        labels,
+                        currentIndex,
+                    ) { which ->
+                        val episode = parsedEpisodes.getOrNull(which)
+                        if (episode != null) {
+                            env.playVodDeepLink(
+                                VodDeepLinkPayload(
+                                    sourceKey = "${seriesKey}:ep:${which}_${episode.url.hashCode()}",
+                                    streamUrl = episode.url,
+                                    title = seriesMeta.name,
+                                    episodeTitle = episode.title,
+                                    logoUrl = seriesMeta.logoUrl,
+                                ),
+                            )
+                        }
                     }
+                    return@launch
+                } catch (e: Exception) {
+                    env.log("Parse episodes JSON failed: ${e.message}")
                 }
-                return@launch
             }
 
             env.openVodLibrary()
@@ -262,6 +268,7 @@ class VodHost(
 
         // Dogrudan medya akisi ise (mp4, m3u8, mkv vs.) web resolver'a girmeden direkt oynat
         if (WebVideoResolver.isDirectStream(directStreamUrl)) {
+            env.log("VOD_DIRECT | key=$sourceKey url=${sanitizeUrl(directStreamUrl)}")
             env.selectChannel(baseChannel)
             return
         }
@@ -274,7 +281,10 @@ class VodHost(
             env.hideResolvingFeedback()
             if (!env.isVodMode() || requestGeneration != env.currentGeneration()) return@launch
             when (val decision = decideCandidates(baseChannel, resolved)) {
-                is VodCandidateDecision.PlayBase -> env.selectChannel(decision.channel)
+                is VodCandidateDecision.PlayBase -> {
+                    env.log("VOD_RESOLVED | key=$sourceKey url=${sanitizeUrl(decision.channel.uri)} candidates=${resolved.candidates.size}")
+                    env.selectChannel(decision.channel)
+                }
                 is VodCandidateDecision.ShowChoice -> env.showStreamChoice(decision.resolved, decision.baseChannel)
             }
         }

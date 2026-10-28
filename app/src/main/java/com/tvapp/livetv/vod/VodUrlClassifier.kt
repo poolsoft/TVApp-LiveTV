@@ -20,8 +20,7 @@ object VodUrlClassifier {
         if (lower.contains(".smil") && lower.contains(".m3u8")) return true
 
         if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
-            lower.contains("/hls/") || lower.contains("playlist.m3u8") ||
-            lower.contains("/movie/") || lower.contains("/series/") || lower.contains("/live/")
+            lower.contains("/hls/") || lower.contains("playlist.m3u8")
         ) {
             return true
         }
