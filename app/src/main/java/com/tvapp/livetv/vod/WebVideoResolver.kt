@@ -82,8 +82,7 @@ object WebVideoResolver {
         if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains("stream.php") ||
             lower.contains("/hls/") || lower.contains("/dash/") || lower.contains("playlist.m3u8") ||
             lower.contains("master.m3u8") || lower.contains("manifest") ||
-            lower.contains("master.txt") || lower.contains("playlist.txt") ||
-            lower.contains("/movie/") || lower.contains("/series/")
+            lower.contains("master.txt") || lower.contains("playlist.txt")
         ) {
             return true
         }
