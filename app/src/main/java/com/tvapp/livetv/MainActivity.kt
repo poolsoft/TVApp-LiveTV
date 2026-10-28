@@ -364,9 +364,7 @@ class MainActivity : TvRemoteActivity() {
         override fun showBufferingPreparing() {
             val preparingText = getString(R.string.vod_archive_preparing)
             updateBlackoutStatus(preparingText)
-            binding.iptvBufferingSpinner.visibility = View.VISIBLE
-            binding.iptvBufferingContainer.visibility = View.VISIBLE
-            binding.iptvBufferingText.text = preparingText
+            binding.iptvBufferingContainer.visibility = View.GONE
         }
         override fun hideBuffering() {
             binding.iptvBufferingContainer.visibility = View.GONE
@@ -721,6 +719,15 @@ class MainActivity : TvRemoteActivity() {
                 }
                 if (vodMode) {
                     vodPlayerOverlayController?.scheduleAutoHide()
+                }
+            }
+        }
+        iptvPlayback.onIsPlayingChanged = { isPlaying ->
+            if (vodMode) {
+                if (isPlaying) {
+                    vodPlayerOverlayController?.scheduleAutoHide()
+                } else {
+                    vodPlayerOverlayController?.showControls(autoHide = false)
                 }
             }
         }
@@ -1415,7 +1422,7 @@ class MainActivity : TvRemoteActivity() {
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean, compact: Boolean = false) {
-        val shouldShow = visible && (!blackScreenActive || vodMode) && currentChannel?.source == LiveChannel.Source.IPTV
+        val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
         binding.iptvBufferingCorner.visibility = if (shouldShow && compact) View.VISIBLE else View.GONE
         if (compact) {
             binding.iptvBufferingContainer.visibility = View.GONE
@@ -1646,8 +1653,6 @@ class MainActivity : TvRemoteActivity() {
         binding.iptvBufferingContainer.visibility = View.GONE
         osdCoordinator.hideStatus()
 
-        val channelName = channel?.displayName?.trim().orEmpty()
-        binding.playbackErrorTitle.text = if (channelName.isNotBlank()) channelName else getString(R.string.playback_error_title)
         binding.playbackErrorMessage.text = detail
         binding.playbackErrorContainer.visibility = View.VISIBLE
 
@@ -2411,11 +2416,11 @@ class MainActivity : TvRemoteActivity() {
         vodPlayerOverlayController?.showControls(autoHide)
     }
 
-    /** Web sayfasi cozumlenirken VOD buffering gostergesini acar. */
+    /** Web sayfasi cozumlenirken VOD durum gostergesini acar. */
     private fun showVodResolvingFeedback() {
-        binding.iptvBufferingSpinner.visibility = View.VISIBLE
-        binding.iptvBufferingContainer.visibility = View.VISIBLE
-        binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+        val preparingText = getString(R.string.vod_archive_preparing)
+        updateBlackoutStatus(preparingText)
+        binding.iptvBufferingContainer.visibility = View.GONE
     }
 
     private fun hideVodResolvingFeedback() {

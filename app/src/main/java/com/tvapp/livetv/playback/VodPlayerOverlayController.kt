@@ -144,11 +144,15 @@ class VodPlayerOverlayController(
 
     fun scheduleAutoHide() {
         controlsJob?.cancel()
-        if (binding.iptvBufferingContainer.visibility == View.VISIBLE) {
+        if (binding.iptvBufferingContainer.visibility == View.VISIBLE ||
+            binding.blackoutView.visibility == View.VISIBLE ||
+            binding.playbackErrorContainer.visibility == View.VISIBLE
+        ) {
             return
         }
         val snapshot = iptvPlayback.playbackSnapshot()
-        if (!snapshot.isPlaying && snapshot.playbackSpeed == null) {
+        val health = iptvPlayback.healthSnapshot()
+        if (!snapshot.isPlaying || health.phase != IptvPlaybackPhase.READY) {
             return
         }
         controlsJob = scope.launch {

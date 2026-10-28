@@ -162,6 +162,7 @@ class IptvPlaybackController(
     var onPlaybackError: ((PlaybackException) -> Unit)? = null
     var onPlaybackReady: (() -> Unit)? = null
     var onPlaybackEnded: (() -> Unit)? = null
+    var onIsPlayingChanged: ((Boolean) -> Unit)? = null
     var onBuffering: ((IptvBufferingState) -> Unit)? = null
     var onContentKindChanged: ((IptvContentKind) -> Unit)? = null
     var onTracksChanged: (() -> Unit)? = null
@@ -447,6 +448,10 @@ class IptvPlaybackController(
                     val current = player ?: return
                     val next = current.currentMediaItemIndex + 1
                     if (next < current.mediaItemCount) current.removeMediaItems(next, current.mediaItemCount)
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    onIsPlayingChanged?.invoke(isPlaying)
                 }
 
                 override fun onTracksChanged(tracks: Tracks) {

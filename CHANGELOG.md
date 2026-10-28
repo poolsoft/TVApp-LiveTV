@@ -9,9 +9,13 @@
   - VOD oynatıcı ilk açıldığında arka plandaki DB çözümlemesi tamamlanana kadar başlığın boş veya önceki içeriği göstermesi engellendi; aktarılan `payload.title` ve `payload.episodeTitle` bilgisi `pendingTitle` ile oynatıcı arayüzüne anında basıldı.
 - **Lottie Yükleniyor Animasyonu ve Tek Satır Bilgilendirme Metni (`activity_main.xml` & `MainActivity.kt`):**
   - Kanal değişimi ve VOD yükleme karartması (`blackout_view`) sırasında ortada yer alan `LottieAnimationView` (`channel_tuning.json`) altına tek satırlık modern durum metni (`blackout_status_text`) eklendi ("VOD açılıyor...", "Bağlanıyor...", kanal adı).
-- **Modern Ortalanmış Hata & Yeniden Dene Arayüzü (`activity_main.xml`, `MainActivity.kt` & `RemoteInputRouter.kt`):**
-  - Kutu şeklindeki eski modal hata diyaloğu (`status_panel`) tamamen kaldırılarak yerine video ortasında odaklanabilir büyük dairesel Yeniden Dene/Play butonu ve hata sebebi metni (`playback_error_container`) getirildi.
-  - Hata oluştuğunda kumanda odağı doğrudan ortadaki butona konumlanır; `OK` basıldığında akış hemen yeniden bağlanır, `Back` basıldığında VOD kütüphanesine veya TV'ye temiz dönüş sağlanır, `CH+`/`CH-` ile canlı TV'de zap yapılabilir.
+  - Yükleme sırasında eski gri arabelleğe alma kutusu (`iptv_buffering_container`) tamamen gizlenerek Lottie üzerine binmesi ve çift yazı basılması engellendi.
+- **Kutusuz Şeffaf Hata Arayüzü & Odaklanabilir Replay-Play İkonu (`activity_main.xml`, `ic_replay_play.xml`, `bg_replay_play_focused.xml`):**
+  - Hata ekranındaki tüm kutu, kart ve çerçeve arka planları kaldırıldı (`@android:color/transparent`); sadece üstte gölgeli hata sebebi metni ve ortada beyaz dairesel ok + play simgesi (`ic_replay_play.xml`) yerleştirildi.
+  - İkon kumanda ile odaklanabilir yapıldı (`bg_replay_play_focused.xml`); odak yokken şeffaf, odaklandığında zarif dairesel vurgu alır.
+- **VOD Kontrollerinin Yalnızca Oynatılırken Gizlenmesi Kuralı (`VodPlayerOverlayController.kt`, `IptvPlaybackController.kt` & `MainActivity.kt`):**
+  - VOD oynatıcı kontrolleri artık yalnızca video aktif olarak çalarken (`isPlaying == true && phase == READY`) 8 saniye sonra otomatik gizlenir.
+  - Video duraklatıldığında (PAUSE), tamponlanırken, yüklenirken veya hata durumunda kontroller asla otomatik gizlenmez, ekranda sabit ve görünür kalır (`onIsPlayingChanged`).
 
 ## 2026-10-27 - Ayarlar Ekranı Modernizasyonu, Dikey Telefon Dokunmatik ve D-Pad Chip Tasarımı
 
