@@ -347,6 +347,18 @@ class MainActivity : TvRemoteActivity() {
         override fun setVodHasEpisodes(hasEpisodes: Boolean) {
             currentVodHasEpisodes = hasEpisodes
         }
+        override fun setPendingTitle(title: String?, episodeTitle: String?) {
+            vodPlayerOverlayController?.setPendingTitle(title, episodeTitle)
+            vodPlayerOverlayController?.updateControls()
+        }
+        override fun startLoading(statusText: String) {
+            startBlackout(statusText, force = true)
+            binding.iptvBufferingContainer.visibility = View.GONE
+        }
+        override fun stopLoading() {
+            endBlackout("VOD_STOP_LOADING")
+            binding.iptvBufferingContainer.visibility = View.GONE
+        }
         override fun currentChannelKey(): String? = currentChannel?.sourceKey
         override fun isTunedAndReady(sourceKey: String): Boolean =
             iptvPlayback.tunedSourceKey() == sourceKey &&
@@ -356,9 +368,7 @@ class MainActivity : TvRemoteActivity() {
         override fun showResolvingFeedback() = showVodResolvingFeedback()
         override fun hideResolvingFeedback() = hideVodResolvingFeedback()
         override fun showBufferingPreparing() {
-            binding.iptvBufferingSpinner.visibility = View.VISIBLE
-            binding.iptvBufferingContainer.visibility = View.VISIBLE
-            binding.iptvBufferingText.text = getString(R.string.vod_archive_preparing)
+            binding.iptvBufferingContainer.visibility = View.GONE
         }
         override fun hideBuffering() {
             binding.iptvBufferingContainer.visibility = View.GONE
@@ -1237,12 +1247,17 @@ class MainActivity : TvRemoteActivity() {
      *  read what they switched to. While the blackout is active the previous
      *  channel's audio is muted too, and playback.unmutedByPlayback restores
      *  the level when the new channel renders (or on a failure path). */
-    private fun startBlackout() {
-        if (!displayPreferences.blackScreenWhileTuning) return
-        if (blackScreenActive) return
+    private fun startBlackout(statusText: String? = null, force: Boolean = false) {
+        if (!force && !vodMode && !displayPreferences.blackScreenWhileTuning) return
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE
+        if (!statusText.isNullOrBlank()) {
+            binding.blackoutStatusText.text = statusText
+            binding.blackoutStatusText.visibility = View.VISIBLE
+        } else {
+            binding.blackoutStatusText.visibility = View.GONE
+        }
         binding.blackoutAnimation.apply {
             if (composition == null) {
                 setFailureListener { error ->
@@ -1255,13 +1270,14 @@ class MainActivity : TvRemoteActivity() {
         blackScreenActive = true
         blackScreenTuneGeneration++
         playback.setMuted(true)
-        debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
+        debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration, text=$statusText")
     }
 
     private fun endBlackout(reason: String) {
         if (!blackScreenActive) return
         blackScreenActive = false
         binding.blackoutView.visibility = View.GONE
+        binding.blackoutStatusText.visibility = View.GONE
         binding.blackoutAnimation.cancelAnimation()
         playback.setMuted(false)
         debugLog.recordDebug("BLACKOUT_END | reason=$reason")
@@ -1393,6 +1409,10 @@ class MainActivity : TvRemoteActivity() {
      *  previous channel keep it on screen: when no IPTV channel is currently
      *  tuned, the spinner is always hidden. */
     private fun setIptvBufferingVisible(visible: Boolean, compact: Boolean = false) {
+        if (vodMode) {
+            binding.iptvBufferingContainer.visibility = View.GONE
+            return
+        }
         val shouldShow = visible && !blackScreenActive && currentChannel?.source == LiveChannel.Source.IPTV
         binding.iptvBufferingCorner.visibility = if (shouldShow && compact) View.VISIBLE else View.GONE
         if (compact) {

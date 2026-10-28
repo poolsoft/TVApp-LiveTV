@@ -199,7 +199,11 @@ class VodHost(
             ?: return
 
         env.enterVodMode()
+        env.setPendingTitle(payload.title, payload.episodeTitle)
         env.showVodPlayerControls(autoHide = false)
+        val statusText = payload.title?.let { "$it ${env.string(R.string.vod_archive_preparing)}" }
+            ?: env.string(R.string.vod_archive_preparing)
+        env.startLoading(statusText)
         val requestGeneration = env.beginGeneration()
         if (payload.startOver) {
             env.saveResumePosition()
@@ -213,6 +217,7 @@ class VodHost(
         }
 
         if (env.currentChannelKey() == sourceKey && env.isTunedAndReady(sourceKey)) {
+            env.stopLoading()
             env.resumeIptvPlayback()
             env.showVodPlayerControls(autoHide = true)
             return
@@ -226,10 +231,14 @@ class VodHost(
         resolveJob = scope.launch {
             val channel = withContext(Dispatchers.IO) { buildLibraryChannel(sourceKey) }
             env.hideBuffering()
-            if (!env.isVodMode() || requestGeneration != env.currentGeneration()) return@launch
+            if (!env.isVodMode() || requestGeneration != env.currentGeneration()) {
+                env.stopLoading()
+                return@launch
+            }
             if (channel != null) {
                 env.selectChannel(channel)
             } else {
+                env.stopLoading()
                 env.clearLastVodKey()
                 env.showChannelNotFound()
             }
@@ -464,6 +473,9 @@ interface VodHostEnv {
     fun resumeIptvPlayback()
     fun clearResume(sourceKey: String)
     fun setVodHasEpisodes(hasEpisodes: Boolean)
+    fun setPendingTitle(title: String?, episodeTitle: String?)
+    fun startLoading(statusText: String)
+    fun stopLoading()
     fun currentChannelKey(): String?
     fun isTunedAndReady(sourceKey: String): Boolean
     fun selectChannel(channel: LiveChannel)

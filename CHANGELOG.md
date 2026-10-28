@@ -1,5 +1,16 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-28 - VOD Lottie Animasyonu, Anında Başlık Senkronizasyonu ve Gri Diyalog Temizliği
+
+- **VOD Açılışında Anında Başlık Senkronizasyonu (`VodHost.kt` & `VodPlayerOverlayController.kt`):**
+  - Canlı TV kanalından VOD'a geçildiğinde arka plandaki DB çözümlemesi tamamlanana kadar ekranda önceki açık kanalın ("TRT Belgesel" vb.) adının kalması kökten engellendi.
+  - `handlePayload` içine girildiği an `setPendingTitle` ile VOD başlığı (`payload.title`) ve bölüm bilgisi doğrudan kontrol arayüzüne basılır.
+- **Merkezi Lottie Yükleme Animasyonu & Tek Satır Durum Metni (`activity_main.xml` & `MainActivity.kt`):**
+  - VOD hazırlığı başladığında ortada çalışan `LottieAnimationView` (`channel_tuning.json`) ve hemen altında tek satır gölgeli başlık metni (*"Film Adı Açılıyor..."*) devreye girer.
+  - Video hazır olduğunda (`IptvPlaybackPhase.READY`) Lottie yükleme katmanı akıcı biçimde kaybolur ve oynatma başlar.
+- **Eski Gri Arabelleğe Alma Kutusunun (`iptv_buffering_container`) VOD'da Engellenmesi (`MainActivity.kt`):**
+  - VOD oynatma ve hazırlık döngüsünde eski gri durum kutusunun görünmesi ve açılıp kapanarak flaş (titreme) yapması kesin olarak engellendi (`if (vodMode) return`).
+
 ## 2026-10-26 - VOD Player Yükleme UI Kararlılığı, Bağımsız Seekbar, Ses Odağı, Kompakt Sıralama ve Renkli Klasik İkon
 
 - **VOD Player Yükleme ve Hazırlık Sırasında UI Görünürlüğü (`VodPlayerOverlayController.kt` & `MainActivity.kt`):**

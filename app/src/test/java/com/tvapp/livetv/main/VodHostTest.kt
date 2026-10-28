@@ -51,6 +51,9 @@ class VodHostTest {
         override fun resumeIptvPlayback() { events += "resume" }
         override fun clearResume(sourceKey: String) { events += "clear:$sourceKey" }
         override fun setVodHasEpisodes(hasEpisodes: Boolean) { this.hasEpisodes = hasEpisodes }
+        override fun setPendingTitle(title: String?, episodeTitle: String?) { events += "title:$title" }
+        override fun startLoading(statusText: String) { events += "loading:$statusText" }
+        override fun stopLoading() { events += "stopLoading" }
         override fun currentChannelKey(): String? = currentKey
         override fun isTunedAndReady(sourceKey: String) = tunedReady
         override fun selectChannel(channel: LiveChannel) { selected = channel }
