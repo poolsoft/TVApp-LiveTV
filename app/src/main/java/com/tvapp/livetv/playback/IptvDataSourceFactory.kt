@@ -20,6 +20,7 @@ object IptvDataSourceFactory {
         referrer: String?,
         origin: String? = null,
         cookie: String? = null,
+        streamUri: String? = null,
         liveEdge: Boolean = false,
         reconnectLive: Boolean = false,
         livePrefetchBytes: Int = 8 * 1024 * 1024,
@@ -29,11 +30,16 @@ object IptvDataSourceFactory {
         // Live MPEG-TS streams can sit silent longer than VOD between reads
         // (pause filler, source hiccups), so they get a longer read timeout
         // instead of failing the open and waiting for watchdog recovery.
+        val resolvedHeaders = StreamHeaderResolver.resolve(
+            url = streamUri,
+            existingReferrer = referrer,
+            existingOrigin = origin,
+        )
         val okHttp = OkHttpDataSource.Factory(if (liveEdge) LIVE_HTTP_CLIENT else HTTP_CLIENT)
             .setUserAgent(userAgent?.takeIf(String::isNotBlank) ?: DEFAULT_USER_AGENT)
         okHttp.setDefaultRequestProperties(buildMap {
-            referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
-            origin?.takeIf(String::isNotBlank)?.let { put("Origin", it) }
+            resolvedHeaders.referrer?.takeIf(String::isNotBlank)?.let { put("Referer", it) }
+            resolvedHeaders.origin?.takeIf(String::isNotBlank)?.let { put("Origin", it) }
             cookie?.takeIf(String::isNotBlank)?.let { put("Cookie", it) }
         })
         val resolved = ResolvingDataSource.Factory(okHttp) { dataSpec ->

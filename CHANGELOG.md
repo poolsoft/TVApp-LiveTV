@@ -1,5 +1,13 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - URL Bazlı Otomatik HTTP Header Enjeksiyonu (403 Forbidden Çözümü)
+
+- **Otomatik Referer ve Origin Header Enjeksiyonu (`StreamHeaderResolver.kt` & `IptvDataSourceFactory.kt`):**
+  - M3U veya doğrudan stream URL'lerinde Referer/Origin belirtilmediğinde Kanal D (duhnet/demiroren), ATV (trkvz), Show TV (ciner), Star TV/NTV (dogus), TV8, NowTV, Halk TV, TRT (tabii), SZC TV gibi ulusal yayıncı CDN'lerinin HTTP 403 Forbidden hatası dönmesi engellendi.
+  - Yayın akışı URL kalıbına göre ilgili yayıncının resmi Referer ve Origin başlıkları otomatik olarak `OkHttpDataSource` istek özelliklerine enjekte edilir.
+  - Kullanıcı veya M3U kaynağı tarafından zaten özel bir `referrer`/`origin` tanımlanmışsa bu değerler öncelikli tutularak korunur.
+  - Sistem TIF TvInputService (`IptvTvInputService.kt`) oynatımına da aynı otomatik header çözümleme desteği entegre edildi.
+
 ## 2026-10-29 - TIF Kanal Açılış/Geçiş Hızlandırması, Tarayıcı Alt Bar Navigasyonu & VOD Bölüm Paneli Kumanda Gezinmesi
 
 - **TIF (DVB/Tuner) Kanal Açılış ve Geçiş Hızlandırması (`MainActivity.kt`):**

@@ -495,6 +495,7 @@ class IptvPlaybackController(
             channel.referrer,
             channel.origin,
             cookie = channel.cookie,
+            streamUri = channel.uri.toString(),
             liveEdge = liveEdge,
             reconnectLive = bufferedLiveEnabled(),
             removeLiveOverlap = removeLiveOverlap,
