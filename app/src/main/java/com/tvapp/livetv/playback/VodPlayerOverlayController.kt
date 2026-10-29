@@ -143,10 +143,16 @@ class VodPlayerOverlayController(
         binding.vodEpisodesCount.text = "${episodes.size} ${getString(R.string.vod_btn_list_label)}"
 
         binding.vodEpisodesPanel.visibility = View.VISIBLE
-        if (currentActiveIndex in episodes.indices) {
-            binding.vodEpisodesRecycler.scrollToPosition(currentActiveIndex)
+        val focusTargetIndex = if (currentActiveIndex in episodes.indices) currentActiveIndex else 0
+        binding.vodEpisodesRecycler.scrollToPosition(focusTargetIndex)
+        binding.vodEpisodesRecycler.post {
+            val holder = binding.vodEpisodesRecycler.findViewHolderForAdapterPosition(focusTargetIndex)
+            if (holder != null) {
+                holder.itemView.requestFocus()
+            } else {
+                binding.vodEpisodesRecycler.getChildAt(0)?.requestFocus()
+            }
         }
-        binding.vodEpisodesRecycler.requestFocus()
         controlsJob?.cancel() // Panel açıkken kontroller otomatik gizlenmesin
     }
 
@@ -379,9 +385,31 @@ class VodPlayerOverlayController(
                         hideEpisodePanel()
                         return true
                     }
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER -> {
+                        val focusedView = binding.vodEpisodesRecycler.findFocus()
+                        if (focusedView != null) {
+                            focusedView.performClick()
+                            return true
+                        }
+                    }
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        return false
+                    }
+                }
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_BACK,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN -> return true
                 }
             }
-            return binding.vodEpisodesRecycler.dispatchKeyEvent(event)
+            return true
         }
 
         val isVisible = isOverlayVisible()

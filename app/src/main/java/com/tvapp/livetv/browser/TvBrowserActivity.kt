@@ -859,10 +859,21 @@ class TvBrowserActivity : Activity() {
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (urlInput.hasFocus() && actionBar.visibility != View.VISIBLE) {
+                if (urlInput.hasFocus()) {
                     if (event.action == KeyEvent.ACTION_DOWN) {
                         actionBar.visibility = View.VISIBLE
                         btnActionClear.requestFocus()
+                    }
+                    return true
+                }
+                val hasActionFocus = btnActionClear.hasFocus() || btnActionGo.hasFocus() ||
+                    btnActionMouse.hasFocus() || btnActionCom.hasFocus() || btnActionHttps.hasFocus() ||
+                    btnActionFavorite.hasFocus() || btnActionReload.hasFocus() || btnActionPlay.hasFocus()
+                if (hasActionFocus) {
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        hideKeyboard()
+                        actionBar.visibility = View.GONE
+                        layout.leaveTopBarToCursor()
                     }
                     return true
                 }
@@ -871,6 +882,18 @@ class TvBrowserActivity : Activity() {
                     layout.leaveTopBarToCursor()
                 }
                 return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                val hasActionFocus = btnActionClear.hasFocus() || btnActionGo.hasFocus() ||
+                    btnActionMouse.hasFocus() || btnActionCom.hasFocus() || btnActionHttps.hasFocus() ||
+                    btnActionFavorite.hasFocus() || btnActionReload.hasFocus() || btnActionPlay.hasFocus()
+                if (hasActionFocus) {
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        urlInput.requestFocus()
+                        urlInput.setSelection(urlInput.text.length)
+                    }
+                    return true
+                }
             }
         }
         return super.dispatchKeyEvent(event)

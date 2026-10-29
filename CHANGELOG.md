@@ -1,5 +1,16 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - TIF Kanal Açılış/Geçiş Hızlandırması, Tarayıcı Alt Bar Navigasyonu & VOD Bölüm Paneli Kumanda Gezinmesi
+
+- **TIF (DVB/Tuner) Kanal Açılış ve Geçiş Hızlandırması (`MainActivity.kt`):**
+  - Kanal geçişinde siyah ekranın (`blackoutView`) uzun süre asılı kalmasını önlemek için 800ms güvenlik zaman aşımı (`TIF_TIMEOUT_SAFETY`) ve ses/akış hazır olduğunda (`TIF_TRACKS_READY`) karartmayı anında kaldırma mekanizması eklendi.
+  - `applyPreferredTracks` içerisindeki gereksiz SharedPreferences disk I/O yükü kaldırılarak TV donanım tunerinin frekansa anında kilitlenmesi sağlandı.
+- **Web Tarayıcı Adres Çubuğu & Alt Bar Kumanda Navigasyonu (`TvBrowserActivity.kt`):**
+  - Adres alanında (`urlInput`) D-Pad Aşağı tuşuna basıldığında ikinci bara (`actionBar`) girilip ilk butona (`btnActionClear`) odaklanması, alt bardayken bir kez daha Aşağı basıldığında sayfaya/imlece geçilmesi, Yukarı basıldığında ise adres alanına dönülmesi sağlandı.
+- **VOD Bölüm Listesi D-Pad ile Gezinme ve Seçim (`activity_main.xml` & `VodPlayerOverlayController.kt`):**
+  - Bölümler paneli açıldığında kumanda odağının dış çerçeveye hapsolması engellendi; aktif/ilk bölüm kartına otomatik odak verildi.
+  - Yukarı/Aşağı tuşları ile bölümler arasında akıcı gezinme, OK/Enter ile seçilen bölümü derhal başlatma ve Sol/Geri ile paneli kapatma desteği sağlandı.
+
 ## 2026-10-29 - VOD Bölüm Paneli Entegrasyonu, Tarayıcı Akıllı Geri Dönüşü & Sayfa Yönlendirme Loop Koruması
 
 - **VOD Dizi Bölüm Paneli Düzeltmesi (`VodHost.kt`):**

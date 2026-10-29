@@ -485,6 +485,7 @@ class MainActivity : TvRemoteActivity() {
                 .show()
         }
     }
+    private var blackoutTimeoutJob: Job? = null
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null
     private var programJob: Job? = null
@@ -717,6 +718,13 @@ class MainActivity : TvRemoteActivity() {
         playback.onTracksChanged = { tracks ->
             logTifTracks(tracks)
             applyPreferredTracks()
+            val channel = currentChannel
+            if (channel != null && channel.source == LiveChannel.Source.TIF && blackScreenActive) {
+                val hasAudioOrVideo = tracks.any { it.type == android.media.tv.TvTrackInfo.TYPE_AUDIO || it.type == android.media.tv.TvTrackInfo.TYPE_VIDEO }
+                if (hasAudioOrVideo) {
+                    endBlackout("TIF_TRACKS_READY")
+                }
+            }
         }
         playback.onVideoSizeChanged = { width, height ->
             binding.tvView.setVideoSize(width, height)
@@ -1336,6 +1344,16 @@ class MainActivity : TvRemoteActivity() {
             }
             playAnimation()
         }
+        blackoutTimeoutJob?.cancel()
+        val isTif = currentChannel?.source == LiveChannel.Source.TIF
+        if (isTif && !vodMode) {
+            blackoutTimeoutJob = lifecycleScope.launch {
+                delay(800L)
+                if (blackScreenActive && currentChannel?.source == LiveChannel.Source.TIF) {
+                    endBlackout("TIF_TIMEOUT_SAFETY")
+                }
+            }
+        }
         debugLog.recordDebug("BLACKOUT_START | generation=$blackScreenTuneGeneration")
     }
 
@@ -1351,6 +1369,8 @@ class MainActivity : TvRemoteActivity() {
 
     private fun endBlackout(reason: String) {
         if (!blackScreenActive) return
+        blackoutTimeoutJob?.cancel()
+        blackoutTimeoutJob = null
         blackScreenActive = false
         binding.blackoutView.visibility = View.GONE
         binding.blackoutAnimation.cancelAnimation()
@@ -2972,7 +2992,6 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun applyPreferredTracks() {
-        displayPreferences = displayPreferencesStore.load()
         val audio = playback.audioTracks()
         val subtitles = playback.subtitleTracks()
         currentChannel?.let { channel ->

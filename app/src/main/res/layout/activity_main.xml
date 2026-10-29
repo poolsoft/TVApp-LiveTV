@@ -1324,7 +1324,9 @@
         android:layout_height="match_parent"
         android:layout_gravity="end"
         android:background="@drawable/bg_glass_panel"
+        android:descendantFocusability="afterDescendants"
         android:elevation="45dp"
+        android:focusable="false"
         android:orientation="vertical"
         android:padding="20dp"
         android:visibility="gone">
@@ -1378,7 +1380,7 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:clipToPadding="false"
-            android:focusable="true"
+            android:focusable="false"
             android:overScrollMode="never" />
     </LinearLayout>
 
