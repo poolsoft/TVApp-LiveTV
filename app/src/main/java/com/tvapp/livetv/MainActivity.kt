@@ -1328,7 +1328,9 @@ class MainActivity : TvRemoteActivity() {
         }
         blackScreenActive = true
         blackScreenTuneGeneration++
-        playback.setMuted(true)
+        if (currentChannel?.source != LiveChannel.Source.TIF || vodMode) {
+            playback.setMuted(true)
+        }
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE
@@ -1348,7 +1350,7 @@ class MainActivity : TvRemoteActivity() {
         val isTif = currentChannel?.source == LiveChannel.Source.TIF
         if (isTif && !vodMode) {
             blackoutTimeoutJob = lifecycleScope.launch {
-                delay(800L)
+                delay(6_000L)
                 if (blackScreenActive && currentChannel?.source == LiveChannel.Source.TIF) {
                     endBlackout("TIF_TIMEOUT_SAFETY")
                 }
@@ -1479,7 +1481,7 @@ class MainActivity : TvRemoteActivity() {
                     binding.iptvPlayerView.visibility = View.GONE
                     binding.tvView.visibility = View.VISIBLE
                     playback.play(channel)
-                    applyPreferredTracks()
+                    // Preferred tracks onTracksChanged ile otomatik secilir
                 }
                 LiveChannel.Source.IPTV -> {
                     playback.stop()
@@ -3005,19 +3007,27 @@ class MainActivity : TvRemoteActivity() {
         val resolved = resolveCurrentTrackPreferences()
         val preferredAudio = resolved.audioLanguage
         if (preferredAudio != null) {
-            audio.firstOrNull { it.language.equals(preferredAudio, ignoreCase = true) }
-                ?.let { playback.selectAudio(it.id) }
+            val targetAudio = audio.firstOrNull { it.language.equals(preferredAudio, ignoreCase = true) }
+            val currentAudioId = playback.selectedTrackId(android.media.tv.TvTrackInfo.TYPE_AUDIO)
+            if (targetAudio != null && targetAudio.id != currentAudioId) {
+                playback.selectAudio(targetAudio.id)
+            }
         }
 
+        val currentSubtitleId = playback.selectedTrackId(android.media.tv.TvTrackInfo.TYPE_SUBTITLE)
         if (!resolved.subtitlesEnabled) {
-            playback.selectSubtitle(null)
+            if (currentSubtitleId != null) {
+                playback.selectSubtitle(null)
+            }
             return
         }
         val preferredSubtitle = resolved.subtitleLanguage
         val track = subtitles.firstOrNull {
             it.language.equals(preferredSubtitle, ignoreCase = true)
         } ?: subtitles.firstOrNull()
-        playback.selectSubtitle(track?.id)
+        if (track != null && track.id != currentSubtitleId) {
+            playback.selectSubtitle(track.id)
+        }
     }
 
     private fun resolveCurrentTrackPreferences() = resolveTrackPreferences(
@@ -6297,7 +6307,7 @@ class MainActivity : TvRemoteActivity() {
                 currentChannel?.takeIf { it.source == LiveChannel.Source.TIF }?.let { channel ->
                     debugLog.recordDebug("TIF_SESSION_RESUME | channel=${channel.sourceKey}")
                     playback.play(channel)
-                    applyPreferredTracks()
+                    // Preferred tracks onTracksChanged ile otomatik secilir
                 }
             }
         }, 250L)

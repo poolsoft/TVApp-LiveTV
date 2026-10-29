@@ -3,8 +3,9 @@
 ## 2026-10-29 - TIF Kanal Açılış/Geçiş Hızlandırması, Tarayıcı Alt Bar Navigasyonu & VOD Bölüm Paneli Kumanda Gezinmesi
 
 - **TIF (DVB/Tuner) Kanal Açılış ve Geçiş Hızlandırması (`MainActivity.kt`):**
-  - Kanal geçişinde siyah ekranın (`blackoutView`) uzun süre asılı kalmasını önlemek için 800ms güvenlik zaman aşımı (`TIF_TIMEOUT_SAFETY`) ve ses/akış hazır olduğunda (`TIF_TRACKS_READY`) karartmayı anında kaldırma mekanizması eklendi.
-  - `applyPreferredTracks` içerisindeki gereksiz SharedPreferences disk I/O yükü kaldırılarak TV donanım tunerinin frekansa anında kilitlenmesi sağlandı.
+  - Kanal geçişinde "eski görüntü - yeni kanal adı" karmaşasını önleyen kanal geçiş animasyonu korundu; erken 800ms zoraki timeout kaldırılarak arkasında siyah ekran kalması önlendi.
+  - TIF kanal geçişlerinde TV donanımının A/V PTS/PCR saatini donduran erken `setMuted(true)` çağrısı engellendi.
+  - Kanal tune edilme aşamasında donanımı boğan erken `applyPreferredTracks` çağrısı kaldırılarak; dil ve altyazı seçimlerinin akış hazır olduğunda (`onTracksChanged`) idempotent olarak tek seferde yapılması sağlandı. Böylece tuner donanımı frekansa anında kilitlenip görüntüyü (`onVideoAvailable`) beklemeden basar.
 - **Web Tarayıcı Adres Çubuğu & Alt Bar Kumanda Navigasyonu (`TvBrowserActivity.kt`):**
   - Adres alanında (`urlInput`) D-Pad Aşağı tuşuna basıldığında ikinci bara (`actionBar`) girilip ilk butona (`btnActionClear`) odaklanması, alt bardayken bir kez daha Aşağı basıldığında sayfaya/imlece geçilmesi, Yukarı basıldığında ise adres alanına dönülmesi sağlandı.
 - **VOD Bölüm Listesi D-Pad ile Gezinme ve Seçim (`activity_main.xml` & `VodPlayerOverlayController.kt`):**
