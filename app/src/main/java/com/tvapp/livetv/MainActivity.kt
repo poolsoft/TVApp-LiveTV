@@ -28,6 +28,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ContextThemeWrapper
 import android.view.GestureDetector
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -1821,7 +1822,11 @@ class MainActivity : TvRemoteActivity() {
         }
 
         binding.playbackErrorContainer.post {
-            binding.playbackErrorRetryBtn.requestFocus()
+            if (vodMode || isVodPlaybackActive()) {
+                binding.playbackErrorRetryBtn.requestFocus()
+            } else {
+                binding.playbackErrorRetryBtn.clearFocus()
+            }
         }
 
         if (!vodMode && !isVodPlaybackActive()) {
@@ -1956,19 +1961,32 @@ class MainActivity : TvRemoteActivity() {
 
     @Suppress("ClickableViewAccessibility")
     private fun setupMobileTouchControls() {
-        if (!BuildConfig.MOBILE_UI_ENABLED) return
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(event: MotionEvent): Boolean = true
 
             override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
+                if (vodMode || isVodPlaybackActive()) {
+                    if (binding.vodPlayerOverlay.visibility == View.VISIBLE) {
+                        hideVodPlayerControls()
+                    } else {
+                        showVodPlayerControls(autoHide = true)
+                    }
+                    return true
+                }
                 if (binding.channelPanel.visibility == View.VISIBLE) {
                     hideChannelPanel()
                 } else if (binding.infoBar.visibility == View.VISIBLE) {
                     setInfoBarVisible(false)
                 } else {
-                    currentChannel?.let(::showInfoBarForChannel) ?: showInfoBar()
+                    toggleChannelPanel()
                 }
                 return true
+            }
+
+            override fun onLongPress(event: MotionEvent) {
+                if (!vodMode && !isVodPlaybackActive()) {
+                    showQuickHubDialog()
+                }
             }
 
             override fun onFling(
@@ -1995,6 +2013,28 @@ class MainActivity : TvRemoteActivity() {
         val listener = View.OnTouchListener { _, event -> detector.onTouchEvent(event) }
         binding.tvView.setOnTouchListener(listener)
         binding.iptvPlayerView.setOnTouchListener(listener)
+    }
+
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_SCROLL && event.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
+            val vScroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            if (vScroll > 0) {
+                if (binding.channelPanel.visibility == View.VISIBLE) {
+                    wrapChannelList(-1)
+                } else {
+                    zap(1)
+                }
+                return true
+            } else if (vScroll < 0) {
+                if (binding.channelPanel.visibility == View.VISIBLE) {
+                    wrapChannelList(1)
+                } else {
+                    zap(-1)
+                }
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
     }
 
     private fun setupMobileColorActions() {

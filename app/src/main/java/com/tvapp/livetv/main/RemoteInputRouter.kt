@@ -51,7 +51,13 @@ class RemoteInputRouter(
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.retryPlaybackFromError()
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    if (env.isVodPlaybackActive()) {
+                        env.retryPlaybackFromError()
+                    } else {
+                        env.showChannelPanel(false)
+                    }
+                }
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {

@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - Canlı TV Hata Ekranı Focus İyileştirmesi & Fare/Dokunmatik Uzun Tık Quick Hub Desteği
+
+- **Canlı TV Hata Ekranı Kumanda ve Odak Optimizasyonu (`MainActivity.kt` & `RemoteInputRouter.kt`):**
+  - Canlı TV'de kanal hata verdiğinde Yenile butonuna otomatik `requestFocus()` verilerek `OK` tuşunun gasp edilmesi engellendi; otomatik odak yalnızca VOD modunda aktif olacak şekilde sınırlandırıldı.
+  - Canlı TV'de kanal hata ekranı varken `OK` (Enter / DPAD_CENTER) tuşuna basıldığında doğrudan **Kanal Listesi Paneli** açılarak kullanıcının beklemeden başka bir kanala geçebilmesi sağlandı.
+- **Fare (Mouse) ve Dokunmatik Kontroller (`MainActivity.kt`):**
+  - Canlı TV ekranında fare ile **Uzun Tıklama (Long Click / Long Press)** yapıldığında kumandanın `OK (Uzun Basma)` işlevi olan **Quick Hub Diyaloğu** (`showQuickHubDialog`) açılması sağlandı.
+  - Fare ile tek tıklamada (`Single Tap`) kanal listesinin açılıp kapatılması sağlandı.
+  - Fare tekerleği (`AXIS_VSCROLL`) desteği eklendi: Canlı yayında tekerlekle zap yapma (`zap(1)` / `zap(-1)`), kanal listesi açıkken listede yukarı/aşağı kayma imkanı tanındı.
+
 ## 2026-10-29 - URL Bazlı Otomatik HTTP Header Enjeksiyonu (403 Forbidden Çözümü)
 
 - **Otomatik Referer ve Origin Header Enjeksiyonu (`StreamHeaderResolver.kt` & `IptvDataSourceFactory.kt`):**
