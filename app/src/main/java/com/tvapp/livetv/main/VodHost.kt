@@ -107,18 +107,20 @@ class VodHost(
         val activeKey = active.sourceKey
         val activeEpisodeTitle = active.episodeTitle
         episodeJob = scope.launch {
+            val seriesKeyFromEp = if (activeKey.contains(":ep:")) {
+                activeKey.substringBefore(":ep:")
+            } else null
+
             val currentMeta = withContext(Dispatchers.IO) {
                 runCatching { env.loadMetadata(activeKey) }.getOrNull()
             }
-            if (currentMeta == null) {
-                env.openVodLibrary()
-                return@launch
-            }
 
-            val seriesKey = currentMeta.parentKey
-                ?: if (currentMeta.kind == "SERIES") currentMeta.sourceKey else null
+            val seriesKey = seriesKeyFromEp
+                ?: currentMeta?.parentKey
+                ?: if (currentMeta?.kind == "SERIES") currentMeta.sourceKey else null
+
             if (seriesKey == null) {
-                env.openVodLibrary()
+                env.log("VOD_EPISODES | No seriesKey found for $activeKey")
                 return@launch
             }
 
@@ -148,43 +150,42 @@ class VodHost(
 
             // Seri kaydinda gomulu JSON bolum listesi var mi?
             val seriesMeta = withContext(Dispatchers.IO) {
-                if (currentMeta.kind == "SERIES") currentMeta else env.loadMetadata(seriesKey)
-            } ?: run {
-                env.openVodLibrary()
-                return@launch
+                if (currentMeta?.kind == "SERIES") currentMeta else env.loadMetadata(seriesKey)
             }
-            val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl)
-            if (parsedEpisodes.isNotEmpty()) {
-                try {
-                    val labels = parsedEpisodes.map { it.title }
-                    val currentIndex = parsedEpisodes
-                        .indexOfFirst { it.title == activeEpisodeTitle }
-                        .coerceAtLeast(0)
-                    env.showEpisodeChoices(
-                        env.activeChannel()?.displayName ?: seriesMeta.name,
-                        labels,
-                        currentIndex,
-                    ) { which ->
-                        val episode = parsedEpisodes.getOrNull(which)
-                        if (episode != null) {
-                            env.playVodDeepLink(
-                                VodDeepLinkPayload(
-                                    sourceKey = "${seriesKey}:ep:${which}_${episode.url.hashCode()}",
-                                    streamUrl = episode.url,
-                                    title = seriesMeta.name,
-                                    episodeTitle = episode.title,
-                                    logoUrl = seriesMeta.logoUrl,
-                                ),
-                            )
+            if (seriesMeta != null) {
+                val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl)
+                if (parsedEpisodes.isNotEmpty()) {
+                    try {
+                        val labels = parsedEpisodes.map { it.title }
+                        val currentIndex = parsedEpisodes
+                            .indexOfFirst { it.title == activeEpisodeTitle }
+                            .coerceAtLeast(0)
+                        env.showEpisodeChoices(
+                            env.activeChannel()?.displayName ?: seriesMeta.name,
+                            labels,
+                            currentIndex,
+                        ) { which ->
+                            val episode = parsedEpisodes.getOrNull(which)
+                            if (episode != null) {
+                                env.playVodDeepLink(
+                                    VodDeepLinkPayload(
+                                        sourceKey = "${seriesKey}:ep:${which}_${episode.url.hashCode()}",
+                                        streamUrl = episode.url,
+                                        title = seriesMeta.name,
+                                        episodeTitle = episode.title,
+                                        logoUrl = seriesMeta.logoUrl,
+                                    ),
+                                )
+                            }
                         }
+                        return@launch
+                    } catch (e: Exception) {
+                        env.log("Parse episodes JSON failed: ${e.message}")
                     }
-                    return@launch
-                } catch (e: Exception) {
-                    env.log("Parse episodes JSON failed: ${e.message}")
                 }
             }
 
-            env.openVodLibrary()
+            env.log("VOD_EPISODES | No episodes found for series $seriesKey")
         }
         return true
     }

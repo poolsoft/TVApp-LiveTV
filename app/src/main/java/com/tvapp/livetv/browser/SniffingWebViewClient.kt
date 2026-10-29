@@ -14,6 +14,7 @@ import java.io.ByteArrayInputStream
  */
 class SniffingWebViewClient(
     private val sniffer: StreamSniffer,
+    private val enableAutoplayClicker: Boolean = true,
     private val onNavigate: (String) -> Unit = {},
     private val onLoaded: (String) -> Unit = {}
 ) : WebViewClient() {
@@ -23,7 +24,6 @@ class SniffingWebViewClient(
         if (url != null) {
             sniffer.onPageStarted(url)
             onNavigate(url)
-            injectAutoplayScript(view)
         }
     }
 
@@ -31,7 +31,9 @@ class SniffingWebViewClient(
         super.onPageFinished(view, url)
         if (url != null) {
             onLoaded(url)
-            injectAutoplayScript(view)
+            if (enableAutoplayClicker) {
+                injectAutoplayScript(view)
+            }
         }
     }
 
@@ -72,17 +74,19 @@ class SniffingWebViewClient(
                             } catch(e) {}
                         }
 
-                        // 2. Yaygin tum oynatici butonlarina tiklama simule et
+                        // 2. Sadece video oynatici butonlarina tikla (Linklere veya dis ogelere ASLA tiklama!)
                         var selectors = [
                             '.play-btn', '.vjs-big-play-button', '.jw-display-icon-container',
-                            '.plyr__control--overlaid', '[aria-label="Play"]', '[aria-label*="Play"]',
-                            '[aria-label*="Oynat"]', '.play-button', '#play-button', '.play_button',
-                            '.click-to-play', '.play', '[class*="play"]', '.vjs-play-control'
+                            '.plyr__control--overlaid', 'button[aria-label="Play"]', 'button[aria-label*="Play"]',
+                            'button[aria-label*="Oynat"]', '.play-button', '#play-button', '.play_button',
+                            '.click-to-play', '.vjs-play-control'
                         ];
                         for (var s = 0; s < selectors.length; s++) {
                             var elements = document.querySelectorAll(selectors[s]);
                             for (var j = 0; j < elements.length; j++) {
-                                try { elements[j].click(); } catch(e) {}
+                                var el = elements[j];
+                                if (el.tagName === 'A' || el.closest('a')) continue;
+                                try { el.click(); } catch(e) {}
                             }
                         }
 
@@ -109,10 +113,10 @@ class SniffingWebViewClient(
                 var interval = setInterval(function() {
                     attempts++;
                     triggerPlay();
-                    if (attempts >= 10) {
+                    if (attempts >= 6) {
                         clearInterval(interval);
                     }
-                }, 600);
+                }, 800);
             })();
         """.trimIndent()
         view?.evaluateJavascript(js, null)

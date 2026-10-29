@@ -254,16 +254,20 @@ class VodHostTest {
     }
 
     @Test
-    fun episodePickerWithoutMetadataOpensLibrary() {
+    fun episodePickerWithDynamicEpisodeResolvesParentSeries() {
         val env = FakeEnv()
-        env.active = testChannel("https://cdn/a.mp4", key = "ep1")
+        env.active = testChannel("https://cdn/a.mp4", key = "series1:ep:0_12345")
+        env.episodes = listOf(
+            metaRecord("e1", kind = "EPISODE", parentKey = "series1", episode = 1, name = "Pilot"),
+            metaRecord("e2", kind = "EPISODE", parentKey = "series1", episode = 2, name = "Final"),
+        )
         val host = newHost(env)
         runBlocking {
             assertTrue(host.showEpisodePicker())
             host.awaitResolve()
         }
-        assertTrue(env.events.contains("library"))
-        assertNull(env.pickerTitle)
+        assertEquals(listOf("1. Sezon 1. Bolum - Pilot", "1. Sezon 2. Bolum - Final"), env.pickerLabels)
+        assertFalse(env.events.contains("library"))
     }
 
     @Test

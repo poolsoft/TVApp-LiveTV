@@ -255,8 +255,10 @@ class TvBrowserActivity : Activity() {
             userAgentString = ua
         }
 
+        val isVodFallback = intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)
         webView.webViewClient = SniffingWebViewClient(
             sniffer = sniffer,
+            enableAutoplayClicker = !isVodFallback,
             onNavigate = { url ->
                 urlInput.setText(url)
                 updateFavoriteIcon()
@@ -384,8 +386,30 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun setupListeners() {
+        val isVodFallback = intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)
+        if (isVodFallback) {
+            btnExitTv.setImageResource(R.drawable.ic_arrow_back)
+            btnExitTv.contentDescription = getString(R.string.vod_fallback_btn_return_vod)
+        } else {
+            btnExitTv.setImageResource(R.drawable.ic_tv)
+            btnExitTv.contentDescription = getString(R.string.browser_back_to_tv)
+        }
+
         btnExitTv.setOnClickListener {
-            finish()
+            if (isVodFallback) {
+                val vodIntent = Intent(this, com.tvapp.livetv.VodHomeActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(vodIntent)
+                finish()
+            } else {
+                val liveIntent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    putExtra(com.tvapp.livetv.main.MainVodExtras.EXTRA_LIVE_MODE, true)
+                }
+                startActivity(liveIntent)
+                finish()
+            }
         }
 
         btnTopMouseMode.setOnClickListener {

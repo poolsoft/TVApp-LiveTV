@@ -1,5 +1,15 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - VOD Bölüm Paneli Entegrasyonu, Tarayıcı Akıllı Geri Dönüşü & Sayfa Yönlendirme Loop Koruması
+
+- **VOD Dizi Bölüm Paneli Düzeltmesi (`VodHost.kt`):**
+  - Dinamik web dizilerinde (`:ep:`) bölüm listesi butonuna basıldığında kütüphaneye fırlatma sorunu giderildi; ana serinin bölümleri doğrudan çözümlenerek sağdan açılan şık **Bölümler Paneli** (`VodEpisodePanel`) devreye alındı.
+- **Tarayıcı Sol Üst Buton & Akıllı Geri Dönüş (`TvBrowserActivity.kt`):**
+  - VOD Fallback ile açılan tarayıcılarda sol üst buton ve Geri tuşu doğrudan **VOD Ana Ekranı'na (`VodHomeActivity`)** döner.
+  - Canlı TV/Ana menüden açılan tarayıcılarda ise sol üst buton Canlı TV'ye (`EXTRA_LIVE_MODE`) döner; siyah ekran ve boş infobar sorunu tamamen çözüldü.
+- **Sayfa Yönlendirme (Redirect Loop) Koruması (`SniffingWebViewClient.kt`):**
+  - Kanal D gibi platformlarda sayfayı anasayfaya yönlendirip döngüye sokan kontrolsüz link (`<a>`) tıklamaları engellendi; VOD fallback modunda otomatik tıklayıcı devre dışı bırakılarak kumanda etkileşimine tam özgürlük tanındı.
+
 ## 2026-10-29 - VOD Sniffer Fallback Kullanıcı Onayı, HTTP 404 Koruması ve VOD Ekranına Dönüş Güvencesi
 
 - **VOD Tarayıcı Fallback Kullanıcı Onayı (`VodHost.kt` & `MainActivity.kt`):**
