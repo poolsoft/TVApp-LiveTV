@@ -925,4 +925,9 @@
     <string name="vod_fallback_browser_title">VOD Web Browser Fallback</string>
     <string name="vod_fallback_browser_summary">Opens web browser when video cannot be sniffed so you can interact and play</string>
     <string name="browser_vod_fallback_hint">Press Play on page or skip ad to start video</string>
+    <string name="vod_fallback_prompt_title">Video Stream Not Found</string>
+    <string name="vod_fallback_prompt_message">Could not automatically resolve video stream for this web content. Would you like to open the webpage and start it manually?</string>
+    <string name="vod_fallback_btn_open_browser">Open in Browser</string>
+    <string name="vod_fallback_btn_return_vod">Back to VOD</string>
+    <string name="vod_http_404_error">Content not found on server (HTTP 404).</string>
 </resources>

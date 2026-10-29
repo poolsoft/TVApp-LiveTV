@@ -466,6 +466,24 @@ class MainActivity : TvRemoteActivity() {
             }
             startActivity(intent)
         }
+        override fun promptVodBrowserFallback(url: String, title: String?) {
+            endBlackout("VOD_FALLBACK_PROMPT")
+            androidx.appcompat.app.AlertDialog.Builder(this@MainActivity, R.style.Theme_TVApp_Dialog)
+                .setTitle(R.string.vod_fallback_prompt_title)
+                .setMessage(R.string.vod_fallback_prompt_message)
+                .setPositiveButton(R.string.vod_fallback_btn_open_browser) { dialog, _ ->
+                    dialog.dismiss()
+                    openVodInBrowser(url, title)
+                }
+                .setNegativeButton(R.string.vod_fallback_btn_return_vod) { dialog, _ ->
+                    dialog.dismiss()
+                    openVodLibrary()
+                }
+                .setOnCancelListener {
+                    openVodLibrary()
+                }
+                .show()
+        }
     }
     private var infoBarJob: Job? = null
     private var channelPanelJob: Job? = null

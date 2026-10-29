@@ -69,7 +69,7 @@ class RemoteActionRouter {
 
         return when (context.playbackUiState.primaryOsd) {
             PrimaryOsd.STATUS -> if (key == RemoteKey.BACK) {
-                RemoteAction.DISMISS_STATUS
+                if (context.isVod) RemoteAction.OPEN_VOD_LIBRARY else RemoteAction.DISMISS_STATUS
             } else {
                 RemoteAction.HANDLE_PLAYBACK
             }

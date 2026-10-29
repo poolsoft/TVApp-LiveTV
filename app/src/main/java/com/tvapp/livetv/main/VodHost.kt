@@ -79,12 +79,13 @@ class VodHost(
         baseChannel: LiveChannel,
         resolved: VodPageResolver.Resolved,
     ): VodCandidateDecision = when {
+        resolved.is404 -> VodCandidateDecision.Failure("HTTP_404", is404 = true)
         resolved.candidates.isNotEmpty() && resolved.playable() != null -> VodCandidateDecision.PlayBase(
             resolved.applyTo(baseChannel, requireNotNull(resolved.playable())),
         )
         resolved.candidates.size > 1 -> VodCandidateDecision.ShowChoice(resolved, baseChannel)
         WebVideoResolver.isDirectStream(baseChannel.uri) -> VodCandidateDecision.PlayBase(baseChannel)
-        else -> VodCandidateDecision.Failure("NO_STREAM_FOUND")
+        else -> VodCandidateDecision.Failure("NO_STREAM_FOUND", is404 = false)
     }
 
     private fun sanitizeUrl(url: String): String = url.substringBefore('?').substringBefore('#')
@@ -288,10 +289,15 @@ class VodHost(
                 }
                 is VodCandidateDecision.ShowChoice -> env.showStreamChoice(decision.resolved, decision.baseChannel)
                 is VodCandidateDecision.Failure -> {
-                    env.log("VOD_RESOLVE_FAILED | key=$sourceKey no stream found")
-                    if (env.isVodFallbackToBrowserEnabled() && directStreamUrl.startsWith("http", ignoreCase = true)) {
-                        env.log("VOD_FALLBACK_BROWSER | opening TvBrowserActivity for key=$sourceKey")
-                        env.openVodInBrowser(directStreamUrl, mainTitle)
+                    env.log("VOD_RESOLVE_FAILED | key=$sourceKey no stream found, is404=${decision.is404}")
+                    if (decision.is404) {
+                        env.showPlaybackError(
+                            baseChannel,
+                            env.string(R.string.vod_http_404_error),
+                        )
+                    } else if (env.isVodFallbackToBrowserEnabled() && directStreamUrl.startsWith("http", ignoreCase = true)) {
+                        env.log("VOD_FALLBACK_BROWSER_PROMPT | prompting user for key=$sourceKey")
+                        env.promptVodBrowserFallback(directStreamUrl, mainTitle)
                     } else {
                         env.showPlaybackError(
                             baseChannel,
@@ -458,7 +464,7 @@ sealed interface VodCandidateDecision {
         val resolved: VodPageResolver.Resolved,
         val baseChannel: LiveChannel,
     ) : VodCandidateDecision
-    data class Failure(val reason: String) : VodCandidateDecision
+    data class Failure(val reason: String, val is404: Boolean = false) : VodCandidateDecision
 }
 
 /**
@@ -512,4 +518,5 @@ interface VodHostEnv {
     fun showPlaybackError(channel: LiveChannel?, message: String)
     fun isVodFallbackToBrowserEnabled(): Boolean
     fun openVodInBrowser(url: String, title: String?)
+    fun promptVodBrowserFallback(url: String, title: String?)
 }

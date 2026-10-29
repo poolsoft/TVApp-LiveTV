@@ -1,5 +1,14 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-29 - VOD Sniffer Fallback Kullanıcı Onayı, HTTP 404 Koruması ve VOD Ekranına Dönüş Güvencesi
+
+- **VOD Tarayıcı Fallback Kullanıcı Onayı (`VodHost.kt` & `MainActivity.kt`):**
+  - Sniffer akış bulamadığında kullanıcı doğrudan tarayıcıya fırlatılmaz; TV kumandasına uygun şık bir diyalog açılarak kullanıcıya onay sorulur (*"Web sayfasına gidip kumandayla başlatmak ister misiniz?"* -> [Tarayıcıda Aç] [VOD Ekranına Dön]).
+- **HTTP 404 (Kaynak Yok) Koruması (`WebVideoResolver.kt`, `VodPageResolver.kt` & `VodHost.kt`):**
+  - Web sayfası veya medya kaynağı HTTP 404 (Not Found) verdiğinde içerik silinmiş/mevcut olmadığından fallback kesinlikle teklif edilmez; doğrudan "İçerik kaynak sunucuda bulunamadı (HTTP 404)" hatası gösterilir.
+- **Geri (Back) Tuşunda Canlı TV Yerine Doğrudan VOD Ekranına Dönüş (`TvBrowserActivity.kt` & `RemoteActionRouter.kt`):**
+  - VOD fallback ile açılan web tarayıcısından veya VOD oynatıcı hata ekranından Geri (Back) tuşuna basıldığında Canlı TV'nin arkada açığa çıkması engellendi; doğrudan VOD Ana Ekranı'na (`VodHomeActivity`) dönülmesi sağlandı.
+
 ## 2026-10-29 - VOD Sniffer Çözümleyemediğinde Web Tarayıcısına Otomatik Fallback Desteği
 
 - **VOD Web Tarayıcı Fallback Mekanizması (`VodHost.kt` & `MainActivity.kt`):**

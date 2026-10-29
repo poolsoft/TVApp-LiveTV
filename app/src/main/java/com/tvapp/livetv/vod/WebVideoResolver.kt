@@ -709,4 +709,23 @@ object WebVideoResolver {
             init(null, trustAllCerts, java.security.SecureRandom())
         }
     }
+
+    fun checkIsHttp404(url: String): Boolean = runCatching {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "HEAD"
+            connectTimeout = 3_000
+            readTimeout = 3_000
+            setRequestProperty("User-Agent", USER_AGENT)
+            instanceFollowRedirects = true
+            if (this is javax.net.ssl.HttpsURLConnection) {
+                sslSocketFactory = trustAllSslContext.socketFactory
+                hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            }
+        }
+        try {
+            conn.responseCode == 404
+        } finally {
+            conn.disconnect()
+        }
+    }.getOrDefault(false)
 }

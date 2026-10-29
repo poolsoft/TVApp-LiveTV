@@ -98,10 +98,15 @@ class VodHostTest {
         override suspend fun loadSeriesEpisodes(seriesKey: String): List<VodMetadataEntity> = episodes
         var fallbackToBrowserEnabled = false
         var openedInBrowserUrl: String? = null
+        var promptedFallbackUrl: String? = null
         override fun isVodFallbackToBrowserEnabled(): Boolean = fallbackToBrowserEnabled
         override fun openVodInBrowser(url: String, title: String?) {
             openedInBrowserUrl = url
             events += "browser:$url"
+        }
+        override fun promptVodBrowserFallback(url: String, title: String?) {
+            promptedFallbackUrl = url
+            events += "prompt_browser:$url"
         }
     }
 
@@ -322,7 +327,7 @@ class VodHostTest {
     )
 
     @Test
-    fun resolveFailureWithFallbackOpensBrowser() {
+    fun resolveFailureWithFallbackPromptsUserInsteadOfOpeningDirectly() {
         val env = FakeEnv()
         env.fallbackToBrowserEnabled = true
         val host = newHost(env)
@@ -336,9 +341,21 @@ class VodHostTest {
             )
             host.awaitResolve()
         }
-        assertEquals("https://example.com/watch/999", env.openedInBrowserUrl)
-        assertTrue(env.events.contains("browser:https://example.com/watch/999"))
+        assertEquals("https://example.com/watch/999", env.promptedFallbackUrl)
+        assertTrue(env.events.contains("prompt_browser:https://example.com/watch/999"))
+        assertNull(env.openedInBrowserUrl)
         assertNull(env.playbackError)
+    }
+
+    @Test
+    fun decideCandidatesWith404YieldsFailureWith404Flag() {
+        val env = FakeEnv()
+        val host = newHost(env)
+        val channel = testChannel("https://example.com/dead_link")
+        val resolved = VodPageResolver.Resolved(emptyList(), is404 = true)
+        val decision = host.decideCandidates(channel, resolved)
+        assertTrue(decision is VodCandidateDecision.Failure)
+        assertTrue((decision as VodCandidateDecision.Failure).is404)
     }
 
     @Test
@@ -357,6 +374,7 @@ class VodHostTest {
             host.awaitResolve()
         }
         assertNull(env.openedInBrowserUrl)
+        assertNull(env.promptedFallbackUrl)
         assertNotNull(env.playbackError)
     }
 }

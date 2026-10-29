@@ -1121,6 +1121,14 @@ class TvBrowserActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (intent.getBooleanExtra(EXTRA_VOD_FALLBACK, false)) {
+            val vodIntent = Intent(this, com.tvapp.livetv.VodHomeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            startActivity(vodIntent)
+            finish()
+            return
+        }
         if (customView != null) {
             webView.webChromeClient?.onHideCustomView()
             return

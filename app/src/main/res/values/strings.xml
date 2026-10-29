@@ -925,4 +925,9 @@
     <string name="vod_fallback_browser_title">VOD Web Sayfası Tarayıcı Desteği</string>
     <string name="vod_fallback_browser_summary">Sniffer video bulamadığında sayfayı kumanda ile oynatabilmeniz için tarayıcıda açar</string>
     <string name="browser_vod_fallback_hint">Video başlatmak için sayfadaki Oynat tuşuna basın veya reklamı geçin</string>
+    <string name="vod_fallback_prompt_title">Video Akışı Bulunamadı</string>
+    <string name="vod_fallback_prompt_message">Bu web içeriğinin video akışı otomatik çözümlenemedi. Web sayfasına gidip kumandayla başlatmak ister misiniz?</string>
+    <string name="vod_fallback_btn_open_browser">Tarayıcıda Aç</string>
+    <string name="vod_fallback_btn_return_vod">VOD Ekranına Dön</string>
+    <string name="vod_http_404_error">İçerik kaynak sunucuda bulunamadı (HTTP 404).</string>
 </resources>

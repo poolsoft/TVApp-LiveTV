@@ -20,6 +20,7 @@ object VodPageResolver {
     /** Cozulmus VOD adaylarinin bir kanala uygulanmis hali. */
     data class Resolved(
         val candidates: List<WebVideoResolver.ResolvedStream>,
+        val is404: Boolean = false,
     ) {
         val single: WebVideoResolver.ResolvedStream?
             get() = if (candidates.size == 1) candidates.first() else null
@@ -48,6 +49,9 @@ object VodPageResolver {
         if (target.isEmpty()) return Resolved(emptyList())
         if (WebVideoResolver.isDirectStream(target)) {
             return Resolved(listOf(WebVideoResolver.ResolvedStream(target, userAgent = null, isPlayable = true)))
+        }
+        if (target.startsWith("http", ignoreCase = true) && WebVideoResolver.checkIsHttp404(target)) {
+            return Resolved(emptyList(), is404 = true)
         }
         val candidates = runCatching {
             WebVideoResolver.resolveCandidates(target, context)
