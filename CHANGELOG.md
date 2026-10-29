@@ -4,7 +4,7 @@
 
 - **Canlı TV Hata Ekranı Kumanda ve Odak Optimizasyonu (`MainActivity.kt` & `RemoteInputRouter.kt`):**
   - Canlı TV'de kanal hata verdiğinde Yenile butonuna otomatik `requestFocus()` verilerek `OK` tuşunun gasp edilmesi engellendi; otomatik odak yalnızca VOD modunda aktif olacak şekilde sınırlandırıldı.
-  - Canlı TV'de kanal hata ekranı varken `OK` (Enter / DPAD_CENTER) tuşuna basıldığında doğrudan **Kanal Listesi Paneli** açılarak kullanıcının beklemeden başka bir kanala geçebilmesi sağlandı.
+  - Canlı TV'de kanal hata ekranı varken `OK` tuşu standart `okKeyGate` davranışına bağlandı: Kısa basışta kanal paneli açılır/kapanır (`toggleChannelPanel`), uzun basışta ise **Quick Hub Diyaloğu** (`showQuickHubDialog`) açılarak kullanıcının hata ekranından çıkıp kanal seçebilmesi sağlandı.
 - **Fare (Mouse) ve Dokunmatik Kontroller (`MainActivity.kt`):**
   - Canlı TV ekranında fare ile **Uzun Tıklama (Long Click / Long Press)** yapıldığında kumandanın `OK (Uzun Basma)` işlevi olan **Quick Hub Diyaloğu** (`showQuickHubDialog`) açılması sağlandı.
   - Fare ile tek tıklamada (`Single Tap`) kanal listesinin açılıp kapatılması sağlandı.

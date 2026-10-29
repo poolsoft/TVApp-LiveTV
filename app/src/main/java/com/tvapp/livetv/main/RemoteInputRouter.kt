@@ -51,11 +51,17 @@ class RemoteInputRouter(
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (event.action == KeyEvent.ACTION_DOWN) {
-                    if (env.isVodPlaybackActive()) {
-                        env.retryPlaybackFromError()
-                    } else {
-                        env.showChannelPanel(false)
+                if (env.isVodPlaybackActive()) {
+                    if (event.action == KeyEvent.ACTION_DOWN) env.retryPlaybackFromError()
+                } else {
+                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                        okKeyGate.onDown(
+                            event.keyCode,
+                            onLongPress = { env.showQuickHubDialog() },
+                            onShortPress = { env.toggleChannelPanel() },
+                        )
+                    } else if (event.action == KeyEvent.ACTION_UP) {
+                        okKeyGate.onUp()
                     }
                 }
                 return true
