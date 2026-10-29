@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-10-30 - Canlı TV Hata Ekranı Sadeleştirme (Yenile Butonu ve Olayları Kaldırıldı)
+
+- **Canlı TV Hata Ekranı Sadeleştirildi (`MainActivity.kt` & `RemoteInputRouter.kt`):**
+  - Canlı TV'de kanal hatası aldığında Yenile (`playbackErrorRetryBtn`) butonu gizlendi (`GONE`), tüm tıklama ve odak dinleyicileri iptal edildi. Buton ve yenileme etkileşimi yalnızca VOD ekranı için aktif bırakıldı.
+  - Canlı TV'de hata ekranının kumanda hareketlerini (`dispatchKeyEvent`) bloke etmesi ve tuşları kendine bağlaması tamamen kaldırıldı. Kullanıcı canlı TV'deyken kanal listesini açma, zap yapma, uzun/kısa OK gibi standart tüm kumanda işlevlerini hatasız ve doğrudan kullanabilir.
+
 ## 2026-10-29 - Canlı TV Hata Ekranı Focus İyileştirmesi & Fare/Dokunmatik Uzun Tık Quick Hub Desteği
 
 - **Canlı TV Hata Ekranı Kumanda ve Odak Optimizasyonu (`MainActivity.kt` & `RemoteInputRouter.kt`):**

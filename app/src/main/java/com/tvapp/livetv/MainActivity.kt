@@ -1816,17 +1816,23 @@ class MainActivity : TvRemoteActivity() {
             { selectChannel(failedChannel, recordHistory = !currentPlaybackUsesIptvLibrary) }
         }
 
-        binding.playbackErrorRetryBtn.setOnClickListener {
-            hidePlaybackError()
-            statusRetryAction?.invoke()
-        }
-
-        binding.playbackErrorContainer.post {
-            if (vodMode || isVodPlaybackActive()) {
-                binding.playbackErrorRetryBtn.requestFocus()
-            } else {
-                binding.playbackErrorRetryBtn.clearFocus()
+        val isVod = vodMode || isVodPlaybackActive()
+        binding.playbackErrorRetryBtn.visibility = if (isVod) View.VISIBLE else View.GONE
+        if (isVod) {
+            binding.playbackErrorRetryBtn.isFocusable = true
+            binding.playbackErrorRetryBtn.isClickable = true
+            binding.playbackErrorRetryBtn.setOnClickListener {
+                hidePlaybackError()
+                statusRetryAction?.invoke()
             }
+            binding.playbackErrorContainer.post {
+                binding.playbackErrorRetryBtn.requestFocus()
+            }
+        } else {
+            binding.playbackErrorRetryBtn.isFocusable = false
+            binding.playbackErrorRetryBtn.isClickable = false
+            binding.playbackErrorRetryBtn.setOnClickListener(null)
+            binding.playbackErrorRetryBtn.clearFocus()
         }
 
         if (!vodMode && !isVodPlaybackActive()) {

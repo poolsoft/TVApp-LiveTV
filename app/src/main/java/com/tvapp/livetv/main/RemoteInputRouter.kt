@@ -42,8 +42,8 @@ class RemoteInputRouter(
      * Tuketildiyse true, tuketilmediyse fallbackSuper cagrilip sonucu doner.
      */
     fun dispatch(event: KeyEvent, fallbackSuper: (KeyEvent) -> Boolean): Boolean {
-        if (env.isPlaybackErrorVisible()) {
-            if (env.isVodPlaybackActive() && env.handleVodPlayerOverlay(event)) {
+        if (env.isPlaybackErrorVisible() && env.isVodPlaybackActive()) {
+            if (env.handleVodPlayerOverlay(event)) {
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -51,39 +51,7 @@ class RemoteInputRouter(
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER || event.keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (env.isVodPlaybackActive()) {
-                    if (event.action == KeyEvent.ACTION_DOWN) env.retryPlaybackFromError()
-                } else {
-                    if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                        okKeyGate.onDown(
-                            event.keyCode,
-                            onLongPress = { env.showQuickHubDialog() },
-                            onShortPress = { env.toggleChannelPanel() },
-                        )
-                    } else if (event.action == KeyEvent.ACTION_UP) {
-                        okKeyGate.onUp()
-                    }
-                }
-                return true
-            }
-            if (event.keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.zap(1)
-                return true
-            }
-            if (event.keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.zap(-1)
-                return true
-            }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_MENU) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.showChannelPanel(false)
-                return true
-            }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.zap(1)
-                return true
-            }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                if (event.action == KeyEvent.ACTION_DOWN) env.zap(-1)
+                if (event.action == KeyEvent.ACTION_DOWN) env.retryPlaybackFromError()
                 return true
             }
             return fallbackSuper(event)
