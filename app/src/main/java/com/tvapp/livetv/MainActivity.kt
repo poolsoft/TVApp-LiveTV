@@ -2044,7 +2044,6 @@ class MainActivity : TvRemoteActivity() {
     }
 
     private fun setupMobileColorActions() {
-        if (!BuildConfig.MOBILE_UI_ENABLED) return
         fun touchTarget(view: View, action: () -> Unit) {
             view.isClickable = true
             view.isFocusable = false

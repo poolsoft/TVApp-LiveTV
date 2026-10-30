@@ -345,6 +345,16 @@ class MultiViewController(
             beginMultiViewChannelSelection()
         }
 
+        fun clearSelection() {
+            multiViewDraft.clear()
+            dialog.dismiss()
+            showIptvGridPicker(emptyList())
+        }
+
+        dialogView.findViewById<View>(R.id.picker_action_red)?.setOnClickListener { clearSelection() }
+        dialogView.findViewById<View>(R.id.picker_action_green)?.setOnClickListener { startSelected() }
+        dialogView.findViewById<View>(R.id.picker_action_yellow)?.setOnClickListener { addChannels() }
+
         dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
             .setView(dialogView)
             .setPositiveButton(R.string.iptv_grid_start, null)
@@ -366,9 +376,7 @@ class MultiViewController(
                 KeyEvent.KEYCODE_PROG_GREEN -> { startSelected(); true }
                 KeyEvent.KEYCODE_PROG_YELLOW -> { addChannels(); true }
                 KeyEvent.KEYCODE_PROG_RED -> {
-                    multiViewDraft.clear()
-                    dialog.dismiss()
-                    showIptvGridPicker(emptyList())
+                    clearSelection()
                     true
                 }
                 else -> false

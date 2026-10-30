@@ -150,7 +150,6 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun setupMobileColorActions() {
-        if (!BuildConfig.MOBILE_UI_ENABLED) return
         fun bind(views: List<View>, color: EditorColor) {
             views.forEach { view ->
                 view.isClickable = true
