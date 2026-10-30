@@ -111,6 +111,18 @@ class IptvSourcesActivity : TvRemoteActivity() {
                 }
             }
         }
+        binding.sourceList.setOnItemLongClickListener { _, _, position, _ ->
+            selectedSourcePosition = position
+            selectedSourceId = sources.getOrNull(position)?.source?.id
+            sources.getOrNull(position)?.let { summary ->
+                if (summary.source.kind == IptvRepository.KIND_JSON_VOD) {
+                    showJsonVodActions(summary)
+                } else {
+                    showSourceActions(summary)
+                }
+                true
+            } ?: false
+        }
         binding.sourceList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,

@@ -216,7 +216,8 @@
             android:layout_weight="1"
             android:divider="#3E4650"
             android:dividerHeight="1dp"
-            android:listSelector="@drawable/bg_focusable" />
+            android:listSelector="@drawable/bg_focusable"
+            android:defaultFocusHighlightEnabled="false" />
 
         <TextView
             android:layout_width="match_parent"
