@@ -255,6 +255,7 @@
             android:divider="#3E4650"
             android:dividerHeight="1dp"
             android:listSelector="@drawable/bg_focusable"
+            android:defaultFocusHighlightEnabled="false"
             android:nextFocusLeft="@id/select_all_button"
             android:nextFocusRight="@id/save_button"
             android:nextFocusUp="@id/category_filter" />

@@ -501,6 +501,7 @@ class MainActivity : TvRemoteActivity() {
     private var focusedListSourceKey: String? = null
     private var focusedAutoTunePreviousChannel: LiveChannel? = null
     private var focusedAutoTuneTargetKey: String? = null
+    private var mobileGestureDetector: GestureDetector? = null
     private var visibleProgramsJob: Job? = null
     private var visibleProgramsRequestId = 0L
     private val epgHost by lazy {
@@ -2021,9 +2022,27 @@ class MainActivity : TvRemoteActivity() {
                 }
             }
         })
+        mobileGestureDetector = detector
         val listener = View.OnTouchListener { _, event -> detector.onTouchEvent(event) }
         binding.tvView.setOnTouchListener(listener)
         binding.iptvPlayerView.setOnTouchListener(listener)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        // Disaridan tıklamada kanal panelini kapatma veya video alanında fare etkilesimini garanti etme
+        if (binding.channelPanel.visibility == View.VISIBLE) {
+            val panelLocation = IntArray(2)
+            binding.channelPanel.getLocationOnScreen(panelLocation)
+            val panelX = panelLocation[0]
+            val panelY = panelLocation[1]
+            val insidePanel = event.rawX >= panelX && event.rawX <= panelX + binding.channelPanel.width &&
+                event.rawY >= panelY && event.rawY <= panelY + binding.channelPanel.height
+            if (!insidePanel && event.action == MotionEvent.ACTION_DOWN) {
+                hideChannelPanel()
+                return true
+            }
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
