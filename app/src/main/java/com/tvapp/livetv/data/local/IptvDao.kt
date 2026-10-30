@@ -519,12 +519,12 @@ interface IptvDao {
         "INSERT INTO iptv_channels " +
             "(sourceKey, sourceId, tvgId, tvgName, displayName, streamUrl, logoUrl, " +
             "groupTitle, userAgent, referrer, origin, subtitleUrl, originalIndex, contentType, " +
-            "selected, lastSeenAt, matchKey, catchUpMode, catchUpSource, catchUpDays) " +
+            "selected, lastSeenAt, matchKey, catchUpMode, catchUpSource, catchUpDays, alternativeStreamsJson) " +
             "SELECT staged.resolvedSourceKey, :sourceId, staged.tvgId, staged.tvgName, " +
             "staged.displayName, staged.streamUrl, staged.logoUrl, staged.groupTitle, " +
             "staged.userAgent, staged.referrer, staged.origin, staged.subtitleUrl, staged.originalIndex, " +
             "staged.contentType, staged.selected, :lastSeenAt, staged.matchKey, staged.catchUpMode, " +
-            "staged.catchUpSource, staged.catchUpDays " +
+            "staged.catchUpSource, staged.catchUpDays, staged.alternativeStreamsJson " +
             "FROM iptv_channel_staging staged WHERE staged.sessionId = :sessionId " +
             "AND staged.resolvedSourceKey IS NOT NULL",
     )

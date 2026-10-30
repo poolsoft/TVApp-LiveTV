@@ -348,10 +348,24 @@ class IptvRepository(context: Context) {
     suspend fun channel(sourceKey: String): LiveChannel? = dao.getChannel(sourceKey)?.toLiveChannel()
         ?: database.vodDao().metadata(sourceKey)?.let(VodRepository::playbackChannel)
 
-    suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> =
-        dao.getAlternativeChannels(sourceKey)
-            .distinctBy(IptvChannelEntity::streamUrl)
+    suspend fun alternativeStreams(sourceKey: String): List<LiveChannel> {
+        val current = dao.getChannel(sourceKey)
+        val directAlternatives = current?.let { entity ->
+            val sources = com.tvapp.livetv.model.IptvStreamSource.fromJson(entity.alternativeStreamsJson)
+            sources.filter { it.url != entity.streamUrl }.mapIndexed { index, s ->
+                entity.toLiveChannel().copy(
+                    uri = s.url,
+                    displayName = "${entity.displayName} (${s.label.ifBlank { "Alternatif ${index + 2}" }})",
+                )
+            }
+        }.orEmpty()
+
+        val dbAlternatives = dao.getAlternativeChannels(sourceKey)
+            .filter { it.streamUrl != current?.streamUrl }
             .map { it.toLiveChannel() }
+
+        return (directAlternatives + dbAlternatives).distinctBy(LiveChannel::uri)
+    }
 
     suspend fun setSelectedChannels(sourceId: Long, sourceKeys: Set<String>) {
         database.withTransaction {
@@ -396,6 +410,7 @@ class IptvRepository(context: Context) {
             catchUpSource = catchUpSource,
             catchUpDays = catchUpDays,
             inMainList = selected,
+            alternativeSources = com.tvapp.livetv.model.IptvStreamSource.fromJson(alternativeStreamsJson),
         )
 
     suspend fun catchUpChannel(
@@ -815,6 +830,7 @@ class IptvRepository(context: Context) {
                         catchUpSource = item.catchUpSource,
                         catchUpDays = item.catchUpDays,
                         createdAt = now,
+                        alternativeStreamsJson = item.alternativeStreamsJson,
                     )
                     channelCount++
                     if (batch.size >= IMPORT_BATCH_SIZE) {

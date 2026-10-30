@@ -21,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         VodMetadataEntity::class,
         VodTmdbEntity::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = true,
 )
 abstract class TVAppDatabase : RoomDatabase() {
@@ -74,11 +74,19 @@ abstract class TVAppDatabase : RoomDatabase() {
                 MIGRATION_29_30,
                 MIGRATION_30_31,
                 MIGRATION_31_32,
+                MIGRATION_32_33,
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
                 .build()
                 .also { instance = it }
+        }
+
+        internal val MIGRATION_32_33 = object : Migration(32, 33) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE iptv_channel_staging ADD COLUMN alternativeStreamsJson TEXT")
+                db.execSQL("ALTER TABLE iptv_channels ADD COLUMN alternativeStreamsJson TEXT")
+            }
         }
 
         internal val MIGRATION_31_32 = object : Migration(31, 32) {

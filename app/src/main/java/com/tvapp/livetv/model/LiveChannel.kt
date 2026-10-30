@@ -29,6 +29,7 @@ data class LiveChannel(
     val favorite: Boolean = false,
     val hidden: Boolean = false,
     val groupId: Long? = null,
+    val alternativeSources: List<IptvStreamSource> = emptyList(),
 ) {
     var episodeTitle: String? = null
     var cookie: String? = null

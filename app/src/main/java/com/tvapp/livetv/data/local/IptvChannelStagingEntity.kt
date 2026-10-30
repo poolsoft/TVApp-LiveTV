@@ -33,4 +33,5 @@ data class IptvChannelStagingEntity(
     val catchUpDays: Int,
     val selected: Boolean = false,
     val createdAt: Long,
+    val alternativeStreamsJson: String? = null,
 )

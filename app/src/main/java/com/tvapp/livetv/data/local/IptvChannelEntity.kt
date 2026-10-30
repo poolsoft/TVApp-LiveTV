@@ -55,4 +55,5 @@ data class IptvChannelEntity(
     val catchUpMode: String? = null,
     val catchUpSource: String? = null,
     val catchUpDays: Int = 0,
+    val alternativeStreamsJson: String? = null,
 )
