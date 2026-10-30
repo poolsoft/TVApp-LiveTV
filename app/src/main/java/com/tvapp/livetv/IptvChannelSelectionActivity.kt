@@ -126,6 +126,12 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
                 }
             }
         }
+        binding.channelList.setOnItemLongClickListener { _, _, position, _ ->
+            val channel = channels.getOrNull(position) ?: return@setOnItemLongClickListener false
+            focusedPosition = position
+            schedulePreview(position)
+            true
+        }
         binding.channelList.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,

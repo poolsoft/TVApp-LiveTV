@@ -378,6 +378,9 @@
                     android:layout_height="32dp"
                     android:layout_marginEnd="8dp"
                     android:background="@drawable/bg_filter_icon"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:defaultFocusHighlightEnabled="false"
                     android:contentDescription="@string/search_channels"
                     android:padding="7dp"
                     android:src="@drawable/ic_search"
@@ -385,8 +388,13 @@
 
                 <ImageView
                     android:id="@+id/channel_list_mode_icon"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:padding="4dp"
                     android:contentDescription="@string/all_channels"
                     android:src="@drawable/ic_list" />
             </LinearLayout>
@@ -507,6 +515,10 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:defaultFocusHighlightEnabled="false"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_red_line" />
@@ -519,6 +531,10 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:defaultFocusHighlightEnabled="false"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_green_line" />
@@ -531,6 +547,10 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:defaultFocusHighlightEnabled="false"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_yellow_line" />
@@ -543,6 +563,10 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:defaultFocusHighlightEnabled="false"
+                android:background="?attr/selectableItemBackgroundBorderless"
                 android:gravity="center"
                 android:orientation="vertical">
                 <View android:layout_width="34dp" android:layout_height="3dp" android:layout_marginBottom="6dp" android:background="@drawable/key_blue_line" />

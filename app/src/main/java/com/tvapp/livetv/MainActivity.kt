@@ -928,6 +928,11 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         binding.channelSearchButton.setOnClickListener { showChannelSearchDialog() }
+        binding.channelListModeIcon.setOnClickListener { cycleChannelListMode() }
+        binding.channelListModeIcon.setOnLongClickListener {
+            showChannelListModeDialog()
+            true
+        }
         setupMobileTouchControls()
         setupMobileColorActions()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -2047,10 +2052,8 @@ class MainActivity : TvRemoteActivity() {
         fun touchTarget(view: View, action: () -> Unit) {
             view.isClickable = true
             view.isFocusable = false
-            view.foreground = ContextCompat.getDrawable(
-                this,
-                android.R.drawable.list_selector_background,
-            )
+            view.defaultFocusHighlightEnabled = false
+            view.foreground = null
             view.setOnClickListener { action() }
         }
         touchTarget(binding.channelActionRed) {

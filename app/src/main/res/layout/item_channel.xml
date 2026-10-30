@@ -6,6 +6,7 @@
     android:background="@drawable/bg_channel"
     android:clickable="true"
     android:focusable="true"
+    android:defaultFocusHighlightEnabled="false"
     android:gravity="center_vertical"
     android:orientation="horizontal"
     android:paddingHorizontal="10dp">
