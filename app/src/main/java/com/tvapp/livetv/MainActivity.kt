@@ -2023,21 +2023,25 @@ class MainActivity : TvRemoteActivity() {
             }
         })
         mobileGestureDetector = detector
-        val listener = View.OnTouchListener { _, event -> detector.onTouchEvent(event) }
+        val listener = View.OnTouchListener { _, event ->
+            if (binding.channelPanel.visibility == View.VISIBLE) false else detector.onTouchEvent(event)
+        }
         binding.tvView.setOnTouchListener(listener)
         binding.iptvPlayerView.setOnTouchListener(listener)
     }
 
+    private var lastScrollEventTime = 0L
+
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        // Disaridan tıklamada kanal panelini kapatma veya video alanında fare etkilesimini garanti etme
-        if (binding.channelPanel.visibility == View.VISIBLE) {
+        // Sadece ACTION_DOWN aninda ve kanal paneli acikken hafif koordinat kontrolu yap
+        if (event.action == MotionEvent.ACTION_DOWN && binding.channelPanel.visibility == View.VISIBLE) {
             val panelLocation = IntArray(2)
             binding.channelPanel.getLocationOnScreen(panelLocation)
             val panelX = panelLocation[0]
             val panelY = panelLocation[1]
             val insidePanel = event.rawX >= panelX && event.rawX <= panelX + binding.channelPanel.width &&
                 event.rawY >= panelY && event.rawY <= panelY + binding.channelPanel.height
-            if (!insidePanel && event.action == MotionEvent.ACTION_DOWN) {
+            if (!insidePanel) {
                 hideChannelPanel()
                 return true
             }
@@ -2047,8 +2051,13 @@ class MainActivity : TvRemoteActivity() {
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_SCROLL && event.isFromSource(InputDevice.SOURCE_CLASS_POINTER)) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastScrollEventTime < 180L) {
+                return true
+            }
             val vScroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
             if (vScroll > 0) {
+                lastScrollEventTime = now
                 if (binding.channelPanel.visibility == View.VISIBLE) {
                     wrapChannelList(-1)
                 } else {
@@ -2056,6 +2065,7 @@ class MainActivity : TvRemoteActivity() {
                 }
                 return true
             } else if (vScroll < 0) {
+                lastScrollEventTime = now
                 if (binding.channelPanel.visibility == View.VISIBLE) {
                     wrapChannelList(1)
                 } else {
