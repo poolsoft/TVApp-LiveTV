@@ -46,7 +46,7 @@ interface XtreamEpgDao {
 
     @Query(
         "SELECT * FROM xtream_epg_programs WHERE startTimeMillis <= :now AND endTimeMillis > :now " +
-            "AND (normalizedChannelId IN (:channelKeys) OR normalizedChannelName IN (:channelKeys)) " +
+            "AND normalizedChannelId IN (:channelKeys) UNION SELECT * FROM xtream_epg_programs WHERE startTimeMillis <= :now AND endTimeMillis > :now AND normalizedChannelName IN (:channelKeys) " +
             "ORDER BY startTimeMillis",
     )
     fun currentPrograms(

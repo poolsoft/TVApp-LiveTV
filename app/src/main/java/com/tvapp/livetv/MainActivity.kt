@@ -182,8 +182,8 @@ class MainActivity : TvRemoteActivity() {
         private const val IPTV_CONTROL_TIMEOUT_MS = 6_000L
         private const val IPTV_PLAYBACK_CHECK_INTERVAL_MS = 5_000L
         private const val EPG_REFRESH_INTERVAL_MS = 15_000L
-        private const val EPG_FOCUS_DEBOUNCE_MS = 300L
-        private const val EPG_LIST_WINDOW_RADIUS = 5
+        private const val EPG_FOCUS_DEBOUNCE_MS = 600L
+        private const val EPG_LIST_WINDOW_RADIUS = 3
         private const val IPTV_MAX_LIVE_OFFSET_MS = 60_000L
         /** Max automatic full re-tunes after watchdog recovery is exhausted
          *  before the failure OSD becomes the only recovery path. The

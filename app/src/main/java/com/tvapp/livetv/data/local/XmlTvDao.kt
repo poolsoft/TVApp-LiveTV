@@ -121,7 +121,12 @@ interface XmlTvDao {
         "SELECT * FROM xmltv_programs WHERE sourceId IN " +
             "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
             "AND startTimeMillis <= :now AND endTimeMillis > :now " +
-            "AND (normalizedChannelId IN (:channelKeys) OR normalizedChannelName IN (:channelKeys)) " +
+            "AND normalizedChannelId IN (:channelKeys) " +
+            "UNION " +
+            "SELECT * FROM xmltv_programs WHERE sourceId IN " +
+            "(SELECT id FROM xmltv_sources WHERE enabled = 1) " +
+            "AND startTimeMillis <= :now AND endTimeMillis > :now " +
+            "AND normalizedChannelName IN (:channelKeys) " +
             "ORDER BY startTimeMillis",
     )
     fun currentPrograms(
