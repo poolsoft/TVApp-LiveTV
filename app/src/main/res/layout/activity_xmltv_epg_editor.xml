@@ -38,6 +38,21 @@
                 android:textSize="14sp" />
         </LinearLayout>
 
+        <EditText
+            android:id="@+id/search_input"
+            android:layout_width="260dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/bg_focusable"
+            android:hint="@string/xmltv_search_channel_hint"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingHorizontal="14dp"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="14sp" />
+
         <ImageView
             android:id="@+id/epg_editor_btn_close"
             android:layout_width="40dp"

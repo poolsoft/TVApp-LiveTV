@@ -38,6 +38,7 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
     private var optionBySourceAndId = emptyMap<Pair<Long, String>, XmlTvChannelOption>()
     private var matchIndex = XmlTvMatcher.Index(emptyList())
     private var matchFilter = MatchFilter.ALL
+    private var searchQuery = ""
     private var ambiguousIds = emptySet<String>()
     private var ambiguousNames = emptySet<String>()
 
@@ -48,6 +49,14 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
         binding.list.layoutManager = LinearLayoutManager(this)
         binding.list.adapter = adapter
         binding.epgEditorBtnClose.setOnClickListener { finish() }
+        binding.searchInput?.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                searchQuery = s?.toString()?.trim() ?: ""
+                if (selectedChannel == null) showChannels() else renderOptions()
+            }
+        })
         loadData()
     }
 
@@ -60,6 +69,18 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
             KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> {
                 page(1)
                 return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (currentFocus == null || currentFocus != binding.searchInput) {
+                    page(-1)
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (currentFocus == null || currentFocus != binding.searchInput) {
+                    page(1)
+                    return true
+                }
             }
             KeyEvent.KEYCODE_PROG_BLUE -> if (selectedChannel != null) {
                 cycleSourceFilter()
@@ -79,7 +100,13 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
     }
 
     override fun onBackPressed() {
-        if (selectedChannel != null) showChannels() else finish()
+        if (selectedChannel != null) {
+            binding.searchInput?.text?.clear()
+            searchQuery = ""
+            showChannels()
+        } else {
+            finish()
+        }
     }
 
     private fun loadData() {
@@ -153,7 +180,12 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
                 status,
                 matchState = state,
             )
-        }.filter { row -> matchFilter.accepts(row.matchState) }
+        }.filter { row ->
+            matchFilter.accepts(row.matchState) &&
+                (searchQuery.isBlank() || row.name.contains(searchQuery, ignoreCase = true) ||
+                    row.number.contains(searchQuery, ignoreCase = true) ||
+                    row.detail.contains(searchQuery, ignoreCase = true))
+        }
         debugLog.recordDebug(
             "XMLTV_EDITOR_MATCH | channels=${rows.size}, duration=${SystemClock.elapsedRealtime() - startedAt}ms",
         )
@@ -163,12 +195,18 @@ class XmlTvEpgEditorActivity : TvRemoteActivity() {
     private fun showOptions(channel: LiveChannel) {
         selectedChannel = channel
         sourceFilter = null
+        binding.searchInput?.text?.clear()
+        searchQuery = ""
         renderOptions()
     }
 
     private fun renderOptions() {
         val channel = selectedChannel ?: return
-        val visible = options.filter { sourceFilter == null || it.sourceId == sourceFilter }
+        val visible = options.filter {
+            (sourceFilter == null || it.sourceId == sourceFilter) &&
+                (searchQuery.isBlank() || it.channelName.contains(searchQuery, ignoreCase = true) ||
+                    it.channelId.contains(searchQuery, ignoreCase = true))
+        }
         val sourceName = sourceFilter?.let { id -> options.firstOrNull { it.sourceId == id }?.sourceName }
             ?: getString(R.string.all_sources)
         binding.title.text = channel.displayName

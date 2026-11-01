@@ -722,9 +722,9 @@ class MainActivity : TvRemoteActivity() {
             applyPreferredTracks()
             val channel = currentChannel
             if (channel != null && channel.source == LiveChannel.Source.TIF && blackScreenActive) {
-                val hasAudioOrVideo = tracks.any { it.type == android.media.tv.TvTrackInfo.TYPE_AUDIO || it.type == android.media.tv.TvTrackInfo.TYPE_VIDEO }
-                if (hasAudioOrVideo) {
-                    endBlackout("TIF_TRACKS_READY")
+                val hasAudio = tracks.any { it.type == android.media.tv.TvTrackInfo.TYPE_AUDIO }
+                if (channel.isRadioChannel() && hasAudio) {
+                    endBlackout("TIF_RADIO_READY")
                 }
             }
         }
@@ -1335,9 +1335,7 @@ class MainActivity : TvRemoteActivity() {
         }
         blackScreenActive = true
         blackScreenTuneGeneration++
-        if (currentChannel?.source != LiveChannel.Source.TIF || vodMode) {
-            playback.setMuted(true)
-        }
+        playback.setMuted(true)
         val target = binding.blackoutView
         target.visibility = View.VISIBLE
         binding.iptvBufferingContainer.visibility = View.GONE

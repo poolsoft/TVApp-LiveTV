@@ -367,6 +367,7 @@
     <string name="xmltv_source_file">Dosya</string>
     <string name="xmltv_source_deleted">XMLTV kaynağı silindi.</string>
     <string name="xmltv_add_url">URL ekle</string>
+    <string name="xmltv_search_channel_hint">Kanal ara (isim veya no)...</string>
     <string name="xmltv_match_editor">EPG eşleştirme editörü</string>
     <string name="xmltv_match_editor_summary">TVApp kanallarının XMLTV kanal kimlikleriyle nasıl eşleştiğini gösterir.</string>
     <string name="xmltv_match_filter_status">Eşleşme filtresi: %1$s</string>

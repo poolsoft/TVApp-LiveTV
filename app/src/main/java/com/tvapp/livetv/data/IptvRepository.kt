@@ -76,8 +76,12 @@ class IptvRepository(context: Context) {
 
     suspend fun sources(): List<IptvSourceSummary> {
         val vodDao = database.vodDao()
-        return dao.getSources().map { source ->
-            val vCount = vodDao.countTitlesBySourceId(source.id)
+        val allSources = dao.getSources()
+        val vodCounts = runCatching {
+            vodDao.countTitlesGroupedBySourceId().associate { it.sourceId to it.count }
+        }.getOrDefault(emptyMap())
+        return allSources.map { source ->
+            val vCount = vodCounts[source.id] ?: 0
             IptvSourceSummary(
                 source,
                 dao.channelCount(source.id),

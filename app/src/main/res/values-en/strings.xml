@@ -354,6 +354,7 @@
     <string name="xmltv_source_file">File</string>
     <string name="xmltv_source_deleted">XMLTV source deleted.</string>
     <string name="xmltv_add_url">Add URL</string>
+    <string name="xmltv_search_channel_hint">Search channel (name or no)...</string>
     <string name="xmltv_match_editor">EPG matching editor</string>
     <string name="xmltv_match_editor_summary">Shows how TVApp channels match XMLTV channel identifiers.</string>
     <string name="xmltv_match_filter_status">Match filter: %1$s</string>
