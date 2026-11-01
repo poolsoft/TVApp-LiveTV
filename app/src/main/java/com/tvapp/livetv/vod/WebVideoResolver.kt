@@ -124,7 +124,7 @@ object WebVideoResolver {
 
         // 1. Fast path: Check for quick static links in page HTML (e.g. data-pv, json-ld, direct m3u8)
         val fastResolved = runCatching {
-            extractStreamFromPage(targetUrl, depth = 0)
+            extractStreamFromPage(targetUrl, depth = 0, html = null)
         }.getOrNull()
 
         if (!fastResolved.isNullOrBlank() && isDirectStream(fastResolved)) {
@@ -224,11 +224,11 @@ object WebVideoResolver {
         val html = fetchHtml(pageUrl) ?: return emptyList()
         val found = linkedSetOf<String>()
 
+        // Ayni sayfa birden fazla kez indirilmesin: VodMetadataExtractor ile
+        // cikarin, Pilavyer ve regex dallari ayni HTML'i okusun.
         val extraction = runCatching { VodMetadataExtractor.extract(html, pageUrl) }.getOrNull()
         extraction?.streamUrl?.takeIf { isDirectStream(it) }?.let { found.add(it) }
-
-        // Site-ozel hizli dallar korunur (Pilavyer s.php vb.)
-        extractStreamFromPage(pageUrl, depth)?.takeIf { isDirectStream(it) }?.let { found.add(it) }
+        extractStreamFromPage(pageUrl, depth, html)?.takeIf { isDirectStream(it) }?.let { found.add(it) }
 
         val embeds = linkedSetOf<String>()
         extraction?.embedUrls.orEmpty().forEach { embeds.add(it) }
@@ -517,8 +517,9 @@ object WebVideoResolver {
     }
 
     /**
-     * Guclu aday = HLS manifest izni alan en iyi manifest; segment/poster gibi
-     * gürültü icin listeyi bekletme. Tam manifest alindiginda listeyi doldur.
+     * Guclu aday = HLS/DASH manifest; segment/poster gibi gürültü için
+     * listeyi bekletme. master kelimesi URL'de olmak zorunda degil (index.m3u8 de
+     * gucIü adaydir).
      */
     private fun isStrongCandidate(item: ResolvedStream): Boolean {
         val lower = item.streamUrl.lowercase()
@@ -528,7 +529,7 @@ object WebVideoResolver {
         val isArtifact = lower.endsWith(".jpg") || lower.endsWith(".png") ||
             lower.endsWith(".webp") || lower.endsWith(".svg")
         val isSegment = isSegmentLike(lower)
-        return !isArtifact && !isSegment && lower.contains("master")
+        return !isArtifact && !isSegment
     }
 
     /**
@@ -569,26 +570,26 @@ object WebVideoResolver {
     private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): ResolvedStream? =
         collectViaHeadlessWebView(context, pageUrl).firstOrNull()
 
-    private fun extractStreamFromPage(pageUrl: String, depth: Int): String? {
+    private fun extractStreamFromPage(pageUrl: String, depth: Int, html: String? = null): String? {
         if (depth > 2) return null
-        val html = fetchHtml(pageUrl) ?: return null
+        val targetHtml = html ?: fetchHtml(pageUrl) ?: return null
 
         // 0. Evrensel yapisal cikarma: JSON-LD / OpenGraph / microdata / JS blob.
         //    Site-ozel dallardan once calisir; ilk bulunan oynatilabilir aday kazanir.
-        val extraction = runCatching { VodMetadataExtractor.extract(html, pageUrl) }.getOrNull()
+        val extraction = runCatching { VodMetadataExtractor.extract(targetHtml, pageUrl) }.getOrNull()
         if (!extraction?.streamUrl.isNullOrBlank() && isDirectStream(extraction!!.streamUrl!!)) {
             return extraction.streamUrl
         }
 
         // 1. Check for Pilavyer data-pv & s.php
-        val pvMatcher = DATA_PV_REGEX.matcher(html)
+        val pvMatcher = DATA_PV_REGEX.matcher(targetHtml)
         if (pvMatcher.find()) {
             val slug = pvMatcher.group(1)?.trim()
             if (!slug.isNullOrEmpty()) {
-                val host = if (html.contains("play2.pilavyerplay.top")) {
+                val host = if (targetHtml.contains("play2.pilavyerplay.top")) {
                     "https://play2.pilavyerplay.top"
                 } else {
-                    val coreMatcher = CORE_JS_REGEX.matcher(html)
+                    val coreMatcher = CORE_JS_REGEX.matcher(targetHtml)
                     if (coreMatcher.find()) {
                         coreMatcher.group(1)?.substringBefore("/assets/js/core.js") ?: "https://play2.pilavyerplay.top"
                     } else "https://play2.pilavyerplay.top"
