@@ -607,7 +607,7 @@ object WebVideoResolver {
         }
 
         // 2. Check for JSON-LD VideoObject contentUrl
-        val jsonLdMatcher = JSON_LD_REGEX.matcher(html)
+        val jsonLdMatcher = JSON_LD_REGEX.matcher(targetHtml)
         while (jsonLdMatcher.find()) {
             val jsonText = jsonLdMatcher.group(1).orEmpty()
             val contentMatcher = CONTENT_URL_REGEX.matcher(jsonText)
@@ -629,7 +629,7 @@ object WebVideoResolver {
         }
 
         // 3. Look for direct .m3u8 stream links inside HTML
-        val m3u8Matcher = M3U8_REGEX.matcher(html)
+        val m3u8Matcher = M3U8_REGEX.matcher(targetHtml)
         if (m3u8Matcher.find()) {
             val stream = m3u8Matcher.group(0)
             if (!stream.isNullOrBlank()) {
@@ -638,7 +638,7 @@ object WebVideoResolver {
         }
 
         // 4. Look for direct .mp4 video links inside HTML
-        val mp4Matcher = MP4_REGEX.matcher(html)
+        val mp4Matcher = MP4_REGEX.matcher(targetHtml)
         if (mp4Matcher.find()) {
             val stream = mp4Matcher.group(0)
             if (!stream.isNullOrBlank()) {
@@ -649,7 +649,7 @@ object WebVideoResolver {
         // 5. Look for video iframe embeds (`src` + lazy `data-src` varyantlari).
         //    Tembel yuklenen iframe'ler (`data-src`) hdfilmcehennemi tarzinda gizli
         //    embed zincirlerini tasir; recursion ayni cikarmayla devam eder.
-        val iframeMatcher = IFRAME_SRC_REGEX.matcher(html)
+        val iframeMatcher = IFRAME_SRC_REGEX.matcher(targetHtml)
         while (iframeMatcher.find()) {
             val iframeSrc = iframeMatcher.group(1)
             if (!iframeSrc.isNullOrBlank() && iframeSrc.startsWith("http")) {
