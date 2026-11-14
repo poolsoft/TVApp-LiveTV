@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import com.tvapp.livetv.BuildConfig
+import com.tvapp.livetv.data.readLimitedText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -65,10 +66,11 @@ class AppUpdateManager(private val context: Context) {
     private fun readUrl(url: String, maximumBytes: Int): String {
         require(url.startsWith("https://")) { "Only HTTPS update manifests are accepted" }
         return openConnection(url).useConnection { connection ->
-            connection.inputStream.bufferedReader().use { reader ->
-                val result = reader.readText()
-                check(result.toByteArray().size <= maximumBytes) { "Update manifest is too large" }
-                result
+            // Govde once tamamen bellekte String'e cevrilip sonra olculuyordu; boylece
+            // beklenenden buyuk bir manifesto sinir kontrolune ulasamadan bellegi
+            // tuketebiliyordu. Artik sinir okuma sirasinda uygulanir (TASKS.md CRASH-003).
+            connection.inputStream.use { stream ->
+                stream.readLimitedText(maximumBytes, "Güncelleme manifestosu")
             }
         }
     }

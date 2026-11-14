@@ -4,8 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -81,10 +79,10 @@ class GithubManifestRepository {
             if (code !in 200..299) {
                 error("HTTP $code")
             }
+            // Manifest tek dosyada pek cok kaynak tasiyabilir; yine de sinirsiz bir yanitin
+            // String'e donusmesine izin verilmez (TASKS.md CRASH-003).
             conn.inputStream.use { stream ->
-                BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader ->
-                    reader.readText()
-                }
+                stream.readLimitedText(DOCUMENT_RESPONSE_BYTES, "Kaynak manifesti")
             }
         } finally {
             conn.disconnect()

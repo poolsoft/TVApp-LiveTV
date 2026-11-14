@@ -326,8 +326,13 @@ internal class XtreamClient(
         reader.endArray()
     }
 
+    /**
+     * Yalnizca hesap/handshake gibi tek nesnelik kontrol yanitlari icin kullanilir; katalog
+     * listeleri ayri ve akisarak (JsonReader) okunur. Tam metin bellege alinirken sinirsiz
+     * birikme olmasin diye sinir uygulanir (TASKS.md CRASH-003).
+     */
     private fun requestText(action: String?): String = open(action).useConnection { connection ->
-        connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        connection.inputStream.use { it.readLimitedText(CONTROL_RESPONSE_BYTES, "Xtream hesap") }
     }
 
     private fun open(action: String?, extras: Map<String, String> = emptyMap()): HttpURLConnection {

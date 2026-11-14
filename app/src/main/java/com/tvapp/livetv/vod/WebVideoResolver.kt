@@ -1,10 +1,10 @@
 package com.tvapp.livetv.vod
 
+import com.tvapp.livetv.data.DOCUMENT_RESPONSE_BYTES
+import com.tvapp.livetv.data.readLimitedText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.regex.Pattern
@@ -689,9 +689,10 @@ object WebVideoResolver {
             val code = conn.responseCode
             if (code !in 200..299) return null
             conn.inputStream.use { stream ->
-                BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader ->
-                    reader.readText()
-                }
+                // Ucuncu taraf sayfasi sinirsiz boyutta dönebilir (agır JSON-LD, satir ici
+                // veritabani). Govde tamami bellekte String'e cevrilirken sinir asilirsa bu
+                // aday cozulemez sayilir; bellek tuketip VOD oynaticisini dusurmez (CRASH-003).
+                stream.readLimitedText(DOCUMENT_RESPONSE_BYTES, "VOD sayfası")
             }
         } finally {
             conn.disconnect()

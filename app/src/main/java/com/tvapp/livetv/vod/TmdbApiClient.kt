@@ -1,5 +1,7 @@
 package com.tvapp.livetv.vod
 
+import com.tvapp.livetv.data.CONTROL_RESPONSE_BYTES
+import com.tvapp.livetv.data.readLimitedText
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -100,7 +102,7 @@ object TmdbApiClient {
             conn.requestMethod = "GET"
             conn.setRequestProperty("Accept", "application/json")
             if (conn.responseCode in 200..299) {
-                conn.inputStream.bufferedReader().use { it.readText() }
+                conn.inputStream.use { it.readLimitedText(CONTROL_RESPONSE_BYTES, "TMDB yanıtı") }
             } else {
                 null
             }

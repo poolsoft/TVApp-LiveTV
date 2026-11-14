@@ -542,16 +542,50 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   durum makinesi ile döngü yapısal olarak imkânsız hâle gelir; OSD aç/kapa davranışı
   değişmez; cihazda uzun oturumda çökme yeniden üretilemez.
 
-- [ ] **CRASH-003 (P0): Çökme izi ve tam gövde okumalarında bellek sınırı**
+- [~] **CRASH-003 (P0): Çökme izi ve tam gövde okumalarında bellek sınırı**
   127 MB'lık tek ayırma çökmesi (`StringWriter.write`). `diagnostics/CrashReportStore.kt:98`
   çökme izini tamamen bellekte String'e kuruyor; CRASH-002'nin 100k frame'lik izi burada
   patlamış olabilir. İzi boyut sınırlı (örn. 200 KB, kesildiği satır not düşülerek) ve
   doğrudan dosyaya akıtarak yaz. İkincil adaylar tüm gövdeyi String'e okuyan ağ yolları:
   `data/IptvRepository.kt:479`, `data/XtreamClient.kt:330`, `data/StalkerClient.kt:160`,
   `data/XmlTvRepository.kt:747` (metin + parse ağacı aynı anda bellekte).
-  **Kabul:** Sınırsız boyutta yanıt/istisna bellekte String'e biriktirilmez; 15.000+ kayıtlı
-  M3U/JSON/XMLTV yükleme sırasında tepe bellek ölçülebilir biçimde düşer; çökme raporu
-  yazılmaya devam eder ve asla ikinci bir çökme üretmez.
+  **Durum (2026-11-14, yapılanlar):**
+  - `CrashReportStore`: iz artık `LimitedCharWriter` ile **200.000 karakterle sınırlı** kurulur;
+    sınır aşılınca kalan kısım biriktirilmez, izde kaç karakter/satır atlandığı ve sınır
+    not olarak yazılır. Rapor dosyaya eskisi gibi tam (sınırlı) hâliyle gider.
+  - Tam rapor artık **SharedPreferences'e yazılmıyor**: `KEY_PENDING_REPORT` en fazla
+    16.000 karakterlik özet + tam raporun dosya yolu tutuyor (`pendingExcerpt`). Büyük iz,
+    `commit()` ile senkron yazılan tercih dosyasının neden olduğu ikinci bellek/ANR riskini
+    üretmez. `pendingReport()` sözcüğü değişmedi (özet döner), çağıranı şu an yok.
+  - Yeni `data/HttpBodyReader.kt`: `readLimitedText(maximumBytes, label)` sınırı aşan gövdeyi
+    **kırpıp döndürmez**, adlandırılmış hata fırlatır ve sınırı geçince okumayı bırakır.
+    Uygulandığı yerler:
+    - `XtreamClient.requestText` — hesap/handshake (4 MB)
+    - `StalkerClient.request` — handshake/get_profile/get_genres/create_link (4 MB)
+    - `TmdbApiClient.fetchJson` — TMDB API yanıtı (4 MB; zaten `null` dönen yutulmuş hata yolu)
+    - `GithubManifestRepository.downloadText` — kullanıcı kaynak manifesti (16 MB)
+    - `WebVideoResolver.fetchHtml` — üçüncü taraf VOD sayfası (16 MB; sınır aşılırsa aday
+      çözülemez sayılır, `fetchHtml` eskisi gibi `null` döner)
+    - `AppUpdateManager.readUrl` — 64 KB'lık mevcut sınır artık **okuma sırasında**
+      uygulanıyor; önceden gövde tamamen String'e çevrilip sonra ölçülüyordu
+    Sınır sabitleri `IptvWebServer.MAX_BODY_BYTES` (16 MB) ile uyumlu seçildi.
+  - Birim testler: `HttpBodyReaderTest` (sınır ihlali, kırpma yok, çok baytlı UTF-8, sınırda
+    tam okuma, sınır sonrası okumaya devam etmeme) ve `LimitedCharWriterTest` (kısa çıktı
+    bozulmaz, 50k satır sınırda kalır, satır sınırında kesim + atlanan miktar, gerçek
+    `StackOverflowError` izi sınırda kalır).
+  **Doğrulanan ayrıntı:** denetimdeki "dört ağ yolu" listesinin ikisi zaten akışarak
+  okunuyordu — M3U `M3uParser.sequence` ile satır satır, XMLTV `XmlPullParser` ile, Xtream ve
+  Stalker **kanal listeleri** `JsonReader` ile. Bu yollarda sınır uygulanmadı (15.000+ kayıt
+  kesintiye uğramasın).
+  **Kalan iş (bilinçli erteleme):** (1) JSON VOD içe aktarma (`IptvRepository.kt:498` →
+  `JsonVodImporter.importJsonVod` → `JSONArray(text)`) tüm metni + ayrıştırma ağacını birlikte
+  tutar; kalıcı çözüm içe aktarıcıyı `JsonReader` tabanlı akışıcı yapmak, sınırla kırpmak
+  doğru değil. (2) `XmlTvRepository.kt:747` eski JSON önbellek dosyası aynı şekilde
+  `JSONArray(readText())` kullanır. (3) 15.000+ kayıtlı M3U/JSON/XMLTV yüklemede tepe bellek
+  ölçümü cihazda bekliyor.
+  **Kabul:** Sınırsız boyutta yanıt/istisna bellekte String'e biriktirilmez; çökme raporu
+  yazılmaya devam eder ve asla ikinci bir çökme üretmez (testlendi); tepe bellek düşüşü
+  cihazda ölçüldüğünde madde kapanır.
 
 ### Epic MISS — Denetimde açığa çıkan eksikler
 

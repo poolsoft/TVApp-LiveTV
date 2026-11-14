@@ -1,5 +1,32 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-14 - Çökme Raporu ve Ağ Gövde Okumalarında Bellek Sınırı (CRASH-003)
+
+- **Çökme izi artık sınırlı (`CrashReportStore.kt`):** İz, `StringWriter` ile olduğu gibi bellekte
+  String'e çevrilmek yerine yeni `LimitedCharWriter` ile **200.000 karakterle sınırlı** kuruluyor.
+  Karşılıklı çağrı döngülerinin ürettiği yüz binlerce frame'lik izler bu sınırda kesiliyor; kesilen
+  kısmın karakter ve satır sayısı izde not olarak bırakılıyor, kesim satır sınırında yapılıyor.
+  127 MB'lık tek ayırma ile ölümcül olan yol (ikinci bir `OutOfMemoryError`) yapısal olarak kapandı.
+- **Tam rapor tercih dosyasına yazılmıyor:** `KEY_PENDING_REPORT` bundan böyle en fazla
+  16.000 karakterlik özet ve tam raporun dosya yolunu tutuyor. Tam iz eskisi gibi
+  `Download/TVApp/TVApp-uncaught-exception-*.log` (olmazsa uygulama log dizini) içinde;
+  `pendingReport()` aynı sözcükle özet döndürüyor.
+- **Sınırlı gövde okuma (`data/HttpBodyReader.kt`, yeni):** `readLimitedText(maximumBytes, label)`
+  sınırı aşan yanıtı kırpıp sessizce döndürmez, adlandırılmış hata fırlatır ve sınır geçildiği anda
+  okumayı bırakır. Uygulanan yerler: Xtream hesap/handshake (4 MB), Stalker portal kontrol yanıtları
+  (4 MB), TMDB API yanıtı (4 MB), GitHub kaynak manifesti (16 MB), `WebVideoResolver.fetchHtml`
+  üçüncü taraf VOD sayfası (16 MB — sınır aşılırsa `fetchHtml` eskisi gibi `null` döner, aday
+  çözülemez sayılır) ve `AppUpdateManager.readUrl` (64 KB'lık mevcut sınır artık okuma sırasında
+  uygulanıyor; önceden gövde tamamen String'e çevrilip sonra ölçülüyordu).
+- **Korunan davranış:** M3U (satır satır), XMLTV (`XmlPullParser`), Xtream ve Stalker **kanal
+  listeleri** (`JsonReader`) zaten akışarak okunduğu için bunlara sınır getirilmedi — 15.000+
+  kayıtlı kataloglar kesintiye uğramaz. JSON VOD içe aktarma ve eski XMLTV JSON önbelleği büyük
+  payload zorunluluğu nedeniyle bilinçli olarak sınırsız bırakıldı; kalan iş `TASKS.md`
+  `CRASH-003` maddesinde kayıtlı.
+- **Testler:** `HttpBodyReaderTest` ve `LimitedCharWriterTest` eklendi (sınır ihlali, kırpma
+  yapılmaması, çok baytlı UTF-8, sınır sonrası okumaya devam edilmemesi; kısa çıktının bozulmaması,
+  50.000 satırlık ve gerçek `StackOverflowError` izlerinin sınırda kalması).
+
 ## 2026-11-14 - IPTV ve VOD Oynatma Katmanlarında Sistem Odağı Göstergesi
 
 - **Sistem odağı görünür kılındı (`bg_iptv_control.xml`, `bg_vod_button.xml`,

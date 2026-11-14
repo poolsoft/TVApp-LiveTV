@@ -8,7 +8,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
 import java.io.PrintWriter
-import java.io.StringWriter
+import java.io.Writer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -95,9 +95,7 @@ class CrashReportStore(context: Context) {
     }
 
     fun recordCrash(thread: Thread, error: Throwable) {
-        val trace = StringWriter().also { writer ->
-            error.printStackTrace(PrintWriter(writer))
-        }.toString()
+        val trace = limitedTrace(error)
         val report = buildString {
             appendLine("UNCAUGHT APPLICATION EXCEPTION")
             appendLine("Time: ${timestamp()}")
@@ -112,6 +110,18 @@ class CrashReportStore(context: Context) {
         saveReport(report, "uncaught-exception")
     }
 
+    /**
+     * Izin sinirli bir kopyasini kurar. Karsilikli cagri dongusu (TASKS.md CRASH-002) yuz
+     * binlerce frame uretebiliyor; izi oldugu gibi bellekte String'e cevirmek 127 MB'lik tek
+     * ayirma yolu acip ikinci bir cokme (OutOfMemoryError) neden olmustu. Sinir asildiginda
+     * kalan kisim biriktirilmez, yerine kac karakter/satir atlandigi yazilir.
+     */
+    private fun limitedTrace(error: Throwable): String {
+        val writer = LimitedCharWriter(MAX_CRASH_TRACE_CHARS)
+        runCatching { PrintWriter(writer).use { error.printStackTrace(it) } }
+        return writer.text()
+    }
+
     @Synchronized
     fun saveTifDiagnostics(report: String) {
         val fingerprint = report.hashCode()
@@ -124,6 +134,12 @@ class CrashReportStore(context: Context) {
         recordDebug("TIF_DIAGNOSTICS_WRITTEN | $location")
     }
 
+    /**
+     * Son bekleyen cokme raporunun kisa ozeti. Tam iz dosyaya yazilir (bkz.
+     * [pendingLogLocation]); tercih dosyalarina buyuk bir iz yazilmaz, cunku SharedPreferences
+     * tum dosyayi senkron olarak disariya yazar ve buyuk bir iz ikinci bir bellek/ANR riski
+     * uretir (TASKS.md CRASH-003).
+     */
     fun pendingReport(): String? = preferences.getString(KEY_PENDING_REPORT, null)
 
     fun pendingLogLocation(): String? = preferences.getString(KEY_PENDING_LOG_LOCATION, null)
@@ -139,13 +155,26 @@ class CrashReportStore(context: Context) {
         val location = runCatching { writeToDownloads(report, category) }
             .getOrNull()
             ?: runCatching { writeToAppExternalFiles(report, category) }.getOrNull()
-            ?: "Log file could not be written; report remains in app preferences."
+            ?: "Log file could not be written; only a report excerpt remains in app preferences."
         preferences.edit()
-            .putString(KEY_PENDING_REPORT, report)
+            .putString(KEY_PENDING_REPORT, pendingExcerpt(report, location))
             .putString(KEY_PENDING_LOG_LOCATION, location)
             .commit()
         checkAndPurgeExpiredLogs()
     }
+
+    /**
+     * Tercihlerde tam iz degil sinirli bir ozet tutulur; tam rapor dosyadadir. Boylece
+     * yuz binlerce frame'lik bir iz SharedPreferences'in senkron disk yazimina ve bellekteki
+     * String birikimine yol acmaz (TASKS.md CRASH-003).
+     */
+    private fun pendingExcerpt(report: String, location: String): String =
+        if (report.length <= MAX_PENDING_REPORT_CHARS) {
+            report
+        } else {
+            report.take(MAX_PENDING_REPORT_CHARS).trimEnd() +
+                "\n... ozet ${MAX_PENDING_REPORT_CHARS} karakterde kesildi; tam rapor: $location"
+        }
 
     private fun writeToDownloads(report: String, category: String): String {
         val fileName = logFileName(category)
@@ -329,6 +358,8 @@ class CrashReportStore(context: Context) {
             Thread(runnable, "CrashReportLogWriter").apply { isDaemon = true }
         }
         const val MAX_DEBUG_LOG_BYTES = 2 * 1024 * 1024L
+        const val MAX_CRASH_TRACE_CHARS = 200_000
+        const val MAX_PENDING_REPORT_CHARS = 16_000
         const val RETENTION_PERIOD_MS = 7L * 24 * 60 * 60 * 1_000L
         const val PURGE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1_000L
         const val PREFERENCES_NAME = "diagnostic-reports"
@@ -342,5 +373,51 @@ class CrashReportStore(context: Context) {
         const val KEY_DEBUG_LOG_PART = "debug-log-part"
         const val KEY_LAST_PURGE_TIME = "last-log-purge-time"
         const val KEY_TIF_DIAGNOSTICS_HASH = "tif-diagnostics-hash"
+    }
+}
+
+/**
+ * Yalnizca [limit] karakter biriktiren yazar. Cokme izleri sinirsiz boyuta ulasabildigi icin
+ * izi oldugu gibi String'e cevirmek bellegi tuketip ikinci bir cokme (OutOfMemoryError)
+ * yaratiyordu; bu yazar siniri asan girdiyi biriktirmez ve [text] kesilen kismi raporlar
+ * (TASKS.md CRASH-003).
+ */
+internal class LimitedCharWriter(private val limit: Int) : Writer() {
+    private val buffer = StringBuilder(minOf(limit, INITIAL_CAPACITY))
+    private var droppedChars = 0
+    private var droppedLines = 0
+
+    override fun write(cbuf: CharArray, off: Int, len: Int) {
+        if (len <= 0) return
+        val room = limit - buffer.length
+        if (room >= len) {
+            buffer.append(cbuf, off, len)
+            return
+        }
+        if (room > 0) buffer.append(cbuf, off, room)
+        for (index in (off + room) until (off + len)) {
+            droppedChars++
+            if (cbuf[index] == '\n') droppedLines++
+        }
+    }
+
+    override fun flush() = Unit
+
+    override fun close() = Unit
+
+    /**
+     * Biriken metni dondurur. Cikti kesildiyse son tam satira kadar biriktirilir ve atlanan
+     * karakter/satir sayisi izde not olarak birakilir.
+     */
+    fun text(): String {
+        if (droppedChars == 0) return buffer.toString()
+        val lineEnd = buffer.lastIndexOf("\n")
+        val kept = if (lineEnd >= 0) buffer.substring(0, lineEnd + 1) else buffer.toString()
+        return kept + "\n... iz kesildi: $droppedChars karakter / $droppedLines satir atlandi" +
+            " (bellek siniri $limit karakter)\n"
+    }
+
+    private companion object {
+        const val INITIAL_CAPACITY = 8 * 1024
     }
 }

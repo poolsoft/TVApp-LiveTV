@@ -157,7 +157,12 @@ internal class StalkerClient(
             check(connection.responseCode in 200..299) {
                 "Stalker HTTP ${connection.responseCode} ${connection.responseMessage}"
             }
-            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            // Portalin kontrol yanitlari (handshake, get_profile, get_genres, create_link) tek
+            // JSON nesnesidir; kanal listesi ayrica JsonReader ile akisarak okunur. Tam metin
+            // sinirsiz birikmesin (TASKS.md CRASH-003).
+            val body = connection.inputStream.use {
+                it.readLimitedText(CONTROL_RESPONSE_BYTES, "Stalker portal")
+            }
             JSONObject(body)
         } finally {
             connection.disconnect()
