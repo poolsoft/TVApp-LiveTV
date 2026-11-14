@@ -283,7 +283,9 @@ benzersiz `dev-r<run>` etiketi oluşturur; uygulama her zaman GitHub'ın son rel
 dosyaları denetler.
 Release'e şu dosyalar eklenir:
 
-- `TVApp.apk`
+- `TVApp.apk` (`com.tvapp.livetv`)
+- `TVApp-Paid-Test.apk` (`com.tvapp.livetv.play`, Play test derlemesi)
+- `TVApp-Mobile.apk` (`com.tvapp.mobile`)
 - `version.json`
 
 `version.json` sürüm kodunu, APK adresini ve SHA-256 özetini içerir. TVApp içindeki
@@ -301,6 +303,38 @@ Repository'nin GitHub Actions Secrets bölümünde aşağıdaki değerler tanım
 Keystore dosyası ve parolalar repoya eklenmez. İlk release APK kurulduktan sonraki tüm
 sürümler aynı anahtarla imzalanmalıdır. Debug imzalı mevcut APK, farklı release imzalı APK ile
 yerinde güncellenemez; release kanalına ilk geçişte debug sürümünün kaldırılması gerekir.
+
+## Çökme izini çözme (R8 mapping)
+
+Release derlemelerinde R8 çalıştığı için saha loglarındaki `MainActivity.n1`, `q2.m` gibi adlar
+yalnızca o sürümün `mapping.txt` dosyasıyla okunabilir. Mapping dosyası repoya girmez; her
+başarılı release işinde, release etiketiyle aynı revizyon numarasını taşıyan bir **Actions
+artifact'i** olarak 30 gün saklanır. Artifact depo işbirlikçilerine açıktır, release'e halka
+açık varlık olarak eklenmez — depo herkese açık olduğu için yayımlanmış bir mapping, indirilen
+APK'yı geri çözeltmeyi mümkün kılardı.
+
+```powershell
+# 1) Ilgili release'in artifact'ini indir (gh CLI ve depo erisimi gerekir)
+gh run download <run-id> --name r8-mapping-dev-r<run>-build<build> -D .mapping
+
+# 2) Cihazdan alinan izi ilgili varyantla coz
+retrace .mapping\mapping-localRelease.txt trace.txt
+```
+
+Retrace'in adları gerçekten çözmesi için girdideki **satır numarası APK'daki kırpılmış
+numara** olmalıdır (`Unknown Source:907` gibi); kaynak dosyadaki satır numarası yazılırsa
+yalnızca dosya adı düzelir, ad oldugu gibi kalır. Doğru girdiyle örnek çıktı:
+
+```
+at com.tvapp.livetv.MainActivity.M1(Unknown Source:907)   ->   com.tvapp.livetv.MainActivity.updateTechnicalBadges(MainActivity.kt:3190)
+```
+
+Artifact içindeki dosyalar düz listedir ve `mapping.txt` dosyasının bulunduğu dizinin adıyla
+adlandırılır: `mapping-localRelease.txt`, `mapping-mobileRelease.txt`,
+`mapping-paidRelease.txt`. Doğru dosya, çöken APK'nın varyantıdır; TVApp.apk için
+`localRelease` kullanılır. R8 kısa adları sınıf içinde yeniden kullandığı için (MainActivity'de
+`P` adına 98 yöntem bağlanıyor) tek başına ad belirsiz kalabilir; satır numarası çözümlemeyi
+benzersizleştirir. Release işi hiç mapping bulamazsa iş adımında `::warning::` anotü düşer.
 
 ## Cihaz teşhisi
 

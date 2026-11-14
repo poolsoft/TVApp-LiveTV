@@ -635,13 +635,30 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** `git status --short` temiz çalıştırıldığında korumasız dizin kalmaz; imzalama
   malzemesi, APK ve playlist hiçbir derlemede stage edilmez.
 
-- [ ] **MISS-005 (P0): Release R8 mapping arşivi**
+- [~] **MISS-005 (P0): Release R8 mapping arşivi**
   `isMinifyEnabled = true` (`app/build.gradle.kts:122`) fakat `mapping.txt` hiçbir yere
   kopyalanıp saklanmıyor. Bu yüzden saha loglarındaki `n1`, `u1`, `q2.m` gibi adlar
   çözülemiyor; CRASH-002 ve CRASH-003 bugün **teşhis edilemez** durumda. Release işinde
   mapping'i versiyon etiketiyle eşleşen bir CI artifact'i olarak arşivle (repoya commit etmeden).
-  **Kabul:** Her release APK'sı için doğru sürüm numarasıyla bir mapping dosyası erişilebilir;
-  bir saha logundaki kırpılmış yığın `retrace` ile okunabilir hâle getirilir; dosya git'e girmez.
+  **Durum (2026-11-14):** `release.yml` içine "Archive R8 mapping" + "Upload R8 mapping
+  artefact" adımları eklendi; `app/build/outputs/mapping/<varyant>/mapping.txt` dosyaları
+  `r8-mapping-dev-r<run>-build<build>` artifact'inde 30 gün saklanıyor (varyant başına ~33 MB
+  ölçüldüğü için kota riski nedeniyle kısa tutuldu). Depo **herkese açık** olduğundan mapping
+  release asset'i olarak **değil**, yalnızca depo erişimi olanların indirebildiği artifact olarak
+  tutuluyor. Mapping bulunamazsa `::warning::` anotü düşer, release kilitlenmez.
+  Yerel doğrulama: `assembleLocalRelease bundlePaidRelease` →
+  `mapping/localRelease/mapping.txt` ve `mapping/paidRelease/mapping.txt` üretildi (CI kalıbı
+  birebir çalışıyor); `retrace` ile `M1(Unknown Source:907)` →
+  `updateTechnicalBadges(MainActivity.kt:3190)`, `N(:18)` → `endBlackout(:1382)`,
+  `O(:145)` → `ensurePermissionAndLoad(:1023)` çözüldü. Retrace'in adı çözmesi için girdide
+  APK'daki **kırpılmış** satır numarası olmalı; README'de belgelendi.
+  **Kabul:** Her release APK'sı için doğru sürüm numarasıyla bir mapping dosyası erişilebilir
+  (ilk release işinin artifact'i görüldüğünde kapanır); bir saha logundaki kırpılmış yığın
+  `retrace` ile okunabilir hâle getirilir (yerelde kanıtlandı); dosya git'e girmez
+  (`mapping-archive/` ayrıca `.gitignore`'a eklendi).
+  **Not:** Bugüne kadarki sürümlerin mapping'i üretilmedi; CRASH-002'nin eski izi geri
+  çözülemez. Mevcut `localRelease` mapping'inde `MainActivity` içinde `n1`/`u1` adında yöntem
+  olmadığı doğrulandı — eski iz ile bugünkü derleme arasında ad eşleşmesi yok.
 
 - [ ] **MISS-006 (P3): Ölü bayrak, import ve kaynak temizliği**
   `build.gradle.kts:65, 75, 87` `STORE_BILLING_ENABLED` hiçbir Kotlin kodunda okunmuyor;

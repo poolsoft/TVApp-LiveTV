@@ -68,6 +68,41 @@ jobs:
           ./gradlew assembleLocalRelease assemblePaidDebug bundlePaidRelease assembleMobileRelease \
             -PtvappTargetAbis=arm64-v8a,armeabi-v7a
 
+      - name: Archive R8 mapping
+        id: mapping
+        shell: bash
+        run: |
+          # Field crash traces (n1, u1, q2.m) are only readable with the R8 mapping file of the
+          # exact release. mapping.txt is never committed; it is kept as a CI artefact named
+          # after the same revision as the release tag. It stays a workflow artefact (repo
+          # collaborators only) instead of a public release asset, because a public mapping
+          # would let anyone de-obfuscate the shipped APKs. The artefact itself is already
+          # compressed by actions/upload-artifact, so the files are stored as plain text.
+          mkdir -p mapping-archive
+          found=0
+          while IFS= read -r -d '' file; do
+            variant="$(basename "$(dirname "$file")")"
+            cp "$file" "mapping-archive/mapping-$variant.txt"
+            echo "Archived R8 mapping for $variant ($(wc -c < "mapping-archive/mapping-$variant.txt") bytes)"
+            found=1
+          done < <(find app/build/outputs/mapping -type f -name mapping.txt -print0)
+          if [ "$found" -ne 1 ]; then
+            echo "::warning::No mapping.txt found under app/build/outputs/mapping - crash traces of this release cannot be retraced"
+          fi
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+
+      - name: Upload R8 mapping artefact
+        if: steps.mapping.outputs.found == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8-mapping-dev-r${{ steps.version.outputs.revision }}-build${{ steps.version.outputs.build }}
+          path: mapping-archive/mapping-*.txt
+          if-no-files-found: error
+          # Each variant mapping is roughly 33 MB (the artefact zip compresses it well).
+          # Retention is kept short so repeated releases cannot exhaust the repository's
+          # artefact storage quota, which would fail the upload step of later releases.
+          retention-days: 30
+
       - name: Prepare release assets
         id: assets
         shell: bash

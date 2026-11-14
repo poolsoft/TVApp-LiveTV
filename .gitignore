@@ -21,5 +21,6 @@ TVApp-backup-*.json
 .doc/
 .clinerules/
 .kotlin/
+mapping-archive/
 .env
 *.env

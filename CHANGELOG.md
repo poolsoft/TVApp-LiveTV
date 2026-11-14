@@ -1,5 +1,39 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-14 - Release R8 Mapping Arşivi (`MISS-005`)
+
+- **Release işi artık `mapping.txt` arşivliyor (`.github/workflows/release.yml`):** Derlemeden
+  sonra `app/build/outputs/mapping/<varyant>/mapping.txt` dosyaları toplanıp varyant adıyla
+  (`mapping-localRelease.txt` gibi) `r8-mapping-dev-r<run>-build<build>` adlı bir **Actions
+  artifact'i** olarak 30 gün saklanıyor. Artifact adı release etiketiyle (`dev-r<run>`) aynı
+  revizyonu taşıdığı için hangi mapping'in hangi APK'ya ait olduğu belirsizliği kalmıyor.
+- **Neden release varlığı değil:** Depo **herkese açık**; mapping'i release asset'i olarak
+  yayımlamak, indirilen APK'yı geri çözeltmeyi mümkün kılardı. Artifact yalnızca depo erişimi
+  olan kişilerce indirilebiliyor.
+- **Depolama kotası gerekçesi:** Yerel doğrulamada varyant başına mapping **~33 MB** ölçüldü
+  (`localRelease` 33.353 KB, `paidRelease` 33.217 KB). Sık release yapılan bir depoda artifact
+  kotasının dolması upload adımını patlatıp release'i engellemesin diye saklama süresi 30 gün
+  seçildi (uygulamadaki günlük log saklama süresi 7 gün).
+- **Mapping bulunamazsa sessiz başarısızlık yok:** Bulma adımı boş kalırsa işte `::warning::`
+  anotü düşüyor; artifact adımı koşula bağlandığı için release akışı kilitlenmiyor.
+- **Fiili doğrulama (`assembleLocalRelease bundlePaidRelease`):** Yollar CI kalıbıyla birebir
+  uyumlu çıktı — `app/build/outputs/mapping/localRelease/mapping.txt` ve
+  `app/build/outputs/mapping/paidRelease/mapping.txt` (`bundlePaidRelease` ayrı bir dizin
+  üretmiyor). Sonra `retrace` ile gerçek bir çözümleme yapıldı:
+  `MainActivity.M1(Unknown Source:907)` → `MainActivity.updateTechnicalBadges(MainActivity.kt:3190)`,
+  `N(Unknown Source:18)` → `endBlackout(MainActivity.kt:1382)`,
+  `O(Unknown Source:145)` → `ensurePermissionAndLoad(MainActivity.kt:1023)`.
+- **Öğrenilen ayrıntı (`README.md`'e yazıldı):** Retrace'in adları çözmesi için girdideki satır
+  numarasının APK'daki **kırpılmış** numara olması gerekiyor; kaynak satır numarası yazılırsa
+  yalnızca dosya adı düzeliyor. Ayrıca R8 kısa adları sınıf içinde yeniden kullanıyor
+  (MainActivity'de `P` adına 98 yöntem bağlı), benzersizleştirme satır numarasıyla yapılıyor.
+- **`.gitignore`:** Test sırasında oluşan `mapping-archive/` dizini yok sayma listesine alındı.
+- **Etki:** R8'in kırpdığı `MainActivity.n1` / `u1` / `q2.m` gibi adlar bundan sonraki her
+  sürüm için çözülebilir; `CRASH-002` teşhisi artık mapping birikimine bağlı. Bugüne kadarki
+  sürümlerin mapping'i hiç üretilmediği için eski saha logları geri çözülmez — mevcut
+  `localRelease` mapping'inde `MainActivity` içinde `n1`/`u1` adında yöntem olmadığı bu
+  doğrulandı, yani denetimdeki iz ile bugünkü derleme arasında ad eşleşmesi yok.
+
 ## 2026-11-14 - Çökme Raporu ve Ağ Gövde Okumalarında Bellek Sınırı (CRASH-003)
 
 - **Çökme izi artık sınırlı (`CrashReportStore.kt`):** İz, `StringWriter` ile olduğu gibi bellekte
