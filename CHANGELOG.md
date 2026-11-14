@@ -28,7 +28,13 @@
   yalnızca dosya adı düzeliyor. Ayrıca R8 kısa adları sınıf içinde yeniden kullanıyor
   (MainActivity'de `P` adına 98 yöntem bağlı), benzersizleştirme satır numarasıyla yapılıyor.
 - **`.gitignore`:** Test sırasında oluşan `mapping-archive/` dizini yok sayma listesine alındı.
-- **Etki:** R8'in kırpdığı `MainActivity.n1` / `u1` / `q2.m` gibi adlar bundan sonraki her
+- **CI'da doğrulandı (run 43568964804, release `dev-r343`):** İş başarılı; artifact
+  `r8-mapping-dev-r343-build3` (8.571.580 bayt, 30 gün sonra `2026-12-14`te sona eriyor)
+  üretildi. Artifact indirilip içinden çıkan `mapping-localRelease.txt` ile `retrace` yeniden
+  çalıştırıldı ve adlar çözüldü (`M1(Unknown Source:907)` →
+  `updateTechnicalBadges(MainActivity.kt:3190)`). Artifact'te üç varyant da var:
+  `localRelease` 33.353 KB, `mobileRelease` 33.545 KB, `paidRelease` 33.217 KB. `MISS-005` kapandı.
+- **Etki:** R8'in kırpılmış `MainActivity.n1` / `u1` / `q2.m` gibi adları bundan sonraki her
   sürüm için çözülebilir; `CRASH-002` teşhisi artık mapping birikimine bağlı. Bugüne kadarki
   sürümlerin mapping'i hiç üretilmediği için eski saha logları geri çözülmez — mevcut
   `localRelease` mapping'inde `MainActivity` içinde `n1`/`u1` adında yöntem olmadığı bu

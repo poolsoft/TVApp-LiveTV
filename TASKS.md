@@ -635,7 +635,7 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** `git status --short` temiz çalıştırıldığında korumasız dizin kalmaz; imzalama
   malzemesi, APK ve playlist hiçbir derlemede stage edilmez.
 
-- [~] **MISS-005 (P0): Release R8 mapping arşivi**
+- [x] **MISS-005 (P0): Release R8 mapping arşivi**
   `isMinifyEnabled = true` (`app/build.gradle.kts:122`) fakat `mapping.txt` hiçbir yere
   kopyalanıp saklanmıyor. Bu yüzden saha loglarındaki `n1`, `u1`, `q2.m` gibi adlar
   çözülemiyor; CRASH-002 ve CRASH-003 bugün **teşhis edilemez** durumda. Release işinde
@@ -652,10 +652,17 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   `updateTechnicalBadges(MainActivity.kt:3190)`, `N(:18)` → `endBlackout(:1382)`,
   `O(:145)` → `ensurePermissionAndLoad(:1023)` çözüldü. Retrace'in adı çözmesi için girdide
   APK'daki **kırpılmış** satır numarası olmalı; README'de belgelendi.
-  **Kabul:** Her release APK'sı için doğru sürüm numarasıyla bir mapping dosyası erişilebilir
-  (ilk release işinin artifact'i görüldüğünde kapanır); bir saha logundaki kırpılmış yığın
-  `retrace` ile okunabilir hâle getirilir (yerelde kanıtlandı); dosya git'e girmez
-  (`mapping-archive/` ayrıca `.gitignore`'a eklendi).
+  **CI doğrulaması (2026-11-14, run 43568964804 / release `dev-r343`):** iş başarılı;
+  `r8-mapping-dev-r343-build3` artifact'i 8.571.580 bayt olarak üretildi ve
+  `2026-12-14`'te (30 gün) sona erecek şekilde zamanlandı. Artifact indirilip içi açıldı:
+  `mapping-localRelease.txt` (33.353 KB), `mapping-mobileRelease.txt` (33.545 KB),
+  `mapping-paidRelease.txt` (33.217 KB). İndirilen `localRelease` mapping'i ile `retrace`
+  tekrar çalıştırıldı: `M1(Unknown Source:907)` →
+  `updateTechnicalBadges(MainActivity.kt:3190)`, `N(:18)` → `endBlackout(:1382)`.
+  **Kabul karşılandı:** Her release APK'sı için doğru sürüm numarasıyla (`build3` = `.build`
+  değeri, `dev-r343` = release etiketi) mapping erişilebilir; kırpılmış yığın `retrace` ile
+  okunabilir hâle geliyor; dosya git'e girmiyor (`mapping-archive/` `.gitignore`'da ve
+  mapping yalnızca artifact olarak saklanıyor).
   **Not:** Bugüne kadarki sürümlerin mapping'i üretilmedi; CRASH-002'nin eski izi geri
   çözülemez. Mevcut `localRelease` mapping'inde `MainActivity` içinde `n1`/`u1` adında yöntem
   olmadığı doğrulandı — eski iz ile bugünkü derleme arasında ad eşleşmesi yok.
@@ -1043,14 +1050,21 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
 > önünü kesmeyecek; önce stabilite (`CRASH-*`, `VOD-*` sağlamlık, bellek/thread) ve
 > arayüz görevleri (`UI-*`) bitirilecek.
 
+**Tamamlanan (2026-11-14):** `MISS-004` (depoyu yok sayma), `UI-001` (sistem odağı — cihaz
+ekran görüntüsü doğrulaması hâlâ bekliyor), `CRASH-003` (bellek sınırı — tepe bellek ölçümü
+cihazda bekliyor), `MISS-005` (R8 mapping artifact'i; `dev-r343` ile uçtan uca doğrulandı).
+
 **Sıcak — çökme ve teşhis yeteneği:**
-1. `MISS-005` (mapping arşivi olmadan CRASH-002/003 teşhis edilemez) ve `MISS-004`
-2. `CRASH-003` (bellek sınırı), ardından `CRASH-001` kalıntısı ve `CRASH-002`
+1. `CRASH-001` kalıntısı (`browser/StreamSniffer.kt:62, 75` ve `vod/WebVideoResolver.kt:309`
+   CookieManager çağrılarını ana thread'de önbelleğe almak)
+2. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
+   iz çözülemez. Yeni saha çökmesi geldiğinde ilgili revizyonun artifact'i indirilip `retrace`
+   ile çözülür (README, "Çökme izini çözme").
 3. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
 4. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
-5. `UI-001` (sistem odağı göstergesi) → `UI-002`, `UI-003`, `UI-004`, `UI-005`
+5. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
 6. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
 7. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce)
 
