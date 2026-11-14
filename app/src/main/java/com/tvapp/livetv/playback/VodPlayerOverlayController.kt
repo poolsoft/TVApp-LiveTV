@@ -330,7 +330,7 @@ class VodPlayerOverlayController(
             binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline_selected)
             binding.vodTimelineRow.requestFocus()
         } else {
-            binding.vodTimelineRow.background = null
+            binding.vodTimelineRow.setBackgroundResource(R.drawable.bg_vod_timeline)
         }
 
         highlight(binding.vodBtnPlayPause, selectedTarget == VodControlTarget.PLAY_PAUSE)

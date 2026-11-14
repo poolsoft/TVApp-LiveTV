@@ -556,6 +556,8 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
 ### Epic MISS — Denetimde açığa çıkan eksikler
 
 - [ ] **MISS-001 (P0): paid flavor'da IPTV erişim kapısı kapalı**
+  **Durum (2026-11-14):** kullanıcı kararıyla **en sona alındı** — stabilite ve arayüz
+  görevleri bitirilemeden başlatılmayacak. Bulgular geçerliliğini koruyor.
   `app/build.gradle.kts:66, 76, 87` — `IPTV_PRO_REQUIRED = false` **`paid` dahil her flavor'da**.
   `billing/IptvEntitlementManager.kt:90-92` bu durumda `FREE_BUILD / accessGranted = true`
   döndürüyor, yani production paid derlemesinde ücretli IPTV tamamen açık ve deneme/satın alma
@@ -589,10 +591,13 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** Son üç migration dahil her geçiş için tablo/kolon/kayıt koruması doğrulanır;
   şema JSON'ları ile versiyon numarası tutarlılığı bir testte kontrol edilir.
 
-- [ ] **MISS-004 (P1): `.gitignore` ikili ve playlist sızıntısına kapalı olmalı**
+- [x] **MISS-004 (P1): `.gitignore` ikili ve playlist sızıntısına kapalı olmalı**
   `.log/`, `*.log.txt`, `*.jks`, `*.keystore`, `keystore.properties`, `.env` doğru korunmuş.
   Ancak `.doc/` (içinde iki APK ve üç playlist var), `.clinerules/` ve `.freebuff/` alt
   içeriği ignore edilmemiş ve untracked duruyor — `git add .` ile repoya girerler.
+  **Durum (2026-11-14):** `.doc/`, `.clinerules/`, `.freebuff/` ve Gradle'ın ürettiği
+  `.kotlin/` eklendi. `git ls-files -i -c --exclude-standard` boş (hiçbir izlenen dosya
+  yanlışlıkla kapanmıyor); `git status --short` bu dizinleri artık göstermiyor.
   **Kabul:** `git status --short` temiz çalıştırıldığında korumasız dizin kalmaz; imzalama
   malzemesi, APK ve playlist hiçbir derlemede stage edilmez.
 
@@ -722,15 +727,27 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
 `UIINPUT-004` (ortak TV görsel bileşenleri) tamamlandı; ancak aşağıdaki satırlar o ortak
 bileşenleri hâlâ kullanmıyor.
 
-- [ ] **UI-001 (P0): IPTV ve VOD düğmelerinde odak göstergesi yok**
-  `res/drawable/bg_iptv_control.xml` tamamen düz, şeffaf bir `shape` (seçici bile değil) ve
-  `res/drawable/bg_vod_button.xml` içinde hiç `state_focused` dalı yok. IPTV oynatma kontrolleri
-  (`activity_main.xml:752, 767, 782, 798, 814`) ve VOD düğmeleri odaklandığında görsel olarak
-  hiç ayırt edilemiyor — AGENTS.md "Focused state must remain clearly visible on the dark OSD"
-  kuralının doğrudan ihlali; bu ekranlar kumandayla fiilen kullanılamaz.
-  **Kabul:** Mevcut `bg_vod_poster_focused` deseninde (kenarlık + hafif ölçek) odak durumu iki
-  drawable'a da eklenir; karanlık OSD üzerinde odak belirgindir; 720p/1080p/4K ekran
-  görüntülerinde tutarlıdır.
+- [~] **UI-001 (P0): IPTV ve VOD katmanlarında sistem odağı görünmüyor**
+  İlk inceleme bulgusu ("odak göstergesi hiç yok, bu ekranlar kumandayla kullanılamaz")
+  **doğru değildi**: bu iki katmanda uygulama ayrı bir **seçim imleci** modeli kullanıyor ve
+  seçili öğe kod tarafında boyanıyor — `MainActivity.renderIptvControlSelection`
+  (`:2863-2903`) `bg_iptv_control_selected`, `VodPlayerOverlayController.renderSelection`
+  (`:317-347`) `bg_vod_button_selected` veriyor; IPTV düğmelerinin odaklanabilirliği
+  `iptvControlsInteractive` ile kapılı (`MainActivity.kt:2919-2924`). D-pad akışında
+  geri bildirim zaten var.
+  Gerçek açık: tema `defaultFocusHighlightEnabled = false` olduğu için (`styles.xml:12, 16,
+  35, 46`) **imlekten bağımsız sistem odağı** (çerçeve odak araması, fare/dokunma, ilk
+  yerleşim odağı) hiçbir iz bırakmıyordu; `bg_iptv_control` tamamen şeffaftı ve
+  `vod_timeline_row` seçili değilken `background = null` alıyordu.
+  **Durum (2026-11-14):** `bg_iptv_control` ve `bg_vod_button` seçiciye çevrildi,
+  `state_focused` dalı eklendi; yeni `bg_vod_timeline.xml` seçicisi `vod_timeline_row`
+  üzerindeki `background = null` yolunun yerine geçti. Seçim imleci modeli ve `*_selected`
+  drawable'ları değiştirilmedi. Cihaz ve 720p/1080p/4K ekran görüntüsü doğrulaması bekliyor.
+  **Kabul:** Sistem odağı her iki katmanda görünür; seçili öğe ile yalnız odaklı öğe ayırt
+  edilebilir (seçili: camgöbeği dolgu + accent kenarlık; yalnız odaklı: accent kenarlık);
+  odak davranışı ve renk tuş sözleşmeleri değişmez.
+  **İzlenen kalan iş:** imleç ile sistem odağı tek doğruluk kaynağına indirilmeli (odak
+  değişimi imleci de taşımalı), aksi hâlde iki gösterge ayrışabilir.
 
 - [ ] **UI-002 (P1): VOD ana ekranında yükleme, hata ve yeniden dene durumu yok**
   `VodHomeActivity.kt:412-456` yüklerken ızgara boş kalıyor, ağ hatası yalnız `debugLog`'a
@@ -970,22 +987,27 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
 
 ### Denetim sonrası iş sırası
 
+> **Kullanıcı kararı (2026-11-14):** satın alma ve yetkilendirme işleri **en sona** alındı.
+> `MISS-001` (paid flavor erişim kapısı) ve `STORE-001` (gerçek Play Billing) yeni işlerin
+> önünü kesmeyecek; önce stabilite (`CRASH-*`, `VOD-*` sağlamlık, bellek/thread) ve
+> arayüz görevleri (`UI-*`) bitirilecek.
+
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `MISS-005` (mapping arşivi olmadan CRASH-002/003 teşhis edilemez) ve `MISS-004`
 2. `CRASH-003` (bellek sınırı), ardından `CRASH-001` kalıntısı ve `CRASH-002`
-3. `MISS-001` (paid flavor erişim kapısı kararı) ve `VOD-004` (güvenlik)
+3. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
 4. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
-5. `UI-001` (tek drawable değişikliğiyle kullanılamaz ekranları kullanılır yapar)
+5. `UI-001` (sistem odağı göstergesi) → `UI-002`, `UI-003`, `UI-004`, `UI-005`
 6. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
 7. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce)
 
-**Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-002`..`UI-005`,
+**Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`,
 `PERF-013`, `PERF-019`.
 
-**Sonraki:** kalan PERF-020..024, `MISS-006`, `UI-012`, `REFACTOR-002`,
-`MISS-003` ve `STORE-001` (gerçek Play Billing, `MISS-001` kararına bağlı).
+**Son:** kalan `PERF-020..024`, `MISS-006`, `UI-012`, `REFACTOR-002`, `MISS-003`,
+**ve en son** `MISS-001` + `STORE-001` (kullanıcı kararı).
 
 Her maddede AGENTS.md gereği: birim testler geçtikten sonra doğrudan commit + push;
 kumanda tuş ve odak sözleşmeleri ile VOD akışları Android 11 Google TV cihazında ayrıca

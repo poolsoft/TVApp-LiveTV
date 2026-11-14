@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#99141A22" />
-    <stroke android:width="2dp" android:color="#33FFFFFF" />
-    <corners android:radius="22dp" />
-</shape>
+<!-- VOD oynatma katmani dügmeleri varsayilan durumu. Secim imleci kod tarafinda
+     bg_vod_button_selected ile boyanir (VodPlayerOverlayController.renderSelection).
+     state_focused dali yalnız sistem odak aramasini (cerceve/fare/dokunma) görünür
+     kilar; tema defaultFocusHighlightEnabled = false oldugundan aksi hâlde odak
+     belirsiz kalirdi. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#1F38BDF8" />
+            <stroke android:width="2dp" android:color="@color/accent" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#99141A22" />
+            <stroke android:width="2dp" android:color="#33FFFFFF" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+</selector>

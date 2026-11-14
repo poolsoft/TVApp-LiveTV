@@ -1,5 +1,30 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-14 - IPTV ve VOD Oynatma Katmanlarında Sistem Odağı Göstergesi
+
+- **Sistem odağı görünür kılındı (`bg_iptv_control.xml`, `bg_vod_button.xml`,
+  `bg_vod_timeline.xml`, `VodPlayerOverlayController.kt`):** Tema genelinde
+  `defaultFocusHighlightEnabled = false` olduğu için uygulama seçim imlecinden bağımsız gelişen
+  sistem odağı (çerçeve odak araması, fare/dokunma, ilk yerleşim odağı) hiçbir görsel iz
+  bırakmıyordu. `bg_iptv_control` ve `bg_vod_button` seçici (selector) yapısına çevrilip
+  `state_focused` dalı (accent kenarlık + hafif dolgu) eklendi; VOD zaman çizgisi satırının
+  seçili olmayan durumunda kullanılan `background = null` yerine şeffaf ama odakta kenarlık
+  çizen `bg_vod_timeline.xml` verildi.
+- **Korunan davranış:** Uygulamanın kendi seçim imleci modeli (`bg_iptv_control_selected`,
+  `bg_vod_button_selected`, `bg_vod_timeline_selected`) ve IPTV düğmelerinin
+  `iptvControlsInteractive` odak kapısı değiştirilmedi; normal görünüm piksel düzeyinde aynı.
+- **`TASKS.md` düzeltmesi:** `UI-001` bulgusunun ilk ifadesi ("odak göstergesi hiç yok,
+  ekranlar kumandayla kullanılamaz") doğrulama sonrası yanlışlandı; görev, gerçek açık
+  (sistem odağı göstergesiz) ve uygulanan çözümle güncellendi. Ayrıca satın alma işleri
+  (`MISS-001`, `STORE-001`) kullanıcı kararıyla iş sırasının en sonuna alındı.
+- **Depo hijyeni (`.gitignore`, `MISS-004`):** `.doc/` (içinde APK ve playlist örnekleri var),
+  `.clinerules/`, `.freebuff/` ve Gradle'ın ürettiği `.kotlin/` dizinleri yok sayma listesine
+  alındı; `git add .` ile ikili/playlist sızma riski kapatıldı. İzlenen hiçbir dosya
+  yanlışlıkla kapanmadığı `git ls-files -i -c --exclude-standard` boş çıktısıyla doğrulandı.
+- **Doğrulama:** İki varyantın birim testleri ve debug derlemeleri başarılı; Android 11
+  Google TV üzerinde odak görüntüsü ve 720p/1080p/4K ekran görüntüsü doğrulaması bekliyor.
+
+
 ## 2026-11-14 - Denetim Bulguları Görev Defterine İşlendi
 
 - **`TASKS.md`:** 13 Kasım proje denetiminin bulguları görev olarak eklendi — `CRASH-001..003`
