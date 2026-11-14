@@ -1,5 +1,18 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-14 - Denetim Bulguları Görev Defterine İşlendi
+
+- **`TASKS.md`:** 13 Kasım proje denetiminin bulguları görev olarak eklendi — `CRASH-001..003`
+  (WebView thread kalıntısı, StackOverflow döngüsü, OOM bellek sınırı), `MISS-001..006`
+  (paid flavor erişim kapısı, VOD test boşluğu, migration testleri, `.gitignore`, R8 mapping
+  arşivi, ölü kod), `VOD-001..009`, `UI-001..012`, `PERF-006..024` ve `REFACTOR-001..002`.
+  Denetim raporundaki `PERF-001..019` kimlikleri mevcut `PERF-001..005` ile çakışmaması için
+  deftere `PERF-006..024` olarak taşındı (defter = rapor + 5).
+- **`PROJECT_AUDIT_2026_11_13.md`:** §2 ve §7'ye görev defteri çapraz referansı ve kimlik
+  eşlemesi eklendi.
+- Kod değişikliği yok; cihaz doğrulaması bekleyen maddeler rapor §8'te listelenmeye devam ediyor.
+
+
 ## 2026-10-30 - Canlı TV Hata Ekranı Sadeleştirme (Yenile Butonu ve Olayları Kaldırıldı)
 
 - **Canlı TV Hata Ekranı Sadeleştirildi (`MainActivity.kt` & `RemoteInputRouter.kt`):**

@@ -118,6 +118,11 @@ java.lang.OutOfMemoryError: Failed to allocate a 133103624 byte allocation
 
 ## 2. PERFORMANS
 
+> **Defter eşlemesi (14 Kasım):** bu tablodaki `PERF-001..019` bulguları `TASKS.md` defterine
+> `PERF-006..024` olarak işlendi (`TASKS.md` içindeki mevcut `PERF-001..005` ölçüm işleriyle
+> çakışmayı önlemek için). Eşleme: **defter = rapor + 5**. `CRASH-*`, `VOD-*`, `UI-*`, `MISS-*`
+> kimlikleri defterde de aynıdır.
+
 | ID | Konu | Yer | Etki |
 |---|---|---|---|
 | PERF-001 | VOD kataloğu her sayfa/kategori/sayaç sorgusunda **tam malzemeleştirilip** dış seviyede sıralanıyor; `name LIKE '%q%'` indeks kullanamıyor | `data/VodCatalogQuery.kt:18-101`, `data/VodRepository.kt:17-21` | **YÜKSEK** |
@@ -376,6 +381,10 @@ main'deki çökme ve performans düzeltmeleri geri gelir.
 ---
 
 ## 7. ÖNERİLEN İŞ SIRASI
+
+> **Durum (14 Kasım):** bu sıradaki maddeler `TASKS.md` içine görev olarak işlendi
+> (`CRASH-001..003`, `MISS-001..006`, `VOD-001..009`, `UI-001..012`, `PERF-006..024`,
+> `REFACTOR-001..002`). Aşağıdaki liste gerekçe ve öncelik sırası için korunmaktadır.
 
 **Sıcak (çökme/güvenlik):**
 1. `CRASH-003` — `CrashReportStore` trace'ini boyut sınırlı + stream'e yaz; tam-gövde

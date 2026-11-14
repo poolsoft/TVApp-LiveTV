@@ -505,3 +505,488 @@ gerçek TV/TV stick üzerinde doğrulanmadan başlatılmamalıdır.
   ölçülmeli; mevcut OkHttp ailesiyle uyumlu minimal çözüm tercih edilir.
 - Uzaktan (LAN dışı) erişim v1'de kapsamda **değildir**; gerekirse ileride ayrı
   güvenlik değerlendirmesiyle ele alınır.
+
+## 2026-11-13 proje denetimi — görev defteri
+
+Kaynak: `PROJECT_AUDIT_2026_11_13.md` (4 paralel salt-okunur kod denetimi + saha çökme
+logları). **ID eşlemesi:** rapordaki `PERF-001..019` bu defterdeki mevcut `PERF-001..005`
+kimlikleriyle çakıştığı için deftere **`PERF-006..024`** olarak taşındı (defter = rapor + 5).
+`CRASH-*`, `VOD-*`, `UI-*`, `MISS-*` aileleri rapordaki numaralarıyla aynıdır.
+Kod değişikliklerinde olduğu gibi her görev kendi testleriyle gönderilir; hiçbir maddesi
+Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
+
+### Epic CRASH — Saha çökmeleri (Expressluck Apollo Premium4K, Android 11 / API 30)
+
+- [ ] **CRASH-001 (P0): WebView ve CookieManager çağrılarını tek iş parçacığına topla**
+  `SniffingWebViewClient.shouldInterceptRequest` arka plan thread'inde çalışır; içindeki
+  `userAgent` lambda'sı `webView.settings`'e dokunduğu için `WebView.checkThread()` çöküyordu.
+  `main` bu kısmı `cachedUserAgent` ile kapattı, ancak `browser/StreamSniffer.kt:62` ve `:75`
+  ile `vod/WebVideoResolver.kt:309` hâlâ arka plan thread'inden `CookieManager.getInstance()`
+  çağırıyor. Kullanıcı ajanını ve cookie'yi çözümleme başında ana thread'de önbelleğe al,
+  sniff callback'i yalnız bu önbelleği okusun.
+  **Kabul:** Sniffer yolu boyunca hiçbir WebView/CookieManager erişimi arka plan thread'inde
+  olmaz; `refactor/main-activity-split` dalı da düzeltmeyi içerir; aday yakalama davranışı
+  değişmez ve cihazda VOD açılışı çökmez.
+
+- [ ] **CRASH-002 (P0): MainActivity karşılıklı çağrı StackOverflowError'u**
+  Saha logunda `MainActivity.n1 ↔ u1` ikilisi `setVisibility` üzerinde yüz binlerce frame
+  üretmiş. R8 eşleme dosyası olmadığı için hangi iki metodun olduğu **kesin bilinmiyor**
+  (bkz. `MISS-005` — bu görev onun ön koşuluna bağlı). 217 metod / 614 kenar analizinde
+  visibility değiştiren aday döngüler: `hideChannelPanel ↔ scheduleChannelPanelClose`,
+  `hideChromeForPictureInPicture ↔ restoreChromeAfterPictureInPicture`,
+  `updateInfoColorActions ↔ action`, `buildNormalPanelChannels ↔ applyChannelFilter`,
+  `updateDiagnosticsOverlay ↔ startDiagnosticsObservation`.
+  Kalıcı çözüm olarak görünürlük geçişlerini `OsdCoordinator` üzerinden yeniden-giriş
+  korumalı tek noktaya indir ve döngü üretmeyen bir kumanda/OSD testi ekle.
+  **Kabul:** Eşleme çözüldükten sonra iki metod adı belgelenir; yeniden-giriş bayrağı veya
+  durum makinesi ile döngü yapısal olarak imkânsız hâle gelir; OSD aç/kapa davranışı
+  değişmez; cihazda uzun oturumda çökme yeniden üretilemez.
+
+- [ ] **CRASH-003 (P0): Çökme izi ve tam gövde okumalarında bellek sınırı**
+  127 MB'lık tek ayırma çökmesi (`StringWriter.write`). `diagnostics/CrashReportStore.kt:98`
+  çökme izini tamamen bellekte String'e kuruyor; CRASH-002'nin 100k frame'lik izi burada
+  patlamış olabilir. İzi boyut sınırlı (örn. 200 KB, kesildiği satır not düşülerek) ve
+  doğrudan dosyaya akıtarak yaz. İkincil adaylar tüm gövdeyi String'e okuyan ağ yolları:
+  `data/IptvRepository.kt:479`, `data/XtreamClient.kt:330`, `data/StalkerClient.kt:160`,
+  `data/XmlTvRepository.kt:747` (metin + parse ağacı aynı anda bellekte).
+  **Kabul:** Sınırsız boyutta yanıt/istisna bellekte String'e biriktirilmez; 15.000+ kayıtlı
+  M3U/JSON/XMLTV yükleme sırasında tepe bellek ölçülebilir biçimde düşer; çökme raporu
+  yazılmaya devam eder ve asla ikinci bir çökme üretmez.
+
+### Epic MISS — Denetimde açığa çıkan eksikler
+
+- [ ] **MISS-001 (P0): paid flavor'da IPTV erişim kapısı kapalı**
+  `app/build.gradle.kts:66, 76, 87` — `IPTV_PRO_REQUIRED = false` **`paid` dahil her flavor'da**.
+  `billing/IptvEntitlementManager.kt:90-92` bu durumda `FREE_BUILD / accessGranted = true`
+  döndürüyor, yani production paid derlemesinde ücretli IPTV tamamen açık ve deneme/satın alma
+  yolu hiç çalışmıyor. `billing/IptvAccessDialogs.kt:35` "Satın al" butonu yalnız
+  `billing_not_connected` Toast'u gösteren bir yer tutucu. Gerçek satın alma altyapısı
+  `STORE-001` kapsamındadır; bu görev önce **politikayı netleştirir**: paid derlemede
+  `IPTV_PRO_REQUIRED = true` olur ve erişim ancak `PURCHASED` ile açılır, ya da ücretsiz
+  yayın bilinçli bir karar olarak README/MARKET_LISTING'e yazılır.
+  **Kabul:** Hiçbir production varyantında "paralı ama kapısız" durum kalmaz; debug simülatör
+  release paketinde bulunmaz; yer tutucu buton ya çalışır ya da arayüzden kaldırılır;
+  `IptvEntitlementPolicy` karar tablosu her flavor için birim testli.
+
+- [ ] **MISS-002 (P1): VOD çözümleme katmanına birim test (AUDIT-000 regresyonunun nedeni)**
+  `VodHostTest`, `VodLibraryResolverTest`, `VodUiSupportTest` ve `VodTitleCleanerTest` var;
+  **olmayanlar:** `VodUrlClassifier` (68 satır, saf JVM — son iki düzeltme bunu değiştirdi ama
+  regresyon testi yok), `WebVideoResolver` (713 satır), `VodMetadataExtractor` (216 satır),
+  `IptvPlaybackController` (1276 satır), `IptvResumeStore`, `MultiViewController`.
+  En azından saf JVM'de test edilebilir olanları kapsa: URL sınıflandırma (webpage yolu doğrudan
+  medya sayılmayacak), `isNetworkMediaCandidate`, `isSegmentLike`, `rankHeadlessCandidates`,
+  `extractStreamFromPage` `html = null` girdisi (1 Kasım'da kaçan NPE), `VodMetadataExtractor`
+  JSON-LD/OpenGraph alanları.
+  **Kabul:** `f1fb402` tipinde bir gerileme derleme geçse bile testte yakalanır; mock web sunucusu
+  veya sabit HTML fikstürleriyle test çevrimdışı çalışır; üretim davranışı değişmez.
+
+- [ ] **MISS-003 (P2): Room migration sözleşme testlerini genişlet**
+  Zincir eksiksiz ve `fallbackToDestructiveMigration` hiç kullanılmıyor (uyumlu), fakat tek
+  migration testi var: `Migration25To24ContractTest.kt`. `MIGRATION_31_32`, `30_31`, `24_26` ve
+  yeni eklenecekler test-siz. **Dikkat:** `main` dalında v33 (`alternativeStreamsJson`) var,
+  `refactor/main-activity-split` v32'de; birleştirme sırasında numara sırası bozulursa kullanıcı
+  verisi tehlikeye girer (`REFACTOR-001`).
+  **Kabul:** Son üç migration dahil her geçiş için tablo/kolon/kayıt koruması doğrulanır;
+  şema JSON'ları ile versiyon numarası tutarlılığı bir testte kontrol edilir.
+
+- [ ] **MISS-004 (P1): `.gitignore` ikili ve playlist sızıntısına kapalı olmalı**
+  `.log/`, `*.log.txt`, `*.jks`, `*.keystore`, `keystore.properties`, `.env` doğru korunmuş.
+  Ancak `.doc/` (içinde iki APK ve üç playlist var), `.clinerules/` ve `.freebuff/` alt
+  içeriği ignore edilmemiş ve untracked duruyor — `git add .` ile repoya girerler.
+  **Kabul:** `git status --short` temiz çalıştırıldığında korumasız dizin kalmaz; imzalama
+  malzemesi, APK ve playlist hiçbir derlemede stage edilmez.
+
+- [ ] **MISS-005 (P0): Release R8 mapping arşivi**
+  `isMinifyEnabled = true` (`app/build.gradle.kts:122`) fakat `mapping.txt` hiçbir yere
+  kopyalanıp saklanmıyor. Bu yüzden saha loglarındaki `n1`, `u1`, `q2.m` gibi adlar
+  çözülemiyor; CRASH-002 ve CRASH-003 bugün **teşhis edilemez** durumda. Release işinde
+  mapping'i versiyon etiketiyle eşleşen bir CI artifact'i olarak arşivle (repoya commit etmeden).
+  **Kabul:** Her release APK'sı için doğru sürüm numarasıyla bir mapping dosyası erişilebilir;
+  bir saha logundaki kırpılmış yığın `retrace` ile okunabilir hâle getirilir; dosya git'e girmez.
+
+- [ ] **MISS-006 (P3): Ölü bayrak, import ve kaynak temizliği**
+  `build.gradle.kts:65, 75, 87` `STORE_BILLING_ENABLED` hiçbir Kotlin kodunda okunmuyor;
+  `MainActivity.kt:75` kullanılmayan `main.LongPressKeyGate` import'u; `res/layout/dialog_vod_detail.xml`
+  ve `dialog_vod_filters.xml` hiçbir yerden inflate edilmiyor (`androidTest/VodHomeLayoutTest.kt:135,139`
+  `vod_detail_scroll` kimliğine bağımlı, test önce güncellenmeli); `vod/VodRightPanelAdapters.kt`
+  içindeki `VodSourceAdapter` ve `VodHomeActivity.history` ölü. Koda gömülü "Faz 1/2/3/4/5"
+  refaz etiketleri kalıcı terminolojiye çevrilmeli.
+  **Kabul:** Derlemeye girmeyen bayrak ve kod kalmaz; silinen her dosyanın yerine bir gerekçe
+  veya test güncellemesi bırakılır.
+
+### Epic VOD — Çözümleme ve oynatma sağlamlığı
+
+- [ ] **VOD-001 (P0): Aday bulunamadığında net hata ve Yeniden dene**
+  `main/VodHost.kt:82` adaysız durumda orijinal sayfa URL'sini sessizce oynatıcıya veriyor;
+  kullanıcı `PARSING_CONTAINER_UNSUPPORTED` veya 403 görüyor ve bu yolda `statusRetryAction`
+  hiç kurulmadığı için (`MainActivity.kt:1639-1657` yalnız `showPlaybackError` kurar)
+  **Yeniden dene seçeneği sunulmuyor**. `WebVideoResolver.kt:160` `isPlayable = false` üretiyor
+  ama tek bir tüketicisi bile yok; `VodPageResolver.kt:16`'nın belgelediği tarayıcı/tiyatro
+  geri dönüşü de yok.
+  **Kabul:** Çözülemeyen içerikte iki dilli net mesaj + OK ile tetiklenen Yeniden dene ve
+  VOD kütüphanesine dön eylemi vardır; ham HTML oynatıcıya gitmez veya yalnız açık bir
+  "doğrudan dene" adımı olarak gider; `isPlayable` gerçek bir tüketici tarafından okunur.
+
+- [ ] **VOD-002 (P1): Header, referer ve cookie taşımada üç kayıp**
+  (1) `MainVodExtras.EXTRA_VOD_REFERRER/ORIGIN/USER_AGENT/COOKIE` tanımlı ve okunuyor
+  (`VodHost.kt:379-382, 418-421, 269-274`) ama `VodHomeActivity` bu dördünü **hiç doldurmuyor**
+  (`:619-627, 643-651, 687-694`). (2) `VodLibraryResolver.buildChannel` (`:98-114`) başlık
+  taşımıyor. (3) `VodPageResolver.applyTo` (`:34-38`) `base.userAgent ?: chosen.userAgent`
+  önceliğiyle **sniffer'ın ürettiği UA/referer/cookie'yi siliyor** — tam da token korumalı CDN
+  için gereken cookie düşüyor.
+  **Kabul:** Sniffer kaynaklı başlıklar DB kanalının varsayılanlarını ancak gerçekten boşsa
+  bastırır; kütüphane ve ana ekran yolları da aynı başlık kümesini taşır; kimlik bilgisi
+  loglanmaz; cihazda token'lı bir kaynakta oynatma doğrulanır.
+
+- [ ] **VOD-003 (P1): Çözümleme için küresel zaman bütçesi**
+  `fetchHtml` istek başına ~14 sn (`WebVideoResolver.kt:673-674`), `extractStreamFromPage`
+  adım 5 iframe listesi sınırsız (`:652-659`) ve aynı embed sayfaları iki ayrı dolaşım tarafından
+  **iki kez** indiriliyor (`:231` vs `:242-249`). Aday yokken ~140 ardışık istek ve teorik
+  ~30+ dk bekleme mümkün; ekranda yalnız "hazırlanıyor" var. Mp4-only sitelerde
+  `HEADLESS_TIMEOUT_MS = 10_000` her seferinde tam 10 sn. Kütüphane/anahtar yolunda
+  `context = null` geçtiği için sniffer **hiç çalışmıyor** (`VodHost.kt:318, 363`) — aynı
+  içerik derin bağlantıda oynayıp kütüphanede oynamayabilir.
+  **Kabul:** Toplam çözümleme süresi üst sınırının (örn. 45 sn) sonunda kullanıcıya durum
+  gösterilir; aynı URL bir çözümleme içinde iki kez indirilmez; iframe sayısı sınırlıdır;
+  kütüphane yolu ile derin bağlantı yolu aynı çözünülebilirlik davranışını gösterir.
+
+- [ ] **VOD-004 (P1): Ağ ve WebView güvenlik sertleştirmesi**
+  Trust-all SSL + daima-true `hostnameVerifier` hem statik çözümlemede
+  (`WebVideoResolver.kt:682-685, 701-712`) hem **tüm oynatma veri yolunda**
+  (`IptvDataSourceFactory.kt:75-96`); `onReceivedSslError → proceed()` (`:450-456`);
+  `MIXED_CONTENT_ALWAYS_ALLOW` + `allowFileAccess` (`:293-301`); global cleartext
+  (`AndroidManifest.xml:31`); hard-coded TMDB anahtarı kaynak kodunda ve URL sorgusunda
+  (`TmdbApiClient.kt:26, 66, 78`); hard-coded yedek host `play2.pilavyerplay.top`
+  (`WebVideoResolver.kt:589-596`). En somut açık: sniffing kanalı
+  `console.log('net_stream_sniff:'+url)` (`:336-339, 493-501`) üzerinden sayfadaki betiğin
+  aday listesine **istediği URL'yi enjekte edebilmesi** — ardından o URL'ye bizim UA + cookie'mizle
+  istek atıyoruz.
+  **Kabul:** TMDB anahtarı derleme/secret konfigürasyonuna taşınır; SSL toleransı açıkça
+  listelenmiş host'larla sınırlanır veya kullanıcı onayına bağlanır; sniffing kanalı origin
+  doğrulaması yapar veya kapatılır; risk kabul edilecekse AGENTS/README'de gerekçesi yazılır.
+
+- [ ] **VOD-005 (P1): Bölüm modelinde üç parser kopyası ve kırılgan `:ep:` anahtarı**
+  Bölüm listesi bir yanda Room `vod_metadata` (`parentKey`), diğer yanda `SERIES.streamUrl`
+  içine gömülü JSON string (`JsonVodImporter.kt:53-73` yalnız üst kayıt yazıyor). Üç ayrık
+  çözümleyici var: `VodUiSupport.parseEpisodesJson` (`:45-85`), `VodHost.showEpisodePicker`
+  JSON dalı (`:154-183`), `VodHomeActivity.showEpisodesDialog` satır içi parser (`:564-610`);
+  başlık biçimleri farklı (`"Bolum"` vs `"Bölüm"`). `VodHost.kt:158-160` aktif bölümü
+  `title ==` ile aradığı için vurgulama **hep 0. bölüme** düşüyor. `:ep:<index>_<hash>`
+  anahtarında hash doğrulanmıyor (`VodLibraryResolver.kt:36-39`) — kaynak sırası değişirse aynı
+  anahtar **farklı bölümü** oynatır. `buildLibraryChannel` kanal listesi dalında
+  `setVodHasEpisodes` hiç çağrılmıyor (`VodHost.kt:306-321`), LIST düğmesi bayat kalabiliyor.
+  **Kabul:** Tek bir bölüm çözümleyici tüm yollar tarafından kullanılır; aktif bölüm doğru
+  vurgulanır; hash doğrulanmayan anahtarda eski kayıt sessizce yanlış bölümü oynatmaz;
+  LIST düğmesi gerçek bölüm durumunu yansıtır; her kural birim testli.
+
+- [ ] **VOD-006 (P2): Bölüm seçici iş iptali ve sayaç paylaşımı**
+  Durum makinesi genelinde generation/`cancelResolve`/`tuneGeneration` korumaları çalışıyor;
+  kalan boşluklar: `episodeJob` **hiç iptal edilmiyor** (`VodHost.kt:37-40` yalnız `resolveJob`)
+  ve callback'i mod değişse de `playVodKey` tetikleyebiliyor (`:107-186`); `selectChannel`
+  sayacı ikinci kez artırıyor (`MainActivity.kt:1151`); `handlePayload` aynı anahtarın hazır
+  olduğu dalda da sayaç artırıyor (`VodHost.kt:207, 219-224`).
+  **Kabul:** Mod/kanal değişimi bekleyen tüm VOD işlerini iptal eder; bekleyen her iş tek bir
+  iş sahibine kayıtlıdır ve yalnız o sahip tarafından iptal edilir; eski bir bölüm seçimi
+  yeni içeriği oynatamaz.
+
+- [ ] **VOD-007 (P1): Devam Et rayı ve izleme ilerlemesi**
+  Oynatma tarafı doğru (30 sn altı kaydedilmez, okumada 5 sn geri sarılır, son 60 sn "bitti"),
+  fakat ray `VodCatalogQuery.resumeItems` içinde `sourceKey IN (...)` ile
+  `iptv_channels ∪ vod_metadata` arıyor (`VodHomeActivity.kt:289-315`, `VodCatalogQuery.kt:41-45`).
+  JSON dizilerinin dinamik `...:ep:3_<hash>` anahtarlarının `vod_metadata`'da satırı olmadığı
+  için **yarım kalan JSON bölümleri rayda hiç görünmez**. `position/duration` tutuluyor ama
+  `VodPosterAdapter.bind` (`:80-106`) hiçbir ilerleme çizmiyor.
+  **Kabul:** Yarım kalan JSON dizisi bölümü rayda görünür ve kaldığı yerden açılır; poster veya
+  kart üzerinde gerçek ilerleme oranı gösterilir; biten içerik raydan düşer.
+
+- [ ] **VOD-008 (P2): VOD katmanında altyazı, kalite ve otomatik sonraki bölüm**
+  `AUDIO_SUB` düğmesi yalnız sesi açıyor (`MainActivity.kt:2374`); `showSubtitleTracks` yalnız
+  canlı IPTV kontrol çubuğunda (`:5901-5903`) ve o çubuk VOD'da gizli (`:5150-5152`) —
+  **VOD'da altyazı seçilemiyor**, yalnız otomatik tercih uygulanıyor (`:3218-3238`).
+  Kalite/video seçimi VOD katmanında yok (`VodPlayerOverlayController.kt:236-246`).
+  `onPlaybackEnded` yalnız resume temizliyor (`MainActivity.kt:729-737`); manuel "sonraki bölüm"
+  `VodDao.nextEpisode` sorgusu `kind='EPISODE'` aradığı için JSON dizilerinde hiç çalışmıyor
+  (`VodDao.kt:16-21`). Timeline üzerinde sürükleyerek ileri/geri alma yok, yalnız ±10/±30 sn.
+  **Kabul:** VOD oynatmada altyazı ve ses parçası kumandayla seçilebilir; sonraki bölüm
+  odağa göre önerilir veya otomatik geçer (tercihe bağlı, kapalı varsayılan olabilir) ve JSON
+  dizilerinde de çalışır; tüm yeni eylemler iki dilde ve `Back` sözleşmesine uygun.
+
+- [ ] **VOD-009 (P3): Çözümleyicide ölü kod**
+  `WebVideoResolver.resolveStream` / `resolve` (`:118-165`) üretimde hiç çağrılmıyor
+  (AUDIT-000 tam bu ölü yolda yaşıyordu), `VodHost.classifyDeepLink` (`:52-63`) kullanılmıyor.
+  **Kabul:** Ya gerçek bir çağıranı ve testi olur ya da silinir; ölü yol üzerinde düzeltme
+  yapılmaz.
+
+### Epic UI — Odak, boş durum ve 10-foot okunabilirlik
+
+`UIINPUT-004` (ortak TV görsel bileşenleri) tamamlandı; ancak aşağıdaki satırlar o ortak
+bileşenleri hâlâ kullanmıyor.
+
+- [ ] **UI-001 (P0): IPTV ve VOD düğmelerinde odak göstergesi yok**
+  `res/drawable/bg_iptv_control.xml` tamamen düz, şeffaf bir `shape` (seçici bile değil) ve
+  `res/drawable/bg_vod_button.xml` içinde hiç `state_focused` dalı yok. IPTV oynatma kontrolleri
+  (`activity_main.xml:752, 767, 782, 798, 814`) ve VOD düğmeleri odaklandığında görsel olarak
+  hiç ayırt edilemiyor — AGENTS.md "Focused state must remain clearly visible on the dark OSD"
+  kuralının doğrudan ihlali; bu ekranlar kumandayla fiilen kullanılamaz.
+  **Kabul:** Mevcut `bg_vod_poster_focused` deseninde (kenarlık + hafif ölçek) odak durumu iki
+  drawable'a da eklenir; karanlık OSD üzerinde odak belirgindir; 720p/1080p/4K ekran
+  görüntülerinde tutarlıdır.
+
+- [ ] **UI-002 (P1): VOD ana ekranında yükleme, hata ve yeniden dene durumu yok**
+  `VodHomeActivity.kt:412-456` yüklerken ızgara boş kalıyor, ağ hatası yalnız `debugLog`'a
+  düşüyor, ekranda hiçbir şey değişmiyor ve yeniden deneme yolu yok (`vod_grid_empty_state`
+  altyapısı `activity_vod_home.xml:319`'de hazır). `VODUI-001` bu davranışı istiyor ama
+  VOD ana ekranına tam yansımamış.
+  **Kabul:** Yükleme göstergesi, iki dilli hata kartı ve OK ile tetiklenen yeniden dene vardır;
+  hata boş katalogdan ayırt edilir; `VODUI-001` bu maddeyle birlikte kapatılır.
+
+- [ ] **UI-003 (P1): Boş durum ekranları eksik**
+  Ana kanal listesinde filtre/arama 0 sonuç verdiğinde panel bomboş kalıyor
+  (`activity_main.xml` kanal listesi); `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml`
+  listelerinde de boş durum ve "nasıl eklenir" yönlendirmesi yok.
+  **Kabul:** Her liste için iki dilli boş durum metni ve ilgili renk tuşu/ipucu yönlendirmesi;
+  filtre temizleme tek eylemle mümkün.
+
+- [ ] **UI-004 (P1): VOD ekranında sabit Türkçe metin ve emoji**
+  `activity_vod_home.xml:31, 99, 137, 153, 162, 192, 209, 247, 274, 342-368` (🌐⚡📂🎬⏱️🔴),
+  `VodHomeActivity.kt:545, 578-583, 636-639, 763, 770`, `VodRightPanelAdapters.kt:47` ve
+  `TmdbApiClient.kt` tür adları. `values` ile `values-en` paritesi şu an tam (905 = 905);
+  bu metinler kaynak dışında olduğu için EN dilinde de Türkçe kalıyor — AGENTS.md kuralı ihlali.
+  **Kabul:** Kullanıcıya görünen her VOD metni iki dilde tanımlı; yer tutuculu biçim
+  (`%1$d. Sezon`) kullanılır; emojiler sabit boyutlu drawable ikonlarıyla değiştirilir.
+
+- [ ] **UI-005 (P1): 10-foot için okunmaz punto (7-9 sp)**
+  Renk aksiyon ipuçları `MainActivity.kt:5037, 5079, 5123` (9f) ve ayraç `:5103` (11f);
+  `item_channel.xml:71` kalite rozeti 8sp, `:126` kaynak rozeti 9sp; `activity_main.xml:685`
+  tarih autoSize min 7sp; `activity_vod_home.xml:139` 9sp. İpuçlarının `technical_row` içinde
+  spacer ile sağa hizalı olması kurala uygun — sorun yalnız boyut.
+  **Kabul:** OSD'de minimum punto bir alt sınıra (örn. 12sp) bağlanır; TV mesafesinden
+  okunabilirlik cihazda doğrulanır; rozetler satırı kaydırmaz.
+
+- [ ] **UI-006 (P2): Oransal olmayan VOD ve Quick Hub ölçüleri**
+  `activity_vod_home.xml` sabit 38dp üst bar, 175dp Devam Et rayı, 185dp sol panel;
+  `dialog_quick_hub.xml` sabit 760dp genişlik ve ~35 sabit dp. `TvOverlayLayoutHelper` bu
+  ekranları kapsamıyor, ~480dp yükseklikli 720p görünümde alt ipucu barı ile içerik çakışabiliyor.
+  **Kabul:** Birincil geometri ekran oranına bağlanır; 720p/1080p/4K ekran görüntülerinde
+  üst ve alt güvenli boşluklar korunur.
+
+- [ ] **UI-007 (P2): OSD geçişlerinde animasyon yok**
+  `MainActivity.kt:5140+` (`renderPlaybackUiState`) tüm katmanları ani GONE/VISIBLE ile
+  değiştiriyor; tek istisna `ui/TvUiComponents.kt` `applyFocusRow`. AGENTS.md tek-birincil-OSD
+  kuralı korunarak 120-150 ms alpha geçişi eklenebilir.
+  **Kabul:** Geçişler kırpma hissi vermez; aynı anda iki birincil OSD görünmez; kumanda
+  gecikmesi artmaz.
+
+- [ ] **UI-008 (P2): Toast bağımlılığı ve ham hata metni**
+  40+ Toast çağrısı (örn. `browser/TvBrowserActivity.kt:351, 386, 493, 717, 721, 732, 765, 905,
+  1079, 1103`; `DisplaySettingsActivity.kt:307, 911, 967, 1006, 1022, 1031`;
+  `playback/MultiViewController.kt:169, 185, 189`) TV'de odaklanamayan ve tekrar okunamayan
+  geri bildirim üretiyor. `IptvChannelSelectionActivity.kt:322, 357, 456` ham `error.message`
+  gösteriyor (teknik, İngilizce ve kimlik bilgisi parçası içerebilir).
+  **Kabul:** Kalıcı/önemli mesajlar infobar benzeri OSD katmanına taşınır; ham hata yalnız
+  `.log`'a yazılır, kullanıcıya iki dilli genel mesaj + yeniden dene gösterilir.
+
+- [ ] **UI-009 (P2): Tarayıcıda kendi hata katmanı yok**
+  `browser/TvBrowserActivity.kt` içinde `onReceivedError` yok; ağ hatasında Chromium'un varsayılan
+  hata sayfası görünüyor ve kumandadan "yeniden yükle" köprüsü yok.
+  **Kabul:** Kendi OSD hata katmanı gösterilir; OK ile yeniden yükleme, Back ile çıkış çalışır.
+
+- [ ] **UI-010 (P2): VOD ipucu barı gerçek tuş sözleşmesiyle çelişiyor**
+  `activity_vod_home.xml:332-383` Kırmızı'yı tekrarlıyor, Mavi (arama) ve Sarı (kaynak)
+  ipuçlarını göstermiyor; `VodHomeActivity.kt:789-811` atamaları farklı ve kaynak yokken sarı
+  tuş sessiz no-op (`:252`).
+  **Kabul:** İpucu barı `dispatchKeyEvent` sözleşmesiyle birebir eşleşir; kullanılamaz eylem
+  devre dışı görünür ve kısa iki dilli açıklama verir.
+
+- [ ] **UI-011 (P2): Bölüm seçici düz AlertDialog**
+  `VodHomeActivity.kt:636-639` `setItems` ile düz liste: sezon gruplaması, bölüm numarası ve
+  izleme durumu göstergesi yok; uzun serilerde kumandayla gezinmek zor (`VODUI-005` ile bağlantılı,
+  `VOD-005` parser işine bağımlı).
+  **Kabul:** Sezon başlıklı, bölüm numaralı ve izlenen rozetli odaklanabilir liste; odak
+  ilk başta aktif bölümde açılır.
+
+- [ ] **UI-012 (P3): Layout'a gömülü teknik rozet metinleri**
+  `activity_main.xml:903, 922, 966` içindeki "RADIO", "DOLBY", "TXT" string kaynağında değil;
+  çeviri denetimi bu metinleri kaçırıyor.
+  **Kabul:** Sabitler dahil her görünen metin iki dilde tanımlıdır.
+
+### Epic PERF (denetim) — Çalışma zamanı performans bulguları
+
+Aşağıdaki kimlikler `PROJECT_AUDIT_2026_11_13.md` §2 tablosunun `PERF-001..019` satırlarına
+sırayla karşılık gelir (defter = rapor + 5). `PERF-001..005` ölçüm/altyapı işleri
+tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
+
+- [ ] **PERF-006 (P1): VOD kataloğu her sorguda tam oluşturulup sıralanıyor**
+  `data/VodCatalogQuery.kt:18-101` ve `data/VodRepository.kt:17-21`: CATALOG tüm
+  `iptv_channels` VOD satırları ile `vod_metadata`'yı UNION ALL ile birleştiriyor ve her
+  sayfa/sayaç/kategori sorgusu bu kümenin tamamını oluşturup dış seviyede ORDER BY ile
+  sıralıyor; `name LIKE '%q%'` indeks kullanamıyor. 15.000+ kayıtlı katalogda her kaydırma
+  tam tarama.
+  **Kabul:** `EXPLAIN QUERY PLAN` ile sayfa başına maliyet ölçülür; sayfalama ve sayaçlar
+  tüm katalogu oluşturmaz; 15.000 kayıtta kaydırma/jank cihazda önce/sonra ölçülür.
+
+- [ ] **PERF-007 (P1): Kanal arama filtresi ana iş parçacığında tüm listeyi dönüştürüyor**
+  `main/ChannelListRules.kt:23-33, 60-70` her tuş vuruşunda her kanal için
+  `Normalizer(NFD)` + Regex + `copy()` çalıştırıyor. Yüzlerce kanalda arama kutusunda kare
+  düşmesi ve geçici nesne yığını.
+  **Kabul:** Normalizasyon ya önbelleğe alınır ya IO'ya alınır; ana thread'de tam liste
+  dönüştürülmez; `UIALPHA-002` normalizasyon kuralları birebir korunur.
+
+- [ ] **PERF-008 (P1): DiffUtil senkron hesaplanıyor**
+  `ui/ChannelAdapter.kt:49-65` `DiffUtil.calculateDiff` çağrı iş parçacığında (proje genelinde
+  `AsyncListDiffer` veya background differ hiç yok) + `channels.toList()` tam kopyası.
+  PERF-007 ile aynı yolda zincirleniyor.
+  **Kabul:** Fark arka planda hesaplanır ve ana thread'e dağıtılır; DiffUtil payload ve stable
+  ID davranışı korunur; arama sırasında odak sıçramaz.
+
+- [ ] **PERF-009 (P2): IPTV→TIF eşitleme OFFSET paging ve satır başına binder yazması**
+  `data/local/IptvDao.kt:51-65` indekslenemeyen `ORDER BY COALESCE(u.sortOrder, …), s.name,
+  c.originalIndex` ile LIMIT/OFFSET kullanıyor; `tifinput/IptvInputChannelSyncRepository.kt:38-75`
+  her kanal için ayrı ContentResolver yazması yapıyor (`bulkInsert` yok).
+  **Kabul:** Sayfalama keyset'e döner veya sıralama indekslenebilir olur; yazmalar toplulaştırılır;
+  senkronizasyon süresi binlerce kanalda ölçülür ve Room tek yetkili kalır.
+
+- [ ] **PERF-010 (P2): 500 ms oynatma ticker'ı tam OSD yeniliyor**
+  `MainActivity.kt:2216-2223, 2445-2509` saniyede iki tam kontrol/infobar güncellemesi;
+  oynatma boyunca aralıksız ana iş parçacığı işi.
+  **Kabul:** Yalnız değişen alanlar güncellenir (payload), görüş görünür değilken ticker durur.
+
+- [ ] **PERF-011 (P2): Renk ipuçları her güncellemede yeniden üretiliyor**
+  `MainActivity.kt:5031+` `removeAllViews()` + yeni `TextView` üretimi her infobar güncellemesinde
+  ölçüm/layout maliyeti. Öğe yeniden kullanımı veya payload diff gerekli.
+  **Kabul:** İpucu satırı öğe yeniden kullanımıyla güncellenir; `UI-005` punto değişikliği ile
+  birlikte yapılır; teknik satır sırası (source, quality, audio, subtitles, TXT, lock) değişmez.
+
+- [ ] **PERF-012 (P2): Headless sniffer ana iş parçacığında 1920×1080 WebView**
+  `vod/WebVideoResolver.kt:266-517` her sniffingde WebView'i sıfırdan kurup DecorView'a
+  ekliyor ve içinde 500 ms'de bir `querySelectorAll` taraması çalışıyor (`:441-445`);
+  oynatma başlangıcında bellek ve CPU maliyeti.
+  **Kabul:** Oynatma başlangıcında ölçülebilir kare düşmesi olmaz; WebView ömrü sınırlı ve
+  her yolda destroy edilir; sniffer sırasında odak kaybı olmadığı `CRASH-001` ve `VOD-003` ile
+  birlikte cihazda doğrulanır.
+
+- [ ] **PERF-013 (P1): Multi-View oynatıcıları serbest bırakılmıyor**
+  `playback/MultiViewController.kt:100-148` dört ayrı `IptvPlaybackController` üretiyor,
+  `stop()` yalnız oynatmayı durduruyor; `release()` (`IptvPlaybackController.kt:585-598`)
+  Activity dağıtımına kadar çağrılmıyor — donanım kodek ve tampon belleği grid dışında da tutuluyor.
+  **Kabul:** Grid kapatılınca oynatıcılar ve yüzeyler derhal serbest bırakılır; tekrarlı
+  Multi-View oturumlarında bellek birikmez; TIF + IPTV ve IPTV + IPTV kombinasyonları çalışır.
+
+- [ ] **PERF-014 (P2): Her tune'da Media3 fabrika nesneleri yeniden ayrılıyor**
+  `IptvPlaybackController.kt:263-341` (özellikle `:281-286`) her `playPrepared` çağrısında yeni
+  `DefaultRenderersFactory`, `DefaultLoadControl` ve `AdaptiveTrackSelection.Factory` üretiyor.
+  Ayrıca `:308` `EXTENSION_RENDERER_MODE_PREFER` kurulu ama `app/build.gradle.kts:153-158`
+  içinde hiçbir decoder-extension bağımlılığı yok (`OPTIMIZATION_TASKS.md` OPT-1.5 "Review"
+  durumunda) — mod işlevsiz, yalnızca renderer sorgulama maliyeti.
+  **Kabul:** Yapılandırma değişmedikçe fabrikalar yeniden kullanılır; PREFER modu ya gerçek
+  bir extension ile anlamlandırılır ya da ON'a döner; tune süresi ölçülür.
+
+- [ ] **PERF-015 (P2): Harf filtresi non-sargable**
+  `data/local/IptvDao.kt:143, 166, 273` `SUBSTR(TRIM(displayName),1,1) IN (...)` sütun üzerine
+  fonksiyon uyguladığı için indeksi kullanamıyor; 15.000+ satırda her harf seçimi tam tarama.
+  **Kabul:** Baş harf kalıcı/indexlenmiş bir kolona veya FTS'e taşınır (`DATA-004` FTS altyapısı
+  değerlendirilir); 15.000 kayıtta harf seçimi ve toplam sayım süresi ölçülür.
+
+- [ ] **PERF-016 (P2): EPG liste penceresi kanal başına ayrı sorgu**
+  `data/ProgramRepository.kt:253-263` görünen her TIF kanalı için ayrı ContentResolver sorgusu
+  (N+1; önbellek korumalı ama ilk doldurma yavaş, TV provider'ına tekrarlı binder yükü).
+  **Kabul:** Pencere tek veya sınırlı sayıda sorguyla dolar; `EPG-002` odak öncelikli prefetch
+  davranışı ve snapshot tutarlılığı bozulmaz.
+
+- [ ] **PERF-017 (P2): Üyelik değişimi tüm birleşik listeyi yeniden yüklüyor**
+  `MainActivity.kt:4708-4713` (çağrı `:4207`) tek bir IPTV kanalını listeye ekleme/çıkarma
+  tüm birleşik kanal listesini baştan yüklüyor.
+  **Kabul:** Hedefli tek kayıt güncellemesi yapılır; odak ve kaydırma konumu korunur; Room
+  yetkili kalmaya devam eder.
+
+- [ ] **PERF-018 (P2): TMDB zenginleştirme ardışık 15 istek**
+  `VodHomeActivity.kt:478-523` ardışık tekil aramalar (toplam 15 × RTT) ve `tmdbJob?.cancel()`
+  önceki sayfanın işini yarıda kesiyor.
+  **Kabul:** İstekler sınırlı eşzamanlılıkla çalışır; sayfa değişiminde yarım iş görünümü
+  bozmaz; çevrimdışıyken deneme yapılmaz.
+
+- [ ] **PERF-019 (P2): Tam adapter yenilemeleri envanteri**
+  `notifyDataSetChanged()` 11 dosyada 14 nokta: `IptvChannelSelectionActivity.kt:375, 466, 651`
+  (15k katalog), `MainActivity.kt:4737, 4746` (ebeveyn kilidi), `ui/MultiViewChannelAdapter.kt:29`,
+  `guide/GuideProgramAdapter.kt:26`, `guide/GuideScheduleAdapter.kt:56`,
+  `ui/ChannelEditorAdapter.kt:34`, `XmlTvSourceAdapter.kt:28`, `GithubManifestAdapter.kt:67, 73`,
+  `ui/VodRightPanelAdapters.kt:21, 81`. AGENTS.md "DiffUtil payload, stable ID, tam refresh yok"
+  ilkesiyle çelişiyor.
+  **Kabul:** En az 15k katalog seçim listesi ve ebeveyn kilidi yolu DiffUtil payload'a geçer;
+  odak ve kaydırma konumu korunur; kalan noktalar için ya geçiş ya bilinçli gerekçe bırakılır.
+
+- [ ] **PERF-020 (P3): Canlı akış yolunda tekrarlı dizi ayırmaları**
+  `playback/BufferedLiveInputStream.kt:26, 48` her 32 KB chunk ve her tek byte okumada yeni
+  dizi üretiyor; uzun yayınlarda sürekli GC baskısı.
+  **Kabul:** Tampon yeniden kullanılır; tek byte okuma yolu toplu okumaya dönüşür; uzun
+  oturumda GC duraklamaları ölçülür.
+
+- [ ] **PERF-021 (P3): XMLTV sıcak yolunda syscall, N+1 sayaç ve gereksiz `runBlocking`**
+  `data/XmlTvRepository.kt:740-741` her EPG okumasında `File.exists()`, `:53-59` kaynak başına
+  ayrı sayaç sorgusu, `:87` IO içinde gereksiz `runBlocking`.
+  **Kabul:** Dosya meta bilgisi oturum başına bir kez okunur; sayaçlar tek sorguda toplanır;
+  `runBlocking` kaldırılır; `EPGNEXT-001` atomik yenileme davranışı değişmez.
+
+- [ ] **PERF-022 (P3): Regex'ler fonksiyon içinde derleniyor**
+  `data/TifProviderDataInspector.kt:45, 59`; `data/XtreamClient.kt:194`;
+  `playback/StreamCandidates.kt:76`; `vod/WebVideoResolver.kt:566`; `vod/VodTitleCleaner.kt:46-47`;
+  `diagnostics/CrashReportStore.kt:317` her çağrıda `Pattern.compile`.
+  **Kabul:** Desenler `companion object` veya top-level sabit olur; liste doldurmada öğe başına
+  derleme maliyeti kalmaz.
+
+- [ ] **PERF-023 (P3): Boşta çalışan OSD ticker'ları**
+  `MainActivity.kt:5330-5341` her saniye yeni `SimpleDateFormat`, `:5476-5483` 1 sn tanılama
+  döngüsü, `vod/VodPlayerOverlayController.kt:452-456` 1 sn ticker.
+  **Kabul:** Biçimleyici önbelleğe alınır; güncellemeler yalnız görüş görünürken çalışır;
+  boşta CPU ölçülebilir biçimde düşer.
+
+- [ ] **PERF-024 (P3): Veritabanı açılış tetikleyicileri ve logo loader kilidi**
+  `data/local/TVAppDatabase.kt:603+` her bağlantı açılışında üç tetikleyici DROP+CREATE;
+  `image/ChannelLogoLoader.kt:36, 93, 106` `@Synchronized` her bind'de çağrılıyor ve cache
+  boyutu için dizin tam geziliyor.
+  **Kabul:** Tetikleyiciler migration'a taşınır; loader kilidi bind sıcak yolundan çıkar;
+  cache boyutu maliyetli işlem yalnız ayarlar ekranında hesaplanır; `DATA-007` bütçesi korunur.
+
+### Epic REFACTOR — Yapısal borç
+
+- [ ] **REFACTOR-001 (P0): `refactor/main-activity-split` dalını `main` üzerine al**
+  Dal `main`'in 15+ commit gerisinde ve artık farklı davranıyor: WebView thread düzeltmesi
+  (`CRASH-001`) dalda **bozuk**, Room sürümü 32 (`main` 33, `21c6d50`), EPG UNION/debounce
+  (`7056a66`), dokunma/hareket dağıtım optimizasyonu (`da9c00b`), fare uzun-tık etkileşimleri
+  ve TIF blackout mute (`8a147cc`) dalda yok. Bu dal üzerinde yeni iş yapmak main'deki çökme ve
+  performans düzeltmelerini geri getirir.
+  **Kabul:** Dal main üzerine rebase/merge edilir; Room migration numara sırası
+  (`MISS-003`) ve `alternativeStreamsJson` alanı kontrol edilir; iki varyantın birim testleri ve
+  debug derlemeleri geçer; MainActivity bölünmesi davranış değişikliği getirmez.
+
+- [ ] **REFACTOR-002 (P2): MainActivity kabuğunu küçült (Faz 6) ve planı güncelle**
+  Dalda MainActivity hâlâ ~5.856 satır, `main`'de daha büyük; `main/` paketindeki 11 sınıfın
+  tamamı kullanımda (ölü sınıf yok) ama delegeler ince kalıyor. `OPTIMIZATION_TASKS.md`
+  OPT-4.2 ile aynı iş. Faz 4/5'i tamamlanmış olarak işlemeyen plan dosyası
+  (`C:\Users\pools\.opencode\plan\main-activity-split.md`) güncellenmeli.
+  **Kabul:** Kalan büyük bloklar (kullanıcı kararına göre oynatma/OSD/kuyruk yönetimi)
+  dar arayüzlü host'lara taşınır; bağımlılık yönü tek yönlü kalır (host'lar birbirini çağırmaz);
+  kumanda ve odak sözleşmeleri cihazda doğrulanır.
+
+### Denetim sonrası iş sırası
+
+**Sıcak — çökme ve teşhis yeteneği:**
+1. `MISS-005` (mapping arşivi olmadan CRASH-002/003 teşhis edilemez) ve `MISS-004`
+2. `CRASH-003` (bellek sınırı), ardından `CRASH-001` kalıntısı ve `CRASH-002`
+3. `MISS-001` (paid flavor erişim kapısı kararı) ve `VOD-004` (güvenlik)
+
+**Yüksek getiri / dar değişiklik:**
+4. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
+5. `UI-001` (tek drawable değişikliğiyle kullanılamaz ekranları kullanılır yapar)
+6. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
+7. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce)
+
+**Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-002`..`UI-005`,
+`PERF-013`, `PERF-019`.
+
+**Sonraki:** kalan PERF-020..024, `MISS-006`, `UI-012`, `REFACTOR-002`,
+`MISS-003` ve `STORE-001` (gerçek Play Billing, `MISS-001` kararına bağlı).
+
+Her maddede AGENTS.md gereği: birim testler geçtikten sonra doğrudan commit + push;
+kumanda tuş ve odak sözleşmeleri ile VOD akışları Android 11 Google TV cihazında ayrıca
+doğrulanır.
