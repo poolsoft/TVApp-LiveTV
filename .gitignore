@@ -16,6 +16,10 @@ keystore.properties
 *.m3u
 *.m3u8
 TVApp-backup-*.json
+.freebuff/
 .freebuff/project-id
+.doc/
+.clinerules/
+.kotlin/
 .env
 *.env
