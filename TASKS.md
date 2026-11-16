@@ -863,6 +863,37 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** Ya gerçek bir çağıranı ve testi olur ya da silinir; ölü yol üzerinde düzeltme
   yapılmaz.
 
+- [~] **VOD-010 (P0): VOD modundan çıkışta durum temizlenmiyor — canlı IP kanalda siyah ekran**
+  **Kullanıcı bildirimi (2026-11-16):** VOD ekranında bir içerik açıldı (veya hata verdi),
+  sonra Live TV'ye dönülüp bir IP kanal açıldı; tampon göstergesi geldi ama görüntü yerine
+  **siyah ekran** kaldı ve `OK` VOD ekranını geri getirdi.
+  **Kök neden (kod kanıtı, iki katman):** (1) `PlaybackRules.blockedByVodMode` VOD modunda
+  VOD olmayan her seçimi **sessizce** yutuyordu — log, bilgi balonu, durum yok. Seçim
+  hiç başlamadığı için `startBlackout` (VOD modunda her zaman siyah katman açar) kapatılmıyor,
+  `OK` de hâlâ görünen VOD oynatıcı katmanıyla karşılanıyordu. (2) `switchToLiveMode()`
+  yalnızca `vodMode` bayrağını sıfırlıyordu; `currentIptvContentKind = VOD`, VOD başlığı,
+  VOD hata kartı ve `statusRetryAction` hayatta kalıyordu. Bu bayrak live kanalda bile
+  `isVodPlaybackActive()` = true yaptığı için bilgi balonu kapanıp VOD katmanı açılıyor,
+  odaktaki "Yeniden dene" VOD'u tekrar başlatıyordu. Saha logundaki
+  `IPTV_HEALTH ... kind=VOD` satırları bayrağın gerçekten sarkabildiğini gösteriyor.
+  **Uygulanan:** `blockedByVodMode` yerine üç sonuçlu `PlaybackRules.vodModeGate` — açık
+  seçimler (OK, CH+/CH-, rakam) VOD modunu kapatıp kanalı açar (`ExitVodThenPlay`), yalnız
+  listede gezinmenin gecikmeli otomatik ayarlaması engellemeyi korur (`Block`, AGENTS.md
+  sözleşmesi). VOD'a ait tüm durum tek yerde temizlenir: `clearVodPlaybackState()`
+  (`vodMode`, `currentIptvContentKind`, timeshift/hata bayrakları, `statusRetryAction`, hata
+  kartı, VOD başlığı, VOD katmanı, tampon göstergesi, intent extra'ları). Yeni izler:
+  `VOD_MODE_EXIT_ON_LIVE_SELECT`, `VOD_STATE_RESET`, `CHANNEL_SELECT_BLOCKED_VOD`,
+  `PLAYBACK_BLOCKED_VOD`.
+  **Doğrulama:** `PlaybackRulesTest` 3 yeni test (`vodModeGate*`,
+  `staleVodContentKindKeepsVodInterfaceOnLiveChannel`), 3 flavor toplamı hatasız.
+  **Cihazda bekliyor:** VOD → Live TV → IP kanal akışının kendisi; yeni izlerden
+  `VOD_MODE_EXIT_ON_LIVE_SELECT` mi yoksa yalnız `VOD_STATE_RESET` mi geldiği, takılan
+  bayrağın hangisi olduğunu kesinleştirir.
+  **Kalan gözlem (bu satırda çözülmedi):** `startBlackout` IPTV için hiçbir zaman aşımı
+  üretmiyor (yalnız TIF'te `TIF_TIMEOUT_SAFETY`); oynatma READY/FAILED olmadan asılırsa
+  siyah katman kalıcı olur. Yeni loglarda `BLACKOUT_START` satırından sonra hiç
+  `BLACKOUT_END` olmayan IPTV örnekleri görülürse ayrı iş olarak açılacak.
+
 ### Epic UI — Odak, boş durum ve 10-foot okunabilirlik
 
 `UIINPUT-004` (ortak TV görsel bileşenleri) tamamlandı; ancak aşağıdaki satırlar o ortak
@@ -1280,6 +1311,9 @@ satırı):** dikkate değer üç gerçek sorun ve iki yanlışlanan varsayım.
   oluyor ve iz çözülebilir değil.
 - **Ayrıca:** `MEMORY_PRESSURE` 30 olay (14 Kasım'da 11) — `CRASH-003` tepe bellek cihaz
   ölçümünü bekletiyor; yavaş kuyrukların çoğu bu anlarla çakışıyor.
+
+**Tamamlanan (2026-11-17):** `VOD-010` kod tarafı — VOD modundan çıkışta durum tek noktadan
+sıfırlanıyor ve açik kanal seçimi artık sessizce engellenmiyor (cihaz doğrulaması bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

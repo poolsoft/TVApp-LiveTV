@@ -12,9 +12,50 @@ import com.tvapp.livetv.playback.IptvPlaybackPhase
  */
 object PlaybackRules {
 
-    /** VOD modunda VOD olmayan kanal secilemez. */
-    fun blockedByVodMode(vodMode: Boolean, channel: LiveChannel): Boolean =
-        vodMode && !channel.isVodContent()
+    /** VOD modunda VOD olmayan bir kanal secilirken ne olacagi. */
+    enum class VodModeGate {
+        /** Secim dogrudan oynatilir. */
+        Play,
+
+        /**
+         * Kullanici canli kanali kendisi secerse (OK, CH+, rakam): VOD modu kapanir, sonra
+         * secim oynatilir. Eskiden bu secim sessizce engelleniyor ve uygulama "VOD modunda
+         * takildi" hissi veriyordu (siyah ekran + OK ile VOD oynatici katmani).
+         */
+        ExitVodThenPlay,
+
+        /** Odak kaynakli gecikmeli otomatik ayarlama VOD oynatmasini bozamaz. */
+        Block,
+    }
+
+    /**
+     * VOD modunda kanal seciminin kapisi.
+     *
+     * Engelleme yalnizca listede gezinirken tetiklenen otomatik ayarlamada korunur
+     * (AGENTS.md: listede gezinmek/uzun basma oynatmayi degistirmemeli). OK, CH+/CH-,
+     * rakam girisi gibi acik secimler artik VOD modundan cikarip kanali acar.
+     */
+    fun vodModeGate(vodMode: Boolean, channel: LiveChannel, autoTune: Boolean): VodModeGate = when {
+        !vodMode || channel.isVodContent() -> VodModeGate.Play
+        autoTune -> VodModeGate.Block
+        else -> VodModeGate.ExitVodThenPlay
+    }
+
+    /**
+     * VOD arayuzunun (VOD oynatici katmani, VOD zaman cizgisi, bilgi barinin kapanmasi)
+     * etkin olup olmadigi; `MainActivity.isVodPlaybackActive` ifadesinin karsiligidir.
+     *
+     * Kritik ayrim: [contentKindIsVod] oynaticinin son IPTV icerosu icin bildirdigi
+     * bayraktir. Canli kanala geciste sifirlanmazsa arayuz VOD'da kalmaya devam eder;
+     * canli kanalda bilgi bar yerine VOD oynatici katmani acar.
+     */
+    fun vodInterfaceActive(
+        vodMode: Boolean,
+        contentKindIsVod: Boolean,
+        vodTimeline: Boolean,
+        channelIsVod: Boolean,
+        channelIsIptv: Boolean,
+    ): Boolean = (vodMode || contentKindIsVod || vodTimeline || channelIsVod) && channelIsIptv
 
     /**
      * Ayni kanal uzerinde PREPARING/BUFFERING iken tekrar OK basimi oynatmayi

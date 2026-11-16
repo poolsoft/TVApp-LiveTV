@@ -1224,8 +1224,24 @@ class MainActivity : TvRemoteActivity() {
 
     private fun selectChannel(channel: LiveChannel) = selectChannel(channel, recordHistory = true)
 
-    private fun selectChannel(channel: LiveChannel, recordHistory: Boolean) {
-        if (PlaybackRules.blockedByVodMode(vodMode, channel)) return
+    /**
+     * [autoTune] `true` iken secim listede gezinmeden kaynaklanan gecikmeli otomatik
+     * ayarlamadir: VOD oynatmasini bozmaz. Kullanicinin OK / CH+ / rakam ile yaptigi
+     * acik secim (`autoTune = false`) VOD modunda ise modu kapatip kanali acar;
+     * eskiden bu secim sessizce yutuluyordu (kullanici bildirimi: "IP kanal actim,
+     * ekran siyah kaldi, OK ile VOD ekrani geliyor").
+     */
+    private fun selectChannel(channel: LiveChannel, recordHistory: Boolean, autoTune: Boolean = false) {
+        when (PlaybackRules.vodModeGate(vodMode, channel, autoTune)) {
+            PlaybackRules.VodModeGate.Block -> {
+                debugLog.recordDebug(
+                    "CHANNEL_SELECT_BLOCKED_VOD | key=${channel.sourceKey}, autoTune=$autoTune",
+                )
+                return
+            }
+            PlaybackRules.VodModeGate.ExitVodThenPlay -> exitVodModeForLiveSelection(channel)
+            PlaybackRules.VodModeGate.Play -> Unit
+        }
         if (channel.sourceKey != currentChannel?.sourceKey) saveCurrentIptvResumePosition()
         if (channel.isVodContent()) {
             enterVodMode()
@@ -1389,8 +1405,16 @@ class MainActivity : TvRemoteActivity() {
         debugLog.recordDebug("BLACKOUT_END | reason=$reason")
     }
 
+    /**
+     * Dogrudan oynatma cagrilari (kilit acma, geri alma, VOD deep-link) icin kapi:
+     * VOD modunda VOD olmayan bir kanal yalnizca [selectChannel] uzerinden secildiginde
+     * VOD modunu kapatir; bu dolayli yollar eskiden oldugu gibi engellenir.
+     */
     private fun playSelectedChannel(channel: LiveChannel, recordHistory: Boolean = true) {
-        if (PlaybackRules.blockedByVodMode(vodMode, channel)) return
+        if (PlaybackRules.vodModeGate(vodMode, channel, autoTune = true) == PlaybackRules.VodModeGate.Block) {
+            debugLog.recordDebug("PLAYBACK_BLOCKED_VOD | key=${channel.sourceKey}")
+            return
+        }
         if (channel.source == LiveChannel.Source.IPTV && !hasIptvAccess {
                 playSelectedChannel(channel, recordHistory)
             }
@@ -1952,6 +1976,7 @@ class MainActivity : TvRemoteActivity() {
                 selectChannel(
                     channel,
                     recordHistory = channelPanelContent == ChannelPanelContent.NORMAL,
+                    autoTune = true,
                 )
             }
         }
@@ -2834,9 +2859,13 @@ class MainActivity : TvRemoteActivity() {
     private fun showsVodTimeline(): Boolean = vodMode || currentChannel?.isVodContent() == true ||
         (currentChannel?.iptvContentType.equals("LIVE", true).not() && currentIptvContentKind == IptvContentKind.VOD)
 
-    private fun isVodPlaybackActive(): Boolean =
-        (vodMode || currentIptvContentKind == IptvContentKind.VOD || showsVodTimeline() || currentChannel?.isVodContent() == true) &&
-            currentChannel?.source == LiveChannel.Source.IPTV
+    private fun isVodPlaybackActive(): Boolean = PlaybackRules.vodInterfaceActive(
+        vodMode = vodMode,
+        contentKindIsVod = currentIptvContentKind == IptvContentKind.VOD,
+        vodTimeline = showsVodTimeline(),
+        channelIsVod = currentChannel?.isVodContent() == true,
+        channelIsIptv = currentChannel?.source == LiveChannel.Source.IPTV,
+    )
 
     private fun setIptvControlLabel(view: TextView, label: String, value: String) {
         val fullText = "$label  $value"
@@ -3503,27 +3532,79 @@ class MainActivity : TvRemoteActivity() {
         dialog.show()
     }
 
-    private fun switchToLiveMode(targetSource: String? = null) {
-        saveCurrentIptvResumePosition()
+    /**
+     * VOD'a ait tüm kalıcı durumun tek noktadan temizlenmesi.
+     *
+     * `switchToLiveMode` eskiden yalnizca `vodMode` bayragini sifirliyordu;
+     * `currentIptvContentKind = VOD`, VOD basligi, VOD hata karti ve `statusRetryAction`
+     * hayatta kaliyordu. Bu yuzden canli bir IP kanalda bile
+     * `isVodPlaybackActive()` true kalir, bilgi cabagi yerine VOD oynatici katmani
+     * acilir ve odaktaki "Yeniden dene" VOD oynatmasini tekrar baslatirdi.
+     *
+     * @param reason logta izi surdurulebilir kilmak icin kisaltma.
+     * @param clearIntentExtras VOD deep-link extra'lari da silinsin mi (canli moda gecis).
+     */
+    private fun clearVodPlaybackState(reason: String, clearIntentExtras: Boolean) {
+        val wasVodMode = vodMode
+        val previousKind = currentIptvContentKind
+        val wasActive = wasVodMode || previousKind == IptvContentKind.VOD ||
+            currentChannel?.isVodContent() == true
         vodMode = false
+        currentIptvContentKind = IptvContentKind.UNKNOWN
+        iptvManualTimeshift = false
+        iptvPlaybackFailed = false
+        statusRetryAction = null
         vodHost.cancelResolve()
+        hidePlaybackError()
+        hideIptvPlaybackControls()
         binding.iptvBufferingContainer.visibility = View.GONE
         binding.iptvBufferingCorner.visibility = View.GONE
+        vodPlayerOverlayController?.hideControls()
+        vodPlayerOverlayController?.setPendingTitle(null, null)
+        binding.vodPlayerOverlay.visibility = View.GONE
+        if (clearIntentExtras) {
+            intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
+            intent.removeExtra(EXTRA_VOD_STREAM_URL)
+            intent.removeExtra(EXTRA_VOD_TITLE)
+            intent.removeExtra(EXTRA_VOD_EPISODE_TITLE)
+            intent.removeExtra(EXTRA_VOD_LOGO_URL)
+        }
+        if (wasActive) {
+            debugLog.recordDebug(
+                "VOD_STATE_RESET | reason=$reason, previousKind=$previousKind, vodMode=$wasVodMode",
+            )
+        }
+    }
+
+    /**
+     * Kullanici VOD modunda iken acikca canli bir kanal secerse (OK, CH+/CH-, rakam):
+     * mod kapatilir ve secim oynatilir. Eskiden bu secim sessizce yutuluyor, ekran
+     * siyah kaliyor ve OK VOD oynatici katmaniyla karsilaniyordu.
+     */
+    private fun exitVodModeForLiveSelection(channel: LiveChannel) {
+        debugLog.recordDebug(
+            "VOD_MODE_EXIT_ON_LIVE_SELECT | from=${currentChannel?.sourceKey}, to=${channel.sourceKey}",
+        )
+        saveCurrentIptvResumePosition()
+        clearVodPlaybackState(reason = "LIVE_SELECT", clearIntentExtras = true)
+        if (currentChannel?.isVodContent() == true) {
+            channelResolutionGeneration++
+            iptvPlayback.stop()
+            currentChannel = null
+        }
+        renderPlaybackUiState(osdCoordinator.state)
+    }
+
+    private fun switchToLiveMode(targetSource: String? = null) {
+        saveCurrentIptvResumePosition()
+        clearVodPlaybackState(reason = "SWITCH_TO_LIVE", clearIntentExtras = true)
         endBlackout("SWITCH_TO_LIVE")
-        intent.removeExtra(EXTRA_VOD_SOURCE_KEY)
-        intent.removeExtra(EXTRA_VOD_STREAM_URL)
-        intent.removeExtra(EXTRA_VOD_TITLE)
-        intent.removeExtra(EXTRA_VOD_EPISODE_TITLE)
-        intent.removeExtra(EXTRA_VOD_LOGO_URL)
         if (currentChannel?.isVodContent() == true) {
             currentChannel = null
         }
         channelResolutionGeneration++
         val requestGeneration = channelResolutionGeneration
         iptvPlayback.stop()
-        hideIptvPlaybackControls()
-        vodPlayerOverlayController?.hideControls()
-        binding.vodPlayerOverlay.visibility = View.GONE
         channelPanelContent = ChannelPanelContent.NORMAL
         applyChannelFilter(requestFocus = false)
         val lastKey = modePreferences.getString(LAST_LIVE_KEY, null)

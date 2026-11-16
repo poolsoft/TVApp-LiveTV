@@ -1,5 +1,46 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Live TV'ye Dönünce VOD Modu Takılı Kalıyordu (`VOD-010`)
+
+- **Bildirim:** VOD ekranında bir içerik açıldı (veya hata verdi), sonra Live TV'ye dönülüp
+  bir IP kanal açıldı; tampon göstergesi geldi ama görüntü yerine **siyah ekran** kaldı ve
+  `OK` VOD ekranını geri getirdi.
+- **Ölçülen kök neden (kod kanıtı, iki katman):**
+  1. `PlaybackRules.blockedByVodMode`, VOD modunda VOD olmayan **her** seçimi sessizce
+     yutuyordu: ne log, ne bilgi balonu, ne durum değişikliği. Oynatma hiç başlamadığı için
+     VOD modunda her zaman açılan siyah ayarlama katmanı kapanmıyor, `OK` de hâlâ görünen
+     VOD oynatıcı katmanıyla karşılanıyordu.
+  2. `switchToLiveMode()` yalnızca `vodMode` bayrağını sıfırlıyordu;
+     `currentIptvContentKind = VOD`, VOD başlığı, VOD hata kartı ve `statusRetryAction`
+     hayatta kalıyordu. Bu bayrak canlı kanalda bile `isVodPlaybackActive()` = true yaptığı
+     için bilgi balonu kapanıp VOD katmanı açılıyor, odaktaki "Yeniden dene" VOD oynatmasını
+     tekrar başlatıyordu. Saha logundaki `IPTV_HEALTH ... kind=VOD` satırları bayrağın
+     gerçekten sarkabildiğini gösteriyor.
+- **Üç sonuçlu kapı (`main/PlaybackRules.vodModeGate`, saf karar):** kullanıcının **açık**
+  seçimi (OK, CH+/CH-, rakam) artık VOD modunu kapatıp kanalı açar (`ExitVodThenPlay`);
+  engelleme yalnızca listede gezinmenin gecikmeli otomatik ayarlamasında korundu (`Block`) —
+  AGENTS.md "listede gezinmek oynatmayı değiştirmemeli" sözleşmesi. VOD içeriği veya VOD
+  modu yoksa seçim doğrudan oynar (`Play`). Böylece VOD, canlı kanal seçimini sessizce
+  yutamaz.
+- **Tek noktadan durum temizliği (`clearVodPlaybackState`):** `vodMode`,
+  `currentIptvContentKind`, timeshift/oynatma-hata bayrakları, `statusRetryAction`, hata
+  kartı, VOD başlığı, VOD oynatıcı katmanı, tampon göstergesi ve VOD deep-link extra'ları
+  birlikte sıfırlanır. `switchToLiveMode()` ve yeni canlı-seçim çıkış yolu aynı fonksiyonu
+  kullanır; `isVodPlaybackActive()` kararı `PlaybackRules.vodInterfaceActive`'e devredildi.
+- **Teşhis izleri:** `VOD_MODE_EXIT_ON_LIVE_SELECT`, `VOD_STATE_RESET`,
+  `CHANNEL_SELECT_BLOCKED_VOD`, `PLAYBACK_BLOCKED_VOD`.
+- **Doğrulama:** `PlaybackRulesTest`'e 3 yeni test (`vodModeGateBlocksOnlyDelayedFocusTune`,
+  `vodModeGateKeepsTifChannelsOutOfVodPlayback`,
+  `staleVodContentKindKeepsVodInterfaceOnLiveChannel`); `testLocalDebugUnitTest` /
+  `testPaidDebugUnitTest` / `testMobileDebugUnitTest` ve `assembleLocalDebug` /
+  `assemblePaidDebug` hatasız. **Cihazda bekliyor:** VOD → Live TV → IP kanal akışının
+  kendisi; gelecek `VOD_MODE_EXIT_ON_LIVE_SELECT` / `VOD_STATE_RESET` izleri hangi bayrağın
+  takıldığını kesinleştirir.
+- **Bilinç olarak dışarıda bırakılan:** `startBlackout` IPTV için zaman aşımı üretmiyor
+  (yalnız TIF'te `TIF_TIMEOUT_SAFETY`); oynatma READY/FAILED olmadan asılırsa siyah katman
+  kalıcı olabilir. Yeni saha loglarında `BLACKOUT_START` sonrası `BLACKOUT_END` olmayan IPTV
+  örnekleri görülürse ayrı iş olarak açılacak.
+
 ## 2026-11-16 - VOD Ekranı Telefonda Listeyi Eziyordu (`UI-006`)
 
 - **Bildirim:** VOD ekranı telefondan açıldığında üstteki "İzlemeye Devam Et" kartları sabit

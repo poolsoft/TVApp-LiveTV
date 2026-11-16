@@ -27,16 +27,71 @@ class PlaybackRulesTest {
     )
 
     @Test
-    fun vodModeBlocksLiveChannels() {
-        assertTrue(PlaybackRules.blockedByVodMode(true, iptvChannel(contentType = "LIVE")))
-        assertFalse(PlaybackRules.blockedByVodMode(true, iptvChannel(contentType = "VOD")))
-        assertFalse(PlaybackRules.blockedByVodMode(false, iptvChannel(contentType = "LIVE")))
+    fun vodModeGateBlocksOnlyDelayedFocusTune() {
+        assertEquals(
+            PlaybackRules.VodModeGate.Block,
+            PlaybackRules.vodModeGate(true, iptvChannel(contentType = "LIVE"), autoTune = true),
+        )
+        assertEquals(
+            PlaybackRules.VodModeGate.ExitVodThenPlay,
+            PlaybackRules.vodModeGate(true, iptvChannel(contentType = "LIVE"), autoTune = false),
+        )
+        assertEquals(
+            PlaybackRules.VodModeGate.Play,
+            PlaybackRules.vodModeGate(true, iptvChannel(contentType = "VOD"), autoTune = true),
+        )
+        assertEquals(
+            PlaybackRules.VodModeGate.Play,
+            PlaybackRules.vodModeGate(false, iptvChannel(contentType = "LIVE"), autoTune = true),
+        )
     }
 
     @Test
-    fun vodModeBlocksTifChannels() {
+    fun vodModeGateKeepsTifChannelsOutOfVodPlayback() {
         val tif = iptvChannel().copy(source = LiveChannel.Source.TIF)
-        assertTrue(PlaybackRules.blockedByVodMode(true, tif))
+        assertEquals(
+            PlaybackRules.VodModeGate.Block,
+            PlaybackRules.vodModeGate(true, tif, autoTune = true),
+        )
+        assertEquals(
+            PlaybackRules.VodModeGate.ExitVodThenPlay,
+            PlaybackRules.vodModeGate(true, tif, autoTune = false),
+        )
+    }
+
+    @Test
+    fun staleVodContentKindKeepsVodInterfaceOnLiveChannel() {
+        // Kullanici bildirimi: canli IP kanalda OK ile VOD oynatici katmani aciliyordu.
+        // Nedeni oynaticidan kalan contentKind=VOD bayraginin sifirlanmamasidir.
+        assertTrue(
+            PlaybackRules.vodInterfaceActive(
+                vodMode = false,
+                contentKindIsVod = true,
+                vodTimeline = true,
+                channelIsVod = false,
+                channelIsIptv = true,
+            ),
+        )
+        // Sifirlandiktan sonra canli kanal normal arayuzu kullanir.
+        assertFalse(
+            PlaybackRules.vodInterfaceActive(
+                vodMode = false,
+                contentKindIsVod = false,
+                vodTimeline = false,
+                channelIsVod = false,
+                channelIsIptv = true,
+            ),
+        )
+        // TIF yuzeyinde VOD katmani hic devreye girmez.
+        assertFalse(
+            PlaybackRules.vodInterfaceActive(
+                vodMode = true,
+                contentKindIsVod = true,
+                vodTimeline = true,
+                channelIsVod = true,
+                channelIsIptv = false,
+            ),
+        )
     }
 
     @Test
