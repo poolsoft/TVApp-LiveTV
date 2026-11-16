@@ -59,39 +59,54 @@ class PlaybackRulesTest {
         )
     }
 
+    /**
+     * `MainActivity.isVodPlaybackActive` arguman kurulumunu birebir taklit eder;
+     * `LiveChannel.isVodContent()` ve `PlaybackRules.channelDeclaredLive` ayni kaynaktan okur.
+     */
+    private fun vodInterface(
+        contentType: String?,
+        kindIsVod: Boolean,
+        vodMode: Boolean = false,
+        source: LiveChannel.Source = LiveChannel.Source.IPTV,
+    ) = PlaybackRules.vodInterfaceActive(
+        vodMode = vodMode,
+        channelIsVod = source == LiveChannel.Source.IPTV && "VOD".equals(contentType, ignoreCase = true),
+        contentKindIsVod = kindIsVod,
+        declaredLive = PlaybackRules.channelDeclaredLive(contentType),
+        channelIsIptv = source == LiveChannel.Source.IPTV,
+    )
+
     @Test
-    fun staleVodContentKindKeepsVodInterfaceOnLiveChannel() {
-        // Kullanici bildirimi: canli IP kanalda OK ile VOD oynatici katmani aciliyordu.
-        // Nedeni oynaticidan kalan contentKind=VOD bayraginin sifirlanmamasidir.
-        assertTrue(
-            PlaybackRules.vodInterfaceActive(
-                vodMode = false,
-                contentKindIsVod = true,
-                vodTimeline = true,
-                channelIsVod = false,
-                channelIsIptv = true,
-            ),
-        )
-        // Sifirlandiktan sonra canli kanal normal arayuzu kullanir.
+    fun vodInterfaceRequiresRealVodIntentNotPlayerGuess() {
+        // Saha logu (2026-11-16 13:45): ana listeden secilen CANLI IP kanalin akisi
+        // sureli olculdugu icin kind=VOD geldi ve OK VOD oynatici katmanini acti.
+        // Akisin suresi tek basina arayuzu VOD'a ceviremez.
+        assertFalse(vodInterface(contentType = "LIVE", kindIsVod = true))
+        assertFalse(vodInterface(contentType = null, kindIsVod = true))
+        assertFalse(vodInterface(contentType = "", kindIsVod = true))
+        // Kaynagin VOD/catch-up olarak sundugu icerik VOD katmanini korur.
+        assertTrue(vodInterface(contentType = "CATCHUP", kindIsVod = true))
+        assertTrue(vodInterface(contentType = "VOD", kindIsVod = false))
+        // VOD modu IPTV'de her zaman gecerlidir; TIF yuzeyinde VOD katmani hic acilmaz.
+        assertTrue(vodInterface(contentType = "LIVE", kindIsVod = false, vodMode = true))
         assertFalse(
-            PlaybackRules.vodInterfaceActive(
-                vodMode = false,
-                contentKindIsVod = false,
-                vodTimeline = false,
-                channelIsVod = false,
-                channelIsIptv = true,
-            ),
-        )
-        // TIF yuzeyinde VOD katmani hic devreye girmez.
-        assertFalse(
-            PlaybackRules.vodInterfaceActive(
+            vodInterface(
+                contentType = "VOD",
+                kindIsVod = true,
                 vodMode = true,
-                contentKindIsVod = true,
-                vodTimeline = true,
-                channelIsVod = true,
-                channelIsIptv = false,
+                source = LiveChannel.Source.TIF,
             ),
         )
+    }
+
+    @Test
+    fun channelDeclaredLiveTreatsUnknownTypeAsLive() {
+        assertTrue(PlaybackRules.channelDeclaredLive("LIVE"))
+        assertTrue(PlaybackRules.channelDeclaredLive("live"))
+        assertTrue(PlaybackRules.channelDeclaredLive(null))
+        assertTrue(PlaybackRules.channelDeclaredLive(""))
+        assertFalse(PlaybackRules.channelDeclaredLive("VOD"))
+        assertFalse(PlaybackRules.channelDeclaredLive("CATCHUP"))
     }
 
     @Test

@@ -863,11 +863,11 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** Ya gerçek bir çağıranı ve testi olur ya da silinir; ölü yol üzerinde düzeltme
   yapılmaz.
 
-- [~] **VOD-010 (P0): VOD modundan çıkışta durum temizlenmiyor — canlı IP kanalda siyah ekran**
+- [~] **VOD-010 (P0): Canlı IP kanalda VOD arayüzü takılı kalıyor — siyah ekran + OK VOD katmanı**
   **Kullanıcı bildirimi (2026-11-16):** VOD ekranında bir içerik açıldı (veya hata verdi),
   sonra Live TV'ye dönülüp bir IP kanal açıldı; tampon göstergesi geldi ama görüntü yerine
   **siyah ekran** kaldı ve `OK` VOD ekranını geri getirdi.
-  **Kök neden (kod kanıtı, iki katman):** (1) `PlaybackRules.blockedByVodMode` VOD modunda
+  **Kök neden A — VOD modunda seçim sessizce yutuluyor:** (1) `PlaybackRules.blockedByVodMode` VOD modunda
   VOD olmayan her seçimi **sessizce** yutuyordu — log, bilgi balonu, durum yok. Seçim
   hiç başlamadığı için `startBlackout` (VOD modunda her zaman siyah katman açar) kapatılmıyor,
   `OK` de hâlâ görünen VOD oynatıcı katmanıyla karşılanıyordu. (2) `switchToLiveMode()`
@@ -876,19 +876,38 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   `isVodPlaybackActive()` = true yaptığı için bilgi balonu kapanıp VOD katmanı açılıyor,
   odaktaki "Yeniden dene" VOD'u tekrar başlatıyordu. Saha logundaki
   `IPTV_HEALTH ... kind=VOD` satırları bayrağın gerçekten sarkabildiğini gösteriyor.
+  **Kök neden B — oynatıcının `kind=VOD` bildirimi arayüzü kaçırıyordu (saha logu kanıtı):**
+  `.log/TVApp-debug-20261116.log.txt` 13:44:20 `CHANNEL_SELECT | number=25, key=iptv:21:…`
+  (ana listeden **canlı** bir IP kanalı) → 13:45:16 `IPTV_HEALTH … kind=VOD, resolution=1920x1080`.
+  `RemoteInputRouter` OK kapısını `env.isVodMode() || env.isVodContentKind()` ile kurduğu için,
+  akışı süreli ölçülen canlı kanalda `OK` kanal panelini değil `showIptvPlaybackControls()` →
+  `isVodPlaybackActive()` → VOD oynatıcı katmanını açıyordu. Aynı ifadenin
+  `isVodPlaybackActive()` tarafı ayrıca `showsVodTimeline()`daki "kaynak LIVE diyorsa VOD
+  değildir" korumasını baypas ediyordu: iki ayrı "VOD mu?" tarifi birbirinden farklıydı.
   **Uygulanan:** `blockedByVodMode` yerine üç sonuçlu `PlaybackRules.vodModeGate` — açık
   seçimler (OK, CH+/CH-, rakam) VOD modunu kapatıp kanalı açar (`ExitVodThenPlay`), yalnız
   listede gezinmenin gecikmeli otomatik ayarlaması engellemeyi korur (`Block`, AGENTS.md
-  sözleşmesi). VOD'a ait tüm durum tek yerde temizlenir: `clearVodPlaybackState()`
+  sözleşmesi). (2) VOD'a ait tüm durum tek yerde temizlenir: `clearVodPlaybackState()`
   (`vodMode`, `currentIptvContentKind`, timeshift/hata bayrakları, `statusRetryAction`, hata
-  kartı, VOD başlığı, VOD katmanı, tampon göstergesi, intent extra'ları). Yeni izler:
-  `VOD_MODE_EXIT_ON_LIVE_SELECT`, `VOD_STATE_RESET`, `CHANNEL_SELECT_BLOCKED_VOD`,
-  `PLAYBACK_BLOCKED_VOD`.
-  **Doğrulama:** `PlaybackRulesTest` 3 yeni test (`vodModeGate*`,
-  `staleVodContentKindKeepsVodInterfaceOnLiveChannel`), 3 flavor toplamı hatasız.
-  **Cihazda bekliyor:** VOD → Live TV → IP kanal akışının kendisi; yeni izlerden
-  `VOD_MODE_EXIT_ON_LIVE_SELECT` mi yoksa yalnız `VOD_STATE_RESET` mi geldiği, takılan
-  bayrağın hangisi olduğunu kesinleştirir.
+  kartı, VOD başlığı, VOD katmanı, tampon göstergesi, intent extra'ları); `switchToLiveMode()`
+  ve Quick Hub "Live TV" bu yolu kullanır. (3) "VOD arayüzü mü?" tek kurala bağlandı:
+  `PlaybackRules.vodInterfaceActive(vodMode, channelIsVod, contentKindIsVod, declaredLive,
+  isIptv)` — oynatıcının süreli akış ölçümü tek başına arayüzü VOD'a çeviremez; kaynağın
+  VOD/catch-up içeriği veya VOD modu gerekir (`PlaybackRules.channelDeclaredLive`: "LIVE" veya
+  boş/bilinmeyen tip canlıdır). Zaman kaydırma (timeshift) normal IPTV kontrol çubuğunda kalır;
+  bu yüzden `RemoteInputEnv.isVodContentKind()` yerini `showsVodTimeline()` aldı ve OK kapısı ile
+  hızlı seek ayrı sinyalleri okuyor. Yeni izler: `VOD_MODE_EXIT_ON_LIVE_SELECT`,
+  `VOD_STATE_RESET`, `CHANNEL_SELECT_BLOCKED_VOD`, `PLAYBACK_BLOCKED_VOD`,
+  `IPTV_KIND_VOD_ON_LIVE_CHANNEL`.
+  **Doğrulama:** `PlaybackRulesTest` — `vodModeGateBlocksOnlyDelayedFocusTune`,
+  `vodModeGateKeepsTifChannelsOutOfVodPlayback`, `vodInterfaceRequiresRealVodIntentNotPlayerGuess`,
+  `channelDeclaredLiveTreatsUnknownTypeAsLive`; üç varyantın birim testleri (1188) ve
+  `assembleLocalDebug` / `assemblePaidDebug` hatasız.
+  **Cihazda bekliyor:** (a) VOD → Live TV → IP kanal akışı, (b) **ana listeden süreli akış
+  oynatan bir IP kanalda** `OK` kanal panelini mi VOD katmanını mı açtığı, (c) `←/→` hızlı seek
+  ile zaman kaydırmanın çalıştığı, (d) catch-up ve gerçek VOD oynatmada VOD katmanının korunduğu.
+  Gelecek izler mekanizmaları ayırır: `VOD_MODE_EXIT_ON_LIVE_SELECT` (A),
+  `IPTV_KIND_VOD_ON_LIVE_CHANNEL` (B).
   **Kalan gözlem (bu satırda çözülmedi):** `startBlackout` IPTV için hiçbir zaman aşımı
   üretmiyor (yalnız TIF'te `TIF_TIMEOUT_SAFETY`); oynatma READY/FAILED olmadan asılırsa
   siyah katman kalıcı olur. Yeni loglarda `BLACKOUT_START` satırından sonra hiç
@@ -1313,7 +1332,8 @@ satırı):** dikkate değer üç gerçek sorun ve iki yanlışlanan varsayım.
   ölçümünü bekletiyor; yavaş kuyrukların çoğu bu anlarla çakışıyor.
 
 **Tamamlanan (2026-11-17):** `VOD-010` kod tarafı — VOD modundan çıkışta durum tek noktadan
-sıfırlanıyor ve açik kanal seçimi artık sessizce engellenmiyor (cihaz doğrulaması bekliyor).
+sıfırlanıyor, açık kanal seçimi artık sessizce engellenmiyor ve oynatıcının `kind=VOD`
+bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

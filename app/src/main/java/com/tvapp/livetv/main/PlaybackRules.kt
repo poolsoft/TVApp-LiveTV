@@ -42,20 +42,36 @@ object PlaybackRules {
     }
 
     /**
-     * VOD arayuzunun (VOD oynatici katmani, VOD zaman cizgisi, bilgi barinin kapanmasi)
-     * etkin olup olmadigi; `MainActivity.isVodPlaybackActive` ifadesinin karsiligidir.
+     * Kanal kaynak tarafindan canli mi sunuluyor? Xtream/M3U kayitlarinda tip bos da
+     * olabilir; bilinmeyen tip canli kabul edilir, cunku VOD icerikler ayrica
+     * `iptvContentType = "VOD"` ile ve `enterVodMode()` uzerinden gelir.
+     */
+    fun channelDeclaredLive(contentType: String?): Boolean =
+        contentType.isNullOrBlank() || contentType.equals("LIVE", ignoreCase = true)
+
+    /**
+     * VOD arayuzunun (VOD oynatici katmani ve bilgi barinin kapanmasi) etkin olup
+     * olmadigi; `MainActivity.isVodPlaybackActive` ifadesinin karsiligidir.
      *
-     * Kritik ayrim: [contentKindIsVod] oynaticinin son IPTV icerosu icin bildirdigi
-     * bayraktir. Canli kanala geciste sifirlanmazsa arayuz VOD'da kalmaya devam eder;
-     * canli kanalda bilgi bar yerine VOD oynatici katmani acar.
+     * Oynaticinin `contentKind = VOD` bildirimi tek basina arayuzu VOD'a ceviremez.
+     * Saha logu (2026-11-16 13:45, `IPTV_HEALTH ... kind=VOD`): ana listeden secilen
+     * **canli** bir IP kanalin akisi sureli olculdugu icin arayuz VOD'a geciyor, bilgi
+     * balonu kapaniyor ve `OK` VOD oynatici katmanini aciyordu ("OK basiyorum, VOD
+     * ekrani geliyor / ekran siyah"). VOD katmani yalnizca gercek VOD niyeti ister:
+     * VOD modu, VOD icerigi veya kaynagin VOD/catch-up olarak sundugu icerik.
+     * Sureli canli akisin zaman kaydirmasi (timeshift) VOD katmani degil, normal IPTV
+     * kontrol cabagidir; bu ayrim `showsVodTimeline` tarafinda korunur.
+     *
+     * @param declaredLive kanal kaynak tarafindan canli olarak mi sunuluyor
+     *   (`iptvContentType` "LIVE" veya bos/bilinmiyor).
      */
     fun vodInterfaceActive(
         vodMode: Boolean,
-        contentKindIsVod: Boolean,
-        vodTimeline: Boolean,
         channelIsVod: Boolean,
+        contentKindIsVod: Boolean,
+        declaredLive: Boolean,
         channelIsIptv: Boolean,
-    ): Boolean = (vodMode || contentKindIsVod || vodTimeline || channelIsVod) && channelIsIptv
+    ): Boolean = (vodMode || channelIsVod || (contentKindIsVod && !declaredLive)) && channelIsIptv
 
     /**
      * Ayni kanal uzerinde PREPARING/BUFFERING iken tekrar OK basimi oynatmayi

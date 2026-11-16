@@ -5,7 +5,7 @@
 - **Bildirim:** VOD ekranında bir içerik açıldı (veya hata verdi), sonra Live TV'ye dönülüp
   bir IP kanal açıldı; tampon göstergesi geldi ama görüntü yerine **siyah ekran** kaldı ve
   `OK` VOD ekranını geri getirdi.
-- **Ölçülen kök neden (kod kanıtı, iki katman):**
+- **Ölçülen kök nedenler (kod ve saha logu kanıtı):**
   1. `PlaybackRules.blockedByVodMode`, VOD modunda VOD olmayan **her** seçimi sessizce
      yutuyordu: ne log, ne bilgi balonu, ne durum değişikliği. Oynatma hiç başlamadığı için
      VOD modunda her zaman açılan siyah ayarlama katmanı kapanmıyor, `OK` de hâlâ görünen
@@ -16,6 +16,14 @@
      için bilgi balonu kapanıp VOD katmanı açılıyor, odaktaki "Yeniden dene" VOD oynatmasını
      tekrar başlatıyordu. Saha logundaki `IPTV_HEALTH ... kind=VOD` satırları bayrağın
      gerçekten sarkabildiğini gösteriyor.
+   3. Aynı logda 13:44:20 `CHANNEL_SELECT | number=25, key=iptv:21:…` — ana listeden
+      **canlı** bir IP kanalı — ve 13:45:16 `IPTV_HEALTH … kind=VOD, resolution=1920x1080`.
+      Akış süreli ölçüldüğünde oynatıcı `contentKind = VOD` bildiriyor; `RemoteInputRouter`
+      OK kapısını `env.isVodMode() || env.isVodContentKind()` ile kurduğu için canlı kanalda
+      `OK`, kanal paneli yerine `showIptvPlaybackControls()` → `isVodPlaybackActive()` →
+      **VOD oynatıcı katmanını** açıyordu ("OK basıyorum, VOD ekranı geliyor").
+      `isVodPlaybackActive()` tarafı ayrıca `showsVodTimeline()`daki "kaynak LIVE diyorsa VOD
+      değildir" korumasını baypas ediyordu: iki "VOD mu?" tarifi birbirinden farklıydı.
 - **Üç sonuçlu kapı (`main/PlaybackRules.vodModeGate`, saf karar):** kullanıcının **açık**
   seçimi (OK, CH+/CH-, rakam) artık VOD modunu kapatıp kanalı açar (`ExitVodThenPlay`);
   engelleme yalnızca listede gezinmenin gecikmeli otomatik ayarlamasında korundu (`Block`) —
@@ -27,15 +35,26 @@
   kartı, VOD başlığı, VOD oynatıcı katmanı, tampon göstergesi ve VOD deep-link extra'ları
   birlikte sıfırlanır. `switchToLiveMode()` ve yeni canlı-seçim çıkış yolu aynı fonksiyonu
   kullanır; `isVodPlaybackActive()` kararı `PlaybackRules.vodInterfaceActive`'e devredildi.
+- **Tek kural (`PlaybackRules.vodInterfaceActive` + `channelDeclaredLive`):** VOD katmanı
+  yalnızca gerçek VOD niyetini ister — VOD modu, VOD içeriği veya kaynağın VOD/catch-up olarak
+  sunduğu içerik. Süreli akış ölçümü tek başına yetmez; süreli **canlı** akış zaman kaydırma
+  (timeshift) olarak normal IPTV kontrol çubuğunda kalır. Bu yüzden
+  `RemoteInputEnv.isVodContentKind()` yerini `showsVodTimeline()` aldı: OK kapısı VOD
+  arayüzünü, `←/→` hızlı seek zaman çizgisini okuyor.
 - **Teşhis izleri:** `VOD_MODE_EXIT_ON_LIVE_SELECT`, `VOD_STATE_RESET`,
-  `CHANNEL_SELECT_BLOCKED_VOD`, `PLAYBACK_BLOCKED_VOD`.
-- **Doğrulama:** `PlaybackRulesTest`'e 3 yeni test (`vodModeGateBlocksOnlyDelayedFocusTune`,
+  `CHANNEL_SELECT_BLOCKED_VOD`, `PLAYBACK_BLOCKED_VOD`, `IPTV_KIND_VOD_ON_LIVE_CHANNEL`
+  (oynatıcı VOD ölçtü ama kanal VOD olarak sunulmuyor — hangi mekanizmanın tetiklendiğini ayırır).
+- **Doğrulama:** `PlaybackRulesTest`'e 4 yeni test (`vodModeGateBlocksOnlyDelayedFocusTune`,
   `vodModeGateKeepsTifChannelsOutOfVodPlayback`,
-  `staleVodContentKindKeepsVodInterfaceOnLiveChannel`); `testLocalDebugUnitTest` /
+  `vodInterfaceRequiresRealVodIntentNotPlayerGuess`,
+  `channelDeclaredLiveTreatsUnknownTypeAsLive`); `testLocalDebugUnitTest` /
   `testPaidDebugUnitTest` / `testMobileDebugUnitTest` ve `assembleLocalDebug` /
   `assemblePaidDebug` hatasız. **Cihazda bekliyor:** VOD → Live TV → IP kanal akışının
-  kendisi; gelecek `VOD_MODE_EXIT_ON_LIVE_SELECT` / `VOD_STATE_RESET` izleri hangi bayrağın
-  takıldığını kesinleştirir.
+  kendisi; (b) ana listeden süreli akış oynatan bir IP kanalda `OK` kanal panelini açmalı,
+  (c) `←/→` zaman kaydırmayı korumalı, (d) catch-up ve gerçek VOD oynatmada VOD katmanı
+  görünmeye devam etmelidir. Gelecek `VOD_MODE_EXIT_ON_LIVE_SELECT` (A) veya
+  `IPTV_KIND_VOD_ON_LIVE_CHANNEL` (B) izleri hangi mekanizmanın
+  tetiklendiğini ayırır.
 - **Bilinç olarak dışarıda bırakılan:** `startBlackout` IPTV için zaman aşımı üretmiyor
   (yalnız TIF'te `TIF_TIMEOUT_SAFETY`); oynatma READY/FAILED olmadan asılırsa siyah katman
   kalıcı olabilir. Yeni saha loglarında `BLACKOUT_START` sonrası `BLACKOUT_END` olmayan IPTV

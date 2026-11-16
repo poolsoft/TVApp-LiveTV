@@ -834,6 +834,15 @@ class MainActivity : TvRemoteActivity() {
                 currentChannel?.source == LiveChannel.Source.IPTV
             ) {
                 currentIptvContentKind = kind
+                if (kind == IptvContentKind.VOD && !vodMode && currentChannel?.isVodContent() != true) {
+                    // Oynatici sureli akis olcti ama kanal VOD olarak sunulmuyor: arayuz
+                    // canli kalir (VOD-010). Iz, bu kanalin gercekten catch-up mi oldugunu
+                    // saha logunda ayirt etmeyi saglar.
+                    debugLog.recordDebug(
+                        "IPTV_KIND_VOD_ON_LIVE_CHANNEL | key=${currentChannel?.sourceKey}, " +
+                            "contentType=${currentChannel?.iptvContentType}",
+                    )
+                }
                 startIptvPlaybackMonitor(kind)
             }
         }
@@ -2859,13 +2868,18 @@ class MainActivity : TvRemoteActivity() {
     private fun showsVodTimeline(): Boolean = vodMode || currentChannel?.isVodContent() == true ||
         (currentChannel?.iptvContentType.equals("LIVE", true).not() && currentIptvContentKind == IptvContentKind.VOD)
 
-    private fun isVodPlaybackActive(): Boolean = PlaybackRules.vodInterfaceActive(
-        vodMode = vodMode,
-        contentKindIsVod = currentIptvContentKind == IptvContentKind.VOD,
-        vodTimeline = showsVodTimeline(),
-        channelIsVod = currentChannel?.isVodContent() == true,
-        channelIsIptv = currentChannel?.source == LiveChannel.Source.IPTV,
-    )
+    private fun LiveChannel.declaredLive(): Boolean = PlaybackRules.channelDeclaredLive(iptvContentType)
+
+    private fun isVodPlaybackActive(): Boolean {
+        val channel = currentChannel ?: return false
+        return PlaybackRules.vodInterfaceActive(
+            vodMode = vodMode,
+            channelIsVod = channel.isVodContent(),
+            contentKindIsVod = currentIptvContentKind == IptvContentKind.VOD,
+            declaredLive = channel.declaredLive(),
+            channelIsIptv = channel.source == LiveChannel.Source.IPTV,
+        )
+    }
 
     private fun setIptvControlLabel(view: TextView, label: String, value: String) {
         val fullText = "$label  $value"
@@ -3507,7 +3521,13 @@ class MainActivity : TvRemoteActivity() {
         val dialog = MainDialogs.createQuickHubDialog(
             activity = this,
             onLiveTv = {
-                if (vodMode) switchToLiveMode()
+                if (vodMode) {
+                    switchToLiveMode()
+                } else if (isVodPlaybackActive()) {
+                    // VOD modu kapali ama VOD yuzeyi henuz duruyor (VOD-010): kanali
+                    // degistirmeden yalnizca VOD durumunu temizle.
+                    clearVodPlaybackState(reason = "QUICK_HUB_LIVE", clearIntentExtras = false)
+                }
                 showChannelPanel(expanded = false)
             },
             onVod = { openVodLibrary() },
@@ -6239,9 +6259,9 @@ class MainActivity : TvRemoteActivity() {
         override fun isVodPlaybackActive(): Boolean = this@MainActivity.isVodPlaybackActive()
         override fun handleVodPlayerOverlay(event: KeyEvent): Boolean =
             vodPlayerOverlayController?.handleDispatchKeyEvent(event) == true
-        override fun isVodMode(): Boolean = vodMode
-        override fun isVodContentKind(): Boolean = currentIptvContentKind == IptvContentKind.VOD
-        override fun isIptvChannel(): Boolean = currentChannel?.source == LiveChannel.Source.IPTV
+        override fun showsVodTimeline(): Boolean = this@MainActivity.showsVodTimeline()
+        override fun isIptvChannel(): Boolean =
+            currentChannel?.source == LiveChannel.Source.IPTV
         override fun handleIptvMediaKey(keyCode: Int) = this@MainActivity.handleIptvMediaKey(keyCode)
         override fun quickSeek(offsetMs: Long) {
             iptvControlRow = IptvControlRow.TIMELINE

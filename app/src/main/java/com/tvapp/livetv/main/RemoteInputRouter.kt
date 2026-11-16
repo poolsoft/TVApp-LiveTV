@@ -154,7 +154,11 @@ class RemoteInputRouter(
         }
 
         val hasNoBlockingPlaybackOsd = env.hasNoBlockingPlaybackOsd()
-        val isVod = env.isVodMode() || env.isVodContentKind()
+        // VOD katmani ile timeshift zaman cizgisi ayrilmali: sureli bir akis oynatan
+        // canli kanalda OK VOD katmanini degil kanal panelini acmali, ama zaman
+        // kaydirma kisayolu kullanilabilir kalmali.
+        val isVod = env.isVodPlaybackActive()
+        val vodTimeline = env.showsVodTimeline()
 
         if (
             RemoteInputRules.canTriggerOkGate(
@@ -181,7 +185,7 @@ class RemoteInputRouter(
             event.repeatCount == 0 &&
             RemoteInputRules.canQuickSeek(
                 env.isIptvChannel(),
-                isVod,
+                vodTimeline,
                 hasNoBlockingPlaybackOsd,
                 env.isIptvControlsInteractive(),
                 event.keyCode,
@@ -382,8 +386,7 @@ class RemoteInputRouter(
 interface RemoteInputEnv {
     fun isVodPlaybackActive(): Boolean
     fun handleVodPlayerOverlay(event: KeyEvent): Boolean
-    fun isVodMode(): Boolean
-    fun isVodContentKind(): Boolean
+    fun showsVodTimeline(): Boolean
     fun isIptvChannel(): Boolean
     fun handleIptvMediaKey(keyCode: Int)
     fun quickSeek(offsetMs: Long)
