@@ -1091,7 +1091,23 @@ bileşenleri hâlâ kullanmıyor.
   çeviri denetimi bu metinleri kaçırıyor.
   **Kabul:** Sabitler dahil her görünen metin iki dilde tanımlıdır.
 
-### Epic PERF (denetim) — Çalışma zamanı performans bulguları
+- [ ] **UI-013 (P2): IPTV siyah ayarlama katmanının zaman aşımı yok — takılırsa kalıcı siyah ekran**
+  `startBlackout` yalnızca TIF için `blackoutTimeoutJob` (6 sn, `TIF_TIMEOUT_SAFETY`) kuruyor.
+  IPTV'de katman sadece `IPTV_PLAYBACK_READY`, `IPTV_FAILURE`, `PLAYBACK_ERROR`, `USER_STOP`,
+  `SWITCH_TO_LIVE`, `PHYSICAL_INPUT` ve `ACTIVITY_START` ile kapanıyor: oynatıcı hata üretmeden
+  asılırsa (READY yok, FAILED yok) siyah katman ekranda kalır — `VOD-010` bildirimindeki
+  "tampon geliyor ama görüntü yerine siyah ekran" tarifinin besleyicisi.
+  **Ölçülen (2026-11-10..16 saha logları, 630 `BLACKOUT_START` / 625 `BLACKOUT_END`):**
+  kapanış nedenleri 604 `TIF_VIDEO_AVAILABLE`, 8 `PLAYBACK_ERROR`, 7 `TIF_TIMEOUT_SAFETY`,
+  6 `IPTV_PLAYBACK_READY`, **0 `IPTV_FAILURE`**; gün başına eşleşmeyen START 0–2 (16 Kasım: 1,
+  14 Kasım: 2). Kaçış yolları çalışıyor, ancak IPTV için hiçbir zaman aşımı yok ve 8
+  `IPTV_PLAYBACK_FAILURE` olayı siyah katmanı `PLAYBACK_ERROR` üzerinden kapatıyor.
+  **Kabul:** IPTV için de bir güvenlik zaman aşımı (ölçümle belirlenecek, ~15–20 sn) katmanı
+  `BLACKOUT_END | reason=IPTV_TIMEOUT_SAFETY` ile kapatır; gerçek faz hâlâ BUFFERING/PREPARING
+  ise tampon göstergesi görünmeye devam eder (uydurma durum yok). READY olan yayınlarda
+  davranış değişmez; yeni saha logunda eşleşmeyen `BLACKOUT_START` kalmamalı.
+
+### Epic PERF (denetim) - Çalışma zamanı performans bulguları
 
 Aşağıdaki kimlikler `PROJECT_AUDIT_2026_11_13.md` §2 tablosunun `PERF-001..019` satırlarına
 sırayla karşılık gelir (defter = rapor + 5). `PERF-001..005` ölçüm/altyapı işleri
@@ -1348,7 +1364,7 @@ bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekli
 6. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` ve `PERF-025` bu
    dala da taşınır)
 
-**Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`,
+**Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`, `UI-013`,
 `PERF-013`, `PERF-019`, `PERF-027`.
 
 **Son:** kalan `PERF-020..024`, `MISS-006`, `UI-012`, `REFACTOR-002`, `MISS-003`,
