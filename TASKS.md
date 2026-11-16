@@ -741,6 +741,25 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** Derlemeye girmeyen bayrak ve kod kalmaz; silinen her dosyanın yerine bir gerekçe
   veya test güncellemesi bırakılır.
 
+- [ ] **MISS-007 (P2): Gece EPG yenilemesi her döngüde "başarısız" görünüyor**
+  **Ölçülen (saha logları, 7 gün):** `NIGHTLY_REFRESH_SUCCESS` hiç yok; `XmlTvRefreshJobService.kt:49`
+  tarafından yazılan `NIGHTLY_REFRESH_FAILURE | f3.f0: D was cancelled` **14 kez** var —
+  planlanan her döngüde bir tane (10–16 Kasım, ~6–7 saatte bir). Aynı günlerde
+  `XMLTV_IMPORT_TIMING` satırları var (içe aktarma 6–19 sn sürüyor, kaynak başına 6–7.6 bin
+  program), yani iş kısmen çalışıyor sonra **iptal edilerek** kesiliyor. Kullanıcı etkisi:
+  rehber verisi bayatlayabilir (EPG'de "şu an/sonraki" boş kanallar).
+  **Teşhis eksikliği:** satır yalnız obfüske edilmiş sınıf adı (`f3.f0`) ve mesaj taşıyor;
+  sebep zinciri (`cause`), `JobInfo` durumu ve iptal kaynağı loglanmadığı için iz çözülemiyor —
+  `MISS-005` retrase'i yığın izi olmadan çalışmaz.
+  **Kabul:** (1) iptal, `recordDebug` içinde `NIGHTLY_REFRESH_CANCELLED` olarak ayrı yazılır ve
+  `CancellationException` artık "failure" sayılmaz (AGENTS.md: yanlış teşhis değeri yok);
+  (2) log satırı `WorkManagerInfo` durumu/açıklaması + sebep zincirini taşır, R8 altında okunur
+  kalır; (3) gerçek neden bulunur (işlem öldürme, `setOverrideDeadline`, network kısıtı veya
+  kapsam iptali) ve gece yenilemesi `NIGHTLY_REFRESH_SUCCESS` ile biter ya da bilinçli olarak
+  ertelenir.
+  **Not:** `EPGNEXT-001` atomik yenileme sözleşmesi bozulmayacak — yarıda kalan içe aktarma
+  eski veriyi korumaya devam etmeli.
+
 ### Epic VOD — Çözümleme ve oynatma sağlamlığı
 
 - [ ] **VOD-001 (P0): Aday bulunamadığında net hata ve Yeniden dene**
@@ -1115,6 +1134,49 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
   **Kabul:** Tetikleyiciler migration'a taşınır; loader kilidi bind sıcak yolundan çıkar;
   cache boyutu maliyetli işlem yalnız ayarlar ekranında hesaplanır; `DATA-007` bütçesi korunur.
 
+- [~] **PERF-025 (P1): Room okuma sorguları yazma transaction'larıyla aynı yürütücüde sıraya giriyor**
+  **Ölçülen (saha logları, 7 gün / 1258 `PERF` satırı):** `epg_now_next` 1015 örnekte p50 30 ms
+  ama 25 örnek 400–2400 ms; yavaş örnekler tek tek değil, **saniyeler içinde patiler hâlinde**
+  (ör. 14 Kasım 21:42'de altı örnek) ve hep ağır bir işin (XMLTV içe aktarma, hızlı kanal geçişi,
+  bellek baskısı) içinde. `epg_list_window` en kötü 3186 ms — tamamı `xmlTvMs`, TIF tarafı 32 ms.
+  **Kök neden (kodda doğrulandı):** `TVAppDatabase` yalnız `setJournalMode(WAL)` kuruyordu;
+  `setQueryExecutor` verilmemiş. Room 2.8.4 `RoomDatabase$Builder.build()` bytecode'unda
+  görüldüğü üzere `transactionExecutor` boşsa `ArchTaskExecutor.getIOThreadExecutor()` ile
+  doldurulur ve `queryExecutor` **aynı nesneye** atanır; yani tüm okuma sorguları ile
+  `runInTransaction`/`withTransaction` yazmaları tek paylaşılan havuzda sıralanıyor. XMLTV
+  kaynağı başına içe aktarma transaction'ı `XMLTV_IMPORT_TIMING`'e göre **6–19 sn** sürüyor
+  (6–7.6 bin program); o süre boyunca sıradaki EPG ve kanal listesi okumaları bekliyor.
+  **Durum (2026-11-16):** okumalar `setQueryExecutor` ile 2 iplikli ayrı bir havuza
+  (`TVApp-room-read`) alındı. WAL açık olduğu için okumalar yazma kilidini beklemez; yazma
+  transaction'ları **bilinçli olarak** varsayılan sıralı yürütücüde bırakıldı (yazma sırası
+  korunur, SQLITE_BUSY riski eklenmez, hiçbir DAO/imza değişmedi).
+  **Kabul:** Aynı logları bir sonraki sürümde karşılaştır: `epg_now_next` p95 ve 1000+ ms kuyruğu
+  düşmeli; `epg_list_window` `xmlTvMs` kuyruğu düşmeli; `MEMORY_PRESSURE` ve TIF tune fırtınası
+  sırasındaki `channel_panel_open` dışı değerler etkilenmemeli ( regresyon işareti).
+  **Kalan:** Sahada `dev-r348` sonrası 2–3 günlük log karşılaştırması (cihaz/birim testi yok —
+  davranış yapılandırma düzeyinde değişiyor, Room açılışında doğrulanır).
+
+- [ ] **PERF-026 (P1): `roomMerge` açılışta tek başına 100–1060 ms**
+  `CHANNEL_LOAD_TIMING` satırları (24 örnek) yüklemenin ağırlığının Room birleştirme adımında
+  olduğunu gösteriyor: `iptv=4-105ms, tif=2-2813ms, roomMerge=100-1060ms, total=108-3317ms`,
+  kanal sayısı 639–651. `channel_load` PERF değeri (ort 1481 ms, en kötü 6241 ms) bu toplamdan
+  büyük: kalan süre IO dispatcher bekleme + liste uyarlaması (`PERF-008` senkron DiffUtil).
+  İlk TIF sorgusunun 2.8 sn'ye çıkıp aynı oturumda 188 ms'ye inmesi soğuk provider/ilk sorgu
+  maliyetine işaret ediyor.
+  **Kabul:** `roomMerge` 650 kanalda ölçülüp (Macrobenchmark `PERF-003`) hedefin altına indirilir
+  (gereksiz tam tablo okuma / satır başına yazma yok); `PERF-008` ile birlikte açılış
+  `channel_load` p50'si 500 ms altına iner; TIF ilk sorgu maliyeti ayrı ölçülür.
+
+- [ ] **PERF-027 (P2): `channel_panel_open` yavaş kuyruğu TIF tune ile çakışıyor**
+  33 örnekte p50 **54 ms** — panel açılışı sağlıklı; yalnız 3 örnek 871/1270/1285 ms. Üçü de
+  logda hemen bir TIF tune dizisinin (`tracksChanged`/`videoAvailable`, ve birinde 1882 ms
+  `xmlTvMs`) içinde. Yani liste açılışı yavaş değil, **ana thread başka işle meşgul**; ölçüm
+  `channelList.post {}` ile bittiği için ana thread sırasındaki her gecikmeyi kendine yazıyor.
+  **Kabul:** Metrik yanıltıcılıktan kurtarılır (geometri/odak süresi ile ilk frame ayrılır) veya
+  doğrulanır; tune sırasındaki ana thread işi (`PERF-010`, `PERF-011` ve TIF geri çağrıları)
+  azaltılır. Yalnız başına yeni bir optimizasyon yapılmaz — `PERF-025` sonrası kuyruğun
+  düşüp düşmediğine bakılır.
+
 ### Epic REFACTOR — Yapısal borç
 
 - [ ] **REFACTOR-001 (P0): `refactor/main-activity-split` dalını `main` üzerine al**
@@ -1152,23 +1214,44 @@ cihazda bekliyor), `MISS-005` (R8 mapping artifact'i; `dev-r343` ile uçtan uca 
 üzerinden, `WebVideoResolver` dört okuma), çağrısız `allPlayableRequests()` silindi; cihaz
 doğrulaması ve refactor dalına taşınması bekliyor. `MISS-002` kod tarafı — VOD çözümleme
 katmanı 31 birim testle kapsandı (`f1fb402` ve 1 Kasım NPE'si artık testte yakalanır);
-`IptvPlaybackController` / `IptvResumeStore` / `MultiViewController` kalan.
+`IptvPlaybackController` / `IptvResumeStore` / `MultiViewController` kalan. `UI-002` — VOD ana
+ekranında yükleme/hata/yeniden dene kartı (`VODUI-001` kod tarafı kapandı). `CRASH-004` —
+kategori yüklemesi artık çökme üretmiyor. `PERF-025` — Room okuma yürütücüsü ayrıldı.
+
+**Saha logu bulguları (2026-11-16, `.log/TVApp-debug-2026111{0..6}.log.txt`, 1258 `PERF`
+satırı):** dikkate değer üç gerçek sorun ve iki yanlışlanan varsayım.
+- **Yanlışlanan:** EPG sorgusunun `OR` + `IN (SELECT ...)` öngördürücüsünün indeks
+  kullanamadığı ve yavaş `xtream_epg_programs` geri düşüşünün suçlu olduğu varsayımları —
+  `next=false` oranı hızlı örneklerde %52, yavaşlarda %60 (ayrım yok); `epg_now_next` p50'si
+  30 ms. `channel_panel_open` "1.28 sn" bantı da sistematik değil (33 örnekte p50 54 ms, yalnız
+  3 dış değer, hepsi TIF tune fırtınası içinde) — `PERF-027` yalnız metrik dürüstlüğü işi.
+- **Gerçek 1 — `PERF-025` (uygulandı):** okuma sorguları yazma transaction'larıyla aynı
+  yürütücüde; 6–19 sn'lik XMLTV içe aktarma transaction'ları sıradaki EPG/kanal okumalarını
+  bekletiyor (25 örnek 400–2400 ms, patiler hâlinde). Okumalar ayrı 2 ipliğe alındı;
+  **doğrulama = `dev-r348` sonrası aynı log karşılaştırması.**
+- **Gerçek 2 — `PERF-026`:** açılış zinciri; `roomMerge` 100–1060 ms, `channel_load` ort 1.5 sn
+  (en kötü 6.2 sn), `activity_create` ort 740 ms; ilk TIF sorgusu 2.8 sn, ısınınca 188 ms.
+- **Gerçek 3 — `MISS-007`:** `NIGHTLY_REFRESH_SUCCESS` hiç yok, 14 kez
+  `NIGHTLY_REFRESH_FAILURE | ...: D was cancelled` — gece EPG yenilemesi her döngüde iptal
+  oluyor ve iz çözülebilir değil.
+- **Ayrıca:** `MEMORY_PRESSURE` 30 olay (14 Kasım'da 11) — `CRASH-003` tepe bellek cihaz
+  ölçümünü bekletiyor; yavaş kuyrukların çoğu bu anlarla çakışıyor.
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
    iz çözülemez. Yeni saha çökmesi geldiğinde ilgili revizyonun artifact'i indirilip `retrace`
    ile çözülür (README, "Çökme izini çözme").
-2. `CRASH-004` (yeni bulgu, dar değişiklik) — `VodHomeActivity.loadGridCategories()`
-   `try/catch` olmadan korutin içinde DAO çağırıyor; tek dosyalık düzeltme.
+2. `MISS-007` — gece yenilemesi iptali hem işlevsel hem teşhis boşluğu (yukarıda).
 3. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
-3. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
-4. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
-5. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` bu dala da taşınır)
+4. `UI-003`, `UI-004`, `UI-005` (`UI-001`, `UI-002` uygulandı, kod tarafı bitti)
+5. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008` + `PERF-026`
+6. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` ve `PERF-025` bu
+   dala da taşınır)
 
 **Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`,
-`PERF-013`, `PERF-019`.
+`PERF-013`, `PERF-019`, `PERF-027`.
 
 **Son:** kalan `PERF-020..024`, `MISS-006`, `UI-012`, `REFACTOR-002`, `MISS-003`,
 **ve en son** `MISS-001` + `STORE-001` (kullanıcı kararı).

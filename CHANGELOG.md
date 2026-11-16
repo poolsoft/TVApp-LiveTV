@@ -1,5 +1,42 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - Saha Logu Performans Analizi ve Room Okuma Yürütücüsü (`PERF-025`)
+
+- **Analiz:** TV'den alınan yedi günlük hata ayıklama loglarındaki 1258 `PERF` satırı toplu
+  ölçüldü (operasyon bazında adet, ortalama, p50, p95, en kötü). Sağlıklı taraflar da
+  raporlandı: `epg_now_next` p50 **30 ms**, `channel_panel_open` p50 **54 ms**,
+  `iptv_selection_page` en kötü 65 ms.
+- **Bulunan ve düzeltilen:** Room, `setQueryExecutor` verilmediğinde **okuma sorgularını yazma
+  transaction'larıyla aynı yürütücüye** koyar — Room 2.8.4 `RoomDatabase$Builder.build()`
+  bytecode'unda doğrulandı: `transactionExecutor` boşsa `ArchTaskExecutor.getIOThreadExecutor()`
+  atanır ve `queryExecutor` aynı nesneye bağlanır. `TVAppDatabase` yalnız WAL kuruyordu.
+  XMLTV içe aktarma transaction'ı kaynak başına **6–19 sn** sürüyor (`XMLTV_IMPORT_TIMING`,
+  6–7.6 bin program), o süre boyunca sıradaki EPG ve kanal listesi okumaları bekliyordu:
+  `epg_now_next` 1015 örnekte 25 kez 400–2400 ms, `epg_list_window` en kötü **3186 ms**
+  (`tifMs=32, xmlTvMs=3186`).
+- **Değişiklik:** okumalar `setQueryExecutor` ile 2 iplikli, adlandırılmış (`TVApp-room-read`)
+  ayrı bir havuza alındı. WAL açık olduğundan okumalar yazma kilidini beklemez. **Yazma
+  transaction'ları bilinçli olarak varsayılan sıralı yürütücüde bırakıldı** — yazma sırası
+  korunur, SQLITE_BUSY riski eklenmez. DAO'lar, sorgular ve hiçbir davranış değişmedi;
+  tek dosya, üç satır.
+- **Yanlışlanan iki varsayım (kod değişmedi):** (1) `xmltv_programs` sorgusundaki `OR` +
+  `IN (SELECT ...)` öngördürücüsünün tam tarama yaptığı — yavaş ile hızlı örneklerde `next=false`
+  oranı %60'a %52, yani `xtream_epg_programs` geri düşüşü fark yaratmıyor; yavaşlık tek tek
+  sorgulardan değil, **patiler hâlinde sıraya girmekten** geliyor. (2) `channel_panel_open`
+  "1.28 sn" bantının sistematik gecikme olduğu — 33 örnekte p50 54 ms, yalnız 3 dış değer ve
+  üçü de TIF tune dizisinin içinde; metrik `channelList.post {}` ile bittiği için ana thread'deki
+  başka işi de kendine yazıyor (`PERF-027` olarak yalnız metrik dürüstlüğü işi bırakıldı).
+- **Ölçülen ama bu turda dokunulmayanlar (deftere yazıldı):** `PERF-026` açılış zinciri —
+  `roomMerge` 100–1060 ms, `channel_load` ort 1481 ms / en kötü 6241 ms, `activity_create`
+  ort 740 ms, ilk TIF sorgusu 2813 ms (ısınınca 188 ms). `MISS-007` — `NIGHTLY_REFRESH_SUCCESS`
+  hiç yok, 14 kez `NIGHTLY_REFRESH_FAILURE | ...: D was cancelled`: gece EPG yenilemesi her
+  döngüde iptal oluyor ve iz çözülebilir değil. Ayrıca `MEMORY_PRESSURE` 30 olay (14 Kasım'da
+  11) — `CRASH-003`'ün tepe bellek cihaz ölçümünü bekletiyor.
+- **Doğrulama:** `testLocalDebugUnitTest` + `testPaidDebugUnitTest` **381 test** hatasız,
+  `assembleLocalDebug` + `assemblePaidDebug` başarılı. Bu değişiklik yapılandırma düzeyinde
+  olduğu için birim testi yok; **kabul ölçütü saha logu karşılaştırması** — `dev-r348` sonrası
+  aynı `PERF` satırlarında `xmlTvMs` kuyruğunun (400 ms üzeri örnekler) düşmesi bekleniyor.
+
 ## 2026-11-16 - Kategori Yüklemesi Artık Çökme Üretmiyor (`CRASH-004`)
 
 - `VodHomeActivity.loadGridCategories()` DAO çağrısını (`repository.categories(...)`) korutin

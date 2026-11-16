@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 @Database(
     entities = [
@@ -35,6 +37,28 @@ abstract class TVAppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var instance: TVAppDatabase? = null
+
+        /**
+         * Okuma sorgulari varsayilan olarak yazma transaction'lariyla ayni paylasilan
+         * havuza düser (Room 2.8 `Builder.build()`: `queryExecutor` ayrica verilmemisse
+         * `transactionExecutor` ile birlikte `ArchTaskExecutor.getIOThreadExecutor()`
+         * kullaniyor). Uzun ice aktarma transaction'lari (saha loglarinda XMLTV kaynagi
+         * basina 6-19 sn) o havuzda saniyelerce iplik tutuyor, siraya giren EPG ve kanal
+         * listesi okumalari da bekliyordu.
+         *
+         * WAL acik oldugu icin okumalar yazma kilidini beklemeden ayri ipliklerde
+         * calisabilir; bu yuzden okumalar kucuk bir ayri havuza alindi. Yazma
+         * transaction'lari bilincli olarak varsayilan sirali executor'da biraki
+         * (yazmalar sirali kalir, SQLITE_BUSY riski eklenmez).
+         */
+        private val roomReadExecutor: Executor by lazy {
+            Executors.newFixedThreadPool(READ_EXECUTOR_THREADS) { runnable ->
+                Thread(runnable, "TVApp-room-read").apply { isDaemon = true }
+            }
+        }
+
+        /** EPG simdilik/sonraki ve kanal listesi okumalari icin ayrik okuma iplik sayisi. */
+        private const val READ_EXECUTOR_THREADS = 2
 
         fun getInstance(context: Context): TVAppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
@@ -78,6 +102,7 @@ abstract class TVAppDatabase : RoomDatabase() {
             )
                 .addCallback(IPTV_SEARCH_CALLBACK)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                .setQueryExecutor(roomReadExecutor)
                 .build()
                 .also { instance = it }
         }
