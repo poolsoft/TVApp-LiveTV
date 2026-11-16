@@ -1,5 +1,32 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - VOD Ekranı Telefonda Listeyi Eziyordu (`UI-006`)
+
+- **Bildirim:** VOD ekranı telefondan açıldığında üstteki "İzlemeye Devam Et" kartları sabit
+  kaldığı için altındaki afiş listesi ya yarım görünüyor ya da hiç görünmüyordu.
+- **Ölçülen kök neden:** `VodHomeActivity` manifestte landscape'e sabit (`screenOrientation`),
+  yani telefonda kullanılan eksen kısa eksen: gövde ~260–360dp. Ray XML'de sabit **175dp** ve
+  ızgara **zorla 5 sütun** (kart 106dp) olduğu için 279dp'lik gövdede listeye ~30–80dp kalıyor,
+  kartlar da 35–84dp'lik şeritlere eziliyordu.
+- **Ölçüye bağlı geometri (`vod/VodLayoutRules`, saf karar):** önce ızgaraya en az bir tam kart
+  satırı (149dp) garanti edilir, kalan pay raya verilir; ray kendi kartlarını kırpamayacak bir
+  tabana kadar iner. Afiş ızgarasının sütun sayısı artık gerçek genişlikten hesaplanır
+  (kart için 110dp pay, en çok 5). Karar View'lardan bağımsız olduğu için 8 yeni birim testle
+  (toplam **394**) kanıtlanıyor: hiçbir kısa gövde değerinde kart kırpılmıyor, ray listeyi
+  aç bırakmıyor.
+- **Uygulama:** `VodHomeActivity.applyResponsiveGeometry()` gövde yüksekliği/ızgara genişliği
+  değiştikçe (dönüşüm, pencere yeniden boyutlandırma) planı yeniden kurar;
+  `VodPosterAdapter.applyMetrics()` afiş yüksekliğini ve yıl/puan satırını yazar. Kısa ekranda
+  ray başlığı ve yıl/puan satırı kapanıp alanı afiş/başlığa devreder.
+- **TV güvende:** gövde ≥ 380dp'de XML sabitleri (ray 175dp, afiş 124dp, 5 sütun, başlık açık)
+  aynen döner ve hiçbir View'a dokunulmaz — testte kilitli.
+- **Doğrulama:** `testLocalDebugUnitTest` / `testPaidDebugUnitTest` / `testMobileDebugUnitTest`
+  394 test hatasız; `assembleLocalDebug`, `assemblePaidDebug`, `assembleMobileDebug` başarılı.
+  **Cihazda bekliyor:** telefonda (yatay) listeye en az bir tam satır sığdığı, ray kartlarının
+  kırpılmadığı ve TV'de görünümün birebir aynı kaldığı ekran görüntüleri.
+- **Kalan (`UI-006` içinde):** `dialog_quick_hub.xml` sabit 760dp genişlik; VOD üst bar, 185dp
+  sol panel ve 26dp alt ipucu barının oranlanması.
+
 ## 2026-11-16 - Kanal Listesi Boşken Neden ve Tek Eylemli Temizleme (`UI-003`)
 
 - **Ne eksikti:** Arama veya filtre 0 sonuç verdiğinde kanal paneli bomboş kalıyordu; hiçbir

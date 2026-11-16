@@ -18,11 +18,35 @@ data class VodDisplayItem(
     val resumeProgressPercent: Int = 0,
 )
 
+/**
+ * Kartın bu bağlantı için kullanılacak ölçüsü (`UI-006`). [posterHeightPx] sıfır ise
+ * düzenin kendi sabiti (124dp) korunur; kısa ekranda activity ölçüye göre kısa değer
+ * verir ve yıl/puan satırı kapanır.
+ */
+data class VodCardMetrics(
+    val posterHeightPx: Int = 0,
+    val metaRowVisible: Boolean = true,
+)
+
 class VodPosterAdapter(
     private val onItemClick: (VodDisplayItem) -> Unit,
     private val onItemFocused: (VodDisplayItem) -> Unit,
     private val onItemLongClick: ((VodDisplayItem) -> Boolean)? = null,
 ) : ListAdapter<VodDisplayItem, VodPosterAdapter.ViewHolder>(DiffCallback) {
+
+    private var metrics = VodCardMetrics()
+
+    /**
+     * Ölçü değişimini uygular (ekran/dönüşüm değişikliği). Değer gerçekten
+     * değiştiyse yeniden bağlama gerekir: afiş yükseklikleri geri dönüştürülmüş
+     * kartlarda da doğru olmalı.
+     */
+    fun applyMetrics(next: VodCardMetrics) {
+        if (metrics == next) return
+        metrics = next
+        // Boş listede yeniden bağlama gerekmez: ilk bağlama yeni ölçüyü kullanır.
+        if (itemCount > 0) notifyDataSetChanged()
+    }
 
     fun updateTmdbItem(sourceKey: String, tmdb: VodTmdbEntity) {
         val items = currentList
@@ -44,6 +68,23 @@ class VodPosterAdapter(
     }
 
     inner class ViewHolder(private val binding: ItemVodPosterCardBinding) : RecyclerView.ViewHolder(binding.root) {
+
+        /** Düzenin kendi afiş yüksekliği (XML 124dp); kısa ekranda bu değere dönülür. */
+        private val standardPosterHeightPx = binding.vodCardPosterFrame.layoutParams.height
+
+        /**
+         * Kart ölçüsünü bağlama uygular. Her bağlamada yazılır: geri dönüştürülmüş
+         * kartlar önceki (kısa) ölçüyü taşımasın.
+         */
+        private fun applyMetrics() {
+            val targetHeight = metrics.posterHeightPx.takeIf { it > 0 } ?: standardPosterHeightPx
+            val params = binding.vodCardPosterFrame.layoutParams
+            if (params.height != targetHeight) {
+                params.height = targetHeight
+                binding.vodCardPosterFrame.layoutParams = params
+            }
+            binding.vodCardMetaRow.visibility = if (metrics.metaRowVisible) View.VISIBLE else View.GONE
+        }
 
         init {
             binding.root.setOnClickListener {
@@ -79,6 +120,7 @@ class VodPosterAdapter(
         }
 
         fun bind(item: VodDisplayItem) {
+            applyMetrics()
             val cleaned = if (item.tmdb == null) VodTitleCleaner.clean(item.catalogItem.name) else null
             val title = item.tmdb?.title ?: cleaned?.cleanTitle ?: item.catalogItem.name
             binding.vodCardTitle.text = title

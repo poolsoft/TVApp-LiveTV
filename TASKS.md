@@ -977,12 +977,29 @@ bileşenleri hâlâ kullanmıyor.
   **Kabul:** OSD'de minimum punto bir alt sınıra (örn. 12sp) bağlanır; TV mesafesinden
   okunabilirlik cihazda doğrulanır; rozetler satırı kaydırmaz.
 
-- [ ] **UI-006 (P2): Oransal olmayan VOD ve Quick Hub ölçüleri**
+- [~] **UI-006 (P2): Oransal olmayan VOD ve Quick Hub ölçüleri**
   `activity_vod_home.xml` sabit 38dp üst bar, 175dp Devam Et rayı, 185dp sol panel;
   `dialog_quick_hub.xml` sabit 760dp genişlik ve ~35 sabit dp. `TvOverlayLayoutHelper` bu
   ekranları kapsamıyor, ~480dp yükseklikli 720p görünümde alt ipucu barı ile içerik çakışabiliyor.
   **Kabul:** Birincil geometri ekran oranına bağlanır; 720p/1080p/4K ekran görüntülerinde
   üst ve alt güvenli boşluklar korunur.
+  **Durum (2026-11-16, VOD telefonda ölçülüp düzeltildi):** Kullanıcı bildirimi — VOD ekranı
+  telefonda açıldığında üstteki "İzlemeye Devam Et" kartları sabit kaldığı için altındaki
+  ızgara ya yarım görünüyordu ya da hiç görünmüyordu. Ölçülen kök nedenler:
+  - `AndroidManifest.xml:182` `VodHomeActivity` **landscape'e sabit** → telefonda dikey eksen
+    kısa eksendir; gövde (`vod_body`) ~260–360dp kalır (TV'de 430–700dp).
+  - Ray `activity_vod_home.xml:258` sabit **175dp** + ray başlığı ~21dp: 279dp gövdede ızgaraya
+    ~30–80dp kalıyordu → kart (afiş 124dp + başlık ~31dp = 155dp) hiç sığmıyordu.
+  - Izgara `GridLayoutManager(this, 5)` zorlaması + kart genişliği 106dp: telefon yatayda ızgara
+    alanı ~419dp → sütun başına 84dp, küçük telefonda ~35dp'lik şeritler.
+  Çözüm: `vod/VodLayoutRules` saf kararı (gövde yüksekliğinden ray yüksekliği + afiş yükseklikleri,
+  genişlikten sütun sayısı), `VodHomeActivity.applyResponsiveGeometry()` bunu View'lara uygular,
+  `VodPosterAdapter.applyMetrics()` afiş yüksekliğini ve yıl satırını bağlama sırasında yazar.
+  Gövde ≥ 380dp'de XML sabitleri aynen döner → TV görünümü değişmedi (testte kilitli).
+  **Kalan:** (1) `dialog_quick_hub.xml` sabit 760dp ve ~35 dp ölçüleri; (2) VOD üst bar/sol
+  panel/alt ipucu barının da oranlanması (şu an yalnız ray + ızgara); (3) cihaz doğrulaması —
+  telefonda (yatay) ızgaranın en az bir tam satır gösterdiği, ray kartlarının kırpılmadığı ve
+  TV'de görünümün birebir aynı kaldığı.
 
 - [ ] **UI-007 (P2): OSD geçişlerinde animasyon yok**
   `MainActivity.kt:5140+` (`renderPlaybackUiState`) tüm katmanları ani GONE/VISIBLE ile

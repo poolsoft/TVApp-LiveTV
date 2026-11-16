@@ -26,9 +26,11 @@ import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.playback.IptvResumeStore
 import com.tvapp.livetv.playback.PlaybackHistoryStore
 import com.tvapp.livetv.vod.TmdbApiClient
+import com.tvapp.livetv.vod.VodCardMetrics
 import com.tvapp.livetv.vod.VodCategoryAdapter
 import com.tvapp.livetv.vod.VodCategoryItem
 import com.tvapp.livetv.vod.VodDisplayItem
+import com.tvapp.livetv.vod.VodLayoutRules
 import com.tvapp.livetv.vod.VodPosterAdapter
 import com.tvapp.livetv.vod.VodTitleCleaner
 import java.text.SimpleDateFormat
@@ -57,6 +59,11 @@ class VodHomeActivity : TvRemoteActivity() {
     private lateinit var continueAdapter: VodPosterAdapter
     private lateinit var gridAdapter: VodPosterAdapter
     private lateinit var gridCategoryAdapter: VodCategoryAdapter
+    private lateinit var gridLayoutManager: GridLayoutManager
+
+    /** Son uygulanan geometri; aynı değer için tekrar View'a dokunulmaz (`UI-006`). */
+    private var appliedGeometry: VodLayoutRules.VodGeometry? = null
+    private var geometryPassPending = false
 
     private var gridCurrentPage = 0
     private var gridIsLoading = false
@@ -107,6 +114,7 @@ class VodHomeActivity : TvRemoteActivity() {
 
         setupRecyclerViews()
         setupClickListeners()
+        setupResponsiveGeometry()
         updateClock()
         loadSourcesAndInitialData()
     }
@@ -140,7 +148,7 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodRecyclerContinue.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
         binding.vodRecyclerContinue.adapter = continueAdapter
 
-        // Grid Afiş Adaptörü (5 Sütun)
+        // Grid Afiş Adaptörü (Sütun sayısı ölçüye göre: en çok 5)
         gridAdapter = VodPosterAdapter(
             onItemClick = { displayItem -> onVodItemClicked(displayItem) },
             onItemFocused = { item ->
@@ -152,7 +160,7 @@ class VodHomeActivity : TvRemoteActivity() {
                 true
             },
         )
-        val gridLayoutManager = GridLayoutManager(this, 5)
+        gridLayoutManager = GridLayoutManager(this, VodLayoutRules.MAX_GRID_SPAN)
         binding.vodRecyclerGrid.layoutManager = gridLayoutManager
         binding.vodRecyclerGrid.adapter = gridAdapter
 
@@ -190,6 +198,60 @@ class VodHomeActivity : TvRemoteActivity() {
         binding.vodGridRecyclerCategories.layoutManager = LinearLayoutManager(this)
         binding.vodGridRecyclerCategories.adapter = gridCategoryAdapter
     }
+
+    /**
+     * Ölçüye bağlı geometri (`UI-006`).
+     *
+     * `VodHomeActivity` manifestte landscape'e sabittir ve telefon ile aynı düzeni
+     * kullanır; telefonda gövde yüksekliği ~260-360dp'ye iner. Sabit 175dp'lik Devam Et
+     * rayı ve zorla 5 sütunlu ızgara bu alanda afiş ızgarasını kırpıyordu (liste yarım
+     * ya da hiç görünmüyordu). Karar saf kuralla verilir, burada yalnız View'lara
+     * uygulanır; TV/tablet ölçülerinde (gövde >= 380dp) hiçbir değer değişmez.
+     */
+    private fun setupResponsiveGeometry() {
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> requestResponsiveGeometry() }
+        requestResponsiveGeometry()
+    }
+
+    /** Bir sonraki geçişe kadar istekler tek seferde birleştirilir (yarış/tekrar yok). */
+    private fun requestResponsiveGeometry() {
+        if (geometryPassPending) return
+        geometryPassPending = true
+        binding.root.post {
+            geometryPassPending = false
+            applyResponsiveGeometry()
+        }
+    }
+
+    private fun applyResponsiveGeometry() {
+        if (isFinishing || isDestroyed) return
+        val geometry = VodLayoutRules.geometry(binding.vodBody.height.toDp())
+        if (geometry != appliedGeometry) {
+            appliedGeometry = geometry
+            val railHeight = geometry.railHeightDp.toPx()
+            val railParams = binding.vodRecyclerContinue.layoutParams
+            if (railParams.height != railHeight) {
+                railParams.height = railHeight
+                binding.vodRecyclerContinue.layoutParams = railParams
+            }
+            binding.vodContinueLabel.visibility = if (geometry.railLabelVisible) View.VISIBLE else View.GONE
+            continueAdapter.applyMetrics(
+                VodCardMetrics(geometry.railPosterHeightDp.toPx(), geometry.metaRowVisible)
+            )
+            gridAdapter.applyMetrics(
+                VodCardMetrics(geometry.gridPosterHeightDp.toPx(), geometry.metaRowVisible)
+            )
+        }
+        val span = VodLayoutRules.gridSpan(
+            availableWidthPx = binding.vodRecyclerGrid.width,
+            minCardWidthPx = VodLayoutRules.MIN_CARD_WIDTH_DP.toPx(),
+        )
+        if (span != gridLayoutManager.spanCount) gridLayoutManager.spanCount = span
+    }
+
+    private fun Int.toPx(): Int = (this * resources.displayMetrics.density).toInt()
+
+    private fun Int.toDp(): Int = if (this <= 0) 0 else (this / resources.displayMetrics.density).toInt()
 
     private fun setupClickListeners() {
         // Liste Seçim Combo'su

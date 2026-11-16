@@ -13,7 +13,10 @@
     android:orientation="vertical"
     android:padding="5dp">
 
+    <!-- Afiş çerçevesi: kısa ekranda (telefon) yüksekliği kodda kısılır,
+         karar VodLayoutRules.geometry(), uygulama VodPosterAdapter.applyMetrics(). -->
     <FrameLayout
+        android:id="@+id/vod_card_poster_frame"
         android:layout_width="match_parent"
         android:layout_height="124dp"
         android:background="#1B2230">
@@ -48,6 +51,7 @@
         android:textStyle="bold" />
 
     <LinearLayout
+        android:id="@+id/vod_card_meta_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
