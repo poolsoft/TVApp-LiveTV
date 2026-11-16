@@ -626,7 +626,7 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   release paketinde bulunmaz; yer tutucu buton ya çalışır ya da arayüzden kaldırılır;
   `IptvEntitlementPolicy` karar tablosu her flavor için birim testli.
 
-- [ ] **MISS-002 (P1): VOD çözümleme katmanına birim test (AUDIT-000 regresyonunun nedeni)**
+- [~] **MISS-002 (P1): VOD çözümleme katmanına birim test (AUDIT-000 regresyonunun nedeni)**
   `VodHostTest`, `VodLibraryResolverTest`, `VodUiSupportTest` ve `VodTitleCleanerTest` var;
   **olmayanlar:** `VodUrlClassifier` (68 satır, saf JVM — son iki düzeltme bunu değiştirdi ama
   regresyon testi yok), `WebVideoResolver` (713 satır), `VodMetadataExtractor` (216 satır),
@@ -637,6 +637,30 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   JSON-LD/OpenGraph alanları.
   **Kabul:** `f1fb402` tipinde bir gerileme derleme geçse bile testte yakalanır; mock web sunucusu
   veya sabit HTML fikstürleriyle test çevrimdışı çalışır; üretim davranışı değişmez.
+  **Durum (2026-11-16, yapılanlar):** 31 yeni test, üç yeni dosya — ağ bağımlılığı yok.
+  - `vod/VodUrlClassifierTest.kt` (8 test): web sayfası yolları ve **sorgudaki** uzantılar akis
+    sayılmıyor (`/watch?v=abc.mp4` → `false`); `master.txt`/`playlist.txt`, `.smil/.m3u8`,
+    `stream.php`, klasik uzantılar akış sayılıyor; `isHlsUrl`/`isDashUrl`/`mimeType`
+    eşlemesi (`master.txt` → `application/x-mpegURL`); `WebVideoResolver.isDirectStream`
+    devrinin sabitlenmesi.
+  - `vod/VodMetadataExtractorTest.kt` (12 test): JSON-LD `contentUrl` (dizi biçimi dahil),
+    OpenGraph `og:video:secure_url` + ters öznitelik sırası, `\/` ve `&amp;` çözümü, microdata
+    `itemprop`, oynatıcı JS blob'u `"file"`, çıplak bağlantıda manifest'in mp4/gifte önceliği,
+    analytics etiketinin **asla** akış olmaması, `src`/`data-src` iframe'lerinin sayfaya göre
+    çözülmesi, boş HTML.
+  - `vod/WebVideoResolverTest.kt` (11 test): `isNetworkMediaCandidate` (reklam/reklam-öncesi
+    dosyalar, analitik, statik varlıklar eleniyor), `isSegmentLike` (`chunklist.m3u8` parça
+    **değil**), `isStrongCandidate` (`f1fb402` sonrası `master` aranmaz), `rankHeadlessCandidates`
+    (HLS → DASH → diğer, geliş sırası korunur, `MAX_HEADLESS_CANDIDATES` sınırı),
+    `extractStreamFromPage`: `html` verildiyde sayfanın **tekrar indirilmediği** (geçersiz URL
+    ile kanıt), `html = null` + inemeyen sayfada aday yok ve istisna yok, derinlik sınırı.
+  - Üretim tarafında tek değişiklik görünürlük: `WebVideoResolver` içinde
+    `isNetworkMediaCandidate`, `isStrongCandidate`, `isSegmentLike`, `rankHeadlessCandidates`,
+    `extractStreamFromPage` ve `MAX_HEADLESS_CANDIDATES` `private` → `internal`
+    (davranış aynı; `HttpBodyReader`/`LimitedCharWriter` ile aynı kalıp).
+  **Kalan:** `IptvPlaybackController`, `IptvResumeStore`, `MultiViewController` saf JVM'de
+  test edilebilir parçalarına ayrılıp kapsanmalı (Android/Media3/Room bağımlıları nedeniyle
+  bu turda dışarıda bırakıldı).
 
 - [ ] **MISS-003 (P2): Room migration sözleşme testlerini genişlet**
   Zincir eksiksiz ve `fallbackToDestructiveMigration` hiç kullanılmıyor (uyumlu), fakat tek
@@ -1079,7 +1103,9 @@ cihazda bekliyor), `MISS-005` (R8 mapping artifact'i; `dev-r343` ile uçtan uca 
 **Tamamlanan (2026-11-16):** `CRASH-001` kod tarafı — tüm `CookieManager` okumaları yeni
 `browser/WebCookies.kt` üzerinden ana thread'e taşındı (`StreamSniffer` duyurusu `schedule`
 üzerinden, `WebVideoResolver` dört okuma), çağrısız `allPlayableRequests()` silindi; cihaz
-doğrulaması ve refactor dalına taşınması bekliyor.
+doğrulaması ve refactor dalına taşınması bekliyor. `MISS-002` kod tarafı — VOD çözümleme
+katmanı 31 birim testle kapsandı (`f1fb402` ve 1 Kasım NPE'si artık testte yakalanır);
+`IptvPlaybackController` / `IptvResumeStore` / `MultiViewController` kalan.
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
@@ -1088,10 +1114,9 @@ doğrulaması ve refactor dalına taşınması bekliyor.
 2. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
-3. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
-4. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
-5. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
-6. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` bu dala da taşınır)
+3. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
+4. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
+5. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` bu dala da taşınır)
 
 **Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`,
 `PERF-013`, `PERF-019`.

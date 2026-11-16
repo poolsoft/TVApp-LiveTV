@@ -20,7 +20,7 @@ object WebVideoResolver {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     /** Headless sniffer en fazla kac aday toplar; fazlasi kesilir. */
-    private const val MAX_HEADLESS_CANDIDATES = 6
+    internal const val MAX_HEADLESS_CANDIDATES = 6
     /** Headless sayfa bekleme ust siniri; Var olan davranis korunur (10 sn). */
     private const val HEADLESS_TIMEOUT_MS = 10_000L
 
@@ -62,7 +62,8 @@ object WebVideoResolver {
 
     fun isDirectStream(url: String): Boolean = VodUrlClassifier.isDirectStream(url)
 
-    private fun isNetworkMediaCandidate(url: String): Boolean {
+    /** Sayfa ag isteklerinin akis adayi olup olmadigi; birim testler icin `internal`. */
+    internal fun isNetworkMediaCandidate(url: String): Boolean {
         val clean = url.trim()
         if (clean.isEmpty()) return false
         val lower = clean.lowercase()
@@ -520,7 +521,7 @@ object WebVideoResolver {
      * listeyi bekletme. master kelimesi URL'de olmak zorunda degil (index.m3u8 de
      * gucIü adaydir).
      */
-    private fun isStrongCandidate(item: ResolvedStream): Boolean {
+    internal fun isStrongCandidate(item: ResolvedStream): Boolean {
         val lower = item.streamUrl.lowercase()
         val isManifest = lower.contains(".m3u8") || lower.contains("master.txt") || lower.contains("playlist.txt")
         if (!isManifest) return false
@@ -538,7 +539,7 @@ object WebVideoResolver {
      * Once HLS/DASH manifest, sonra dogrudan progressive dosya; ayni sirada
      * gorulen aday once gelir ( `.m3u8?token=...` once `chunklist` gibi).
      */
-    private fun rankHeadlessCandidates(items: Collection<ResolvedStream>): List<ResolvedStream> {
+    internal fun rankHeadlessCandidates(items: Collection<ResolvedStream>): List<ResolvedStream> {
         if (items.isEmpty()) return emptyList()
         val ordered = items.toList()
         val keyFn: (ResolvedStream) -> Int = { item ->
@@ -557,7 +558,7 @@ object WebVideoResolver {
     }
 
     /** Segment parca adlarini ayirt etmek icin yol adi sozlugu (browser siniflariyla ayni dil). */
-    private fun isSegmentLike(url: String): Boolean {
+    internal fun isSegmentLike(url: String): Boolean {
         val path = url.substringBefore('?').substringBefore('#')
         val name = path.substringAfterLast('/').substringBeforeLast('.')
         if (name.isEmpty()) return false
@@ -569,7 +570,11 @@ object WebVideoResolver {
     private suspend fun resolveViaHeadlessWebView(context: android.content.Context, pageUrl: String): ResolvedStream? =
         collectViaHeadlessWebView(context, pageUrl).firstOrNull()
 
-    private fun extractStreamFromPage(pageUrl: String, depth: Int, html: String? = null): String? {
+    /**
+     * Sayfa HTML'inden oynatilabilir aday cikarir. `html` verilmezse sayfa indirilir.
+     * Birim testler sabit HTML ile ve ag yapmadan calismasi icin `internal`.
+     */
+    internal fun extractStreamFromPage(pageUrl: String, depth: Int, html: String? = null): String? {
         if (depth > 2) return null
         val targetHtml = html ?: fetchHtml(pageUrl) ?: return null
 

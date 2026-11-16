@@ -1,5 +1,40 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - VOD Çözümleme Katmanına Birim Testler (`MISS-002`)
+
+- **31 yeni test, üç yeni dosya; ağ bağımlılığı yok.** Denetimin `AUDIT-000` tipi için
+  açık kalan boşluk kapatıldı: VOD çözümleme katmanının saf JVM'de test edilebilir yüzeyi
+  sabit HTML fikstürleriyle kapsandı (mock sunucuya gerek kalmadı; testler hiç `fetchHtml`
+  yoluna girmiyor).
+- **`vod/VodUrlClassifierTest.kt` (8 test):** web sayfası yolları akış sayılmıyor ve **uzantı
+  sorgu parametresindeyse** de sayılmıyor (`/watch?v=abc.mp4` → `false`); `master.txt` /
+  `playlist.txt`, `.smil/.m3u8`, `stream.php`, klasik uzantılar akış sayılıyor;
+  `isHlsUrl`/`isDashUrl`/`mimeType` eşlemesi (`master.txt` → `application/x-mpegURL`, mp4 →
+  `null`); `WebVideoResolver.isDirectStream` devri sabitleniyor.
+- **`vod/VodMetadataExtractorTest.kt` (12 test):** JSON-LD `contentUrl` (dizi biçimi dahil,
+  Kanal D `.smil/.m3u8` örneği), OpenGraph `og:video:secure_url` ve ters öznitelik sırası,
+  `\/` ve `&amp;` kaçışlarının çözümü, microdata `itemprop`, oynatıcı JS blob'undaki `"file"`,
+  çıplak bağlantılarda manifest'in mp4'e önceliği, **analytics etiketinin asla akış olmaması**,
+  `src` + `data-src` iframe'lerinin sayfa origin'ine göre çözülmesi, boş HTML.
+- **`vod/WebVideoResolverTest.kt` (11 test):** `isNetworkMediaCandidate` reklam/analitik/statik
+  varlık elemesi (`ad_`, `preview_`, `banner`), `isSegmentLike` (`chunklist.m3u8` parça
+  **değil**, `seg-9999.ts` parça), `isStrongCandidate` (`f1fb402` sonrası `master` kelimesi
+  aranmıyor), `rankHeadlessCandidates` (HLS → DASH → diğer, geliş sırası korunur,
+  `MAX_HEADLESS_CANDIDATES` ile liste sınırı), `extractStreamFromPage`: **`html` verildiyse
+  sayfanın tekrar indirilmediği** (geçersiz sayfa URL'siyle kanıtlanır — `f1fb402`
+  sözleşmesi), **`html = null` + indirilemeyen sayfada aday yok ve istisna fırlamıyor**
+  (1 Kasım NPE'si), recursio derinlik sınırı.
+- **Üretim davranışı değişmedi:** tek değişiklik görünürlük — `WebVideoResolver` içinde
+  `isNetworkMediaCandidate`, `isStrongCandidate`, `isSegmentLike`, `rankHeadlessCandidates`,
+  `extractStreamFromPage` ve `MAX_HEADLESS_CANDIDATES` `private` → `internal`; birim test
+  kaynak seti aynı modülde olduğu için erişilebilir (`HttpBodyReader`/`LimitedCharWriter`
+  kalıbıyla aynı).
+- **Doğrulama:** `testLocalDebugUnitTest` + `testPaidDebugUnitTest` **377 test** (önce 346,
+  +31) hatasız; `assembleLocalDebug` ve `assemblePaidDebug` başarılı.
+- **Kalan:** `IptvPlaybackController`, `IptvResumeStore`, `MultiViewController` Android /
+  Media3 / Room bağımlıları nedeniyle bu turda dışarıda; saf JVM'ye çekilebilir parçaları
+  ayrı görevde kapsanacak.
+
 ## 2026-11-16 - CookieManager Okumaları Ana Thread'e Taşındı (`CRASH-001`)
 
 - **Yeni `browser/WebCookies.kt`:** `CookieManager` okumalarının tek giriş noktası. Çağrı ana
