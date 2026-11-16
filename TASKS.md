@@ -609,6 +609,16 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   yazılmaya devam eder ve asla ikinci bir çökme üretmez (testlendi); tepe bellek düşüşü
   cihazda ölçüldüğünde madde kapanır.
 
+- [ ] **CRASH-004 (P1): `VodHomeActivity.loadGridCategories()` korumasız korutin çağrısı**
+  **Buluş (2026-11-16, `UI-002` sırasında):** `VodHomeActivity.loadGridCategories()`
+  `lifecycleScope.launch { repository.categories(...) }` çağrısını `try/catch` olmadan
+  yapıyor. Room/DAO katmanından çıkan bir istisna korutinin varsayılan yoluyla çözülmeden
+  kalır ve süreç çöker; aynı ekrandaki `loadSourcesAndInitialData`, `loadNextGridPage` ve
+  `loadContinueWatching` zaten yakalıyor — korumasız tek yükleme yolu bu.
+  **Kabul:** Kategori yüklemesi de `CancellationException` dışını yakalayıp `debugLog`'a
+  yazar ve kategori rayı boş kalsa da ızgara çalışmaya devam eder; VOD ana ekranında
+  korumasız `lifecycleScope.launch` kalmaz (statik gözden geçirme ile doğrulanır).
+
 ### Epic MISS — Denetimde açığa çıkan eksikler
 
 - [ ] **MISS-001 (P0): paid flavor'da IPTV erişim kapısı kapalı**
@@ -853,13 +863,42 @@ bileşenleri hâlâ kullanmıyor.
   **İzlenen kalan iş:** imleç ile sistem odağı tek doğruluk kaynağına indirilmeli (odak
   değişimi imleci de taşımalı), aksi hâlde iki gösterge ayrışabilir.
 
-- [ ] **UI-002 (P1): VOD ana ekranında yükleme, hata ve yeniden dene durumu yok**
+- [~] **UI-002 (P1): VOD ana ekranında yükleme, hata ve yeniden dene durumu yok**
   `VodHomeActivity.kt:412-456` yüklerken ızgara boş kalıyor, ağ hatası yalnız `debugLog`'a
   düşüyor, ekranda hiçbir şey değişmiyor ve yeniden deneme yolu yok (`vod_grid_empty_state`
   altyapısı `activity_vod_home.xml:319`'de hazır). `VODUI-001` bu davranışı istiyor ama
   VOD ana ekranına tam yansımamış.
   **Kabul:** Yükleme göstergesi, iki dilli hata kartı ve OK ile tetiklenen yeniden dene vardır;
   hata boş katalogdan ayırt edilir; `VODUI-001` bu maddeyle birlikte kapatılır.
+  **Durum (2026-11-16, yapılanlar):**
+  - `activity_vod_home.xml`: ızgara katmanının ortasına `vod_status_panel` eklendi
+    (yükleme spineri `vod_status_progress` + metin `vod_status_text` + `vod_status_retry`).
+    Yeni drawable/strings üretilmedi: kart `bg_vod_panel_card`, düğme `bg_vod_secondary_btn`
+    (ikisi de `state_focused` dalı taşır — `UI-001` ile tutarlı), metinler mevcut
+    `loading` / `vod_load_failed` / `retry` anahtarlarından geliyor. `vod_load_failed`
+    iki dilde de tanımlıydı ama **hiç kullanılmıyordu**; şimdi kullanılan o.
+  - `VodHomeActivity`: durum kararı View'lardan ayrıldı — `decideVodGridStatus(...)`
+    saf fonksiyonu `Hidden | Loading | Error | EmptyCatalog` döndürüyor; `renderGridStatus()`
+    yalnız bunu uyguluyor. Hata kartı ilk açıldığında odak kendiliğinden OK'a gidiyor
+    (`requestFocus`), kartın OK'ı `reloadGridData()` ile aynı kaynak/filtre ile yeniden deniyor.
+  - Kaynak listesi okunamazsa (`loadSourcesAndInitialData`) da aynı kart görünüyor; önceden
+    yalnız `debugLog`'a düşüp ekran bomboş kalıyordu.
+  - Sayfa hatasında `gridHasMore` açık kaldığı için içerik ekrandayken kart açılmıyor
+    (içerik örtülmüyor), kaydırma zaten yeniden deniyor.
+  - `vod_grid_empty_state` artık yalnız **yükleme bitti ve hata yokken** görünüyor; önceden
+    yükleme sırasında da görünebiliyordu — hata ile boş katalog ayrımı buradan geliyor.
+  - Testler: `VodGridStatusTest.kt` (4 test) — hata/yükleme/bos katalog karışmıyor, hata
+    yükleme ile çakıştığında kart kazanıyor, ekranda içerik varken hiçbir katman görünmüyor.
+    Toplam `381` birim testi iki flavor'da da geçiyor.
+  - **Not (`VODUI-001` hakkında):** o madde 2026-10-02'de "hatalar boş katalog gibi gösterilmez,
+    yeniden dene vardır" diye kapatılmış görünüyor; bugünkü kodda bu davranış yoktu (denetim
+    bulgusu doğru). Kalan kanıt, kullanılmayan `vod_load_failed` metninin varlığıydı.
+  - **Yanında fark edilen risk (bu turda dokunulmadı):** `loadGridCategories()` içindeki
+    `repository.categories(...)` çağrısı `try/catch` içermiyor; buradan çıkan bir istisna
+    `lifecycleScope` üzerinden çözülmeden kalır. Ayrı bir `CRASH-*` maddesi olarak izlenmeli.
+  **Kalan:** Cihazda doğrulama — uçurma modunda/ağ kapalı VOD açılışında kartın geldiği, OK ile
+  yeniden denendiği, spinnerın kısa yüklemede titremediği ve 720p/1080p/4K'da kartın taşmadığı.
+  `VODUI-001` kod tarafı tamam; hata enjeksiyonlu kabul doğrulaması cihazda bekliyor.
 
 - [ ] **UI-003 (P1): Boş durum ekranları eksik**
   Ana kanal listesinde filtre/arama 0 sonuç verdiğinde panel bomboş kalıyor
@@ -1111,7 +1150,9 @@ katmanı 31 birim testle kapsandı (`f1fb402` ve 1 Kasım NPE'si artık testte y
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
    iz çözülemez. Yeni saha çökmesi geldiğinde ilgili revizyonun artifact'i indirilip `retrace`
    ile çözülür (README, "Çökme izini çözme").
-2. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
+2. `CRASH-004` (yeni bulgu, dar değişiklik) — `VodHomeActivity.loadGridCategories()`
+   `try/catch` olmadan korutin içinde DAO çağırıyor; tek dosyalık düzeltme.
+3. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
 3. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)

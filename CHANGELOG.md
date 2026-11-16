@@ -1,5 +1,37 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - VOD Ana Ekranında Yükleme / Hata / Yeniden Dene (`UI-002`)
+
+- **Ne eksikti:** VOD ana ekranı yüklenirken ızgara bomboş kalıyor, ağ/veritabanı hatası yalnız
+  `.log`'a düşüyor, ekranda hiçbir şey değişmiyor ve yeniden deneme yolu yoktu. Boş katalog ile
+  hata aynı "boş ekran" gibi görünüyordu.
+- **Yükleme ve hata kartı (`activity_vod_home.xml`):** ızgaranın ortasına `vod_status_panel`
+  eklendi — spiner (`vod_status_progress`), metin (`vod_status_text`) ve `vod_status_retry`.
+  Yeni drawable veya metin üretilmedi: kart `bg_vod_panel_card`, düğme `bg_vod_secondary_btn`
+  (ikisi de `state_focused` taşıyor, `UI-001` ile tutarlı); metinler mevcut `loading`,
+  `retry` ve `vod_load_failed` anahtarlarından geliyor. `vod_load_failed` iki dilde de
+  tanımlıydı ama **hiç kullanılmıyordu** — bu ekranda kullanılan o.
+- **Durum kararı View'lardan ayrıldı:** `decideVodGridStatus(itemsEmpty, isLoading, loadFailed)`
+  saf fonksiyonu `Hidden | Loading | Error | EmptyCatalog` döndürüyor; `renderGridStatus()`
+  yalnız uyguluyor. Böylece "hata boş katalogdan ayırt edilir" kabulü birim testle kanıtlanıyor.
+- **Kumanda yolu:** kart ilk açıldığında odak kendiliğinden OK düğmesine gidiyor; OK aynı
+  kaynak ve filtreyle `reloadGridData()` çağırıyor. Renk tuşu sözleşmelerine dokunulmadı
+  (kırmızı bu ekranda hâlâ Canlı TV).
+- **Kaynak listesi okunamazsa da** aynı kart çıkıyor (`loadSourcesAndInitialData`); önceden
+  sessizce boş ekran kalıyordu.
+- **İçerik örtülmüyor:** sayfa hatasında `gridHasMore` açık kaldığı için kart yalnız ızgara
+  boşken açılıyor; içerik ekrandayken kaydırma zaten yeniden dener.
+- **`vod_grid_empty_state` davranışı:** artık yalnız yükleme bitip hata da yokken görünüyor;
+  önceden yükleme sırasında da görünebiliyordu.
+- **Testler:** `VodGridStatusTest.kt` (4 test). Toplam **381** birim testi `localDebug` ve
+  `paidDebug` için geçiyor; iki debug APK derlendi.
+- **Yeni izlenen görev (`CRASH-004`):** bu çalışma sırasında fark edildi —
+  `VodHomeActivity.loadGridCategories()` DAO çağrısını `try/catch` olmadan korutin içinde
+  yapıyor; çıkan istisna süreci düşürür. Aynı ekrandaki diğer üç yükleme yolu zaten korumalı.
+- **Kalan:** cihazda doğrulama (ağ kapalı VOD açılışı, OK ile yeniden deneme, kartın
+  720p/1080p/4K'da taşmaması). `VODUI-001` kod tarafı tamamlandı; 2026-10-02'de kapatılmış
+  görünen bu davranış bugünkü koda hiç yansımamıştı.
+
 ## 2026-11-16 - VOD Çözümleme Katmanına Birim Testler (`MISS-002`)
 
 - **31 yeni test, üç yeni dosya; ağ bağımlılığı yok.** Denetimin `AUDIT-000` tipi için

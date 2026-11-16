@@ -61,6 +61,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private var gridCurrentPage = 0
     private var gridIsLoading = false
     private var gridHasMore = true
+    private var gridLoadFailed = false
     private var gridOrder = "SOURCE"
     private var gridSection = "ALL"
     private var gridCategory: String? = null
@@ -211,6 +212,11 @@ class VodHomeActivity : TvRemoteActivity() {
             showSortSelectionDialog()
         }
 
+        // Yükleme hatasindan sonra OK ile yeniden dene (UI-002)
+        binding.vodStatusRetry.setOnClickListener {
+            retryGridLoad()
+        }
+
         updateSortComboText()
     }
 
@@ -231,6 +237,10 @@ class VodHomeActivity : TvRemoteActivity() {
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     debugLog.recordDebug("VOD Sources load failed: ${e.message}")
+                    // Liste okunamazsa ekran bomboş kalmaz: ayni hata karti OK ile
+                    // yeniden deneme yolu sunar (UI-002).
+                    gridLoadFailed = true
+                    renderGridStatus()
                 }
             }
         }
@@ -410,14 +420,50 @@ class VodHomeActivity : TvRemoteActivity() {
         gridJob?.cancel()
         gridCurrentPage = 0
         gridHasMore = true
+        gridLoadFailed = false
         gridItems.clear()
         gridAdapter.submitList(emptyList())
         loadNextGridPage()
+        renderGridStatus()
+    }
+
+    /**
+     * Yükleme, hata ve boş katalog katmanlarını tek noktadan yönetir (UI-002).
+     *
+     * Hata kartı yalnız ızgara boşken görünür; içerik ekranın üstündeyse sayfa
+     * hatasında `gridHasMore` açık kaldığı için kaydırma zaten yeniden dener ve
+     * içerik örtülmez. Boş katalog ("İçerik bulunamadı") ile hata ayrt edilir.
+     */
+    private fun renderGridStatus() {
+        val status = decideVodGridStatus(
+            itemsEmpty = gridItems.isEmpty(),
+            isLoading = gridIsLoading,
+            loadFailed = gridLoadFailed,
+        )
+        val retryWasVisible = binding.vodStatusRetry.visibility == View.VISIBLE
+        val showPanel = status == VodGridStatus.Loading || status == VodGridStatus.Error
+
+        binding.vodStatusPanel.visibility = if (showPanel) View.VISIBLE else View.GONE
+        binding.vodStatusProgress.visibility = if (status == VodGridStatus.Loading) View.VISIBLE else View.GONE
+        binding.vodStatusText.setText(if (status == VodGridStatus.Error) R.string.vod_load_failed else R.string.loading)
+        binding.vodStatusRetry.visibility = if (status == VodGridStatus.Error) View.VISIBLE else View.GONE
+        binding.vodStatusRetry.isFocusable = status == VodGridStatus.Error
+        binding.vodGridEmptyState.visibility =
+            if (status == VodGridStatus.EmptyCatalog) View.VISIBLE else View.GONE
+
+        // Kart ilk kez açildiginda odak OK'a gider; kumanda ile tek basinca yeniden dener.
+        if (status == VodGridStatus.Error && !retryWasVisible) binding.vodStatusRetry.requestFocus()
+    }
+
+    /** Hata kartindaki OK: ayni kaynak ve filtre ile listeyi bastan yukar. */
+    private fun retryGridLoad() {
+        reloadGridData()
     }
 
     private fun loadNextGridPage() {
         if (gridIsLoading || !gridHasMore) return
         gridIsLoading = true
+        renderGridStatus()
 
         gridJob = lifecycleScope.launch {
             try {
@@ -451,8 +497,6 @@ class VodHomeActivity : TvRemoteActivity() {
                     enrichMissingTmdb(pageData, cachedTmdb)
                 }
 
-                binding.vodGridEmptyState.visibility = if (gridItems.isEmpty()) View.VISIBLE else View.GONE
-
                 val count = withContext(Dispatchers.IO) {
                     repository.count(sourceId, currentFilter, emptyList())
                 }
@@ -460,9 +504,11 @@ class VodHomeActivity : TvRemoteActivity() {
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     debugLog.recordDebug("VOD Grid page load error: ${e.message}")
+                    gridLoadFailed = true
                 }
             } finally {
                 gridIsLoading = false
+                renderGridStatus()
             }
         }
     }
@@ -870,4 +916,32 @@ class VodHomeActivity : TvRemoteActivity() {
         }
         return super.dispatchKeyEvent(event)
     }
+}
+
+/**
+ * VOD ana ekranindaki ızgara durum katmani (UI-002).
+ *
+ * Dört durum birbiriyle karismaz: hata, yukleme ve bos katalog ayirt edilir; ekranda
+ * icerik varken katman hicbir sey örtmez.
+ */
+internal enum class VodGridStatus {
+    Hidden,
+    Loading,
+    Error,
+    EmptyCatalog,
+}
+
+/**
+ * Durum kararini View'lardan ayiran saf fonksiyon; birim testlerde dogrudan calisir.
+ * Hata yuklemeyi yener; bos katalog yalnizca yukleme bitip hata olmadiginda gosterilir.
+ */
+internal fun decideVodGridStatus(
+    itemsEmpty: Boolean,
+    isLoading: Boolean,
+    loadFailed: Boolean,
+): VodGridStatus = when {
+    !itemsEmpty -> VodGridStatus.Hidden
+    loadFailed -> VodGridStatus.Error
+    isLoading -> VodGridStatus.Loading
+    else -> VodGridStatus.EmptyCatalog
 }
