@@ -615,9 +615,17 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   yapıyor. Room/DAO katmanından çıkan bir istisna korutinin varsayılan yoluyla çözülmeden
   kalır ve süreç çöker; aynı ekrandaki `loadSourcesAndInitialData`, `loadNextGridPage` ve
   `loadContinueWatching` zaten yakalıyor — korumasız tek yükleme yolu bu.
+  **Durum (2026-11-16):** `runCatching` + `CancellationException` geri fırlatma ile sarıldı;
+  hata `.log`'a `VOD Categories load failed: ...` satırı olarak düşüyor ve kategori rayı
+  yalnız "Tüm kategoriler" satırıyla kuruluyor — ızgara bağımsız yüklendiği için çalışmaya
+  devam ediyor. Aynı dosyada korumasız `lifecycleScope.launch` kalmadı (elle gözden
+  geçirildi: `loadSourcesAndInitialData`, `loadContinueWatching`, `loadNextGridPage`,
+  `loadGridCategories`, `enrichMissingTmdb` — sonuncusu döngü gövdesinde yakalıyor).
   **Kabul:** Kategori yüklemesi de `CancellationException` dışını yakalayıp `debugLog`'a
   yazar ve kategori rayı boş kalsa da ızgara çalışmaya devam eder; VOD ana ekranında
   korumasız `lifecycleScope.launch` kalmaz (statik gözden geçirme ile doğrulanır).
+  **Kalan:** Hatanın gerçekten üretildiği cihaz doğrulaması (katalog veritabanı bozukken
+  VOD açılışı) — bu maddenin otomatik testi yok, UI/DAO yolu.
 
 ### Epic MISS — Denetimde açığa çıkan eksikler
 

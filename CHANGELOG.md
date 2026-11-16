@@ -1,5 +1,22 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - Kategori Yüklemesi Artık Çökme Üretmiyor (`CRASH-004`)
+
+- `VodHomeActivity.loadGridCategories()` DAO çağrısını (`repository.categories(...)`) korutin
+  içinde **korumasız** yapıyordu; Room/DAO katmanından çıkan bir istisna çözülmeden kalıp
+  süreci düşürüyordu. `UI-002` sırasında fark edildi, aynı ekrandaki diğer üç yükleme yolu
+  (`loadSourcesAndInitialData`, `loadNextGridPage`, `loadContinueWatching`) zaten
+  yakalıyordu.
+- Çağrı `runCatching` + `CancellationException` geri fırlatma ile sarıldı: iptal davranışı
+  aynı, gerçek hata `.log`'a `VOD Categories load failed: ...` satırı olarak düşüyor.
+- Hata durumunda kategori rayı yalnız **"Tüm kategoriler"** satırıyla kuruluyor; ızgara
+  bağımsız yüklendiği için çalışmaya devam ediyor — önceden tüm uygulama kapanıyordu.
+- Aynı dosyada korumasız `lifecycleScope.launch` kalmadığı elle gözden geçirildi
+  (`enrichMissingTmdb` döngü gövdesinde zaten yakalıyor).
+- **Doğrulama:** `testLocalDebugUnitTest` + `testPaidDebugUnitTest` ve iki debug APK. Bu yol
+  UI/DAO olduğu için otomatik test eklenmedi; bozuk katalog veritabanıyla cihaz doğrulaması
+  bekliyor.
+
 ## 2026-11-16 - VOD Ana Ekranında Yükleme / Hata / Yeniden Dene (`UI-002`)
 
 - **Ne eksikti:** VOD ana ekranı yüklenirken ızgara bomboş kalıyor, ağ/veritabanı hatası yalnız

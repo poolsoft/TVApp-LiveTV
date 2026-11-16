@@ -515,8 +515,15 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun loadGridCategories() {
         lifecycleScope.launch {
-            val catStrings = withContext(Dispatchers.IO) {
-                repository.categories(sourceId, gridSection)
+            // Korumasiz DAO çagrisi koroutinin cozulmeden kalan yolundan sureci
+            // dusuruyordu; artik kategori rayi bos kalsa da ızgara calismaya devam eder
+            // (CRASH-004).
+            val catStrings = runCatching {
+                withContext(Dispatchers.IO) { repository.categories(sourceId, gridSection) }
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                debugLog.recordDebug("VOD Categories load failed: ${error.message}")
+                emptyList()
             }
             val list = mutableListOf<VodCategoryItem>()
             val allCatsLabel = getString(R.string.vod_all_categories)
