@@ -1,5 +1,43 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - CookieManager Okumaları Ana Thread'e Taşındı (`CRASH-001`)
+
+- **Yeni `browser/WebCookies.kt`:** `CookieManager` okumalarının tek giriş noktası. Çağrı ana
+  thread'teyse çerez yerinde okunur; değilse ana thread'e post edilir ve sonuç beklenir. Ana
+  thread `READ_TIMEOUT_MS` (2 sn) içinde dönmezse çerez **yok** sayılır — akış başlıksız
+  denenir, hiçbir çözümleme yolu kilitlenmez. Boş dizi `null` kabul edilir; loglanan tek şey
+  `COOKIE_READ_TIMEOUT` anotasyonudur, URL yazılmaz (kimlik bilgisi içerebilir).
+- **Önbelleğe alma yerine okuma anında taşıma:** Görevde önerilen "çözümleme başında cookie'yi
+  önbelleğe al" yolu uygulanmadı; sayfa açıldıktan **sonra** yerleşen çerezler baştaki
+  önbellekte olmazdı ve aday yakalama davranışı değişirdi. Bunun yerine her okuma ana thread'e
+  taşındı; kabul ölçütü ("sniffer yolu boyunca arka plan thread'inde CookieManager erişimi
+  olmaz") böyle karşılanıyor.
+- **`browser/StreamSniffer.kt`:** `announce()` duyuruyu artık host'un ana thread
+  zamanlayıcısına (`schedule`, `ANNOUNCE_DELAY_MS = 0` — ek gecikme yok) bırakıyor; çerez
+  okuması o anda ana thread'te yapılıyor. `bestRequest()` çerezi `WebCookies.read` ile okuyor.
+  Çağrısız `allPlayableRequests()` (repo genelinde sıfır kullanıcı) silindi — ikinci çökme
+  noktası oydu.
+- **`vod/WebVideoResolver.kt`:** dört çerez okuması (`resolveStream` içinde ikisi,
+  `resolveCandidates` içinde biri, headless sniff `onSniffedUrl` içinde biri) `WebCookies.read`
+  üzerinden. Headless WebView zaten `Dispatchers.Main` içinde kuruluyor; `resolveStream` /
+  `resolveCandidates` `Dispatchers.IO`'da çalıştığı için okumalar artık oradan ana thread'e
+  zıplıyor. Bu yolda `runBlocking` yok (depoda yalnız `XmlTvRepository`'de, alakasız), o
+  yüzden kilitlenme riski yok.
+- **`StreamSniffer`'a `debugLog` bağlama noktası:** varsayılanı önceki `Log.d` ile birebir aynı
+  mesajları yazıyor; aynı sebeple duyuru yolu artık birim testlerinde çalışabiliyor.
+- **Testte yakalanan gerçek kusur:** `WebCookies` nesnesinin `Handler` alanı sınıf
+  yüklenirken kuruluyordu; kurulum hatası `runCatching` **dışına** kaçabiliyordu. Alan artık
+  ilk kullanımda ve hata yutularak (`by lazy` + `runCatching`) kuruluyor; kurulamazsa okuma
+  çerezsiz devam ediyor.
+- **Testler (`browser/StreamSnifferTest.kt`, 4 yeni test):** duyurunun çağrı thread'inde
+  yapılmayıp zamanlandığı ve ana thread görevi koşunca geldiği, başlıkların (`User-Agent`,
+  `Referer`) korunduğu, çerez yokken akışın üretildiği; progresif akışta bekleme süresi,
+  sayfa değişince bekleyen duyurunun iptal edildiği; yalnız altyazı yakalamada duyuru
+  olmadığı. Toplam `346` birim testi `localDebug` ve `paidDebug` için geçiyor.
+- **Kalan:** Cihazda (Android 11 Google TV) VOD ve tarayıcı açılışında çökmenin yeniden
+  üretilemediğinin doğrulanması; `refactor/main-activity-split` dalı bu düzeltmeyi henüz
+  içermiyor (`REFACTOR-001` ile birleştirilecek).
+
 ## 2026-11-14 - Release R8 Mapping Arşivi (`MISS-005`)
 
 - **Release işi artık `mapping.txt` arşivliyor (`.github/workflows/release.yml`):** Derlemeden

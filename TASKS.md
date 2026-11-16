@@ -517,7 +517,7 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
 
 ### Epic CRASH — Saha çökmeleri (Expressluck Apollo Premium4K, Android 11 / API 30)
 
-- [ ] **CRASH-001 (P0): WebView ve CookieManager çağrılarını tek iş parçacığına topla**
+- [~] **CRASH-001 (P0): WebView ve CookieManager çağrılarını tek iş parçacığına topla**
   `SniffingWebViewClient.shouldInterceptRequest` arka plan thread'inde çalışır; içindeki
   `userAgent` lambda'sı `webView.settings`'e dokunduğu için `WebView.checkThread()` çöküyordu.
   `main` bu kısmı `cachedUserAgent` ile kapattı, ancak `browser/StreamSniffer.kt:62` ve `:75`
@@ -527,6 +527,28 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kabul:** Sniffer yolu boyunca hiçbir WebView/CookieManager erişimi arka plan thread'inde
   olmaz; `refactor/main-activity-split` dalı da düzeltmeyi içerir; aday yakalama davranışı
   değişmez ve cihazda VOD açılışı çökmez.
+  **Durum (2026-11-16, yapılanlar):**
+  - Yeni `browser/WebCookies.kt`: `CookieManager` okumalarının tek giriş noktası. Çağrı ana
+    thread'teyse yerinde okur, değilse ana thread'e post eder; ana thread 2 sn içinde
+    cevap vermezse çerez **yok** sayılır (aksine akış başlıksız denenir, kilitlenme olmaz).
+    Boş dizi `null` sayılır; hata durumunda yalnız `COOKIE_READ_TIMEOUT` yazılır, URL yazılmaz.
+  - `StreamSniffer`: `announce()` artık duyuruyu `schedule` (UI handler) üzerinden ana
+    thread'e taşıyor (`ANNOUNCE_DELAY_MS = 0`, ek gecikme yok); `bestRequest()` çerezi
+    `WebCookies.read` ile okuyor. Önerilen "çözümleme başında önbelleğe al" yerine okuma
+    anında ana thread'e taşındı: sayfa açıldıktan **sonra** yerleşen çerezler önbellekte
+    olmazdı, davranış değişmedi.
+  - `WebVideoResolver`: dört çerez okuması (`resolveStream` içinde ikisi, `resolveCandidates`
+    biri, headless sniff `onSniffedUrl` biri) `WebCookies.read` üzerinden; headless sniff
+    zaten `Dispatchers.Main` içinde kuruluyor.
+  - `StreamSniffer.allPlayableRequests()` çağrısızdı (repo genelinde sıfır kullanıcısı vardı)
+    ve ikinci çökme noktasıydı; silindi.
+  - `StreamSniffer`'a `debugLog` bağlama noktası eklendi (varsayılan `Log.d`); aynı sebeple
+    duyuru yolu birim testlerinde çalışabiliyor.
+  - Testler: `browser/StreamSnifferTest.kt` — duyurunun çağrı thread'inde **yapılmadığı**,
+    zamanlanıp ana thread'de yapıldığı, progresif akışta bekleme süresi + sayfa değişimi
+    iptali, yalnız altyazı yakalamada duyuru olmadığı ve çerez yokken akışın üretildiği.
+  **Kalan:** Cihazda VOD/browser açılışında çökmenin yeniden üretilemediği doğrulanmalı;
+  `refactor/main-activity-split` dalı bu düzeltmeyi henüz içermiyor (`REFACTOR-001`).
 
 - [ ] **CRASH-002 (P0): MainActivity karşılıklı çağrı StackOverflowError'u**
   Saha logunda `MainActivity.n1 ↔ u1` ikilisi `setVisibility` üzerinde yüz binlerce frame
@@ -1054,19 +1076,22 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
 ekran görüntüsü doğrulaması hâlâ bekliyor), `CRASH-003` (bellek sınırı — tepe bellek ölçümü
 cihazda bekliyor), `MISS-005` (R8 mapping artifact'i; `dev-r343` ile uçtan uca doğrulandı).
 
+**Tamamlanan (2026-11-16):** `CRASH-001` kod tarafı — tüm `CookieManager` okumaları yeni
+`browser/WebCookies.kt` üzerinden ana thread'e taşındı (`StreamSniffer` duyurusu `schedule`
+üzerinden, `WebVideoResolver` dört okuma), çağrısız `allPlayableRequests()` silindi; cihaz
+doğrulaması ve refactor dalına taşınması bekliyor.
+
 **Sıcak — çökme ve teşhis yeteneği:**
-1. `CRASH-001` kalıntısı (`browser/StreamSniffer.kt:62, 75` ve `vod/WebVideoResolver.kt:309`
-   CookieManager çağrılarını ana thread'de önbelleğe almak)
-2. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
+1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
    iz çözülemez. Yeni saha çökmesi geldiğinde ilgili revizyonun artifact'i indirilip `retrace`
    ile çözülür (README, "Çökme izini çözme").
-3. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
+2. `VOD-004` (güvenlik) — `MISS-001` bu gruptan çıkarıldı, en sona taşındı
 
 **Yüksek getiri / dar değişiklik:**
-4. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
-5. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
-6. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
-7. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce)
+3. `MISS-002` (VOD birim testleri — AUDIT-000 tipini kalıcı kapatır)
+4. `UI-002`, `UI-003`, `UI-004`, `UI-005` (`UI-001` uygulandı, kod tarafı bitti)
+5. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008`
+6. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` bu dala da taşınır)
 
 **Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`,
 `PERF-013`, `PERF-019`.

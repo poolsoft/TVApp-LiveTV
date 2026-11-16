@@ -1,18 +1,21 @@
 package com.tvapp.livetv.browser
 
-import android.webkit.CookieManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Sayfa isteklerini dinleyerek video akislarini yakalayan sniffer bileseni.
+ *
+ * [schedule] ana thread'te calisan bir zamanlayicidir (UI handler): duyuru aninda
+ * cerez okundugu icin akis bildirimi oradan yapilir.
  */
 class StreamSniffer(
     private val userAgent: () -> String,
     private val onStreamAvailable: (PlaybackRequest) -> Unit,
     private val onCleared: () -> Unit,
-    private val schedule: (Long, () -> Unit) -> Unit
+    private val schedule: (Long, () -> Unit) -> Unit,
+    private val debugLog: (String) -> Unit = { message -> android.util.Log.d("StreamSniffer", message) }
 ) {
     private val candidates = CopyOnWriteArrayList<StreamCandidate>()
     private val seq = AtomicInteger(0)
@@ -32,7 +35,7 @@ class StreamSniffer(
     fun onRequest(url: String, headers: Map<String, String> = emptyMap()) {
         val kind = MediaUrlClassifier.classify(url)
         if (kind !in COLLECTED) return
-        android.util.Log.d("StreamSniffer", "SNIFFER_DETECT | kind=$kind, url=$url")
+        debugLog("SNIFFER_DETECT | kind=$kind, url=$url")
         candidates.add(StreamCandidate(url, kind, seq.incrementAndGet(), headers))
         when (kind) {
             MediaKind.MANIFEST_HLS,
@@ -48,42 +51,34 @@ class StreamSniffer(
     }
 
     private fun announce() {
-        if (hasStream()) {
-            val req = bestRequest()
-            if (req != null) {
-                android.util.Log.d("StreamSniffer", "SNIFFER_ANNOUNCE | url=${req.url}, headersCount=${req.headers.size}")
-                onStreamAvailable(req)
-            }
-        }
+        if (!hasStream()) return
+        // Cerez okumasi ana thread istiyor; aday listesi thread-guvenli oldugu icin
+        // duyuru ek bekleme olmadan ana thread'e tasinir.
+        schedule(ANNOUNCE_DELAY_MS) { announceNow() }
+    }
+
+    private fun announceNow() {
+        if (!hasStream()) return
+        val req = bestRequest() ?: return
+        debugLog("SNIFFER_ANNOUNCE | url=${req.url}, headersCount=${req.headers.size}")
+        onStreamAvailable(req)
     }
 
     fun hasStream(): Boolean = candidates.any { it.kind in PLAYABLE }
 
     fun bestRequest(): PlaybackRequest? {
         val best = StreamCandidateSelector.selectBest(candidates) ?: return null
-        val cookie = runCatching { CookieManager.getInstance().getCookie(best.url) }.getOrNull()
+        val cookie = WebCookies.read(best.url)
         val headers = PlaybackHeaders.build(best.url, pageUrl, userAgent(), best.headers)
             .let { if (!cookie.isNullOrEmpty()) it + ("Cookie" to cookie) else it }
         return PlaybackRequest(best.url, headers, emptyList(), pageUrl)
     }
 
-    /**
-     * Yakalanan tum oynatilabilir akislari dondurur.
-     */
-    fun allPlayableRequests(): List<PlaybackRequest> {
-        val playables = candidates.filter { it.kind in PLAYABLE }
-        if (playables.isEmpty()) return emptyList()
-
-        val cookie = runCatching { CookieManager.getInstance().getCookie(pageUrl) }.getOrNull()
-        return playables.map { candidate ->
-            val headers = PlaybackHeaders.build(candidate.url, pageUrl, userAgent(), candidate.headers)
-                .let { if (!cookie.isNullOrEmpty()) it + ("Cookie" to cookie) else it }
-            PlaybackRequest(candidate.url, headers, emptyList(), pageUrl)
-        }.distinctBy { it.url }
-    }
-
     companion object {
         const val PROGRESSIVE_GRACE_MS = 1200L
+
+        /** Duyurunun ana thread'e tasinirken eklenen bekleme (ms). */
+        const val ANNOUNCE_DELAY_MS = 0L
 
         private val PLAYABLE = setOf(
             MediaKind.MANIFEST_HLS,

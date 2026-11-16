@@ -1,5 +1,6 @@
 package com.tvapp.livetv.vod
 
+import com.tvapp.livetv.browser.WebCookies
 import com.tvapp.livetv.data.DOCUMENT_RESPONSE_BYTES
 import com.tvapp.livetv.data.readLimitedText
 import kotlinx.coroutines.Dispatchers
@@ -128,7 +129,7 @@ object WebVideoResolver {
         }.getOrNull()
 
         if (!fastResolved.isNullOrBlank() && isDirectStream(fastResolved)) {
-            val cookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fastResolved) }.getOrNull()
+            val cookie = WebCookies.read(fastResolved)
             return@withContext ResolvedStream(
                 streamUrl = fastResolved,
                 userAgent = USER_AGENT,
@@ -150,7 +151,7 @@ object WebVideoResolver {
         }
 
         val fallback = fastResolved ?: targetUrl
-        val fallbackCookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(fallback) }.getOrNull()
+        val fallbackCookie = WebCookies.read(fallback)
         ResolvedStream(
             streamUrl = fallback,
             userAgent = if (fastResolved != null) USER_AGENT else null,
@@ -189,9 +190,7 @@ object WebVideoResolver {
         val staticFound = runCatching { collectStaticStreams(targetUrl, depth = 0) }.getOrNull().orEmpty()
         for (streamUrl in staticFound) {
             if (!candidates.containsKey(streamUrl)) {
-                val cookie = runCatching {
-                    android.webkit.CookieManager.getInstance().getCookie(streamUrl)
-                }.getOrNull()
+                val cookie = WebCookies.read(streamUrl)
                 candidates[streamUrl] = ResolvedStream(
                     streamUrl = streamUrl,
                     userAgent = USER_AGENT,
@@ -306,7 +305,7 @@ object WebVideoResolver {
                 val clean = url.trim()
                 if (isNetworkMediaCandidate(clean)) {
                     if (collected.containsKey(clean)) return
-                    val cookie = runCatching { android.webkit.CookieManager.getInstance().getCookie(clean) }.getOrNull()
+                    val cookie = WebCookies.read(clean)
                     val ref = reqReferrer?.takeIf { it.isNotBlank() } ?: pageUrl
                     val orig = originOf(ref)
                     collected[clean] = ResolvedStream(
