@@ -183,6 +183,11 @@
     <string name="none">Yok</string>
     <string name="no_detail">Ayrıntı yok</string>
     <string name="no_channels_title">Kanal bulunamadı</string>
+    <string name="channel_list_empty_title">Bu filtreyle eşleşen kanal yok</string>
+    <string name="channel_list_empty_clear_filters">Filtreleri temizle</string>
+    <string name="channel_list_empty_no_channels">Kanal listesi boş</string>
+    <string name="channel_list_empty_no_channels_hint">Kırmızı kanal düzenlemesini açar, Sarı listeyi değiştirir</string>
+    <string name="channel_list_empty_library_hint">Mavi tuş liste ve kategori filtrelerini açar</string>
     <string name="no_inputs_message">Cihaz TIF üzerinden kullanılabilir bir TV girişi bildirmedi.</string>
     <string name="no_channels_message">TV girişleri bulundu ancak okunabilir kanal yok:\n%1$s</string>
     <string name="permission_title">TIF kanal erişimi engellendi</string>

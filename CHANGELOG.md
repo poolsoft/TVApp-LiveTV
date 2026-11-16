@@ -1,5 +1,32 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-16 - Kanal Listesi Boşken Neden ve Tek Eylemli Temizleme (`UI-003`)
+
+- **Ne eksikti:** Arama veya filtre 0 sonuç verdiğinde kanal paneli bomboş kalıyordu; hiçbir
+  açıklama yoktu ve odak, `focusListChannel` içinde **gizli** kaynak simgelerine
+  `requestFocus` çağırdığı için ekranda odak göstergesi de kayboluyordu.
+- **Kart (`activity_main.xml`):** `channel_list` bir `FrameLayout` içine alındı ve ortasına
+  `channel_list_empty_panel` eklendi — başlık, ipucu ve `channel_list_empty_clear`. Liste
+  ağırlığı sarmalayıcıya taşındı; `channel_list` kimliği, dolgu ve kaydırma davranışı aynı.
+- **Dört durum, biri saf kural:** `ChannelListRules.emptyListState(...)` →
+  `Hidden | SearchEmpty | FilterEmpty | NoChannels | LibraryEmpty`. "Bu filtreyle eşleşen kanal
+  yok" ile "Kanal listesi boş" artık birbirine karışmıyor; karar View'lardan bağımsız olduğu
+  için birim testle doğrulanıyor (+5 test, toplam **386**).
+- **Tek eylem:** OK karttaki düğmeye basınca arama + harf + favori + kaynak filtresi birlikte
+  temizleniyor. IPTV kütüphanesinde yalnız arama temizlenir; orada Mavi tuşun filtreleri açtığı
+  ipucu gösterilir — renk tuşu sözleşmeleri değiştirilmedi.
+- **Tema farkındalıklı:** karta sabit arka plan verilmedi (`OsdThemeAppearance` tema
+  arka planlarını panel seviyesinde veriyor; sabit çizim Varsayılan/Cam/Yüksek Kontrast
+  görünümünü bozardı). Düğme, bu düzenin kendi `bg_focusable` kalıbını kullanıyor.
+- **İki dilli:** `channel_list_empty_title/clear_filters/no_channels/no_channels_hint/
+  library_hint` TR + EN; arama durumu mevcut `clear_search` anahtarını kullanıyor.
+- **Doğrulama:** `testLocalDebugUnitTest` + `testPaidDebugUnitTest` 386 test hatasız,
+  `assembleLocalDebug` + `assemblePaidDebug` başarılı. **Cihazda bekliyor:** 0 sonuçlu aramada
+  kartın gelmesi, OK ile temizlenmesi, cam/yüksek kontrast temalarında okunabilirlik,
+  720p/1080p/4K'da taşmaması.
+- **Kalan (`UI-003` içinde):** `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml`
+  listelerinin boş durumları ve "nasıl eklenir" yönlendirmesi.
+
 ## 2026-11-16 - Saha Logu Performans Analizi ve Room Okuma Yürütücüsü (`PERF-025`)
 
 - **Analiz:** TV'den alınan yedi günlük hata ayıklama loglarındaki 1258 `PERF` satırı toplu

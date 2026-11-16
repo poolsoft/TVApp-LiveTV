@@ -68,6 +68,7 @@ import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
+import com.tvapp.livetv.main.ChannelListEmptyState
 import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
 import com.tvapp.livetv.main.EpgHost
@@ -929,6 +930,8 @@ class MainActivity : TvRemoteActivity() {
             }
         }
         binding.channelSearchButton.setOnClickListener { showChannelSearchDialog() }
+        // Bos durum kartindaki OK: arama/filtreleri tek eylemle temizler (UI-003).
+        binding.channelListEmptyClear.setOnClickListener { clearChannelListFilters() }
         binding.channelListModeIcon.setOnClickListener { cycleChannelListMode() }
         binding.channelListModeIcon.setOnLongClickListener {
             showChannelListModeDialog()
@@ -4325,6 +4328,7 @@ class MainActivity : TvRemoteActivity() {
             iptvLibraryChannels.size,
             iptvLibraryTotalCount,
         )
+        renderChannelListEmptyState()
     }
 
     private fun openIptvLibraryNumber(number: Int?) {
@@ -5334,6 +5338,7 @@ class MainActivity : TvRemoteActivity() {
         updateChannelCount(filtered.size)
         binding.channelList.post(::loadVisiblePrograms)
         if (requestFocus) focusCurrentListChannel()
+        renderChannelListEmptyState()
     }
 
     private fun updateChannelCount(count: Int) {
@@ -5342,6 +5347,75 @@ class MainActivity : TvRemoteActivity() {
             count,
             count,
         )
+    }
+
+    /**
+     * Bos kanal listesi katmani (UI-003). Karar saf kurelda
+     * (`ChannelListRules.emptyListState`); burada yalniz View'lara uygulanir, boylece
+     * "filtre 0 sonuc" ile "listede hic kanal yok" ayrimi test edilebilir kalir.
+     *
+     * Kart yalniz panel gorunurken odak ister ve temizleme dugmesi ilk actiginda
+     * odak kendilginden OK'a gider; kumanda ile tek basinca filtreler temizlenir.
+     */
+    private fun renderChannelListEmptyState() {
+        val state = ChannelListRules.emptyListState(
+            listEmpty = panelChannels().isEmpty(),
+            libraryMode = channelPanelContent == ChannelPanelContent.IPTV_LIBRARY,
+            searchActive = channelSearchQuery.isNotEmpty(),
+            filterActive = favoriteFilter || sourceFilter != ChannelSourceFilter.ALL ||
+                alphabetLetter != null,
+        )
+        val panelVisible = state != ChannelListEmptyState.Hidden &&
+            binding.channelPanel.visibility == View.VISIBLE
+        val clearVisible = state == ChannelListEmptyState.SearchEmpty ||
+            state == ChannelListEmptyState.FilterEmpty
+        val clearWasVisible = binding.channelListEmptyClear.visibility == View.VISIBLE
+
+        binding.channelListEmptyPanel.visibility = if (panelVisible) View.VISIBLE else View.GONE
+        binding.channelListEmptyText.setText(
+            when (state) {
+                ChannelListEmptyState.NoChannels -> R.string.channel_list_empty_no_channels
+                else -> R.string.channel_list_empty_title
+            },
+        )
+        binding.channelListEmptyHint.setText(
+            when (state) {
+                ChannelListEmptyState.LibraryEmpty -> R.string.channel_list_empty_library_hint
+                else -> R.string.channel_list_empty_no_channels_hint
+            },
+        )
+        binding.channelListEmptyHint.visibility = when (state) {
+            ChannelListEmptyState.NoChannels, ChannelListEmptyState.LibraryEmpty -> View.VISIBLE
+            else -> View.GONE
+        }
+        binding.channelListEmptyClear.visibility = if (clearVisible) View.VISIBLE else View.GONE
+        binding.channelListEmptyClear.setText(
+            if (state == ChannelListEmptyState.SearchEmpty) R.string.clear_search
+            else R.string.channel_list_empty_clear_filters,
+        )
+        binding.channelListEmptyClear.isFocusable = clearVisible
+        if (clearVisible && !clearWasVisible && panelVisible) {
+            binding.channelListEmptyClear.requestFocus()
+        }
+    }
+
+    /**
+     * Arama, harf, favori ve kaynak filtresini tek eylemle kapatir (UI-003).
+     * Kutuphanede (IPTV katalog) filtreler baska bir yasta tutulur; orada yalniz
+     * arama sorgusu temizlenir ve liste yeniden yuklenir.
+     */
+    private fun clearChannelListFilters() {
+        if (channelPanelContent == ChannelPanelContent.IPTV_LIBRARY) {
+            applyChannelSearch("")
+            return
+        }
+        alphabetFilterJob?.cancel()
+        alphabetLetter = null
+        iptvAlphabetInitials = null
+        channelSearchQuery = ""
+        normalizedChannelSearchQuery = ""
+        binding.channelSearchButton.isSelected = false
+        applyChannelFilter(showFavorites = false, source = ChannelSourceFilter.ALL)
     }
 
     private fun updateChannelActionLabels() {
@@ -5594,6 +5668,7 @@ class MainActivity : TvRemoteActivity() {
             applyPanelGeometry()
             showInfoBar()
             focusCurrentListChannel()
+            renderChannelListEmptyState()
             binding.channelList.post {
                 loadVisiblePrograms()
                 recordPerformance(

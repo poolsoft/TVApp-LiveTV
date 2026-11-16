@@ -183,6 +183,11 @@
     <string name="none">None</string>
     <string name="no_detail">No details</string>
     <string name="no_channels_title">No channels found</string>
+    <string name="channel_list_empty_title">No channels match this filter</string>
+    <string name="channel_list_empty_clear_filters">Clear filters</string>
+    <string name="channel_list_empty_no_channels">The channel list is empty</string>
+    <string name="channel_list_empty_no_channels_hint">Red opens channel editing, Yellow changes the list</string>
+    <string name="channel_list_empty_library_hint">Blue opens the list and category filters</string>
     <string name="no_inputs_message">The device did not report an available TV input through TIF.</string>
     <string name="no_channels_message">TV inputs were found, but no readable channels are available:\n%1$s</string>
     <string name="permission_title">TIF channel access blocked</string>

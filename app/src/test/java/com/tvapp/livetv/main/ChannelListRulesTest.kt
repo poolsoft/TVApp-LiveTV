@@ -267,4 +267,86 @@ class ChannelListRulesTest {
         assertEquals(listOf("Dizi 2"), searched.map { it.displayName })
         assertEquals(listOf("1"), searched.map { it.displayNumber })
     }
+
+    // --- UI-003: bos liste durum karari ---
+
+    @Test
+    fun emptyStateHiddenWhenListHasChannels() {
+        // Icerik varken katman hicbir sey ortmez; filtre/sorgu aktif olsa da.
+        listOf(false to false, false to true, true to false, true to true).forEach { (search, filter) ->
+            assertEquals(
+                "searchActive=$search, filterActive=$filter",
+                ChannelListEmptyState.Hidden,
+                ChannelListRules.emptyListState(
+                    listEmpty = false,
+                    libraryMode = false,
+                    searchActive = search,
+                    filterActive = filter,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun emptyListWithSearchSuggestsClearingSearch() {
+        assertEquals(
+            ChannelListEmptyState.SearchEmpty,
+            ChannelListRules.emptyListState(
+                listEmpty = true,
+                libraryMode = false,
+                searchActive = true,
+                filterActive = true,
+            ),
+        )
+    }
+
+    @Test
+    fun emptyListWithOnlyFiltersSuggestsClearingFilters() {
+        assertEquals(
+            ChannelListEmptyState.FilterEmpty,
+            ChannelListRules.emptyListState(
+                listEmpty = true,
+                libraryMode = false,
+                searchActive = false,
+                filterActive = true,
+            ),
+        )
+    }
+
+    @Test
+    fun emptyListWithoutFiltersIsNotCalledNoMatches() {
+        // Filtre/sorgu yok: "eslesme yok" degil, listede gercekten kanal yok.
+        assertEquals(
+            ChannelListEmptyState.NoChannels,
+            ChannelListRules.emptyListState(
+                listEmpty = true,
+                libraryMode = false,
+                searchActive = false,
+                filterActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun libraryEmptyStatePointsToFiltersInsteadOfClearAction() {
+        // IPTV kutuphanesinde Mavi tus filtreleri acar; renk tusu sozlesmesi bozulmaz.
+        assertEquals(
+            ChannelListEmptyState.LibraryEmpty,
+            ChannelListRules.emptyListState(
+                listEmpty = true,
+                libraryMode = true,
+                searchActive = true,
+                filterActive = true,
+            ),
+        )
+        assertEquals(
+            ChannelListEmptyState.LibraryEmpty,
+            ChannelListRules.emptyListState(
+                listEmpty = true,
+                libraryMode = true,
+                searchActive = false,
+                filterActive = false,
+            ),
+        )
+    }
 }

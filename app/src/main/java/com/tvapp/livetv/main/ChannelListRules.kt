@@ -145,6 +145,46 @@ object ChannelListRules {
             }
         }
     }
+
+    /**
+     * Bos kanal listesinde ne gosterilecegine karar veren saf kural (`UI-003`).
+     *
+     * Hata ile bosluk ve "filtre bos" birbirinden ayirt edilir: sorgu veya filtre
+     * aktifse tek eylemli temizleme onerilir; hicbiri aktif degilse kullanicinin
+     * listeyi kendisinin doldurmasi gerektigi soylenebilir. Kutuphanede (IPTV
+     * katalog) Mavi tus filtreleri acar, bu yuzden orada eylem yerine ipucu
+     * gosterilir - renk tusu sozlesmesi degistirilmez.
+     */
+    fun emptyListState(
+        listEmpty: Boolean,
+        libraryMode: Boolean,
+        searchActive: Boolean,
+        filterActive: Boolean,
+    ): ChannelListEmptyState = when {
+        !listEmpty -> ChannelListEmptyState.Hidden
+        libraryMode -> ChannelListEmptyState.LibraryEmpty
+        searchActive -> ChannelListEmptyState.SearchEmpty
+        filterActive -> ChannelListEmptyState.FilterEmpty
+        else -> ChannelListEmptyState.NoChannels
+    }
+}
+
+/** Kanal listesi bos durumunun sekilleri (`UI-003`). */
+enum class ChannelListEmptyState {
+    /** Listede kayit var: bos durum katmani gorunmez. */
+    Hidden,
+
+    /** Arama sorgusu var ve eslesen kanal yok: sorgu temizlenebilir. */
+    SearchEmpty,
+
+    /** Kaynak/favori/harf filtresi aktif ve eslesen kanal yok: filtreler temizlenebilir. */
+    FilterEmpty,
+
+    /** Filtre yok ama liste bos: kullanici yonlendirmesi gerekir. */
+    NoChannels,
+
+    /** IPTV kutuphanesi bos: Mavi tus filtreleri acar. */
+    LibraryEmpty,
 }
 
 /** Liste modu dongusunun urettigi eylem. */

@@ -927,12 +927,39 @@ bileşenleri hâlâ kullanmıyor.
   yeniden denendiği, spinnerın kısa yüklemede titremediği ve 720p/1080p/4K'da kartın taşmadığı.
   `VODUI-001` kod tarafı tamam; hata enjeksiyonlu kabul doğrulaması cihazda bekliyor.
 
-- [ ] **UI-003 (P1): Boş durum ekranları eksik**
+- [~] **UI-003 (P1): Boş durum ekranları eksik**
   Ana kanal listesinde filtre/arama 0 sonuç verdiğinde panel bomboş kalıyor
   (`activity_main.xml` kanal listesi); `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml`
   listelerinde de boş durum ve "nasıl eklenir" yönlendirmesi yok.
   **Kabul:** Her liste için iki dilli boş durum metni ve ilgili renk tuşu/ipucu yönlendirmesi;
   filtre temizleme tek eylemle mümkün.
+  **Durum (2026-11-16, ana kanal listesi yapıldı):**
+  - `activity_main.xml`: `channel_list` bir `FrameLayout` içine alındı ve ortasına
+    `channel_list_empty_panel` (başlık + ipucu + `channel_list_empty_clear`) eklendi. RecyclerView
+    ağırlığı sarmalayıcıya taşındı; kod tarafı `channelList.layoutParams` okumuyor, sadece
+    `channelPanel.layoutParams` kullanılıyor (`ui/TvOverlayLayoutHelper.kt:50`) — geometri değişmedi.
+    Kart arka planı verilmedi: `ui/OsdThemeAppearance.kt` tema arka planlarını **panel** seviyesinde
+    veriyor, yeni çocuğa sabit çizim vermek Varsayılan/Cam/Yüksek Kontrast temasını bozardı.
+    Düğme bu düzenin kendi kalıbı `bg_focusable` ile (`retry_button` ile aynı).
+  - `main/ChannelListRules.emptyListState(...)` saf kararı: `Hidden | SearchEmpty | FilterEmpty |
+    NoChannels | LibraryEmpty`. Böylece "filtreyle eşleşen kanal yok" ile "listede gerçekten kanal
+    yok" ayrımı birim testle kanıtlanıyor.
+  - `MainActivity.renderChannelListEmptyState()` üç noktadan çağrılıyor: `applyChannelFilter`
+    (normal + favori + kaynak + harf), `updateIptvLibraryCount` (IPTV kütüphanesi) ve
+    `showChannelPanel`. Kart yalnız panel görünürken görünüyor; temizleme düğmesi ilk açılışta
+    odağı alıyor (önceden boş listede odak, `focusListChannel` içinde **gizli** kaynak simgelerine
+    requestFocus çağırıyordu — ekranda odak göstergesi kayboluyordu).
+  - `clearChannelListFilters()` tek eylem: normal listede arama + harf + favori + kaynağı
+    sıfırlayıp `applyChannelFilter` çağırıyor; IPTV kütüphanesinde arama `applyChannelSearch("")`
+    ile temizleniyor (kütüphane filtreleri kendi penceresinde tutuluyor, Mavi tuş sözleşmesi
+    korunuyor). Renk tuşu sözleşmelerine dokunulmadı.
+  - Metinler iki dilde: `channel_list_empty_title/clear_filters/no_channels/
+    no_channels_hint/library_hint`; arama durumu mevcut `clear_search` anahtarını kullanıyor.
+  - Testler: `ChannelListRulesTest` +5 test (toplam **386** iki flavor'da da).
+  **Kalan:** (1) `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml` boş durumları
+  (`web_empty` / `iptv_library_empty` anahtarları hazır, yönlendirme metni eklenecek);
+  (2) cihaz doğrulaması — 0 sonuçlı aramada kartın geldiği, OK ile filtrelerin temizlendiği,
+  cam/yüksek kontrast temalarında okunabilirliği ve odak çerçevesinin göründüğü.
 
 - [ ] **UI-004 (P1): VOD ekranında sabit Türkçe metin ve emoji**
   `activity_vod_home.xml:31, 99, 137, 153, 162, 192, 209, 247, 274, 342-368` (🌐⚡📂🎬⏱️🔴),
