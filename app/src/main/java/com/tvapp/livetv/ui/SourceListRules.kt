@@ -11,8 +11,15 @@ enum class SourceListEmptyState {
 
 /** Liste alanının altındaki kalıcı ipucu satırının içerik seçimi. */
 enum class SourceListHint {
-    /** Liste satır eylemleri ("OK: Kanalları seç", "OK: Kaynak işlemleri"). */
+    /** Liste satır eylemleri kumanda tuşuyla anlatılır ("OK: Kanalları seç"). */
     RowActions,
+
+    /**
+     * UI-016: aynı satır eylemleri dokunma jestiyle anlatılır. Dokunma profilinde
+     * "OK" ve "CH+/CH-" komutları karşılıksız kalıyor, oysa satıra dokunmak aynı
+     * işlemleri açıyor.
+     */
+    RowActionsTouch,
 
     /** Eklenecek tek satır yokken "nasıl eklenir" yönlendirmesi. */
     AddSource,
@@ -31,12 +38,23 @@ enum class SourceListHint {
  *     yönlendirmesine geçer. Ekleme eylemi bu ekranlarda zaten panel düğmeleriyle
  *     yapıldığı için karta ikinci bir eylem düğmesi eklenmez (odak durak sayısı
  *     artmaz, AGENTS.md "yerleşik etkileşim varsa düğme ekleme" kuralı).
+ *  3. Satır eylemleri metni girdi profiline göre seçilir: tuş komutu ya da dokunma
+ *     jesti (`UI-016`).
  */
 object SourceListRules {
 
     fun emptyState(loadFinished: Boolean, itemCount: Int): SourceListEmptyState =
         if (loadFinished && itemCount <= 0) SourceListEmptyState.Empty else SourceListEmptyState.Hidden
 
-    fun hintFor(state: SourceListEmptyState): SourceListHint =
-        if (state == SourceListEmptyState.Empty) SourceListHint.AddSource else SourceListHint.RowActions
+    /**
+     * UI-016: ipucu satırı, eylemin gerçekten nasıl tetiklendiğini söylemelidir.
+     * `hasDpadInput = false` (dokunmatik telefon/tablet) iken "OK" ve "CH+/CH-"
+     * komutları karşılıksızdır; satıra dokunmak aynı işlemleri açar. TV
+     * profillerinde `hasDpadInput` her zaman true olduğu için metin değişmez.
+     */
+    fun hintFor(state: SourceListEmptyState, hasDpadInput: Boolean): SourceListHint = when {
+        state == SourceListEmptyState.Empty -> SourceListHint.AddSource
+        hasDpadInput -> SourceListHint.RowActions
+        else -> SourceListHint.RowActionsTouch
+    }
 }

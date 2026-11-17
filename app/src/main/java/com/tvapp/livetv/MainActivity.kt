@@ -68,6 +68,7 @@ import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.home.HomeRecentChannelsPublisher
+import com.tvapp.livetv.main.ChannelListEmptyHint
 import com.tvapp.livetv.main.ChannelListEmptyState
 import com.tvapp.livetv.main.ChannelListModeAction
 import com.tvapp.livetv.main.ChannelListRules
@@ -5479,10 +5480,19 @@ class MainActivity : TvRemoteActivity() {
                 else -> R.string.channel_list_empty_title
             },
         )
+        // UI-016: metin renk tusu/rozet adi veriyor; dokunma profilinde ayni rozetler
+        // dokunulabilir oldugu icin "dokun" soylemi secilir (ChannelListRules.emptyHintFor).
         binding.channelListEmptyHint.setText(
-            when (state) {
-                ChannelListEmptyState.LibraryEmpty -> R.string.channel_list_empty_library_hint
-                else -> R.string.channel_list_empty_no_channels_hint
+            when (ChannelListRules.emptyHintFor(state, inputProfile.hasColorKeys)) {
+                ChannelListEmptyHint.LibraryKeys -> R.string.channel_list_empty_library_hint
+                ChannelListEmptyHint.LibraryTouch ->
+                    R.string.channel_list_empty_library_touch_hint
+
+                ChannelListEmptyHint.NoChannelsKeys ->
+                    R.string.channel_list_empty_no_channels_hint
+
+                ChannelListEmptyHint.NoChannelsTouch ->
+                    R.string.channel_list_empty_no_channels_touch_hint
             },
         )
         binding.channelListEmptyHint.visibility = when (state) {

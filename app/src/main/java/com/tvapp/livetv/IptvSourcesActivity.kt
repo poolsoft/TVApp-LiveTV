@@ -1207,9 +1207,10 @@ class IptvSourcesActivity : TvRemoteActivity() {
         binding.sourceListEmptyPanel.visibility =
             if (state == SourceListEmptyState.Empty) View.VISIBLE else View.GONE
         binding.sourceListHintLine?.setText(
-            when (SourceListRules.hintFor(state)) {
+            when (SourceListRules.hintFor(state, inputProfile.hasDpadInput)) {
                 SourceListHint.AddSource -> R.string.iptv_sources_empty_hint
                 SourceListHint.RowActions -> R.string.iptv_source_remote_hint
+                SourceListHint.RowActionsTouch -> R.string.source_list_touch_hint
             },
         )
     }

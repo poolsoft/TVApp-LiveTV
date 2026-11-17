@@ -349,4 +349,41 @@ class ChannelListRulesTest {
             ),
         )
     }
+
+    /** UI-016: bos liste metni yalnizca renk tusu varsa tus adiyla anlatilir. */
+    @Test
+    fun emptyHintUsesKeyWordingOnlyWithColorKeys() {
+        assertEquals(
+            ChannelListEmptyHint.NoChannelsKeys,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.NoChannels, hasColorKeys = true),
+        )
+        assertEquals(
+            ChannelListEmptyHint.LibraryKeys,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.LibraryEmpty, hasColorKeys = true),
+        )
+        assertEquals(
+            ChannelListEmptyHint.NoChannelsTouch,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.NoChannels, hasColorKeys = false),
+        )
+        assertEquals(
+            ChannelListEmptyHint.LibraryTouch,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.LibraryEmpty, hasColorKeys = false),
+        )
+    }
+
+    /**
+     * Arama/filtre bos durumunda kart tek eylemli temizleme onerir; ipucu metni yine
+     * girdi profiline gore secilir (gorunurluk ayri bir karardir - UI-003).
+     */
+    @Test
+    fun emptyHintForClearableStatesFollowsInputProfile() {
+        assertEquals(
+            ChannelListEmptyHint.NoChannelsKeys,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.SearchEmpty, hasColorKeys = true),
+        )
+        assertEquals(
+            ChannelListEmptyHint.NoChannelsTouch,
+            ChannelListRules.emptyHintFor(ChannelListEmptyState.FilterEmpty, hasColorKeys = false),
+        )
+    }
 }

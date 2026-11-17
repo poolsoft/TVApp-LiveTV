@@ -32,12 +32,32 @@ class SourceListRulesTest {
         // Son kaynak silindikten sonraki yenileme: okuma tamamlanmış, satır kalmamış.
         val afterDelete = SourceListRules.emptyState(loadFinished = true, itemCount = 0)
         assertEquals(SourceListEmptyState.Empty, afterDelete)
-        assertEquals(SourceListHint.AddSource, SourceListRules.hintFor(afterDelete))
+        assertEquals(SourceListHint.AddSource, SourceListRules.hintFor(afterDelete, hasDpadInput = true))
     }
 
     @Test
     fun rowActionHintRemainsWhileListHasContent() {
-        assertEquals(SourceListHint.RowActions, SourceListRules.hintFor(SourceListEmptyState.Hidden))
-        assertEquals(SourceListHint.AddSource, SourceListRules.hintFor(SourceListEmptyState.Empty))
+        assertEquals(
+            SourceListHint.RowActions,
+            SourceListRules.hintFor(SourceListEmptyState.Hidden, hasDpadInput = true),
+        )
+        assertEquals(
+            SourceListHint.AddSource,
+            SourceListRules.hintFor(SourceListEmptyState.Empty, hasDpadInput = true),
+        )
+    }
+
+    /** UI-016: D-pad olmayan profilde "OK / CH+/CH-" komutu yerine dokunma jesti anlatılır. */
+    @Test
+    fun touchProfileDescribesTapInsteadOfKeys() {
+        assertEquals(
+            SourceListHint.RowActionsTouch,
+            SourceListRules.hintFor(SourceListEmptyState.Hidden, hasDpadInput = false),
+        )
+        // Boş liste yönlendirmesi girdi profiline bağlı değildir: ekleme her yerde panelle.
+        assertEquals(
+            SourceListHint.AddSource,
+            SourceListRules.hintFor(SourceListEmptyState.Empty, hasDpadInput = false),
+        )
     }
 }

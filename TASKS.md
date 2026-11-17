@@ -1283,7 +1283,7 @@ değeri aynen döndürür, dokunmaya özel davranış yalnız dokunma profilinde
   deep-link filtresi burada da eklenmedi: `MobileMainActivity`'de deep-link ayrıştırması ayrı
   iş, `UI-016`'ya devredildi.
 
-- [ ] **UI-016 (P2): Kumanda varsayımı olan etkileşimler dokunmada karşılıksız**
+- [~] **UI-016 (P2): Kumanda varsayımı olan etkileşimler dokunmada karşılıksız**
   Renk tuşu ipucu satırları (`key_red/green/yellow/blue`, örn. `iptv_source_remote_hint`,
   `xmltv_source_remote_hint`, oynatma ipucu barı), uzun-OK bağlam menüleri (`okKeyGate` +
   `onLongPress`), yalnız odakla gezilen Quick Hub (`dialog_quick_hub.xml` sabit **760dp** —
@@ -1294,6 +1294,34 @@ değeri aynen döndürür, dokunmaya özel davranış yalnız dokunma profilinde
   odak çerçevesi yalnız D-pad/HYBRID'de çizilir, dokunmada ripple; minimum dokunma hedefi 48dp;
   Quick Hub mobilde alt sheet olarak açılır (TV'de 760dp aynen kalır); PIN dışı metin girişinde
   sistem klavyesi serbest. TV düzen dosyalarına dokunulmadan, kaynak/kapı ayrımıyla.
+  **Durum (2026-11-17) — dilim A (ipucu metinlerinin söylemi) tamam:**
+  - `SourceListRules.hintFor(state, hasDpadInput)` üçüncü içeriği döndürüyor:
+    `RowActionsTouch`. `IptvSourcesActivity` ve `XmlTvSourcesActivity` D-pad olmayan profilde
+    ortak `source_list_touch_hint` metnini basıyor ("Kaynağa dokun: kaynak işlemleri açılır"):
+    iki ekranda da satıra dokunmak aynı işlemleri açıyor (`setOnItemClickListener` →
+    `showSourceActions`), yani metin artık gerçek davranışı anlatıyor.
+  - `ChannelListRules.emptyHintFor(state, hasColorKeys)` eklendi; boş kanal listesi kartının
+    Kırmızı/Mavi tuş metinleri dokunma profilinde "… rozete dokun" söylemine geçiyor
+    (`channel_list_empty_no_channels_touch_hint`, `channel_list_empty_library_touch_hint`).
+    `channel_actions` rozetleri her varyantta zaten dokunulabilir olduğu için yeni eylem
+    eklenmedi, yalnız söylem düzeltildi.
+  - `layout-port/activity_iptv_sources.xml` içinde alt ipucu satırı **hiç yoktu** (telefonda
+    satır hiç görünmüyordu); `source_list_hint_line` eklendi. Varsayılan metin bilerek boş:
+    kod ilk yüklemeden sonra girdi profiline göre doldurur, yükleme sürerken yanlış bir komut
+    gösterilmez (`UI-003` "kanıtsız iddia yok" ilkesiyle aynı).
+  - Testler: `SourceListRulesTest` +1, `ChannelListRulesTest` +2 → 427 birim test üç flavor'da
+    da geçiyor. TV profillerinde `hasDpadInput` / `hasColorKeys` her zaman true olduğundan
+    metinler eskisiyle bit bit aynı; düzen değişikliği yalnız `layout-port` dosyasında
+    (TV manzarada çizilir).
+  **Kalan (UI-016 dilimleri):** **B)** `ChannelEditorActivity` ipucu satırı odak tabanlı
+  (`currentHint()` odaklı `when`): dokunmada odak olmadığı için satır hep `editor_ok_hint`
+  ("OK Özellikler · BACK Çıkış") yazıyor. **C)** uzun-OK işlevlerinin kalıcı ⋮ ile erişilmesi
+  (`ChannelAdapter`, `VodPosterAdapter`, `GuideProgramAdapter`, `GuideScheduleAdapter` uzun
+  basınmaları keşfedilemiyor). **D)** minimum 48dp dokunma hedefi + odak çerçevesinin yalnız
+  D-pad/HYBRID'de çizilmesi, dokunmada ripple. **E)** Quick Hub'ın telefon dikey düzenine
+  sığması (`dialog_quick_hub.xml` sabit 760dp → `layout-sw600dp` ayrımı; materyal
+  bağımlılığı yok, alt sheet kendin-pişir olacak) ve mobil kabukta Quick Hub'a dokunma ile
+  erişim. **F)** PIN dışı metin girişinde sistem klavyesinin serbest bırakılması.
 
 - [ ] **UI-017 (P2): Kaçınılmaz TV ekranlarında dokunma profili (VOD oynatma dahil)**
   VOD oynatma, EPG editörü ve tarayıcı mobilde de `MainActivity`/TV yüzeyini kullanıyor
@@ -1558,7 +1586,10 @@ değişmiyor (cihaz doğrulaması bekliyor). `UI-015` kod tarafı — girdi UX p
 `platform/UiInputProfile` (`D_PAD` / `TOUCH` / `HYBRID`) ve `TvRemoteActivity.inputProfile`
 dikişi geldi; TV'de cihaz sinyali okunmadan `D_PAD` döndüğü için dokunma kararları TV
 arayüzünü taşıyamıyor, gerçekten girdiye bağlı 5 karar profile bağlandı, 26 koşul
-yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor).
+yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor). `UI-016` dilim A —
+kaynak ekranları ve boş kanal listesi ipuçları dokunma profilinde dokunma jestiyle anlatılıyor;
+telefonda eksik olan IPTV kaynak ipucu satırı dikey düzene eklendi (cihaz doğrulaması
+bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

@@ -114,9 +114,10 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
         val state = SourceListRules.emptyState(sourcesLoaded, itemCount)
         emptyPanel.visibility = if (state == SourceListEmptyState.Empty) View.VISIBLE else View.GONE
         hintLine?.setText(
-            when (SourceListRules.hintFor(state)) {
+            when (SourceListRules.hintFor(state, inputProfile.hasDpadInput)) {
                 SourceListHint.AddSource -> R.string.xmltv_sources_empty_hint
                 SourceListHint.RowActions -> R.string.xmltv_source_remote_hint
+                SourceListHint.RowActionsTouch -> R.string.source_list_touch_hint
             },
         )
     }

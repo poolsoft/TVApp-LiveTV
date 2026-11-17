@@ -167,6 +167,39 @@ object ChannelListRules {
         filterActive -> ChannelListEmptyState.FilterEmpty
         else -> ChannelListEmptyState.NoChannels
     }
+
+    /**
+     * Bos liste yonlendirme metninin soylem bicimi (`UI-016`). Metin renk tusunu ya da
+     * rozeti anlattigi icin karar `hasColorKeys` ile verilir: renk tusu olmayan profilde
+     * ayni rozetler dokunulabilir oldugundan "dokun" denen metin secilir. TV profillerinde
+     * `hasColorKeys` her zaman true oldugu icin metin degismez.
+     */
+    fun emptyHintFor(
+        state: ChannelListEmptyState,
+        hasColorKeys: Boolean,
+    ): ChannelListEmptyHint = when {
+        state == ChannelListEmptyState.LibraryEmpty && hasColorKeys ->
+            ChannelListEmptyHint.LibraryKeys
+
+        state == ChannelListEmptyState.LibraryEmpty -> ChannelListEmptyHint.LibraryTouch
+        hasColorKeys -> ChannelListEmptyHint.NoChannelsKeys
+        else -> ChannelListEmptyHint.NoChannelsTouch
+    }
+}
+
+/** Bos liste yonlendirme metninin soylem bicimi (`UI-016`). */
+enum class ChannelListEmptyHint {
+    /** Normal liste bos, kumanda var: renk tusu adlariyla anlatilir. */
+    NoChannelsKeys,
+
+    /** Normal liste bos, renk tusu yok: rozete dokunma olarak anlatilir. */
+    NoChannelsTouch,
+
+    /** IPTV kutuphanesi bos, kumanda var: Mavi tus adiyla anlatilir. */
+    LibraryKeys,
+
+    /** IPTV kutuphanesi bos, renk tusu yok: mavi rozete dokunma olarak anlatilir. */
+    LibraryTouch,
 }
 
 /** Kanal listesi bos durumunun sekilleri (`UI-003`). */

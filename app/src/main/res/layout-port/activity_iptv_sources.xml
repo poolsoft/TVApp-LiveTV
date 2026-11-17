@@ -239,4 +239,17 @@
         </LinearLayout>
     </FrameLayout>
 
+    <!-- UI-016: alt ipucu satırı. Metin kasıtlı olarak boş: kod ilk yüklemeden sonra
+         girdi profiline göre dolduruyor (d-pad yoksa "OK: ..." komutu yerine dokunma
+         jesti anlatılıyor). Yükleme sürerken yanlış bir komut göstermemek için
+         layout'ta varsayılan metin yok. -->
+    <TextView
+        android:id="@+id/source_list_hint_line"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
 </LinearLayout>

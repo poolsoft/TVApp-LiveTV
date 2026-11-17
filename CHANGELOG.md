@@ -1,5 +1,35 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Dokunma Profilinde İpucu Metinleri (`UI-016` dilim A)
+
+- **Sorun:** Telefonda/tablette ipucu satırları kumanda komutu anlatıyordu: IPTV ve XMLTV
+  kaynak ekranlarında "OK: Kanalları seç · OK uzun bas: Liste işlemleri" ile "OK: Kaynak
+  işlemleri · CH+/CH-: Sayfa değiştir", boş kanal listesi kartında "Kırmızı … Sarı …" ve
+  "Mavi tuş …". Dokunmatik cihazda OK, CH+/CH- ve renk tuşu yok; oysa satıra dokunmak aynı
+  işlemleri zaten açıyor — arayüz kullanıcının yapmadığı bir jesti anlatıyordu.
+- **Kural (saf, birim testli):** `SourceListRules.hintFor(state, hasDpadInput)` artık
+  `RowActionsTouch` seçeneğini de döndürüyor; `ChannelListRules.emptyHintFor(state,
+  hasColorKeys)` boş liste kartının metnini tuş söylemi ile rozet-dokunma söylemi arasında
+  seçiyor. Karar `UI-015`'in `inputProfile` dikişinden geliyor; yeni bir `MOBILE_UI_ENABLED`
+  satır içi koşulu eklenmedi.
+- **Metinler (iki dilli):** ortak `source_list_touch_hint` ("Kaynağa dokun: kaynak işlemleri
+  açılır" / "Tap a source to open its actions") ile
+  `channel_list_empty_no_channels_touch_hint` ve `channel_list_empty_library_touch_hint`. Yalnız
+  doğrulanmış davranış yazıldı: mobil kabukta sarı rozet liste değiştirmiyor, filtre açtığı için
+  eski "Sarı listeyi değiştirir" iddiası dokunma metnine taşınmadı.
+- **Düzen:** `layout-port/activity_iptv_sources.xml` içinde alt ipucu satırı **hiç yoktu**
+  (telefonda satır görünmüyordu); `source_list_hint_line` eklendi ve varsayılan metin bilerek
+  boş bırakıldı — kod ilk yüklemeden sonra girdi profiline göre doldurur, yükleme sürerken
+  yanlış bir komut gösterilmez. TV manzarada çizildiği için `layout/` düzen dosyalarına
+  dokunulmadı.
+- **Testler:** `SourceListRulesTest` +1 ve `ChannelListRulesTest` +2 → **427 birim test üç
+  flavor'da da** geçiyor; `assembleLocalDebug` / `assemblePaidDebug` / `assembleMobileDebug`
+  başarılı. TV profillerinde `hasDpadInput` ve `hasColorKeys` her zaman true olduğundan
+  ekranlarda hiçbir metin değişmez.
+- **Kalan (`UI-016` dilim B–F):** kanal editörünün odak tabanlı ipucu satırı, uzun-OK
+  işlevleri için kalıcı ⋮, 48dp dokunma hedefleri ve odak çerçevesinin yalnız D-pad'de
+  çizilmesi, Quick Hub'ın dikey düzene sığması, PIN dışı metin girişinde sistem klavyesi.
+
 ## 2026-11-17 - Girdi UX Profili: Dokunma mı, Kumanda mı (`UI-015`)
 
 - **Sorun:** "Dokunma mı D-pad mi" kararını veren tek bir yer yoktu; `BuildConfig.MOBILE_UI_ENABLED`

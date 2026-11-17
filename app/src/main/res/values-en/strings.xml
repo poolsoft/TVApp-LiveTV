@@ -188,6 +188,8 @@
     <string name="channel_list_empty_no_channels">The channel list is empty</string>
     <string name="channel_list_empty_no_channels_hint">Red opens channel editing, Yellow changes the list</string>
     <string name="channel_list_empty_library_hint">Blue opens the list and category filters</string>
+    <string name="channel_list_empty_no_channels_touch_hint">Tap the red badge to open channel editing</string>
+    <string name="channel_list_empty_library_touch_hint">Tap the blue badge to open the list and category filters</string>
     <string name="no_inputs_message">The device did not report an available TV input through TIF.</string>
     <string name="no_channels_message">TV inputs were found, but no readable channels are available:\n%1$s</string>
     <string name="permission_title">TIF channel access blocked</string>
@@ -856,6 +858,7 @@
     <string name="iptv_source_enabled">Enabled</string>
     <string name="iptv_sources_empty_hint">Start by adding a URL, file, Xtream or Stalker portal.</string>
     <string name="xmltv_sources_empty_hint">Start by adding a URL or a file.</string>
+    <string name="source_list_touch_hint">Tap a source to open its actions</string>
     <string name="web_tab_sources">IPTV Sources</string>
     <string name="web_tab_channel_editor">Channel Editor</string>
     <string name="web_select_channels_title">Channel Selection</string>
