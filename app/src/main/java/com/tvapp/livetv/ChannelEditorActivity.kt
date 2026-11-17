@@ -1432,7 +1432,10 @@ class ChannelEditorActivity : TvRemoteActivity() {
     companion object {
         const val EXTRA_CURRENT_SOURCE_KEY = "com.tvapp.livetv.extra.CURRENT_SOURCE_KEY"
         const val EXTRA_SELECTED_SOURCE_KEY = "com.tvapp.livetv.extra.SELECTED_SOURCE_KEY"
-        private const val PREVIEW_DELAY_MS = 450L
+        // PERF-028: tek bir TIF ayarlamasi (uydu/DVB kilidi) 1-2 sn surebilir ve kanalda
+    // gezinen kullanici her durusta tam bu bedeli oderdi. 450 ms yerine 900 ms'de
+    // durunca acilir; gezinirken hic tetiklenmez. IPTVSecimActivity ile ayni tavan.
+    private const val PREVIEW_DELAY_MS = 900L
         private const val MOVE_TARGET_DELAY_MS = 1_200L
         private const val NAVIGATION_NUMBER_DELAY_MS = 900L
         private const val MAX_CHANNEL_NUMBER_DIGITS = 4

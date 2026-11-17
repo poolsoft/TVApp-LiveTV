@@ -274,18 +274,22 @@
         android:layout_height="42dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="28dp">
+        android:paddingHorizontal="28dp"
+        android:baselineAligned="false">
 
         <TextView
             android:id="@+id/red_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/key_red"
             android:contentDescription="@string/red_key" />
         <TextView
             android:id="@+id/red_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="start|center_vertical"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="24dp"
             android:text="@string/skip_channel"
@@ -296,12 +300,15 @@
             android:id="@+id/green_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/key_green"
             android:contentDescription="@string/green_key" />
         <TextView
             android:id="@+id/green_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="start|center_vertical"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="24dp"
             android:text="@string/move_channel"
@@ -312,12 +319,15 @@
             android:id="@+id/yellow_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/key_yellow"
             android:contentDescription="@string/yellow_key" />
         <TextView
             android:id="@+id/yellow_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="start|center_vertical"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="24dp"
             android:text="@string/multi_select"
@@ -328,12 +338,15 @@
             android:id="@+id/blue_action_icon"
             android:layout_width="22dp"
             android:layout_height="22dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/key_blue"
             android:contentDescription="@string/blue_key" />
         <TextView
             android:id="@+id/blue_action"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:gravity="start|center_vertical"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="24dp"
             android:text="@string/source_management"

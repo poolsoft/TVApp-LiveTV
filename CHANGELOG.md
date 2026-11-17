@@ -1,5 +1,23 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-18 - Kanal Editöründe TIF Gezinme Önizlemesi ve Alt Araç Çubuğu Hizalaması
+
+- **Kullanıcı raporu (`PERF-028` eki, TV cihazından geldi):** TIF kanalları arasında
+  yukarı/aşağı geçiş bile yavaştı; her duruş 450 ms sonra donanım ayarlaması
+  (uydu/DVB kilidi ~1–2 s) tetikliyordu ve gezinme "önizlemeyi bekler" gibi hissediyordu.
+- **Düzeltme:** `ChannelEditorActivity` `PREVIEW_DELAY_MS` 450 → **900 ms**. Gezinirken
+  hiçbir donanım/network isteği tetiklenmiyor; önizleme yalnız gerçekten satırda
+  durulduğunda açılır. `IptvChannelSelectionActivity` zaten 900 ms kullanıyordu.
+- **Hizalama düzeltmesi:** editörün altındaki araç çubuğunda renk dairesi ikonları ile
+  metin etiketleri dikey olarak ayrık görünüyordu, etiketler üste yapışıktı. Kök neden:
+  satır `LinearLayout`'ta `android:baselineAligned="false"` eksik — varsayılan
+  `true`, metinli ve metinsiz (daire ikonu) çocukları **baseline hizalamasına** zorluyor,
+  kutu içeriğinin üstünü/altını boşaltıyordu. Satıra `baselineAligned="false"` eklendi;
+  ikon ve etiketlere ayrıca `layout_gravity="center_vertical"` (etiketlere
+  `gravity="start|center_vertical"`) verildi. Davranış değişikliği yok; yalnız hizalama.
+- **Testler:** 433 birim test × 3 flavor değişmedi (düzenleme XML düzeyinde davranış
+  değiştirmez; cihazda doğrulanacak).
+
 ## 2026-11-17 - Kanal Editörü Önizlemesi Hafifletildi (`PERF-028`)
 
 - **Kullanıcı raporu:** "TV'de kanal liste editörü çok yavaşladı, bir hantallık var; sanki

@@ -1559,11 +1559,21 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
   `setHasFixedSize(true)` (satırlar sabit 58dp, ad/kaynak `maxLines=1`).
   **Bilinçli davranış farkı:** gezinme sırasında önizleme kutusu kararır (eski kanalın
   görüntüsü/sesi hareket boyunca devam etmiyor); taşıma modunda da çalan önizleme kesilir.
-  **Kabul / kalan:** TV cihazında doğrulanacak — ok ile gezinmede hantallık kaybolmalı,
-  önizleme satırda durulunca (~450 ms) açılmalı, kaynak ekranından dönüşte yeniden açılmalı,
-  kilitli kanalda kararmalı. Şu an **sayaç yok**: `EDITOR_CHANNEL_*` satırları yükleme
-  sürelerini ölçüyor, önizleme maliyetini ölçmüyor; şikâyet sürerse önizleme tune süresi ve
-  eşzamanlı akış sayısı loga yazılır.
+  **Ek önlem (2026-11-18, kullanıcı raporuyla):** TIF
+  kanalları arasında tek adım bile "önizlemeyi bekler" gibi hissettiriyordu: `PREVIEW_DELAY_MS`
+  450 → **900 ms** yapıldı (`IptvChannelSelectionActivity` zaten aynı değeri kullanıyordu);
+  gezinirken hiçbir donanım ayarlaması/network isteği tetiklenmez, önizleme yalnızca satırda
+  gerçekten durulduğunda açılır. Aynı raporda bildirilen hizalama kusuru — editörün altındaki
+  araç çubuğunda renk ikonları ile etiketlerin dikey olarak ayrık görünmesi — kök nedeni
+  satır `LinearLayout`'ta `android:baselineAligned="false"` eksikliğiydi: varsayılan `true`,
+  metinli ve metinsiz çocukları **baseline hizalamasına** zorlar (ikon=metinsiz, etiket=metinli
+  → etiket yukarı itilir); satıra `baselineAligned="false"` ve çocuklara
+  `layout_gravity="center_vertical"` eklendi.
+  **Kabul / kalan:** TV cihazında doğrulanacak — ok ile gezinmede akıcılık, önizlemenin
+  satırda durunca (~900 ms) açılması, alt araç çubuğunda ikon/metin hizası, kilitli kanalda
+  kararma, kaynak ekranından dönüşte önizlemenin yeniden açılması. Şu an **sayaç yok**:
+  `EDITOR_CHANNEL_*` satırları yükleme sürelerini ölçüyor, önizleme maliyetini ölçmüyor;
+  şikâyet sürerse önizleme tune süresi loga yazılır.
 
 ### Epic REFACTOR — Yapısal borç
 
