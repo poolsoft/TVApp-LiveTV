@@ -33,6 +33,7 @@ import com.tvapp.livetv.vod.VodDisplayItem
 import com.tvapp.livetv.vod.VodLayoutRules
 import com.tvapp.livetv.vod.VodPosterAdapter
 import com.tvapp.livetv.vod.VodTitleCleaner
+import com.tvapp.livetv.vod.VodUiSupport
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -692,11 +693,7 @@ class VodHomeActivity : TvRemoteActivity() {
                             val season = epObj.optInt("season", epObj.optInt("season_number", 1)).coerceAtLeast(1)
                             val epNumber = epObj.optInt("episode", epObj.optInt("episode_number", i + 1)).coerceAtLeast(1)
                             val rawTitle = epObj.optString("title").trim().ifEmpty { epObj.optString("name").trim() }
-                            val epTitle = if (rawTitle.isNotEmpty() && !rawTitle.equals("$epNumber. Bölüm", true)) {
-                                "$season. Sezon $epNumber. Bölüm - $rawTitle"
-                            } else {
-                                "$season. Sezon $epNumber. Bölüm"
-                            }
+                            val epTitle = episodeSubtitle(season, epNumber, rawTitle)
                             playDynamicEpisode(seriesItem, i, epTitle, epUrl)
                             return@launch
                         }
@@ -709,6 +706,28 @@ class VodHomeActivity : TvRemoteActivity() {
         }
     }
 
+    /**
+     * Bolum alt basligi: `S. Sezon E. Bolum` ve saglayicinin verdigi ad.
+     *
+     * Saglayici bazi kayitlarda ad alanina varsayilan degeri yazar ("3. Bölüm"
+     * veya "Bölüm 3"); bu tekrar gosterilmez. Karsilastirma kurali
+     * [VodUiSupport.isProviderDefaultEpisodeTitle] icinde tanimlidir.
+     */
+    private fun episodeSubtitle(
+        season: Int,
+        episode: Int,
+        rawTitle: String,
+        allowReversedDefault: Boolean = false,
+    ): String {
+        val isProviderDefault = rawTitle.isBlank() ||
+            VodUiSupport.isProviderDefaultEpisodeTitle(rawTitle, episode, allowReversedDefault)
+        return if (isProviderDefault) {
+            getString(R.string.vod_season_episode_fmt, season, episode)
+        } else {
+            getString(R.string.vod_season_episode_title_fmt, season, episode, rawTitle.trim())
+        }
+    }
+
     private fun showEpisodesDialog(seriesItem: VodCatalogItem) {
         lifecycleScope.launch {
             val episodes = withContext(Dispatchers.IO) {
@@ -716,9 +735,7 @@ class VodHomeActivity : TvRemoteActivity() {
             }
             if (episodes.isNotEmpty()) {
                 val titles = episodes.map { ep ->
-                    val s = ep.seasonNumber ?: 1
-                    val e = ep.episodeNumber ?: 1
-                    "${s}. Sezon ${e}. Bölüm - ${ep.name}"
+                    episodeSubtitle(ep.seasonNumber ?: 1, ep.episodeNumber ?: 1, ep.name)
                 }.toTypedArray()
 
                 AlertDialog.Builder(this@VodHomeActivity, R.style.Theme_TVApp_Dialog)
@@ -750,14 +767,7 @@ class VodHomeActivity : TvRemoteActivity() {
                                 val rawTitle = epObj.optString("title").trim().ifEmpty {
                                     epObj.optString("name").trim()
                                 }
-                                val epTitle = if (rawTitle.isNotEmpty() &&
-                                    !rawTitle.equals("$epNumber. Bölüm", true) &&
-                                    !rawTitle.equals("Bölüm $epNumber", true)
-                                ) {
-                                    "$season. Sezon $epNumber. Bölüm - $rawTitle"
-                                } else {
-                                    "$season. Sezon $epNumber. Bölüm"
-                                }
+                                val epTitle = episodeSubtitle(season, epNumber, rawTitle, allowReversedDefault = true)
                                 val epUrl = epObj.optString("videoUrl").trim().ifEmpty {
                                     epObj.optString("url").trim()
                                 }
@@ -809,11 +819,7 @@ class VodHomeActivity : TvRemoteActivity() {
         val season = episode.seasonNumber ?: 1
         val epNum = episode.episodeNumber
         val subTitle = if (epNum != null) {
-            if (episode.name.isNotBlank() && !episode.name.equals("$epNum. Bölüm", true)) {
-                "$season. Sezon $epNum. Bölüm - ${episode.name}"
-            } else {
-                "$season. Sezon $epNum. Bölüm"
-            }
+            episodeSubtitle(season, epNum, episode.name)
         } else episode.name
 
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -936,14 +942,14 @@ class VodHomeActivity : TvRemoteActivity() {
 
     private fun showSearchDialog() {
         val input = android.widget.EditText(this).apply {
-            hint = "Film veya dizi adı..."
+            hint = getString(R.string.vod_search_name_hint)
             setTextColor(getColor(R.color.text_primary))
             setHintTextColor(getColor(R.color.text_secondary))
             if (gridQuery.isNotEmpty()) setText(gridQuery)
         }
 
         AlertDialog.Builder(this, R.style.Theme_TVApp_Dialog)
-            .setTitle("VOD Arama")
+            .setTitle(R.string.vod_search_hint)
             .setView(input)
             .setPositiveButton(R.string.apply) { _, _ ->
                 val query = input.text.toString().trim()

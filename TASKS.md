@@ -1011,13 +1011,28 @@ bileşenleri hâlâ kullanmıyor.
   (2) cihaz doğrulaması — 0 sonuçlı aramada kartın geldiği, OK ile filtrelerin temizlendiği,
   cam/yüksek kontrast temalarında okunabilirliği ve odak çerçevesinin göründüğü.
 
-- [ ] **UI-004 (P1): VOD ekranında sabit Türkçe metin ve emoji**
+- [~] **UI-004 (P1): VOD ekranında sabit Türkçe metin ve emoji**
   `activity_vod_home.xml:31, 99, 137, 153, 162, 192, 209, 247, 274, 342-368` (🌐⚡📂🎬⏱️🔴),
   `VodHomeActivity.kt:545, 578-583, 636-639, 763, 770`, `VodRightPanelAdapters.kt:47` ve
   `TmdbApiClient.kt` tür adları. `values` ile `values-en` paritesi şu an tam (905 = 905);
   bu metinler kaynak dışında olduğu için EN dilinde de Türkçe kalıyor — AGENTS.md kuralı ihlali.
   **Kabul:** Kullanıcıya görünen her VOD metni iki dilde tanımlı; yer tutuculu biçim
   (`%1$d. Sezon`) kullanılır; emojiler sabit boyutlu drawable ikonlarıyla değiştirilir.
+  - **Tamamlanan (commit 1, kod tarafı):** Bölüm alt başlıkları artık
+    `vod_season_episode_fmt` ve yeni `vod_season_episode_title_fmt` ile üretiliyor
+    (`VodHomeActivity.episodeSubtitle`; dört sabit `"$s. Sezon $e. Bölüm"` bloğu kaldırıldı).
+    Arama penceresi başlığı `vod_search_hint`, ipucu yeni `vod_search_name_hint`; VOD kaynak
+    satırındaki içerik sayısı yeni `vod_source_content_count`. Gömülü JSON bölümleri
+    `VodUiSupport.EpisodeLabels` enjeksiyonuyla iki dilli kaynaklardan besleniyor
+    (`VodHost.episodeLabels`; varsayılan `LegacyEpisodeLabels` eski davranışı korur).
+    Sağlayıcının yazdığı varsayılan bölüm adı ("3. Bölüm" / "Bölüm 3", ASCII "3. Bolum")
+    tek kurala bağlandı: `VodUiSupport.isProviderDefaultEpisodeTitle`. Testler:
+    `VodUiSupportTest` +3.
+  - **Kalan:** (1) `activity_vod_home.xml` içindeki 12 sabit `android:text` ve
+    🌐⚡📂🎬⏱️🔴 emojileri mevcut drawable'larla değiştirilecek; (2) `VodHomeActivity`
+    kategori kartı emojisi (`VodCategoryItem.icon`, `"📁"`); (3) `TmdbApiClient` tür adları
+    (istek `language=tr-TR` + sabit TR harita — yerelleştirme ayrı ele alınacak);
+    (4) cihaz doğrulaması: TR/EN bölüm listesi ve arama penceresi.
 
 - [ ] **UI-005 (P1): 10-foot için okunmaz punto (7-9 sp)**
   Renk aksiyon ipuçları `MainActivity.kt:5037, 5079, 5123` (9f) ve ayraç `:5103` (11f);

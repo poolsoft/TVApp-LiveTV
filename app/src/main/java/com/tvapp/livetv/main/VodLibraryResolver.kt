@@ -27,6 +27,7 @@ object VodLibraryResolver {
         sourceKey: String,
         meta: VodMetadataEntity?,
         parentMeta: VodMetadataEntity?,
+        labels: VodUiSupport.EpisodeLabels = VodUiSupport.LegacyEpisodeLabels,
     ): ResolvedMeta? {
         if (meta != null || !sourceKey.contains(":ep:") || parentMeta == null) return null
         val parentStream = parentMeta.streamUrl
@@ -36,7 +37,8 @@ object VodLibraryResolver {
             val epPart = sourceKey.substringAfter(":ep:")
             val epIdx = epPart.substringBefore('_').toIntOrNull() ?: 0
             if (epIdx !in 0 until epArray.length()) return null
-            val parsed = VodUiSupport.dynamicEpisode(epArray.optJSONObject(epIdx), epIdx) ?: return null
+            val parsed = VodUiSupport.dynamicEpisode(epArray.optJSONObject(epIdx), epIdx, labels)
+                ?: return null
             ResolvedMeta(
                 meta = parentMeta.copy(sourceKey = sourceKey, streamUrl = parsed.url),
                 dynamicEpTitle = parsed.title,

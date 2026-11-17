@@ -771,6 +771,10 @@
     <string name="vod_home_title">VOD Ana Sayfa</string>
     <string name="continue_watching">Devam Et</string>
     <string name="vod_search_hint">VOD ara</string>
+    <string name="vod_search_name_hint">Film veya dizi adı...</string>
+    <string name="vod_season_episode_title_fmt">%1$d. Sezon %2$d. Bölüm - %3$s</string>
+    <string name="vod_episode_number_fmt">%1$d. Bölüm</string>
+    <string name="vod_source_content_count">%1$d içerik</string>
     <string name="vod_empty">VOD içerik bulunamadı</string>
     <string name="vod_resume_from_start">Baştan oynat</string>
     <string name="vod_remove_from_continue">Devam Et listesinden kaldır</string>

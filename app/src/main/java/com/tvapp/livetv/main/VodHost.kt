@@ -7,6 +7,7 @@ import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.vod.VodPageResolver
 import com.tvapp.livetv.vod.VodUiSupport
 import com.tvapp.livetv.vod.WebVideoResolver
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -153,7 +154,7 @@ class VodHost(
                 if (currentMeta?.kind == "SERIES") currentMeta else env.loadMetadata(seriesKey)
             }
             if (seriesMeta != null) {
-                val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl)
+                val parsedEpisodes = VodUiSupport.parseEpisodesJson(seriesMeta.streamUrl, episodeLabels())
                 if (parsedEpisodes.isNotEmpty()) {
                     try {
                         val labels = parsedEpisodes.map { it.title }
@@ -340,7 +341,7 @@ class VodHost(
             val parentKey = sourceKey.substringBefore(":ep:")
             val parentMeta = runCatching { env.loadMetadata(parentKey) }.getOrNull()
             val dyn = runCatching {
-                VodLibraryResolver.resolveDynamicEpisode(sourceKey, meta, parentMeta)
+                VodLibraryResolver.resolveDynamicEpisode(sourceKey, meta, parentMeta, episodeLabels())
             }.getOrNull()
             if (dyn == null && parentMeta?.streamUrl?.startsWith("[") == true) {
                 env.log("Parse dynamic JSON episode in resolve failed for $sourceKey")
@@ -374,6 +375,28 @@ class VodHost(
                 pendingChannel,
                 VodPageResolver.resolve(streamUrl, null),
             )
+        }
+    }
+
+    /**
+     * Bolum etiketlerini iki dilli kaynaklardan uretir.
+     *
+     * [VodHostEnv] yalniz argumansiz `string()` ve `seasonEpisodeLabel()` sundugu
+     * icin baslikli/numarali bicimler burada formatlanir; arayuz genisletilmez.
+     */
+    private fun episodeLabels(): VodUiSupport.EpisodeLabels {
+        val seasonFmt = env.string(R.string.vod_season_episode_fmt)
+        val titleFmt = env.string(R.string.vod_season_episode_title_fmt)
+        val untitledFmt = env.string(R.string.vod_episode_number_fmt)
+        return object : VodUiSupport.EpisodeLabels {
+            override fun seasonEpisode(season: Int, episode: Int): String =
+                String.format(Locale.getDefault(), seasonFmt, season, episode)
+
+            override fun seasonEpisodeTitle(season: Int, episode: Int, title: String): String =
+                String.format(Locale.getDefault(), titleFmt, season, episode, title)
+
+            override fun untitledEpisode(index: Int): String =
+                String.format(Locale.getDefault(), untitledFmt, index)
         }
     }
 }

@@ -44,7 +44,9 @@ class VodSourceAdapter(
 
         fun bind(item: IptvSourceSummary) {
             binding.vodSourceName.text = item.source.name
-            binding.vodSourceDetails.text = "${item.channelCount} içerik"
+            binding.vodSourceDetails.text = binding.root.context.getString(
+                R.string.vod_source_content_count, item.channelCount
+            )
 
             val isActive = item.source.id == activeSourceId
             binding.vodSourceIndicator.setBackgroundResource(

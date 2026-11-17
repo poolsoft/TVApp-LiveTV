@@ -37,12 +37,43 @@ object VodUiSupport {
     data class ParsedEpisode(val title: String, val url: String)
 
     /**
+     * Kullaniciya gorunen bolum etiketleri.
+     *
+     * Android kaynaklarina bagimlilik olusturmamak icin enjekte edilir; varsayilan
+     * uygulama eski davranisi korur, TV uygulamasi iki dilli kaynaklari gecer.
+     */
+    interface EpisodeLabels {
+        /** Baslik yok/tekrarli: yalniz `S. Sezon E. Bolum`. */
+        fun seasonEpisode(season: Int, episode: Int): String
+
+        /** Saglayicidan gelen gercek baslikla birlikte etiket. */
+        fun seasonEpisodeTitle(season: Int, episode: Int, title: String): String
+
+        /** JSON kaydinda ad alani hic yoksa kullanilan numara etiketi. */
+        fun untitledEpisode(index: Int): String
+    }
+
+    /** Kaynak kullanilmayan cagrilar icin ASCII varsayilanlar (eski davranis). */
+    object LegacyEpisodeLabels : EpisodeLabels {
+        override fun seasonEpisode(season: Int, episode: Int): String =
+            "$season. Sezon $episode. Bolum"
+
+        override fun seasonEpisodeTitle(season: Int, episode: Int, title: String): String =
+            "$season. Sezon $episode. Bolum - $title"
+
+        override fun untitledEpisode(index: Int): String = "$index. Bolum"
+    }
+
+    /**
      * Seri `streamUrl` icinde gomulu JSON bolum listesini cozumler.
      *
      * Beklenen bicim: `[{"season":1,"episode":1,"title":"...","videoUrl":"..."}]`
      * Gecersiz/boom JSON bos liste doner; exception yaymaz.
      */
-    fun parseEpisodesJson(raw: String?): List<ParsedEpisode> {
+    fun parseEpisodesJson(
+        raw: String?,
+        labels: EpisodeLabels = LegacyEpisodeLabels,
+    ): List<ParsedEpisode> {
         if (raw.isNullOrBlank() || !raw.startsWith("[")) return emptyList()
         val result = mutableListOf<ParsedEpisode>()
         try {
@@ -51,7 +82,7 @@ object VodUiSupport {
                 val epObj = jsonArray.optJSONObject(i) ?: continue
                 val epTitle = epObj.optString("title").trim().ifEmpty {
                     epObj.optString("name").trim()
-                }.ifEmpty { "${i + 1}. Bolum" }
+                }.ifEmpty { labels.untitledEpisode(i + 1) }
                 val epUrl = epObj.optString("videoUrl").trim().ifEmpty {
                     epObj.optString("url").trim()
                 }
@@ -64,20 +95,42 @@ object VodUiSupport {
     }
 
     /**
-     * Gomulu JSON bolum kaydindan (`sourceKey:ep:<index>_<hash>` yolu) baslik ve
-     * adres cikarir. MainActivity'deki kuralin aynisidir:
-     * `$sNum. Sezon $eNum. Bolum - $rawTitle` (baslik bossa suffix yok).
-     * Veri yoksa null doner.
+     * Saglayicinin bolum kayitlarinda ad alani bazen varsayilan degeri tasir
+     * ("3. Bölüm" ya da "Bölüm 3"). Boyle tekrarlar gosterilmez. Xtream/M3U verisi
+     * uygulama dilinden bagimsiz uretilir; bu yuzden karsilastirma sabit Turkce
+     * etiketlerle (eski ASCII kayitlar icin ayrica ASCII bicimiyle) yapilir.
      */
-    fun dynamicEpisode(epObj: org.json.JSONObject?, fallbackIndex: Int): ParsedEpisode? {
+    fun isProviderDefaultEpisodeTitle(
+        rawTitle: String,
+        episode: Int,
+        allowReversed: Boolean = false,
+    ): Boolean {
+        val candidates = mutableListOf("$episode. Bölüm", "$episode. Bolum")
+        if (allowReversed) {
+            candidates += "Bölüm $episode"
+            candidates += "Bolum $episode"
+        }
+        return candidates.any { rawTitle.equals(it, ignoreCase = true) }
+    }
+
+    /**
+     * Gomulu JSON bolum kaydindan (`sourceKey:ep:<index>_<hash>` yolu) baslik ve
+     * adres cikarir. Etiketler [labels] ile uretilir; varsayilan [LegacyEpisodeLabels]
+     * eski ASCII davranisini korur. Veri yoksa null doner.
+     */
+    fun dynamicEpisode(
+        epObj: org.json.JSONObject?,
+        fallbackIndex: Int,
+        labels: EpisodeLabels = LegacyEpisodeLabels,
+    ): ParsedEpisode? {
         if (epObj == null) return null
         val sNum = epObj.optInt("season", epObj.optInt("season_number", 1)).coerceAtLeast(1)
         val eNum = epObj.optInt("episode", epObj.optInt("episode_number", fallbackIndex + 1)).coerceAtLeast(1)
         val rawTitle = epObj.optString("title").trim().ifEmpty { epObj.optString("name").trim() }
-        val title = if (rawTitle.isNotEmpty() && !rawTitle.equals("$eNum. Bolum", ignoreCase = true)) {
-            "$sNum. Sezon $eNum. Bolum - $rawTitle"
+        val title = if (rawTitle.isNotEmpty() && !isProviderDefaultEpisodeTitle(rawTitle, eNum)) {
+            labels.seasonEpisodeTitle(sNum, eNum, rawTitle)
         } else {
-            "$sNum. Sezon $eNum. Bolum"
+            labels.seasonEpisode(sNum, eNum)
         }
         val url = epObj.optString("videoUrl").trim().ifEmpty { epObj.optString("url").trim() }
         if (url.isEmpty()) return null

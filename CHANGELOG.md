@@ -1,5 +1,28 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - VOD Bölüm Etiketleri ve Arama Penceresi Dile Bağlandı (`UI-004`)
+
+- **Sorun:** Bölüm alt başlıkları (`"<s>. Sezon <e>. Bölüm - <ad>"`) ile arama penceresinin
+  başlığı ve ipucu koda gömülüydü; İngilizce arayüzde de Türkçe kalıyordu. Gömülü JSON bölüm
+  yolu ayrıca Türkçe karakterleri kaybediyordu (`1. Sezon 3. Bolum`).
+- **Kaynaklar:** `vod_season_episode_title_fmt`, `vod_episode_number_fmt`, `vod_search_name_hint`
+  ve `vod_source_content_count` iki dilde eklendi. `vod_season_episode_fmt` (TR
+  `%1$d. Sezon %2$d. Bölüm`, EN `Season %1$d Episode %2$d`) zaten vardı ve yeniden kullanıldı.
+- **Kod:** Dört sabit etiket bloğunun yerini `VodHomeActivity.episodeSubtitle()` aldı; arama
+  penceresi başlığı/ipucu ve `VodRightPanelAdapters` içerik sayısı kaynaklardan okunuyor.
+- **Sağlayıcı verisi korunuyor:** Bölüm adı alanına yazılan varsayılan etiket ("3. Bölüm",
+  "Bölüm 3", eski ASCII "3. Bolum") tekrar sayılır ve gösterilmez. Karşılaştırma uygulama
+  dilinden bağımsızdır; kural `VodUiSupport.isProviderDefaultEpisodeTitle()` içinde tek yerde
+  tanımlıdır (hem `VodHomeActivity` hem gömülü JSON yolu bunu kullanır).
+- **Gömülü JSON bölümleri:** `VodUiSupport.parseEpisodesJson/dynamicEpisode` etiketleri enjekte
+  edilen `EpisodeLabels` ile üretir; `VodHost.episodeLabels()` bunları iki dilli kaynaklardan
+  besler, varsayılan `LegacyEpisodeLabels` eski davranışı korur (birim testler bağımsız kalır).
+- **Testler:** `VodUiSupportTest` +3 (varsayılan etiket eşleşmesi TR/ASCII, enjekte etiketler,
+  adsız bölüm numarası). `local`, `paid` ve `mobile` flavor'larında çalıştırıldı.
+- **Kalan (`UI-004` commit 2):** `activity_vod_home.xml` sabit `android:text` değerleri ve
+  emoji ikonları, `VodCategoryItem.icon` varsayılanı, `TmdbApiClient` tür adları ve cihaz
+  doğrulaması.
+
 ## 2026-11-17 - Live TV'ye Dönünce VOD Modu Takılı Kalıyordu (`VOD-010`)
 
 - **Bildirim:** VOD ekranında bir içerik açıldı (veya hata verdi), sonra Live TV'ye dönülüp
