@@ -62,6 +62,7 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
+            <!-- UI-005: kalite/kaynak rozetleri OsdTextScale.MIN_TEXT_SP (12sp) altina inmez. -->
             <TextView
                 android:id="@+id/channel_quality"
                 android:layout_width="wrap_content"
@@ -69,7 +70,7 @@
                 android:background="@drawable/bg_tech_badge"
                 android:paddingHorizontal="3dp"
                 android:textColor="@color/text_primary"
-                android:textSize="8sp"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -124,7 +125,7 @@
                 android:paddingHorizontal="5dp"
                 android:paddingVertical="2dp"
                 android:textColor="@color/text_primary"
-                android:textSize="9sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 

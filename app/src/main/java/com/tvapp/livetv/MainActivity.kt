@@ -124,6 +124,7 @@ import com.tvapp.livetv.ui.ChannelAdapter
 import com.tvapp.livetv.ui.ChannelRowOptions
 import com.tvapp.livetv.ui.ParentalPinDialog
 import com.tvapp.livetv.ui.OsdCoordinator
+import com.tvapp.livetv.ui.OsdTextScale
 import com.tvapp.livetv.ui.PlaybackSurfaceMode
 import com.tvapp.livetv.ui.PlaybackUiState
 import com.tvapp.livetv.ui.PrimaryOsd
@@ -5540,7 +5541,8 @@ class MainActivity : TvRemoteActivity() {
             binding.infoColorActions.addView(TextView(this).apply {
                 text = getString(R.string.ok_long_mode_hint)
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                textSize = 9f
+                // UI-005: 9f okunmuyordu; OSD punto alt siniri uygulanir.
+                textSize = OsdTextScale.HINT_TEXT_SP
                 setPadding(dp(6), 0, dp(6), 0)
                 setSingleLine(true)
                 if (BuildConfig.MOBILE_UI_ENABLED) {
@@ -5582,7 +5584,8 @@ class MainActivity : TvRemoteActivity() {
                 binding.infoColorActions.addView(TextView(this).apply {
                     setText(label)
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                    textSize = 9f
+                    // UI-005: ipucu satiri da OSD punto alt sinirinin altina inmez.
+                    textSize = OsdTextScale.HINT_TEXT_SP
                     setPadding(dp(10), 0, 0, 0)
                     setSingleLine(true)
                 })
@@ -5606,7 +5609,7 @@ class MainActivity : TvRemoteActivity() {
                 binding.infoColorActions.addView(TextView(this).apply {
                     text = ","
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-                    textSize = 11f
+                    textSize = OsdTextScale.HINT_TEXT_SP
                     setPadding(dp(7), 0, dp(7), 0)
                 })
             }
@@ -5626,7 +5629,7 @@ class MainActivity : TvRemoteActivity() {
         binding.infoColorActions.addView(TextView(this).apply {
             text = getString(R.string.txt_key_hint)
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
-            textSize = 9f
+            textSize = OsdTextScale.HINT_TEXT_SP
             setPadding(dp(10), 0, 0, 0)
             setSingleLine(true)
         })

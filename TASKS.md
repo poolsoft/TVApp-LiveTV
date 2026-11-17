@@ -1045,13 +1045,33 @@ bileşenleri hâlâ kullanmıyor.
     penceresi, ikon boyutlarının 11-15sp metinle hizası, odak çerçevesinin hâlâ görünür olması
     ve 720p'de alt ipucu barının taşmaması.
 
-- [ ] **UI-005 (P1): 10-foot için okunmaz punto (7-9 sp)**
+- [~] **UI-005 (P1): 10-foot için okunmaz punto (7-9 sp)**
   Renk aksiyon ipuçları `MainActivity.kt:5037, 5079, 5123` (9f) ve ayraç `:5103` (11f);
   `item_channel.xml:71` kalite rozeti 8sp, `:126` kaynak rozeti 9sp; `activity_main.xml:685`
   tarih autoSize min 7sp; `activity_vod_home.xml:139` 9sp. İpuçlarının `technical_row` içinde
   spacer ile sağa hizalı olması kurala uygun — sorun yalnız boyut.
   **Kabul:** OSD'de minimum punto bir alt sınıra (örn. 12sp) bağlanır; TV mesafesinden
   okunabilirlik cihazda doğrulanır; rozetler satırı kaydırmaz.
+  **Durum (2026-11-17, alt sınır tek kurala bağlandı):**
+  - Yeni `ui/OsdTextScale.kt`: `MIN_TEXT_SP = 12f` + `textSp()` kırpması ve `HINT_TEXT_SP` /
+    `BADGE_TEXT_SP` yayınlanan değerleri. Kural saf, birim testi `OsdTextScaleTest` (4 test).
+  - Programatik OSD metinler artık kuraldan geçiyor: `MainActivity.updateInfoColorActions()`
+    içindeki üç ipucu (9f) ve virgül ayracı (11f) → `HINT_TEXT_SP`;
+    `TvUiComponents.colorAction()` etkileşimsiz 11f → `textSp()` ile 12f.
+  - Layout: `item_channel.xml` kalite rozeti 8sp ve kaynak rozeti 9sp → 12sp;
+    `item_editor_channel.xml` kalite rozeti 9sp → 12sp; `activity_main.xml` `clock_date`
+    autoSize 7–10sp → 12–13sp. `info_bar` genişliği `match_parent` olduğu için tarih 12sp'de
+    kırpılmadan sığar (ağırlık 16/49); rozet satır yüksekliğini kanal adı (15-16sp) belirlediği
+    için satır kaymaz.
+  - **Kalan (bilinçli):** 10–11.5sp ikincil metadata bildirimleri (70 adet) — `activity_main.xml`
+    37 (tanı/teşhis katmanı `diag_*` dâhil), `activity_vod_home.xml` 10,
+    `layout-port/activity_iptv_channel_selection.xml` 6, kalan 17 tekil kart/satır bildirimi;
+    ayrıca `TvBrowserActivity.kt:659` (11f, gezgin geçmiş satırı). Bunlar okunabilirlik kuşağında
+    (≥10sp) ve hepsini aynı anda büyütmek satır yüksekliklerini/toplam ipucu genişliğini
+    değiştireceği için ayrı bir geometri geçişi olarak ele alınmalı.
+  - **Kalan (cihaz):** TV mesafesinden okunabilirlik; `technical_row` ipucu satırının 12sp'de
+    720p'de taşmaması (4 IP TV ipucu birlikte ~290dp); rozetlerin kanal satırını kaydırmaması;
+    `clock_date` ay adının 13sp'de kırpılmaması.
 
 - [~] **UI-006 (P2): Oransal olmayan VOD ve Quick Hub ölçüleri**
   `activity_vod_home.xml` sabit 38dp üst bar, 175dp Devam Et rayı, 185dp sol panel;

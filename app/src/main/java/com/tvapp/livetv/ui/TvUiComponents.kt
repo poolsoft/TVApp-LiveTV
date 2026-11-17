@@ -56,7 +56,8 @@ object TvUiComponents {
         addView(TextView(context).apply {
             text = label
             setTextColor(ContextCompat.getColor(context, if (interactive) R.color.text_primary else R.color.text_secondary))
-            textSize = if (interactive) 12f else 11f
+            // UI-005: okunabilirlik alt siniri OsdTextScale'den gelir (11f okunmuyordu).
+            textSize = OsdTextScale.textSp(if (interactive) 12f else 11f)
             setPadding(context.dp(5), 0, 0, 0)
         })
     }

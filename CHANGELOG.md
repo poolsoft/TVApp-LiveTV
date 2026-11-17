@@ -1,5 +1,28 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - OSD Punto Alt Sınırı (12 sp) (`UI-005`)
+
+- **Sorun:** OSD'nin bazı satırları TV mesafesinden okunmuyordu: bilgi satırındaki renk aksiyon
+  ve durum ipuçları ile virgül ayracı koda gömülü `9f`/`11f`, kanal satırındaki kalite rozeti
+  `8sp`, kaynak rozetleri `9sp`, saat altındaki tarih `autoSize` alt sınırı `7sp`.
+- **Kural:** Yeni `ui/OsdTextScale.kt` tek alt sınır tanımlar (`MIN_TEXT_SP = 12f`) ve
+  `textSp()` ile altındaki değerleri sinira çeker. Kural saf olduğundan birim testi vardır
+  (`OsdTextScaleTest`, 4 test: kırpma, sinirin üstüne dokunmama, yayınlanan değerler,
+  layout ile ayni sinir).
+- **Kod:** `MainActivity.updateInfoColorActions()` üç ipucu `9f` ve ayrac `11f` yerine
+  `OsdTextScale.HINT_TEXT_SP`; `TvUiComponents.colorAction()` etkileşimsiz `11f` yerine
+  `OsdTextScale.textSp(...)`. Davranış değişmedi, yalnız punto.
+- **Düzen:** `item_channel.xml` kalite `8sp`→`12sp`, kaynak `9sp`→`12sp`;
+  `item_editor_channel.xml` kalite `9sp`→`12sp`; `activity_main.xml` `clock_date` autoSize
+  `7–10sp`→`12–13sp`. Bilgi satırı tam genişlik olduğu için tarih yeni sinirden kırpılmadan
+  sığar; rozet satır yüksekliği kanal adıyla (15-16sp) belirlendiği için satır kaymaz.
+- **Kalan:** 10–11.5sp ikincil metadata bildirimleri (70 adet; `activity_main.xml` 37 — teşhis
+  katmanı `diag_*` dâhil, `activity_vod_home.xml` 10, `layout-port` IP TV seçim 6, 17 tekil
+  satır) ve `TvBrowserActivity.kt:659` (`11f`). Bunlar ayrı bir geometri geçişi; tek tek
+  büyütülmeleri satır yüksekliklerini değiştireceği için bu dar kapsamlı değişikliğe alınmadı.
+- **Cihaz doğrulaması gerekiyor:** TV mesafesinden okunabilirlik, `technical_row` ipuçlarının
+  720p'de taşmaması, rozetlerin kanal satırını kaydırmaması.
+
 ## 2026-11-17 - VOD Bölüm Etiketleri ve Arama Penceresi Dile Bağlandı (`UI-004`)
 
 - **Sorun:** Bölüm alt başlıkları (`"<s>. Sezon <e>. Bölüm - <ad>"`) ile arama penceresinin

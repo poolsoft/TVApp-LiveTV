@@ -794,6 +794,7 @@
                     android:textSize="21sp"
                     android:textStyle="bold" />
 
+                <!-- UI-005: autoSize alt siniri OsdTextScale.MIN_TEXT_SP (12sp). -->
                 <TextView
                     android:id="@+id/clock_date"
                     android:layout_width="match_parent"
@@ -803,11 +804,11 @@
                     android:maxLines="1"
                     android:ellipsize="end"
                     app:autoSizeTextType="uniform"
-                    app:autoSizeMinTextSize="7sp"
-                    app:autoSizeMaxTextSize="10sp"
+                    app:autoSizeMinTextSize="12sp"
+                    app:autoSizeMaxTextSize="13sp"
                     app:autoSizeStepGranularity="1sp"
                     android:textColor="@color/text_secondary"
-                    android:textSize="10sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
