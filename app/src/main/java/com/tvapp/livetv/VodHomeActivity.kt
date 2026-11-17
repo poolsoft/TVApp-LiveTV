@@ -25,6 +25,7 @@ import com.tvapp.livetv.databinding.ActivityVodHomeBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.playback.IptvResumeStore
 import com.tvapp.livetv.playback.PlaybackHistoryStore
+import com.tvapp.livetv.platform.AppShell
 import com.tvapp.livetv.vod.TmdbApiClient
 import com.tvapp.livetv.vod.VodCardMetrics
 import com.tvapp.livetv.vod.VodCategoryAdapter
@@ -802,7 +803,7 @@ class VodHomeActivity : TvRemoteActivity() {
     private fun playDynamicEpisode(seriesItem: VodCatalogItem, epIndex: Int, epTitle: String, epUrl: String) {
         val epKey = "${seriesItem.sourceKey}:ep:${epIndex}_${epUrl.hashCode()}"
         lastPlayedSourceKey = epKey
-        val intent = Intent(this, MainActivity::class.java).apply {
+        val intent = Intent(this, AppShell.vodPlaybackHost).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, epKey)
             putExtra(MainActivity.EXTRA_VOD_STREAM_URL, epUrl)
             putExtra(MainActivity.EXTRA_VOD_TITLE, seriesItem.name)
@@ -822,7 +823,7 @@ class VodHomeActivity : TvRemoteActivity() {
             episodeSubtitle(season, epNum, episode.name)
         } else episode.name
 
-        val intent = Intent(this, MainActivity::class.java).apply {
+        val intent = Intent(this, AppShell.vodPlaybackHost).apply {
             putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, episode.sourceKey)
             putExtra(MainActivity.EXTRA_VOD_STREAM_URL, episode.streamUrl)
             putExtra(MainActivity.EXTRA_VOD_TITLE, episode.name)
@@ -866,7 +867,7 @@ class VodHomeActivity : TvRemoteActivity() {
                     Pair(ch?.streamUrl, ch?.logoUrl ?: item.logoUrl)
                 }
             }
-            val intent = Intent(this@VodHomeActivity, MainActivity::class.java).apply {
+            val intent = Intent(this@VodHomeActivity, AppShell.vodPlaybackHost).apply {
                 putExtra(MainActivity.EXTRA_VOD_SOURCE_KEY, item.sourceKey)
                 putExtra(MainActivity.EXTRA_VOD_STREAM_URL, url)
                 putExtra(MainActivity.EXTRA_VOD_TITLE, item.name)
@@ -929,7 +930,9 @@ class VodHomeActivity : TvRemoteActivity() {
     }
 
     private fun openLiveTv(targetSource: String? = null) {
-        val intent = Intent(this, MainActivity::class.java).apply {
+        // UI-014: hedef kabuk flavor'dan gelir. TV'de MainActivity (degismez), mobilde
+        // MobileMainActivity; boylece "Canli TV'ye Don" telefonda TV arayuzunu acmiyor.
+        val intent = Intent(this, AppShell.liveHost).apply {
             putExtra(MainActivity.EXTRA_LIVE_MODE, true)
             if (targetSource != null) {
                 putExtra(MainActivity.EXTRA_LIVE_TARGET_SOURCE, targetSource)

@@ -58,7 +58,8 @@ class ProgramReminderReceiver : BroadcastReceiver() {
             )
         }
 
-        val openIntent = Intent(context, MainActivity::class.java).apply {
+        // UI-014: bildirim hedefi kabuk (TV: MainActivity, mobil: MobileMainActivity).
+        val openIntent = Intent(context, com.tvapp.livetv.platform.AppShell.liveHost).apply {
             action = Intent.ACTION_VIEW
             data = Uri.Builder()
                 .scheme("tvapp")

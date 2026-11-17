@@ -403,7 +403,8 @@ class TvBrowserActivity : Activity() {
                 startActivity(vodIntent)
                 finish()
             } else {
-                val liveIntent = Intent(this, MainActivity::class.java).apply {
+                // UI-014: hedef kabuk flavor'dan gelir (TV: MainActivity, mobil: MobileMainActivity).
+                val liveIntent = Intent(this, com.tvapp.livetv.platform.AppShell.liveHost).apply {
                     flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra(com.tvapp.livetv.main.MainVodExtras.EXTRA_LIVE_MODE, true)
                 }
@@ -1188,7 +1189,8 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun playDetectedStream(request: PlaybackRequest) {
-        val intent = Intent(this, MainActivity::class.java).apply {
+        // UI-014: VOD oynatma yuzeyi flavor'dan gelir; uc varyantta da TV kabugu.
+        val intent = Intent(this, com.tvapp.livetv.platform.AppShell.vodPlaybackHost).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(MainActivity.EXTRA_VOD_STREAM_URL, request.url)
             val title = if (request.title.isNotBlank() && !request.title.startsWith("http")) {

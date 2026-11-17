@@ -19,7 +19,8 @@ class BootLaunchReceiver : BroadcastReceiver() {
         debugLog.recordDebug("BOOT_RECEIVED | launchOnBoot=$enabled")
         if (!enabled) return
 
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
+        // UI-014: acilis hedefi kabuk (TV: MainActivity, mobil: MobileMainActivity).
+        val launchIntent = Intent(context, com.tvapp.livetv.platform.AppShell.liveHost).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(EXTRA_STARTED_AFTER_BOOT, true)
         }

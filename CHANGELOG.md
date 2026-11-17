@@ -1,5 +1,32 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Mobil Kabuk Yönlendirmesi (`UI-014`)
+
+- **Sorun:** Mobil/tablet yapıda VOD ekranında **"Canlı TV'ye Dön"**e basınca TV arayüzü
+  açılıyordu. Kök neden: yönlendirme hedefleri sabit `MainActivity::class.java` olarak
+  yazılmıştı (sekiz yer) ve mobil flavor'un kendi kabuğu olan `MobileMainActivity`'ye giden
+  hiçbir yol yoktu; `MobileMainActivity`'de `onNewIntent` da bulunmuyordu.
+- **Çözüm:** Yeni `platform/AppShell` — `liveHost` ve `vodPlaybackHost`. Aynı FQN her flavor
+  source-set'inde ayrı yazılır (`src/local`, `src/paid`, `src/mobile`), aynı anda yalnız biri
+  derlenir; hedef derleme zamanında doğrulanır, reflection/sınıf adı yazısı yoktur.
+  `VodHomeActivity` (4), `browser/TvBrowserActivity` (2), `ProgramReminderReceiver` (1) ve
+  `BootLaunchReceiver` (1) artık hedefi buradan okur. **TV'de `AppShell.liveHost ==
+  MainActivity` olduğu için davranış birebir aynıdır.**
+- **Mobilde canlıya dönüş:** `MobileMainActivity` artık `onNewIntent` + açılış intent'i
+  üzerinden canlıya-don isteğini karşılıyor (`VodDeepLinkPayload` ile okunur, extra'lar
+  tüketilir). Kanal listesi asenkron yüklendiği için hedef bekletilir ve yükleme bitince
+  uygulanır. `TvChannelViewActivity` bilinçli olarak dışında: TIF'e özel sistem seçici girişi.
+- **Ortak kural:** Yeni `platform/LiveLaunchRules` — `"TIF"` / `"IPTV"` token semantiği
+  TV kabuğundakiyle tek kaynağa indirildi (`MainActivity.switchToLiveMode` artık bu kuralı
+  çağırır) ve derin bağlantıdaki `sourceKey` desteklenir. Eşleşme yoksa **kanal uydurulmaz**,
+  mevcut oynatma korunur.
+- **VOD oynatma** üç varyantta da TV kabuğunda kalmaya devam eder (kullanıcı kararı);
+  mobilde dokunma profili `UI-017`, mobil-native VOD yüzeyi `UI-018` olarak deftere yazıldı.
+- **Testler:** `LiveLaunchRulesTest` (7 test) + `AppShellTest` (2 test, varyant bazlı) →
+  417 birim test üç flavor'da da geçiyor. **Cihaz doğrulaması gerekiyor:** telefonda VOD →
+  "Canlı TV'ye Dön" sonrası mobil kabuğun açılması, TV'de akışın değişmemesi, açılış
+  (boot) ve hatırlatma bildiriminin doğru kabuğu açması.
+
 ## 2026-11-17 - IPTV ve XMLTV Yönetim Ekranlarında Boş Durum Kartı (`UI-003`)
 
 - **Sorun:** Kaynak listesi boşken (hiç listesi/kaynağı olmayan ilk kurulum veya son

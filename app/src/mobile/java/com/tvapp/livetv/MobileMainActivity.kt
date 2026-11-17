@@ -36,9 +36,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.tvapp.livetv.data.ChannelRepository
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.databinding.ActivityMobileMainBinding
+import com.tvapp.livetv.main.VodDeepLinkPayload
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.playback.IptvPlaybackPhase
+import com.tvapp.livetv.platform.LiveLaunchRules
+import com.tvapp.livetv.platform.LiveLaunchTarget
 import com.tvapp.livetv.ui.MobileCategoryAdapter
 import com.tvapp.livetv.ui.MobileChannelAdapter
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +70,10 @@ class MobileMainActivity : AppCompatActivity() {
 
     private val allChannels = mutableListOf<LiveChannel>()
     private var currentChannel: LiveChannel? = null
+
+    // UI-014: VOD/tarayıcı ekranlarından gelen "canlıya dön" hedefi. Kanal listesi asenkron
+    // yüklendiği için hedef burada bekletilir ve yükleme bitince uygulanır.
+    private var pendingLiveTarget: LiveLaunchTarget? = null
     private var currentCategory = "Tümü"
     private var currentSearchQuery = ""
     private var sideCategory = "Tümü"
@@ -116,7 +123,43 @@ class MobileMainActivity : AppCompatActivity() {
         setupGestureDetector()
         setupBackNavigation()
 
+        pendingLiveTarget = liveLaunchTarget(intent)
         loadChannels()
+    }
+
+    /**
+     * UI-014: kabuk `singleTop` olduğu için VOD/tarayıcı ekranlarından dönüş yeni bir
+     * intent ile gelir. Mobil kabuk zaten canlı yüzey olduğundan `EXTRA_LIVE_MODE` tek
+     * başına bir şey değiştirmez; anlamlı veri hedeftir (kaynak türü token'i veya
+     * derin bağlantıdaki kanal anahtarı).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val target = liveLaunchTarget(intent) ?: return
+        val channel = LiveLaunchRules.resolve(allChannels, target)
+        if (channel != null) {
+            pendingLiveTarget = null
+            playChannel(channel)
+        } else {
+            // Liste henüz yüklenmemiş ya da hedef bu listede yok: mevcut oynatma korunur
+            // ve hedef bir sonraki yüklemede denenir (uydurma kanal seçilmez).
+            pendingLiveTarget = target
+        }
+    }
+
+    /**
+     * Niyetteki canlıya-dön verisini okur. `VodDeepLinkPayload.fromIntent` extra'ları
+     * okur okumaz tüketir; böylece ekran yeniden odağa geldiğinde aynı istek tekrar
+     * tetiklenmez.
+     */
+    private fun liveLaunchTarget(intent: Intent?): LiveLaunchTarget? {
+        val payload = VodDeepLinkPayload.fromIntent(intent) ?: return null
+        val target = LiveLaunchTarget(
+            token = payload.targetSource?.takeIf { payload.liveMode && it.isNotBlank() },
+            sourceKey = intent?.data?.getQueryParameter("sourceKey")?.takeIf { it.isNotBlank() },
+        )
+        return target.takeUnless { it.isEmpty }
     }
 
     private fun setupPlayback() {
@@ -430,6 +473,13 @@ class MobileMainActivity : AppCompatActivity() {
                         applyFilters()
                         setupSideCategories()
                         applySideFilters()
+
+                        // UI-014: "canlıya dön" hedefi liste yüklendikten sonra uygulanır;
+                        // hedef yoksa ya da listede karşılığı yoksa mevcut davranış sürer.
+                        pendingLiveTarget?.let { target ->
+                            pendingLiveTarget = null
+                            LiveLaunchRules.resolve(allChannels, target)?.let(::playChannel)
+                        }
 
                         if (currentChannel == null && allChannels.isNotEmpty()) {
                             playChannel(allChannels.first())

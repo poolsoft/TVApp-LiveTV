@@ -1175,6 +1175,93 @@ bileşenleri hâlâ kullanmıyor.
   ise tampon göstergesi görünmeye devam eder (uydurma durum yok). READY olan yayınlarda
   davranış değişmez; yeni saha logunda eşleşmeyen `BLACKOUT_START` kalmamalı.
 
+#### Mobil/tablet UX hattı (2026-11-17 planı)
+
+Kullanıcı bildirimi: mobil/tablet yapıda VOD ekranından **"Canlı TV'ye Dön"**e basınca
+**TV arayüzü** geliyor. Ölçülen kök neden: `VodHomeActivity.kt:932` hedefi sabit
+`MainActivity::class.java`; mobil flavor'un kendi kabuğu `MobileMainActivity`
+(`app/src/mobile/`, kendi `activity_mobile_main.xml` düzeni, jestler, side drawer) ve ona
+giden hiçbir yönlendirme yok. Aynı kalıp sekiz yerde daha var. Bu hat **TV arayüzünü
+bozmama** ilkesiyle yürür: TV varyantlarında (`local`, `paid`) kararların tümü bugünkü
+değeri aynen döndürür, dokunmaya özel davranış yalnız dokunma profilinde açılır.
+
+- [~] **UI-014 (P1): Kabuk yönlendirmesi sabit sınıfa bağlı — mobilde TV ekranı açılıyor**
+  `Intent(..., MainActivity::class.java)` sekiz yerde: `VodHomeActivity.kt:805, 825, 869`
+  (VOD oynatma), `:932` (canlıya dön), `browser/TvBrowserActivity.kt:406` (canlı) ve `:1191`
+  (tarayıcı akışı), `reminder/ProgramReminderReceiver.kt:61` (bildirim), `BootLaunchReceiver.kt:22`
+  (açılış). `MobileMainActivity`'de `onNewIntent` hiç yok (`app/src/mobile/`), bu yüzden hedef
+  sınıfı değiştirmek tek başına yetmez; `EXTRA_LIVE_MODE` / `EXTRA_LIVE_TARGET_SOURCE`
+  (`main/VodHost.kt:406-407`, okuyucu `VodDeepLinkPayload.fromIntent`) mobilde karşılanmıyor.
+  **Kabul:** Hedef tek noktadan okunur (`platform/AppShell` — `liveHost`, `vodPlaybackHost`;
+  aynı FQN her flavor source-set'inde ayrı yazılır, aynı anda yalnız biri derlenir, bu yüzden
+  derleme zamanı garantili ve reflection yok). Mobilde canlıya dönüş `MobileMainActivity`'ye
+  döner; TV'de `AppShell.liveHost == MainActivity` olduğu için kod yolu bit bit aynı kalır.
+  `VodDeepLink.LiveMode` token semantiği (`"TIF"` / `"IPTV"`, `MainActivity.kt:3637-3641`)
+  mobilde de karşılanır; eşleşme yoksa mevcut oynatma korunur (uydurma kanal seçimi yok).
+  `TvChannelViewActivity.kt:21` **bilerek** dışında: TIF'e özel sistem seçici girişi, mobilde
+  karşılığı yok. **VOD oynatma üç varyantta da `MainActivity`'de kalır** (kullanıcı kararı,
+  `UI-017` dokunma profili ekleyecek; mobil-native yüzey `UI-018`).
+  **Test:** `LiveLaunchRules` saf seçici + varyant başına `AppShell` hedef testi.
+  **Durum (2026-11-17, kod tarafı bitti):**
+  - `platform/AppShell` üç flavor source-set'inde ayrı (`src/local`, `src/paid`, `src/mobile`,
+    aynı FQN): `liveHost` mobilde `MobileMainActivity`, TV'de `MainActivity`;
+    `vodPlaybackHost` üçünde de `MainActivity`. Sekiz çağrı noktası buradan okuyor;
+    `TvChannelViewActivity.kt:21` bilerek sabit kaldı (TIF sistem seçici girişi, mobilde
+    karşılığı yok).
+  - `MobileMainActivity`: `pendingLiveTarget` + `onNewIntent` + `liveLaunchTarget()`; hedef
+    liste yüklenince uygulanır, karşılık yoksa mevcut oynatma sürer. `VodDeepLinkPayload`
+    extra'ları tükettiği için ekran yeniden odağa gelince istek tekrar tetiklenmez.
+  - `MainActivity.switchToLiveMode` içindeki `"TIF"`/`"IPTV"` satır içi kararı yeni
+    `LiveLaunchRules.resolve` ile değiştirildi (koşullar ve sıralama birebir aynı), böylece
+    token semantiği iki kabuk arasında tek kaynağa indi.
+  - `AppShellTest` `BuildConfig.MOBILE_UI_ENABLED` ile beklenen kabuğu varyant başına kilitliyor;
+    `LiveLaunchRulesTest` token/kaynak anahtarı/VOD satırı/TIF'siz mobil liste kararlarını
+    kapsıyor (+9 test).
+  **Kalan:** cihaz doğrulaması — telefonda VOD → "Canlı TV'ye Dön"ün mobil kabuğu açması,
+  hatırlatma bildiriminin ve açılış hedefinin mobilde doğru kabuk olması, TV'de hiçbir
+  akışın değişmemesi. Mobilde `MobileMainActivity`'nin `tvapp://channel` deep-link
+  `intent-filter`'ı yok (`main/AndroidManifest.xml:197-202`'de yalnız `MainActivity` var);
+  bildirim açık bileşenle gönderildiği için bu M0'ı etkilemiyor, ama mobilde dış bağlantı
+  (tarayıcıdan `tvapp://`) açılırsa `UI-015` kapsamında manifest'e alınmalı.
+
+- [ ] **UI-015 (P1): Girdi UX profili yok — 31 dağınık `MOBILE_UI_ENABLED` koşulu**
+  `BuildConfig.MOBILE_UI_ENABLED` 31 yerde (`MainActivity` 14, `DisplaySettingsActivity` 9,
+  `IptvSourcesActivity` 3, `IptvRepository` 2, `ChannelEditorActivity` / `IptvChannelSelectionActivity`
+  / `TvRemoteActivity` 1'er) satır içi `if` olarak duruyor; "dokunma mı D-pad mi" kararı veren
+  tek bir yer yok. `platform/DeviceCapabilities.kt:139 resolveExperienceMode(... mobileUiEnabled)`
+  ve `ExperienceMode.MOBILE_TEST` zaten var, ama yalnız **kaynak** filtresini (TIF dahil mi)
+  yönetiyor, UX'i değil.
+  **Kabul:** `platform/UiInputProfile { D_PAD, TOUCH, HYBRID }` — flavor bayrağı +
+  `Configuration.keyboard/touchscreen` + `isInTouchMode` ile çözülür; tablet + BT kumanda
+  `HYBRID`. TV varyantları **her zaman** `D_PAD` döndürür (saf fonksiyon, birim testte kilitli).
+  31 koşul kalem kalem bu profile bağlanır; davranış birebir korunur, ekran görüntüsü
+  karşılaştırması TV'de fark göstermez.
+
+- [ ] **UI-016 (P2): Kumanda varsayımı olan etkileşimler dokunmada karşılıksız**
+  Renk tuşu ipucu satırları (`key_red/green/yellow/blue`, örn. `iptv_source_remote_hint`,
+  `xmltv_source_remote_hint`, oynatma ipucu barı), uzun-OK bağlam menüleri (`okKeyGate` +
+  `onLongPress`), yalnız odakla gezilen Quick Hub (`dialog_quick_hub.xml` sabit **760dp** —
+  `UI-006` kalanıyla aynı dosya) ve odak çerçevesi varsayımı. Telefonda renk tuşu yok, uzun
+  basınç keşfedilemiyor, 760dp dikey ekrana sığmıyor.
+  **Kabul:** Profil `TOUCH`/`HYBRID` iken: renk eylemleri satır içi ⋮ taşma menüsüne veya alt
+  aksiyon şeridine taşınır (aynı eylemler, iki dilli); uzun-OK işlevi kalıcı ⋮ ile erişilebilir;
+  odak çerçevesi yalnız D-pad/HYBRID'de çizilir, dokunmada ripple; minimum dokunma hedefi 48dp;
+  Quick Hub mobilde alt sheet olarak açılır (TV'de 760dp aynen kalır); PIN dışı metin girişinde
+  sistem klavyesi serbest. TV düzen dosyalarına dokunulmadan, kaynak/kapı ayrımıyla.
+
+- [ ] **UI-017 (P2): Kaçınılmaz TV ekranlarında dokunma profili (VOD oynatma dahil)**
+  VOD oynatma, EPG editörü ve tarayıcı mobilde de `MainActivity`/TV yüzeyini kullanıyor
+  (kullanıcı kararı). Bu ekranlarda dokunma ile: oynatma kontrolleri alt sheet, `Back` ile
+  `VodHomeActivity`'ye dönüş, listede dokunmayla satır seçimi ve kaydırma.
+  **Kabul:** Dokunma profilinde kontroller parmakla erişilebilir, D-pad akışı bozulmaz; TV'de
+  görüntü birebir aynıdır.
+
+- [ ] **UI-018 (P3): Mobilde VOD kataloğu/oynatmanın `MobileMainActivity` yüzeyine taşınması**
+  `UI-014..UI-017` saha geri bildirimi alınana kadar **yapılmayacak** (kullanıcı kararı).
+  `MobileMainActivity`'de PlayerView ve oynatma kontrolleri hazır; katalog ızgarası, kategori
+  rayları ve `VOD-010` çıkış akışının taşıması yok. Taşınırsa `VodHomeActivity` mobilde yalnız
+  katalog olarak kalır ya da tamamen ikiye bölünür.
+
 ### Epic PERF (denetim) - Çalışma zamanı performans bulguları
 
 Aşağıdaki kimlikler `PROJECT_AUDIT_2026_11_13.md` §2 tablosunun `PERF-001..019` satırlarına
@@ -1417,7 +1504,11 @@ satırı):** dikkate değer üç gerçek sorun ve iki yanlışlanan varsayım.
 
 **Tamamlanan (2026-11-17):** `VOD-010` kod tarafı — VOD modundan çıkışta durum tek noktadan
 sıfırlanıyor, açık kanal seçimi artık sessizce engellenmiyor ve oynatıcının `kind=VOD`
-bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekliyor).
+bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekliyor). `UI-004` ve
+`UI-005` (iki dilli metin + 12 sp OSD alt sınırı), `UI-003` kalanı (IPTV/XMLTV kaynak
+listelerinde boş durum kartı). `UI-014` kod tarafı — kabuk yönlendirmesi `platform/AppShell`
+üzerinden okunuyor; mobilde "Canlı TV'ye Dön" artık mobil kabuğa dönüyor, TV hedefi
+değişmiyor (cihaz doğrulaması bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski
@@ -1431,6 +1522,13 @@ bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekli
 5. `VOD-001` + `VOD-002` (görünür hata + başlık taşıma), `PERF-007` + `PERF-008` + `PERF-026`
 6. `REFACTOR-001` (dal birleştirme — yeni refactor işinden önce, `CRASH-001` ve `PERF-025` bu
    dala da taşınır)
+
+**Mobil/tablet UX hattı (2026-11-17 planı):** `UI-014` (dar değişiklik, kullanıcının bildirdiği
+"Canlı TV'ye Dön → TV arayüzü" belirtisi burada kapanır) → `UI-015` (girdi profili) →
+`UI-016` (dokunma etkileşimleri; `UI-006` kalan Quick Hub ölçüsüyle aynı dosya) → `UI-017`
+(kaçınılmaz TV ekranlarında dokunma). `UI-018` (mobil-native VOD yüzeyi) saha geri bildirimi ve
+kullanıcı kararı bekliyor. Hattın tamamı için değişmez ilke: **TV arayüzü bozulmaz** — TV
+varyantlarında kararlar bugünkü değeri aynen döndürür.
 
 **Orta:** `PERF-006`, `VOD-003`, `VOD-005`, `VOD-007`, `VOD-008`, `UI-006`..`UI-011`, `UI-013`,
 `PERF-013`, `PERF-019`, `PERF-027`.

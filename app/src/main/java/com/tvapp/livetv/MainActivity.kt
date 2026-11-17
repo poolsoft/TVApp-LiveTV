@@ -100,6 +100,8 @@ import com.tvapp.livetv.platform.DeviceCapabilities
 import com.tvapp.livetv.platform.DeviceCapabilitiesSession
 import com.tvapp.livetv.platform.DeviceResourcePolicy
 import com.tvapp.livetv.platform.ExperienceMode
+import com.tvapp.livetv.platform.LiveLaunchRules
+import com.tvapp.livetv.platform.LiveLaunchTarget
 import com.tvapp.livetv.platform.resourcePolicyFor
 import com.tvapp.livetv.platform.resolveExperienceMode
 import com.tvapp.livetv.image.ChannelLogoLoader
@@ -3634,11 +3636,8 @@ class MainActivity : TvRemoteActivity() {
                 lastKey?.let { iptvRepository.channel(it) }
             }
             if (vodMode || requestGeneration != channelResolutionGeneration) return@launch
-            val channel = when (targetSource) {
-                "TIF" -> channels.firstOrNull { it.source == LiveChannel.Source.TIF && !it.isVodContent() }
-                "IPTV" -> channels.firstOrNull { it.source == LiveChannel.Source.IPTV && !it.isVodContent() }
-                else -> null
-            } ?: last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
+            val channel = LiveLaunchRules.resolve(channels, LiveLaunchTarget(token = targetSource))
+                ?: last?.takeUnless { it.isVodContent() } ?: channels.firstOrNull { !it.isVodContent() }
             if (channel != null) selectChannel(channel, recordHistory = false)
             else loadChannels(preserveCurrentPlayback = false)
             showChannelPanel(expanded = false)
