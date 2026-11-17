@@ -30,6 +30,7 @@ import com.tvapp.livetv.settings.ChannelSourceFilterStore
 import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.settings.ParentalControlStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
+import com.tvapp.livetv.ui.EditorPreviewRules
 import com.tvapp.livetv.ui.selectedIptvKeys
 import com.tvapp.livetv.ui.ParentalPinDialog
 import com.tvapp.livetv.billing.IptvAccessDialogs
@@ -67,6 +68,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     private var navigationNumberJob: Job? = null
     private var navigationNumberInput = ""
     private var previewSourceKey: String? = null
+    private var appliedModeLabelSignature: ModeLabelSignature? = null
     private var operationInProgress = false
     private var restoredStateApplied = false
     private var restoredFocusedKey: String? = null
@@ -122,9 +124,20 @@ class ChannelEditorActivity : TvRemoteActivity() {
             ::onChannelFocused,
             ::onChannelClicked,
         ) { channel -> parentalControlStore.isLocked(channel.sourceKey) }
-        iptvPreview = IptvPlaybackController(this, binding.previewIptv)
+        // PERF-028: önizleme PRIMARY profilde açılıyordu = tam ekran oynatmanın
+        // konfigürasyonu (çözünürlük/bit hızı sınırsız, 20 sn'ye kadar tampon, 8 MB ön-indirme).
+        // 260dp'lik önizleme kutusu için Multi-View'ın iki hücrede kullandığı tavanlı profil
+        // yeterlidir; aynı kare 720p/3 Mbps olarak çözülür ve bekçi daha hafif çalışır.
+        iptvPreview = IptvPlaybackController(
+            this,
+            binding.previewIptv,
+            EditorPreviewRules.previewProfile,
+        )
         binding.channelList.layoutManager = LinearLayoutManager(this)
         binding.channelList.adapter = adapter
+        // PERF-028: satırlar sabit yükseklikte (58dp; ad ve kaynak satırı maxLines=1), bu
+        // yüzden tam adapter yenilemelerinde RecyclerView yeniden ölçmek zorunda değil.
+        binding.channelList.setHasFixedSize(true)
         setupEditorSidebar()
         setupMobileColorActions()
         updateModeLabels()
@@ -296,15 +309,30 @@ class ChannelEditorActivity : TvRemoteActivity() {
             updateModeLabels()
         }
         previewJob?.cancel()
-        if (parentalControlStore.isLocked(channel.sourceKey)) {
-            previewSourceKey = null
-            binding.previewTv.reset()
-            binding.previewTv.visibility = View.GONE
-            iptvPreview.stop()
-            binding.previewIptv.visibility = View.GONE
+        val previousPreviewKey = previewSourceKey
+        val locked = parentalControlStore.isLocked(channel.sourceKey)
+        // PERF-028: odak başka satıra gidince çalışan akış hemen kesilir. Eskiden yalnızca
+        // henüz başlamamış plan iptal ediliyordu; akış çalarken gezinilirse indirme, çözme ve
+        // ana iş parçacığında çalışan sağlık bekçisi (2 sn'de bir, sürekli bağlanmada 250 ms'de
+        // bir) gezinmenin tamamında listeyle yarışır. Kilitli kanaldaki bugünkü davranış
+        // korunur: her odaklanmada kutu karartılır.
+        if (locked || EditorPreviewRules.stopsRunningPlayback(previousPreviewKey, channel.sourceKey)) {
+            stopPreviewPlayback()
+        }
+        if (!EditorPreviewRules.schedulesPlayback(
+                moveMode = mode == Mode.MOVE,
+                locked = locked,
+                previousSourceKey = previousPreviewKey,
+                nextSourceKey = channel.sourceKey,
+            )
+        ) {
             return
         }
-        if (mode == Mode.MOVE || previewSourceKey == channel.sourceKey) return
+        schedulePreview(channel)
+    }
+
+    /** Önizlemeyi kullanıcının satırda yerleştiği ana kadar erteler ve o kanalı açar. */
+    private fun schedulePreview(channel: LiveChannel) {
         previewSourceKey = channel.sourceKey
         previewJob = lifecycleScope.launch {
             delay(PREVIEW_DELAY_MS)
@@ -325,6 +353,19 @@ class ChannelEditorActivity : TvRemoteActivity() {
                 }
             }.onFailure { binding.syncStatus.text = it.message ?: it.javaClass.simpleName }
         }
+    }
+
+    /**
+     * Çalışan önizlemeyi keser: akış indirmeyi/cözmayı ve ana iş parçacığındaki sağlık
+     * bekçisini bırakır, önizleme kutusunu karartır.
+     */
+    private fun stopPreviewPlayback() {
+        previewJob?.cancel()
+        previewSourceKey = null
+        binding.previewTv.reset()
+        binding.previewTv.visibility = View.GONE
+        iptvPreview.stop()
+        binding.previewIptv.visibility = View.GONE
     }
 
     private fun onChannelClicked(channel: LiveChannel) {
@@ -558,47 +599,75 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun updateModeLabels() {
-        binding.modeTitle.text = when (mode) {
-            Mode.NORMAL -> getString(R.string.editor_mode_normal)
-            Mode.MULTI_SELECT -> getString(R.string.editor_mode_multi, selectedKeys.size)
-            Mode.MOVE -> getString(R.string.editor_mode_move, movingKeys.size)
-        }
-        binding.greenAction.text = when (mode) {
-            Mode.NORMAL -> getString(R.string.move_channel)
-            Mode.MULTI_SELECT -> getString(R.string.move_selected)
-            Mode.MOVE -> getString(R.string.save_order)
-        }
-        binding.redAction.text = when (mode) {
-            Mode.NORMAL, Mode.MULTI_SELECT -> getString(R.string.skip_channel)
-            Mode.MOVE -> getString(R.string.move_target_order)
-        }
-        binding.yellowAction.text = when (mode) {
-            Mode.NORMAL -> getString(R.string.multi_select)
-            Mode.MULTI_SELECT -> getString(R.string.move_selected_to_number)
-            Mode.MOVE -> getString(R.string.cancel)
-        }
+        // PERF-028: bu fonksiyon her odak hareketinde çağrılıyordu (NORMAL modda
+        // onChannelFocused) ve her çağrıda ~12 metin/erişilebilirlik alanı yeniden yazılarak
+        // requestLayout üretiyordu; üstelik seçim boş olsa bile IPTV seçimi için tüm kanal
+        // listesi (15.000+ satır) taranıyordu. Etiketler odağa göre değişmez: yalnızca mod ya
+        // da seçim değiştiğinde yazılır. updateToolHint() her çağrıda çalışmaya devam eder,
+        // çünkü o hangi araç düğmesinin odaklı olduğuna bakıyor.
+        val hasSelectedIptv = selectedKeys.isNotEmpty() &&
+            selectedIptvKeys(channels, selectedKeys).isNotEmpty()
+        val signature = ModeLabelSignature(
+            mode = mode,
+            selectedCount = selectedKeys.size,
+            movingCount = movingKeys.size,
+            hasSelectedIptv = hasSelectedIptv,
+        )
+        if (signature != appliedModeLabelSignature) {
+            appliedModeLabelSignature = signature
+            binding.modeTitle.text = when (mode) {
+                Mode.NORMAL -> getString(R.string.editor_mode_normal)
+                Mode.MULTI_SELECT -> getString(R.string.editor_mode_multi, selectedKeys.size)
+                Mode.MOVE -> getString(R.string.editor_mode_move, movingKeys.size)
+            }
+            binding.greenAction.text = when (mode) {
+                Mode.NORMAL -> getString(R.string.move_channel)
+                Mode.MULTI_SELECT -> getString(R.string.move_selected)
+                Mode.MOVE -> getString(R.string.save_order)
+            }
+            binding.redAction.text = when (mode) {
+                Mode.NORMAL, Mode.MULTI_SELECT -> getString(R.string.skip_channel)
+                Mode.MOVE -> getString(R.string.move_target_order)
+            }
+            binding.yellowAction.text = when (mode) {
+                Mode.NORMAL -> getString(R.string.multi_select)
+                Mode.MULTI_SELECT -> getString(R.string.move_selected_to_number)
+                Mode.MOVE -> getString(R.string.cancel)
+            }
 
-        val blueEnabled = mode == Mode.NORMAL
-        val blueAlpha = if (blueEnabled) 1.0f else 0.35f
-        binding.blueAction.alpha = blueAlpha
-        binding.blueActionIcon.alpha = blueAlpha
-        binding.sidebarBlueButton.isEnabled = blueEnabled
-        binding.sidebarBlueButton.alpha = blueAlpha
+            val blueEnabled = mode == Mode.NORMAL
+            val blueAlpha = if (blueEnabled) 1.0f else 0.35f
+            binding.blueAction.alpha = blueAlpha
+            binding.blueActionIcon.alpha = blueAlpha
+            binding.sidebarBlueButton.isEnabled = blueEnabled
+            binding.sidebarBlueButton.alpha = blueAlpha
 
-        binding.sidebarRedButton.contentDescription = binding.redAction.text
-        binding.sidebarGreenButton.contentDescription = binding.greenAction.text
-        binding.sidebarYellowButton.contentDescription = binding.yellowAction.text
-        binding.sidebarBlueButton.contentDescription = binding.blueAction.text
-        binding.sidebarRemoveButton.visibility = if (mode == Mode.MULTI_SELECT) View.VISIBLE else View.GONE
-        binding.sidebarRemoveButton.isEnabled = selectedIptvKeys(channels, selectedKeys).isNotEmpty()
-        binding.sidebarRemoveButton.alpha = if (binding.sidebarRemoveButton.isEnabled) 1f else 0.35f
-        binding.sidebarYellowButton.nextFocusDownId = if (mode == Mode.MULTI_SELECT) {
-            R.id.sidebar_remove_button
-        } else {
-            R.id.sidebar_blue_button
+            binding.sidebarRedButton.contentDescription = binding.redAction.text
+            binding.sidebarGreenButton.contentDescription = binding.greenAction.text
+            binding.sidebarYellowButton.contentDescription = binding.yellowAction.text
+            binding.sidebarBlueButton.contentDescription = binding.blueAction.text
+            binding.sidebarRemoveButton.visibility =
+                if (mode == Mode.MULTI_SELECT) View.VISIBLE else View.GONE
+            binding.sidebarRemoveButton.isEnabled = hasSelectedIptv
+            binding.sidebarRemoveButton.alpha = if (hasSelectedIptv) 1f else 0.35f
+            binding.sidebarYellowButton.nextFocusDownId = if (mode == Mode.MULTI_SELECT) {
+                R.id.sidebar_remove_button
+            } else {
+                R.id.sidebar_blue_button
+            }
         }
         updateToolHint()
     }
+
+    /** [updateModeLabels] çıktısını belirleyen girdiler; bunlar değişmediğinde aynı metinler
+     *  yeniden yazılmaz.
+     */
+    private data class ModeLabelSignature(
+        val mode: Mode,
+        val selectedCount: Int,
+        val movingCount: Int,
+        val hasSelectedIptv: Boolean,
+    )
 
     private fun updateToolHint() {
         // UI-016: satir eylemleri odak uzerinden anlatiliyordu; dokunma profilinde odak
@@ -719,12 +788,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     private fun setChannelLocked(channel: LiveChannel, locked: Boolean) {
         parentalControlStore.setLocked(channel.sourceKey, locked)
         if (locked && focusedChannel?.sourceKey == channel.sourceKey) {
-            previewJob?.cancel()
-            previewSourceKey = null
-            binding.previewTv.reset()
-            binding.previewTv.visibility = View.GONE
-            iptvPreview.stop()
-            binding.previewIptv.visibility = View.GONE
+            stopPreviewPlayback()
         }
         binding.syncStatus.text = getString(
             if (locked) {
@@ -1316,6 +1380,24 @@ class ChannelEditorActivity : TvRemoteActivity() {
         in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 ->
             keyCode - KeyEvent.KEYCODE_NUMPAD_0
         else -> null
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!::iptvPreview.isInitialized) return
+        // PERF-028: ekran görünür değilken önizleme kesilmiyordu (bırakma yalnız onDestroy
+        // içindeydi). Görünür olunca odaklanan kanal için önizleme yeniden planlanır; taşıma
+        // modunda ve kilitli kanalda önizleme açılmaz.
+        val channel = focusedChannel ?: return
+        if (mode == Mode.MOVE || parentalControlStore.isLocked(channel.sourceKey)) return
+        schedulePreview(channel)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // PERF-028: editör arka plana geçtiğinde (kaynak ekranı, sistem ayarları, ekran
+        // kapanması) önizleme akışı indirmeye ve bekçiyi çalıştırmaya devam ediyordu.
+        if (::iptvPreview.isInitialized) stopPreviewPlayback()
     }
 
     override fun onDestroy() {

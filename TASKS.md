@@ -1530,6 +1530,41 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
   azaltılır. Yalnız başına yeni bir optimizasyon yapılmaz — `PERF-025` sonrası kuyruğun
   düşüp düşmediğine bakılır.
 
+- [~] **PERF-028 (P1): Kanal editörünün önizlemesi tam ekran oynatma konfigürasyonuyla açılıyor**
+  Kullanıcı raporu (2026-11-17): "TV'de kanal liste editörü çok yavaşladı, bir hantallık var;
+  sanki önizleme yapmak için bir hantallık oluşturuyor." Kodda doğrulanan üçlü maliyet:
+  1. `ChannelEditorActivity` önizleme denetleyicisi **profil argumentı olmadan** kuruluyordu =
+     `IptvPlaybackProfile.PRIMARY` = tam ekran oynatmanın konfigürasyonu: çözünürlük ve bit hızı
+     sınırı yok (`IptvPlaybackProfile`), tampon `targetBufferSeconds` = varsayılan **20 sn**
+     (`IptvPlaybackPreferences.DEFAULT_BUFFER_SECONDS`), `setBackBuffer(15 sn)`, canlı
+     ön-indirme **8 MB** (`IptvPlaybackController.kt:311-329` ve `:502` profil dalı). 260dp'lik
+     önizleme kutusu, tam ekranla aynı işi yapıyordu.
+  2. Odak başka satıra gidince **çalışan** akış kesilmiyordu: `onChannelFocused` yalnız henüz
+     başlamamış `previewJob`'ı iptal ediyordu. Akış çalarken gezinilirse indirme + çözme
+     sürmeye devam eder; sağlık bekçisi `automaticRecovery` varsayılanı **true** olduğundan her
+     önizlemede kurulur ve ana iş parçacığında çalışır (2 sn'de bir; kaynakta sürekli
+     bağlanma açıksa **250 ms**'de bir — `:158`), her tik `healthSnapshot()` →
+     `currentTechnicalInfo()` ile video/audio/altyazı track listelerini yeniden kurar.
+  3. Her odak hareketinde `updateModeLabels()` ~12 metin/erişilebilirlik alanını yeniden
+     yazıp requestLayout üretiyordu; üstelik seçim boşken `selectedIptvKeys(channels,
+     selectedKeys)` tüm listeyi (15.000+ satıra kadar) tarıyordu.
+  Ayrıca önizleme **yalnız `onDestroy`'da** bırakılıyordu: editör arka plana geçince (kaynak
+  ekranı, sistem ayarları, ekran kapanması) akış arkada akmaya devam ediyordu.
+  **Yapılan (2026-11-17):** kararlar saf `ui/EditorPreviewRules` nesnesine alındı (6 birim
+  test). Önizleme artık tavanlı profilde (`SECONDARY`: 720p / 3 Mbps / 10 sn tampon /
+  800 ms başlama tamponu / 2 MB ön-indirme); odak başka satıra gidince oynatma
+  `stopPreviewPlayback()` ile **anında** kesilir; `onStop` keser, `onStart` odaklanan kanal
+  için yeniden planlar; `updateModeLabels` imza (mod + seçim/taşıma sayısı + IPTV seçimi)
+  değişmediyse hiç yazmaz ve boş seçimde liste taranmaz; editör listesi
+  `setHasFixedSize(true)` (satırlar sabit 58dp, ad/kaynak `maxLines=1`).
+  **Bilinçli davranış farkı:** gezinme sırasında önizleme kutusu kararır (eski kanalın
+  görüntüsü/sesi hareket boyunca devam etmiyor); taşıma modunda da çalan önizleme kesilir.
+  **Kabul / kalan:** TV cihazında doğrulanacak — ok ile gezinmede hantallık kaybolmalı,
+  önizleme satırda durulunca (~450 ms) açılmalı, kaynak ekranından dönüşte yeniden açılmalı,
+  kilitli kanalda kararmalı. Şu an **sayaç yok**: `EDITOR_CHANNEL_*` satırları yükleme
+  sürelerini ölçüyor, önizleme maliyetini ölçmüyor; şikâyet sürerse önizleme tune süresi ve
+  eşzamanlı akış sayısı loga yazılır.
+
 ### Epic REFACTOR — Yapısal borç
 
 - [ ] **REFACTOR-001 (P0): `refactor/main-activity-split` dalını `main` üzerine al**
@@ -1603,7 +1638,12 @@ arayüzünü taşıyamıyor, gerçekten girdiye bağlı 5 karar profile bağland
 yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor). `UI-016` dilim A–B — kaynak ekranları ve boş kanal listesi ipuçları dokunma
 profilinde dokunma jestiyle anlatılıyor, telefonda eksik olan IPTV kaynak ipucu satırı dikey
 düzenine eklendi; kanal editöründe dokunmanın odak vermemesi nedeniyle araçların **yanlış
-kanala** uygulanması giderildi (cihaz doğrulaması bekliyor).
+kanala** uygulanması giderildi (cihaz doğrulaması bekliyor). `PERF-028` - kullanıcının
+bildirdiği "editörde hantallık" önizlemeden kaynaklanıyordu: önizleme tam ekran oynatma
+konfigürasyonunda (sınırsız çözünürlük/bit hızı, 20 sn tampon, 8 MB ön-indirme) açılıyor, odak
+başka satıra gidince kesilmiyor (bekçi ana iş parçacığında 250 ms - 2 sn aralıkta çalışmaya
+devam ediyordu) ve arka planda akıyordu; üçü de kapatıldı, kararlar `ui/EditorPreviewRules` +
+6 testle kilitlendi (TV cihazında doğrulanacak).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

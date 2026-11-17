@@ -1,5 +1,43 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Kanal Editörü Önizlemesi Hafifletildi (`PERF-028`)
+
+- **Kullanıcı raporu:** "TV'de kanal liste editörü çok yavaşladı, bir hantallık var; sanki
+  önizleme yapmak için bir hantallık oluşturuyor." Şikâyet doğruydu ve kaynağı önizlemeydi.
+- **Kök neden 1 — önizleme tam ekran oynatma konfigürasyonuyla açılıyordu:** editördeki
+  `IptvPlaybackController` profil argumentı almadan kuruluyordu, yani
+  `IptvPlaybackProfile.PRIMARY`: çözünürlük ve bit hızı sınırı yok, tampon kullanıcının
+  ayarında (varsayılan **20 sn**), geri tampon 15 sn, canlı ön-indirme **8 MB**. 260dp'lik
+  önizleme kutusu, tam ekran yayınla aynı işi yapıyordu. Artık Multi-View'ın iki hücrede
+  kullandığı tavanlı profil kullanılıyor (`SECONDARY`: 720p / 3 Mbps / 10 sn tampon /
+  800 ms başlama tamponu / 2 MB ön-indirme).
+- **Kök neden 2 — odak gidince akış kesilmiyordu:** `onChannelFocused` yalnızca henüz
+  başlamamış önizleme planını iptal ediyordu. Bir kanal çalarken gezinmeye devam edilirse eski
+  akış indirmeyi ve çözmeyi sürdürüyor; sağlık bekçisi (`automaticRecovery` varsayılanı=true)
+  her önizlemede ana iş parçacığında çalışıyor — 2 sn'de bir, kaynakta sürekli bağlanma
+  açıksa **250 ms'de bir** — ve her tikte tüm track listelerini yeniden kuruyor. Artık odak
+  başka satıra gittiği anda `stopPreviewPlayback()` akışı kesiyor; aynı satıra geri dönülürse
+  (araç düğmesinden dönüş) kesilme yok.
+- **Kök neden 3 — her odak hareketinde etiket fırtınası:** `updateModeLabels()` ~12
+  metin/erişilebilirlik alanını yeniden yazıp requestLayout üretiyordu ve seçim boş olsa bile
+  IPTV seçimi için tüm kanal listesi taranıyordu. Etiketler artık bir imzaya (mod + seçim/taşıma
+  sayısı + IPTV seçimi) bağlandı; imza değişmediyse hiçbir şey yazılmaz, boş seçimde liste
+  taranmaz. `updateToolHint()` her çağrıda çalışmaya devam eder (araç odağına bakıyor).
+- **Arka planda sızan akış:** önizleme yalnız `onDestroy`'da bırakılıyordu; editör arka plana
+  geçince (kaynak ekranı, sistem ayarları, ekran kapanması) akış akmaya devam ediyordu.
+  `onStop` artık önizlemeyi kesiyor, `onStart` odaklanan kanal için yeniden planlıyor.
+- **Ayrıca:** editör listesi `setHasFixedSize(true)` — satırlar sabit 58dp ve
+  ad/kaynak satırları `maxLines=1`, bu yüzden tam adapter yenilemelerinde liste yeniden
+  ölçülmüyor.
+- **Bilinçli davranış farkı:** gezinme sırasında önizleme kutusu kararıyor; eskimiş bir
+  kanalın görüntüsü/sesi hareket boyunca devam etmiyor. Taşıma modunda çalan önizleme de
+  kesiliyor. Önizlemenin kendisi (satırda ~450 ms durunca açılması) değişmedi.
+- **Testler:** yeni saf `ui/EditorPreviewRules` + 6 birim test (kalite tavanı, kilitli kanal,
+  taşıma modu, aynı kanalı yeniden tune etmeme, odak hareketinde kesme) → 433 birim test üç
+  flavor'da. Cihazda doğrulanacak: TV'de ok ile gezinmede hantallığın kaybolması, kaynak
+  ekranından dönüşte önizlemenin yeniden açılması. Sayaç eklenmedi; şikâyet sürerse önizleme
+  tune süresi ve eşzamanlı akış sayısı loga yazılır.
+
 ## 2026-11-17 - Kanal Editöründe Dokunma Hedefi ve İpucu Satırı (`UI-016` dilim B)
 
 - **Ölçülen hata (kozmetik değil, veri bozuyordu):** editör satırları `focusableInTouchMode`
