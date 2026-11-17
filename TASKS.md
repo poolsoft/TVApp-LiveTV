@@ -1313,9 +1313,23 @@ değeri aynen döndürür, dokunmaya özel davranış yalnız dokunma profilinde
     da geçiyor. TV profillerinde `hasDpadInput` / `hasColorKeys` her zaman true olduğundan
     metinler eskisiyle bit bit aynı; düzen değişikliği yalnız `layout-port` dosyasında
     (TV manzarada çizilir).
-  **Kalan (UI-016 dilimleri):** **B)** `ChannelEditorActivity` ipucu satırı odak tabanlı
-  (`currentHint()` odaklı `when`): dokunmada odak olmadığı için satır hep `editor_ok_hint`
-  ("OK Özellikler · BACK Çıkış") yazıyor. **C)** uzun-OK işlevlerinin kalıcı ⋮ ile erişilmesi
+  **Durum (2026-11-17) — dilim B (`ChannelEditorActivity`) tamam; ölçülen gerçek hata burada:**
+  - Satırlar `focusableInTouchMode` taşımıyor (`item_editor_channel.xml` yalnız
+    `clickable`/`focusable`), bu yüzden dokunmatik cihazda **dokunmak odak vermiyor**; odak
+    programatik olarak odaklanan ilk kanalda kalıyordu. `toggleSkipped()` ve `startSingleMove()`
+    `focusedChannel`'i okuduğu için telefonda kırmızı/yeşil araç **yanlış kanalı** atlıyor ya da
+    taşıyordu — yani yalnızca kozmetik değil, veri bozan bir kusur.
+  - Düzeltme: dokunma profilinde satıra dokunmak `focusedChannel`'i dokunulan kanala alır ve
+    önizleme başlığını günceller (`bindPreviewHeader`); **önizleme oynatması başlatılmaz** —
+    telefonda dokunma önizleme demek değil, ses/görüntü açılmaz. `onChannelFocused` aynı başlık
+    kodunu çağırıyor; TV yolunda davranış farkı yok.
+  - İpucu satırı odak tabanlıydı; dokunma profilinde odak olmadığı için hep `editor_ok_hint`
+    ("OK Özellikler · BACK Çıkış") yazıyordu. Artık modu anlatan iki dilli dokunma metinleri
+    basılıyor: `editor_touch_hint_normal` / `_multi` / `_move` (yalnız `handleEditorColor` ve
+    `onChannelClicked`'da doğrulanan davranışlar yazıldı).
+  - Birim test eklenmedi: karar `usesTouchTargets` (UI-015'te kilitli) ve Android odak/dokunma
+    kablolaması Robolectric olmadan test edilemiyor; cihazda doğrulanacak.
+  **Kalan (UI-016 dilimleri):** **C)** uzun-OK işlevlerinin kalıcı ⋮ ile erişilmesi
   (`ChannelAdapter`, `VodPosterAdapter`, `GuideProgramAdapter`, `GuideScheduleAdapter` uzun
   basınmaları keşfedilemiyor). **D)** minimum 48dp dokunma hedefi + odak çerçevesinin yalnız
   D-pad/HYBRID'de çizilmesi, dokunmada ripple. **E)** Quick Hub'ın telefon dikey düzenine
@@ -1586,10 +1600,10 @@ değişmiyor (cihaz doğrulaması bekliyor). `UI-015` kod tarafı — girdi UX p
 `platform/UiInputProfile` (`D_PAD` / `TOUCH` / `HYBRID`) ve `TvRemoteActivity.inputProfile`
 dikişi geldi; TV'de cihaz sinyali okunmadan `D_PAD` döndüğü için dokunma kararları TV
 arayüzünü taşıyamıyor, gerçekten girdiye bağlı 5 karar profile bağlandı, 26 koşul
-yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor). `UI-016` dilim A —
-kaynak ekranları ve boş kanal listesi ipuçları dokunma profilinde dokunma jestiyle anlatılıyor;
-telefonda eksik olan IPTV kaynak ipucu satırı dikey düzene eklendi (cihaz doğrulaması
-bekliyor).
+yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor). `UI-016` dilim A–B — kaynak ekranları ve boş kanal listesi ipuçları dokunma
+profilinde dokunma jestiyle anlatılıyor, telefonda eksik olan IPTV kaynak ipucu satırı dikey
+düzenine eklendi; kanal editöründe dokunmanın odak vermemesi nedeniyle araçların **yanlış
+kanala** uygulanması giderildi (cihaz doğrulaması bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

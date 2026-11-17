@@ -240,6 +240,9 @@
     <string name="cancel">İptal</string>
     <string name="sync_tif">TIF eşitle</string>
     <string name="editor_ok_hint">OK Özellikler · BACK Çıkış</string>
+    <string name="editor_touch_hint_normal">Kanala dokun: özellikler açılır · Sarı düğme çoklu seçimi açar</string>
+    <string name="editor_touch_hint_multi">Kanala dokun: seç veya seçimi kaldır · Yeşil düğme taşımayı başlatır</string>
+    <string name="editor_touch_hint_move">Kanala dokun: taşımayı onaylar · Sarı düğme vazgeçer</string>
     <string name="editor_remove_selected_iptv">Seçili IPTV kanallarını çıkar</string>
     <string name="editor_remove_selected_iptv_hint">Seçili IPTV kanallarını ana listeden çıkarır; kaynak içerikleri korunur.</string>
     <string name="editor_remove_selected_iptv_confirm">%1$d IPTV kanalı ana kanal listesinden çıkarılsın mı? Kaynak listedeki içerikler ve kanal tercihleri korunur. Seçili uydu kanalları etkilenmez.</string>

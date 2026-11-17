@@ -274,9 +274,8 @@ class ChannelEditorActivity : TvRemoteActivity() {
         focusChannel(channels[targetIndex].sourceKey)
     }
 
-    private fun onChannelFocused(channel: LiveChannel) {
-        updateToolHint()
-        focusedChannel = channel
+    /** Önizleme başlığı: sıra numarası, ad ve durum etiketi. Oynatma başlatmaz. */
+    private fun bindPreviewHeader(channel: LiveChannel) {
         val index = channels.indexOfFirst { it.sourceKey == channel.sourceKey }
         val displayNumber = if (index >= 0) (index + 1).toString() else channel.displayNumber
         binding.previewNumber.text = displayNumber
@@ -287,6 +286,12 @@ class ChannelEditorActivity : TvRemoteActivity() {
             channel.favorite -> getString(R.string.channel_favorite)
             else -> getString(R.string.channel_active)
         }
+    }
+
+    private fun onChannelFocused(channel: LiveChannel) {
+        updateToolHint()
+        focusedChannel = channel
+        bindPreviewHeader(channel)
         if (mode == Mode.NORMAL) {
             updateModeLabels()
         }
@@ -324,6 +329,16 @@ class ChannelEditorActivity : TvRemoteActivity() {
 
     private fun onChannelClicked(channel: LiveChannel) {
         if (operationInProgress) return
+        // UI-016: dokunma profilinde satira dokunmak odak DEGILDIR — satirlar
+        // focusableInTouchMode tasimadigi icin odak programatik olarak odaklanan ilk
+        // kanalda kalir. Kirmizi/yesil araclar focusedChannel'i okudugu icin dokunulan
+        // kanali hedef yapmak zorundayiz, yoksa yanlis kanal atlaniyor/tasiniyor.
+        // Onizleme oynatmasi bilerek baslatilmaz: telefonda dokunma onizleme demek degil.
+        if (inputProfile.usesTouchTargets) {
+            focusedChannel = channel
+            bindPreviewHeader(channel)
+            updateToolHint()
+        }
         when (mode) {
             Mode.NORMAL -> showChannelProperties(channel)
             Mode.MULTI_SELECT -> toggleSelection(channel.sourceKey)
@@ -586,6 +601,19 @@ class ChannelEditorActivity : TvRemoteActivity() {
     }
 
     private fun updateToolHint() {
+        // UI-016: satir eylemleri odak uzerinden anlatiliyordu; dokunma profilinde odak
+        // olmadigi icin satir hep "OK Ozelikler" yazardi; anlatilan sey MOD'un
+        // kendisidir ve dokunma jestiyle soylenir.
+        if (!inputProfile.hasDpadInput) {
+            binding.editorToolHint.setText(
+                when (mode) {
+                    Mode.NORMAL -> R.string.editor_touch_hint_normal
+                    Mode.MULTI_SELECT -> R.string.editor_touch_hint_multi
+                    Mode.MOVE -> R.string.editor_touch_hint_move
+                },
+            )
+            return
+        }
         binding.editorToolHint.text = when {
             binding.sidebarRemoveButton.hasFocus() -> getString(R.string.editor_remove_selected_iptv_hint)
             binding.sidebarRedButton.hasFocus() -> getString(

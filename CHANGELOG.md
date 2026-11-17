@@ -1,5 +1,30 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Kanal Editöründe Dokunma Hedefi ve İpucu Satırı (`UI-016` dilim B)
+
+- **Ölçülen hata (kozmetik değil, veri bozuyordu):** editör satırları `focusableInTouchMode`
+  taşımıyor (`item_editor_channel.xml` yalnız `clickable` + `focusable`), bu yüzden telefonda
+  satıra **dokunmak odak vermiyordu**. Odak, açılışta programatik olarak odaklanan ilk kanalda
+  kalırken `toggleSkipped()` ve `startSingleMove()` kararlarını `focusedChannel` üzerinden
+  veriyor: kullanıcı N. kanala dokunup kırmızı/yeşil araca basınca **başka bir kanal**
+  atlanıyor ya da taşınıyordu.
+- **Düzeltme:** dokunma profilinde (`inputProfile.usesTouchTargets`) satıra dokunmak
+  `focusedChannel`'i dokunulan kanala alır ve önizleme başlığını (sıra no / ad / durum)
+  günceller. Önizleme **oynatması başlatılmaz** — telefonda dokunma önizleme demek değildir.
+  `onChannelFocused` aynı `bindPreviewHeader` yardımcısını çağırır; TV yolunda davranış aynı.
+- **İpucu satırı:** odak tabanlı `when` dokunma profilinde hiç çalışmıyor, satır hep
+  `editor_ok_hint` ("OK Özellikler · BACK Çıkış") yazıyordu. Artık modun kendisi anlatılıyor ve
+  iki dilli yeni metinler kullanılıyor: `editor_touch_hint_normal`, `editor_touch_hint_multi`,
+  `editor_touch_hint_move`. Yalnız koda doğrulanmış davranış yazıldı (NORMAL: dokun → özellikler,
+  sarı → çoklu seçim; MULTI_SELECT: dokun → seç/bırak, yeşil → taşımayı başlat; MOVE:
+  dokun → onayla, sarı → vazgeç).
+- **Erişilebilirlik notu:** kenar çubuğu araç düğmeleri 44dp; 48dp alt sınırı bu dilimde
+  değiştirilmedi (`UI-016` kalanı içinde kayıtlı).
+- **Testler:** bu dilimde birim test yok — karar zaten `usesTouchTargets` üzerinden `UI-015`'te
+  kilitli, Android odak/dokunma kablolaması ise Robolectric olmadan test edilemiyor. Mevcut
+  suite (427 × 3 flavor) ve `assemble*Debug` doğrulaması koşuyor; **cihazda doğrulanması
+  gerekiyor:** telefonda bir kanala dokunup "Atla"ya basınca *dokunulan* kanalın atlanması.
+
 ## 2026-11-17 - Dokunma Profilinde İpucu Metinleri (`UI-016` dilim A)
 
 - **Sorun:** Telefonda/tablette ipucu satırları kumanda komutu anlatıyordu: IPTV ve XMLTV

@@ -240,6 +240,9 @@
     <string name="cancel">Cancel</string>
     <string name="sync_tif">Sync TIF</string>
     <string name="editor_ok_hint">OK Options - BACK Exit</string>
+    <string name="editor_touch_hint_normal">Tap a channel to open its properties · Yellow starts multi-select</string>
+    <string name="editor_touch_hint_multi">Tap a channel to select or deselect it · Green starts the move</string>
+    <string name="editor_touch_hint_move">Tap a channel to confirm the move · Yellow cancels</string>
     <string name="editor_remove_selected_iptv">Remove selected IPTV channels</string>
     <string name="editor_remove_selected_iptv_hint">Removes selected IPTV channels from the main list; source entries are kept.</string>
     <string name="editor_remove_selected_iptv_confirm">Remove %1$d IPTV channels from the main channel list? Source entries and channel preferences are kept. Selected tuner channels are not affected.</string>
