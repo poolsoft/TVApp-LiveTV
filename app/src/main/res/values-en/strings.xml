@@ -775,6 +775,13 @@
     <string name="vod_season_episode_title_fmt">Season %1$d Episode %2$d - %3$s</string>
     <string name="vod_episode_number_fmt">Episode %1$d</string>
     <string name="vod_source_content_count">%1$d items</string>
+    <string name="vod_home_brand">TVApp VOD</string>
+    <string name="vod_categories_title">Categories</string>
+    <string name="vod_movies_and_series">Movies &amp; Series</string>
+    <string name="vod_back_to_live">Back to Live TV</string>
+    <string name="vod_hint_navigate">D-Pad: Navigate</string>
+    <string name="vod_hint_play">OK: Play</string>
+    <string name="vod_hint_back_live">Back: Live TV</string>
     <string name="vod_empty">No VOD content found</string>
     <string name="vod_resume_from_start">Play from start</string>
     <string name="vod_remove_from_continue">Remove from Continue Watching</string>

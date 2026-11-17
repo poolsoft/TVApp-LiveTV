@@ -775,6 +775,13 @@
     <string name="vod_season_episode_title_fmt">%1$d. Sezon %2$d. Bölüm - %3$s</string>
     <string name="vod_episode_number_fmt">%1$d. Bölüm</string>
     <string name="vod_source_content_count">%1$d içerik</string>
+    <string name="vod_home_brand">TVApp VOD</string>
+    <string name="vod_categories_title">Kategoriler</string>
+    <string name="vod_movies_and_series">Filmler &amp; Diziler</string>
+    <string name="vod_back_to_live">Canlı TV’ye Dön</string>
+    <string name="vod_hint_navigate">Yön tuşları: Gezin</string>
+    <string name="vod_hint_play">OK: Oynat</string>
+    <string name="vod_hint_back_live">Geri: Canlı TV</string>
     <string name="vod_empty">VOD içerik bulunamadı</string>
     <string name="vod_resume_from_start">Baştan oynat</string>
     <string name="vod_remove_from_continue">Devam Et listesinden kaldır</string>

@@ -19,9 +19,20 @@
   besler, varsayılan `LegacyEpisodeLabels` eski davranışı korur (birim testler bağımsız kalır).
 - **Testler:** `VodUiSupportTest` +3 (varsayılan etiket eşleşmesi TR/ASCII, enjekte etiketler,
   adsız bölüm numarası). `local`, `paid` ve `mobile` flavor'larında çalıştırıldı.
-- **Kalan (`UI-004` commit 2):** `activity_vod_home.xml` sabit `android:text` değerleri ve
-  emoji ikonları, `VodCategoryItem.icon` varsayılanı, `TmdbApiClient` tür adları ve cihaz
-  doğrulaması.
+- **Düzen tarafı (`activity_vod_home.xml`):** On üç sabit `android:text` değeri kaynaklara
+  taşındı; emojiler sabit boyutlu drawable ikonlarıyla değiştirildi (🌐→`ic_source_iptv`,
+  ⚡→`ic_sort`, 📂→`ic_list`, 🎬→`ic_vod`, ⏱️→`ic_clock_small`, 🔴→`ic_live` buton +
+  `key_red` alt ipucu, `▼`→`ic_arrow_drop_down`, `↩`→`ic_arrow_back`). Yeni anahtarlar
+  `vod_home_brand`, `vod_categories_title`, `vod_movies_and_series`, `vod_back_to_live`,
+  `vod_hint_navigate`, `vod_hint_play`, `vod_hint_back_live`; mevcut `vod_select_source`,
+  `vod_sort_title`, `vod_sort_default`, `vod_continue_watching`, `live_tv` yeniden kullanıldı.
+  Layout dosyalarında artık hiç emoji/glif yok (tarama: yalnız `strings.xml` içindeki ok
+  işaretleri).
+- **Kategori kartı:** `item_vod_category_card.xml` emojisi sabit `ic_list` ikon bloğuna
+  dönüştü; `VodCategoryItem.icon` alanı kaldırıldı (tüm satırlar aynı emojiyi taşıyordu,
+  görünüm değişmedi).
+- **Kalan (`UI-004`):** `TmdbApiClient` tür adlarının yerelleştirilmesi ve cihaz doğrulaması
+  (TR/EN bölüm listesi, arama penceresi, ikon-metin hizası, 720p alt ipucu barı).
 
 ## 2026-11-17 - Live TV'ye Dönünce VOD Modu Takılı Kalıyordu (`VOD-010`)
 

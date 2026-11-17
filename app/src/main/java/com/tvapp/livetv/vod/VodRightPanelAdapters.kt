@@ -56,10 +56,13 @@ class VodSourceAdapter(
     }
 }
 
+/**
+ * Sol panel kategori satiri. Ikon sabit drawable'dir (`item_vod_category_card.xml`);
+ * satirlar arasi farkli emoji kullanilmaz, boylece sabit boyutlu ikon blogu korunur.
+ */
 data class VodCategoryItem(
     val name: String,
     val count: Int,
-    val icon: String = "📁",
 )
 
 class VodCategoryAdapter(
@@ -115,7 +118,6 @@ class VodCategoryAdapter(
 
         fun bind(item: VodCategoryItem) {
             binding.vodCatName.text = item.name
-            binding.vodCatIcon.text = item.icon
             binding.vodCatCount.text = if (item.count > 0) item.count.toString() else ""
 
             val isSelected = item.name == selectedCategory

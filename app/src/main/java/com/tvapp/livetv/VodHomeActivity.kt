@@ -590,9 +590,9 @@ class VodHomeActivity : TvRemoteActivity() {
             }
             val list = mutableListOf<VodCategoryItem>()
             val allCatsLabel = getString(R.string.vod_all_categories)
-            list.add(VodCategoryItem(name = allCatsLabel, count = 0, icon = "📁"))
+            list.add(VodCategoryItem(name = allCatsLabel, count = 0))
             catStrings.filterNotNull().forEach {
-                list.add(VodCategoryItem(name = it, count = 0, icon = "📁"))
+                list.add(VodCategoryItem(name = it, count = 0))
             }
             val activeCat = gridCategory ?: allCatsLabel
             gridCategoryAdapter.submitList(list, activeCat)

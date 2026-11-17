@@ -1028,11 +1028,22 @@ bileşenleri hâlâ kullanmıyor.
     Sağlayıcının yazdığı varsayılan bölüm adı ("3. Bölüm" / "Bölüm 3", ASCII "3. Bolum")
     tek kurala bağlandı: `VodUiSupport.isProviderDefaultEpisodeTitle`. Testler:
     `VodUiSupportTest` +3.
-  - **Kalan:** (1) `activity_vod_home.xml` içindeki 12 sabit `android:text` ve
-    🌐⚡📂🎬⏱️🔴 emojileri mevcut drawable'larla değiştirilecek; (2) `VodHomeActivity`
-    kategori kartı emojisi (`VodCategoryItem.icon`, `"📁"`); (3) `TmdbApiClient` tür adları
-    (istek `language=tr-TR` + sabit TR harita — yerelleştirme ayrı ele alınacak);
-    (4) cihaz doğrulaması: TR/EN bölüm listesi ve arama penceresi.
+  - **Tamamlanan (commit 2, düzen tarafı):** `activity_vod_home.xml` içindeki tüm sabit
+    `android:text` değerleri kaynaklara taşındı. Emojiler sabit boyutlu drawable ikonlarıyla
+    değiştirildi: 🌐→`ic_source_iptv`, ⚡→`ic_sort`, 📂→`ic_list`, 🎬→`ic_vod`,
+    ⏱️→`ic_clock_small`, 🔴→`ic_live` (buton) ve `key_red` (alt ipucu); `▼` metni
+    `ic_arrow_drop_down`, `↩`/`◀ ▶` glifleri `ic_arrow_back` + sözel ipucu oldu. Yeni anahtarlar
+    (`vod_home_brand`, `vod_categories_title`, `vod_movies_and_series`, `vod_back_to_live`,
+    `vod_hint_navigate/play/back_live`) iki dilde; mevcut `vod_select_source`, `vod_sort_title`,
+    `vod_sort_default`, `vod_continue_watching`, `live_tv` yeniden kullanıldı — yeni kopya yok.
+    Kategori kartı emojisi kaldırıldı: `item_vod_category_card.xml` sabit `ic_list` ikon bloğu,
+    `VodCategoryItem.icon` alanı silindi (davranış değişmedi, tüm satırlar aynı ikonu taşıyordu).
+    `vod_btn_live_tv` ve `vod_continue_label` artık ikon+metin sarmalayıcı; kimlikler ve kod
+    sözleşmeleri (tıklama, görünürlük) korundu.
+  - **Kalan:** (1) `TmdbApiClient` tür adları (istek `language=tr-TR` + sabit TR harita —
+    yerelleştirme ayrı ele alınacak); (2) cihaz doğrulaması: TR/EN bölüm listesi ve arama
+    penceresi, ikon boyutlarının 11-15sp metinle hizası, odak çerçevesinin hâlâ görünür olması
+    ve 720p'de alt ipucu barının taşmaması.
 
 - [ ] **UI-005 (P1): 10-foot için okunmaz punto (7-9 sp)**
   Renk aksiyon ipuçları `MainActivity.kt:5037, 5079, 5123` (9f) ve ayraç `:5103` (11f);
