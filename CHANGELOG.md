@@ -1,5 +1,30 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - IPTV ve XMLTV Yönetim Ekranlarında Boş Durum Kartı (`UI-003`)
+
+- **Sorun:** Kaynak listesi boşken (hiç listesi/kaynağı olmayan ilk kurulum veya son
+  kaynağı sildikten sonra) sağ panel bomboş kalıyordu; alttaki kalıcı ipucu satırı ise yok
+  bir listede "OK: Kanalları seç · OK uzun bas: Liste işlemleri" gibi geçersiz bir komutu
+  anlatmaya devam ediyordu.
+- **Kural:** Yeni `ui/SourceListRules.kt` iki kararı saf fonksiyonla verir:
+  `emptyState(loadFinished, itemCount)` kartı **yalnız ilk okuma bittikten sonra** ve satır
+  yoksa gösterir (yükleme sırasında yanlış "kaynak yok" iddiası yoktur), `hintFor(state)` ise
+  alt ipucu satırını satır eylemleri ile "nasıl eklenir" yönlendirmesi arasında seçtirir.
+  Birim testi: `SourceListRulesTest` (5 test).
+- **Düzen:** `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml` (+ `layout-port`
+  kopyaları) içinde `source_list` ağırlıklı bir `FrameLayout`'a alındı, ortasına
+  `source_list_empty_panel` (başlık + yönlendirme) eklendi; ağırlık sarmalayıcıya taşındığı
+  için geometri değişmedi.
+- **Metinler:** Başlıklar mevcut anahtarlardan (`web_empty`, `xmltv_not_configured`); yalnız
+  iki yönlendirme metni yeni: `iptv_sources_empty_hint`, `xmltv_sources_empty_hint`
+  (TR + EN, parite 937 = 937). Boş durumda alt ipucu satırı bu yönlendirmeye geçer.
+- **Düğme eklenmedi:** Ekleme eylemi bu ekranların panel düğmeleriyle yapılıyor ve XMLTV
+  ekranı açılışta odağı zaten "XMLTV URL ekle" düğmesine veriyor; karta ikinci bir düğme aynı
+  iş için fazladan odak durağı üretirdi.
+- **Cihaz doğrulaması gerekiyor:** 0 kaynaklı ekranda kartın görünmesi, yükleme sırasında
+  kısa bir "kaynak yok" yazısının belirmemesi, son kaynağı silince kartın hemen gelmesi ve
+  cam/yüksek kontrast temalarında okunabilirlik.
+
 ## 2026-11-17 - OSD Punto Alt Sınırı (12 sp) (`UI-005`)
 
 - **Sorun:** OSD'nin bazı satırları TV mesafesinden okunmuyordu: bilgi satırındaki renk aksiyon

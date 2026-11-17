@@ -191,15 +191,52 @@
         android:textSize="16sp"
         android:textStyle="bold" />
 
-    <ListView
-        android:id="@+id/source_list"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="8dp"
-        android:layout_weight="1"
-        android:divider="#3E4650"
-        android:dividerHeight="1dp"
-        android:listSelector="@drawable/bg_focusable"
-        android:defaultFocusHighlightEnabled="false" />
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/source_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="#3E4650"
+            android:dividerHeight="1dp"
+            android:listSelector="@drawable/bg_focusable"
+            android:defaultFocusHighlightEnabled="false" />
+
+        <!-- UI-003: liste gerçekten boşken iki dilli yönlendirme kartı.
+             Eylem düğmesi yok: ekleme bu ekranın panel düğmeleriyle yapılıyor. -->
+        <LinearLayout
+            android:id="@+id/source_list_empty_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/source_list_empty_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/web_empty"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/source_list_empty_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/iptv_sources_empty_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </FrameLayout>
 
 </LinearLayout>

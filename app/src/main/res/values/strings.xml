@@ -854,6 +854,8 @@
     <string name="disable_iptv_source">Listeyi Pasife Al</string>
     <string name="iptv_source_disabled">Pasif</string>
     <string name="iptv_source_enabled">Aktif</string>
+    <string name="iptv_sources_empty_hint">URL, dosya, Xtream veya Stalker portalı ekleyerek başlayın.</string>
+    <string name="xmltv_sources_empty_hint">URL veya dosya ekleyerek başlayın.</string>
     <string name="web_tab_sources">IPTV Kaynakları</string>
     <string name="web_tab_channel_editor">Kanal Düzenleyici</string>
     <string name="web_select_channels_title">Kanal Seçimi</string>

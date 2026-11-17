@@ -19,6 +19,9 @@ import com.tvapp.livetv.data.XmlTvImportPhase
 import com.tvapp.livetv.data.XmlTvImportProgress
 import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.data.XmlTvSourceSummary
+import com.tvapp.livetv.ui.SourceListEmptyState
+import com.tvapp.livetv.ui.SourceListHint
+import com.tvapp.livetv.ui.SourceListRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -27,7 +30,10 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
     private val repository by lazy { XmlTvRepository(this) }
     private lateinit var sourceList: ListView
     private lateinit var status: TextView
+    private lateinit var emptyPanel: View
+    private var hintLine: TextView? = null
     private var sources = emptyList<XmlTvSourceSummary>()
+    private var sourcesLoaded = false
 
     private val openFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@registerForActivityResult
@@ -42,6 +48,8 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
         setContentView(R.layout.activity_xmltv_sources)
         sourceList = findViewById(R.id.source_list)
         status = findViewById(R.id.status)
+        emptyPanel = findViewById(R.id.source_list_empty_panel)
+        hintLine = findViewById(R.id.xmltv_source_remote_hint)
         findViewById<View>(R.id.add_url).setOnClickListener { showUrlDialog() }
         findViewById<View>(R.id.add_file).setOnClickListener {
             openFile.launch(arrayOf("application/xml", "text/xml", "application/gzip", "*/*"))
@@ -90,7 +98,27 @@ class XmlTvSourcesActivity : TvRemoteActivity() {
             } else {
                 adapter.submit(sources)
             }
+            sourcesLoaded = true
+            applySourceListEmptyState(sources.size)
         }
+    }
+
+    /**
+     * UI-003: liste gerçekten boş olduğunda (ilk okuma bitmiş ve satır kalmamış)
+     * iki dilli yönlendirme kartını gösterir ve alttaki ipucu satırını "nasıl
+     * eklenir" yönlendirmesine çevirir. Yükleme sürerken kart gizli kalır; böylece
+     * ekranda kanıtlanmamış bir "kaynak yok" yazısı görünmez. Kart eylem düğmesi
+     * taşımaz: ekleme bu ekranın panel düğmeleriyle yapılır.
+     */
+    private fun applySourceListEmptyState(itemCount: Int) {
+        val state = SourceListRules.emptyState(sourcesLoaded, itemCount)
+        emptyPanel.visibility = if (state == SourceListEmptyState.Empty) View.VISIBLE else View.GONE
+        hintLine?.setText(
+            when (SourceListRules.hintFor(state)) {
+                SourceListHint.AddSource -> R.string.xmltv_sources_empty_hint
+                SourceListHint.RowActions -> R.string.xmltv_source_remote_hint
+            },
+        )
     }
 
     private fun showUrlDialog() {

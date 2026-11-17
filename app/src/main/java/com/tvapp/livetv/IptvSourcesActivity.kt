@@ -27,6 +27,9 @@ import com.tvapp.livetv.data.IptvImportStage
 import com.tvapp.livetv.data.IptvSourceSummary
 import com.tvapp.livetv.databinding.ActivityIptvSourcesBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
+import com.tvapp.livetv.ui.SourceListEmptyState
+import com.tvapp.livetv.ui.SourceListHint
+import com.tvapp.livetv.ui.SourceListRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -50,6 +53,7 @@ class IptvSourcesActivity : TvRemoteActivity() {
     private var webStartJob: Job? = null
     private var webSessionText = ""
     private var operationBusy = false
+    private var sourcesLoaded = false
     private val operationGate = com.tvapp.livetv.web.IptvOperationGate()
 
     private val selectChannels = registerForActivityResult(
@@ -1185,8 +1189,29 @@ class IptvSourcesActivity : TvRemoteActivity() {
                         }
                     }
                 }
+                sourcesLoaded = true
+                applySourceListEmptyState(loaded.size)
             }.onFailure(::showError)
         }
+    }
+
+    /**
+     * UI-003: liste gerçekten boş olduğunda (ilk okuma bitmiş ve satır kalmamış)
+     * iki dilli yönlendirme kartını gösterir ve alttaki ipucu satırını "nasıl
+     * eklenir" yönlendirmesine çevirir. Yükleme sürerken kart gizli kalır; böylece
+     * ekranda hiçbir zaman kanıtlanmamış bir "kaynak yok" iddiası durmaz.
+     * Kart eylem düğmesi taşımaz: ekleme bu ekranın panel düğmeleriyle yapılır.
+     */
+    private fun applySourceListEmptyState(itemCount: Int) {
+        val state = SourceListRules.emptyState(sourcesLoaded, itemCount)
+        binding.sourceListEmptyPanel.visibility =
+            if (state == SourceListEmptyState.Empty) View.VISIBLE else View.GONE
+        binding.sourceListHintLine?.setText(
+            when (SourceListRules.hintFor(state)) {
+                SourceListHint.AddSource -> R.string.iptv_sources_empty_hint
+                SourceListHint.RowActions -> R.string.iptv_source_remote_hint
+            },
+        )
     }
 
     private fun showError(error: Throwable) {

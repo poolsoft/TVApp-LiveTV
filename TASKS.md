@@ -1006,10 +1006,32 @@ bileşenleri hâlâ kullanmıyor.
   - Metinler iki dilde: `channel_list_empty_title/clear_filters/no_channels/
     no_channels_hint/library_hint`; arama durumu mevcut `clear_search` anahtarını kullanıyor.
   - Testler: `ChannelListRulesTest` +5 test (toplam **386** iki flavor'da da).
-  **Kalan:** (1) `activity_iptv_sources.xml` ve `activity_xmltv_sources.xml` boş durumları
-  (`web_empty` / `iptv_library_empty` anahtarları hazır, yönlendirme metni eklenecek);
-  (2) cihaz doğrulaması — 0 sonuçlı aramada kartın geldiği, OK ile filtrelerin temizlendiği,
-  cam/yüksek kontrast temalarında okunabilirliği ve odak çerçevesinin göründüğü.
+  **Durum (2026-11-17, kaynak yönetim ekranları yapıldı):**
+  - `ui/SourceListRules.kt` (yeni, saf karar): `emptyState(loadFinished, itemCount)` →
+    `Hidden | Empty` ve `hintFor(state)` → `RowActions | AddSource`. Kart yalnız **ilk okuma
+    bittikten sonra** ve satır yoksa görünür; yükleme sırasında ekranda kanıtlanmamış bir
+    "kaynak yok" yazısı durmaz. `SourceListRulesTest` +5 test.
+  - Dört düzen de (`activity_iptv_sources.xml`, `activity_xmltv_sources.xml` + `layout-port`
+    kopyaları) `source_list` ağırlıklı bir `FrameLayout` içine alındı, ortasına
+    `source_list_empty_panel` (başlık + ipucu) eklendi. Ağırlık sarmalayıcıya taşındı, liste
+    `match_parent`; geometri değişmedi.
+  - Metinler yeniden kullanıldı: IPTV başlığı `web_empty`, XMLTV başlığı
+    `xmltv_not_configured`. Yalnız yönlendirme metinleri yeni: `iptv_sources_empty_hint`,
+    `xmltv_sources_empty_hint` (iki dil, parite 937 = 937).
+  - Kart **eylem düğmesi taşımıyor**: ekleme bu ekranların panel düğmeleriyle yapılıyor ve
+    XMLTV ekranı açılışta odağı zaten `add_url` düğmesine veriyor; karta ikinci bir düğme
+    koymak aynı iş için fazladan odak durağı üretirdi (AGENTS.md: yerleşik etkileşim varsa
+    düğme ekleme).
+  - Boş liste sırasında alttaki kalıcı ipucu satırı geçersiz komutu anlatıyordu
+    ("OK: Kanalları seç · OK uzun bas: Liste işlemleri" / "OK: Kaynak işlemleri · CH+/CH-:
+    Sayfa değiştir"). Artık kart görünürken aynı satır "nasıl eklenir" yönlendirmesine
+    geçiyor (`source_list_hint_line`, `xmltv_source_remote_hint` kimlikleri iki düzen
+    varyantında da tanımlandı; IPTV dikey düzeninde alt ipucu satırı yok, bu yüzden kod
+    güvenli erişimle yazıyor).
+  **Kalan:** (1) cihaz doğrulaması — 0 kaynaklı ekranda kartın geldiği, yükleme sırasında
+  kısa bir "kaynak yok" yazısının görünmediği, cam/yüksek kontrast temalarında okunabilirlik
+  ve son kaynağı silince kartın hemen belirdiği; (2) iptal edilen bir içe aktarma sonrası
+  `import_status` satırının eski metni taşıması (bu görevin kapsamı dışında, ayrı izlenmeli).
 
 - [~] **UI-004 (P1): VOD ekranında sabit Türkçe metin ve emoji**
   `activity_vod_home.xml:31, 99, 137, 153, 162, 192, 209, 247, 274, 342-368` (🌐⚡📂🎬⏱️🔴),

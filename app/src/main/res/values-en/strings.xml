@@ -854,6 +854,8 @@
     <string name="disable_iptv_source">Disable Source</string>
     <string name="iptv_source_disabled">Disabled</string>
     <string name="iptv_source_enabled">Enabled</string>
+    <string name="iptv_sources_empty_hint">Start by adding a URL, file, Xtream or Stalker portal.</string>
+    <string name="xmltv_sources_empty_hint">Start by adding a URL or a file.</string>
     <string name="web_tab_sources">IPTV Sources</string>
     <string name="web_tab_channel_editor">Channel Editor</string>
     <string name="web_select_channels_title">Channel Selection</string>
