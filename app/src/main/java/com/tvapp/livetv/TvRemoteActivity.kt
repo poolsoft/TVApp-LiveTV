@@ -4,9 +4,20 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
+import com.tvapp.livetv.platform.UiInputProfile
+import com.tvapp.livetv.platform.UiInputProfileSource
 
 open class TvRemoteActivity : AppCompatActivity() {
     private var lastOrientation = Configuration.ORIENTATION_UNDEFINED
+
+    /**
+     * UI-015: bu ekranda işaret etme biçimi (D-pad / dokunma / ikisi birden).
+     *
+     * TV yapılandırmalarında her zaman [UiInputProfile.D_PAD] döner ve cihaz sinyalleri
+     * okunmaz, bu yüzden mevcut TV davranışı bit bit aynıdır. Profil ekran boyunca sabittir;
+     * Activity yeniden oluşturulunca (örn. döndürme) yeniden çözülür.
+     */
+    val inputProfile: UiInputProfile by lazy(LazyThreadSafetyMode.NONE) { UiInputProfileSource.from(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

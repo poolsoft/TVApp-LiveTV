@@ -1224,18 +1224,64 @@ değeri aynen döndürür, dokunmaya özel davranış yalnız dokunma profilinde
   bildirim açık bileşenle gönderildiği için bu M0'ı etkilemiyor, ama mobilde dış bağlantı
   (tarayıcıdan `tvapp://`) açılırsa `UI-015` kapsamında manifest'e alınmalı.
 
-- [ ] **UI-015 (P1): Girdi UX profili yok — 31 dağınık `MOBILE_UI_ENABLED` koşulu**
+- [~] **UI-015 (P1): Girdi UX profili yok — 31 dağınık `MOBILE_UI_ENABLED` koşulu**
   `BuildConfig.MOBILE_UI_ENABLED` 31 yerde (`MainActivity` 14, `DisplaySettingsActivity` 9,
   `IptvSourcesActivity` 3, `IptvRepository` 2, `ChannelEditorActivity` / `IptvChannelSelectionActivity`
   / `TvRemoteActivity` 1'er) satır içi `if` olarak duruyor; "dokunma mı D-pad mi" kararı veren
   tek bir yer yok. `platform/DeviceCapabilities.kt:139 resolveExperienceMode(... mobileUiEnabled)`
   ve `ExperienceMode.MOBILE_TEST` zaten var, ama yalnız **kaynak** filtresini (TIF dahil mi)
   yönetiyor, UX'i değil.
-  **Kabul:** `platform/UiInputProfile { D_PAD, TOUCH, HYBRID }` — flavor bayrağı +
-  `Configuration.keyboard/touchscreen` + `isInTouchMode` ile çözülür; tablet + BT kumanda
-  `HYBRID`. TV varyantları **her zaman** `D_PAD` döndürür (saf fonksiyon, birim testte kilitli).
-  31 koşul kalem kalem bu profile bağlanır; davranış birebir korunur, ekran görüntüsü
-  karşılaştırması TV'de fark göstermez.
+  **Kabul:** `platform/UiInputProfile { D_PAD, TOUCH, HYBRID }` — flavor bayrağı + dokunmatik
+  yeteneği + D-pad yeteneği ile çözülür; tablet + BT kumanda `HYBRID`. TV varyantları **her
+  zaman** `D_PAD` döndürür (saf fonksiyon, birim testte kilitli). Koşullar kalem kalem
+  sınıflandırılır; davranış birebir korunur, ekran görüntüsü karşılaştırması TV'de fark
+  göstermez.
+  **Kabul düzeltmesi (2026-11-17, ölçümden):** ilk kabul "31 koşul kalem kalem profile
+  bağlanır" diyordu — bu yanlış hedefti: 31 koşulun yalnız **5'i** gerçekten girdi biçimine
+  bağlı, kalan 26'sı flavor **yeteneği** / **veri politikası** / **kabuk davranışı**. Kök neden
+  ("tek bir yer yok") doğru, kapsam abartılıydı. Ayrıca `isInTouchMode` girdi olarak
+  **çıkarıldı**: anlık dokunma modu ekran içinde sık değişir ve Android odak çerçevesini
+  dokunma modunda zaten bastırıyor; çerçeve/renk-tuşu kararları cihaz **yeteneğine**
+  (`PackageManager.FEATURE_TOUCHSCREEN`, `Configuration.navigation == NAVIGATION_DPAD`)
+  bağlanmalı, yoksa profil ekran boyunca titrer.
+  **Durum (2026-11-17) — kod tarafı tamam:**
+  - `platform/UiInputProfile.kt`: enum + `usesTouchTargets` / `hasDpadInput` / `hasColorKeys`
+    bayrakları, `UiInputRules.resolve(mobileUiEnabled, hasTouchScreen, hasDpadInput)` saf
+    kararı ve `UiInputProfileSource.from(context)` tek okuma noktası. TV yapılandırmalarında
+    cihaz sinyali **hiç okunmadan** `D_PAD` döner.
+  - `TvRemoteActivity.inputProfile` dikiş noktası (TV biçimindeki Activity'lerin ortak üstü).
+  - Profile bağlanan 5 nokta: `MainActivity` — `ok_long_mode_hint` rozetinin dokunulabilirliği,
+    catch-up "Canlıya dön" rozeti (`interactive`), oynatma ekranı `action()` renk rozetleri;
+    `DisplaySettingsActivity` — `settings_remote_hint` görünürlüğü;
+    `IptvChannelSelectionActivity` — `optimizeMobileColorActions` →
+    `applyTouchInputAdjustments` (renk rayı + ipucu metni + kenar boşluğu).
+  - Bilinçli olarak flavor bayrağında kalan 26 koşul: `MainActivity` 11 (açılış hedefi IPTV
+    çözümlemesi 1130/1153; `recordHistory` veri politikası 1915/4449/4472; sarı rozet eylem
+    eşlemesi 2141/2145; mobil kanal paneli kabuğu 2160/2170; OSD tema varsayılanı 3081;
+    `resolveExperienceMode` girdisi 3115), `DisplaySettingsActivity` 8 (pencere boyutu/konumu
+    142 — ekran büyüklüğü politikası; OSD teması 294; infobar konumu 319;
+    `channel_focus_auto_tune` + gecikme satırları 400 — mobil kabuk bu ayarı hiç
+    uygulamadığı için göstermek kullanıcıya yalan olurdu; IPTV input senkronu 476 — TIF
+    yeteneği; cihaz modu 560 ve `resolveExperienceMode` 580; açılış/başlatıcı 619),
+    `IptvSourcesActivity` 3 (satır yönlendirme 111, "Kanalları seç" eylemi 665, seçim özeti
+    691 — kanal seçim akışı mobil kabukta yok), `IptvRepository` 2 (boş listede tüm kanalları
+    kullanma 387, yenilemede tümünü seçme 899 — veri politikası), `ChannelEditorActivity` 1
+    (`resolveExperienceMode` girdisi), `TvRemoteActivity` 1 (orientation recreate — pencere
+    politikası).
+  - **TV bit-bit kilidi:** `MOBILE_UI_ENABLED == false` ⇒ profil `D_PAD` ⇒
+    `usesTouchTargets == false` ve `hasDpadInput == true`; dönüştürülen beş öncül bu durumda
+    eski flavor-bayrağı değeriyle aynı sonucu verir. `UiInputProfileTest` flavor kapalıyken
+    donanım dokunmatik + D-pad taşısa bile `D_PAD` döndüğünü, mobil kabuğun dokunmatik
+    olmayan kutuda `D_PAD`'a düştüğünü sabitliyor (+7 test; üç flavor 424 test, 0 hata).
+  **Kök neden düzeltmesi:** `UiInputProfile` tek karar noktası oldu; "dokunma mı D-pad mi"
+  sorusu artık `MOBILE_UI_ENABLED`'in yerine geçen bir yanıt taşımıyor — bayrak yalnız
+  "bu flavor dokunmatik kabuğu destekliyor mu" sorusunu cevaplıyor.
+  **Kalan:** cihaz doğrulaması — telefonda (TOUCH) renk rozetlerinin dokunulabilirliği ve ayar
+  ipucu satırının kalkması; BT kumandalı tablette (HYBRID) hem dokunmanın hem odak çerçevesinin
+  çalışması; mobil APK'nın dokunmatik olmayan bir kutuda D-pad UX'ini alması; TV'de Ayarlar ve
+  oynatma ipucu barının görüntüsünün değişmemesi. UI-014 kalanı olan mobil `tvapp://channel`
+  deep-link filtresi burada da eklenmedi: `MobileMainActivity`'de deep-link ayrıştırması ayrı
+  iş, `UI-016`'ya devredildi.
 
 - [ ] **UI-016 (P2): Kumanda varsayımı olan etkileşimler dokunmada karşılıksız**
   Renk tuşu ipucu satırları (`key_red/green/yellow/blue`, örn. `iptv_source_remote_hint`,
@@ -1508,7 +1554,11 @@ bildirimi canlı kanalda arayüzü VOD'a çeviremiyor (cihaz doğrulaması bekli
 `UI-005` (iki dilli metin + 12 sp OSD alt sınırı), `UI-003` kalanı (IPTV/XMLTV kaynak
 listelerinde boş durum kartı). `UI-014` kod tarafı — kabuk yönlendirmesi `platform/AppShell`
 üzerinden okunuyor; mobilde "Canlı TV'ye Dön" artık mobil kabuğa dönüyor, TV hedefi
-değişmiyor (cihaz doğrulaması bekliyor).
+değişmiyor (cihaz doğrulaması bekliyor). `UI-015` kod tarafı — girdi UX profili
+`platform/UiInputProfile` (`D_PAD` / `TOUCH` / `HYBRID`) ve `TvRemoteActivity.inputProfile`
+dikişi geldi; TV'de cihaz sinyali okunmadan `D_PAD` döndüğü için dokunma kararları TV
+arayüzünü taşıyamıyor, gerçekten girdiye bağlı 5 karar profile bağlandı, 26 koşul
+yetenek/politika olduğu için bayrakta kaldı (cihaz doğrulaması bekliyor).
 
 **Sıcak — çökme ve teşhis yeteneği:**
 1. `CRASH-002` — artık yeni bir iz bekleniyor: mapping `dev-r343`'ten itibaren birikiyor, eski

@@ -77,12 +77,17 @@ class IptvChannelSelectionActivity : TvRemoteActivity() {
         configureFilters()
         configureActions()
         updateSelectedFilterUi()
-        optimizeMobileColorActions()
+        applyTouchInputAdjustments()
         loadInitialData()
     }
 
-    private fun optimizeMobileColorActions() {
-        if (!BuildConfig.MOBILE_UI_ENABLED) return
+    /**
+     * UI-015: dokunma profilinde renk tusu yan rayi ve tus ipucu metni karsiliksizdir;
+     * ayrica kenar boslugu parmak icin genisletilir. TV profilinde (D_PAD) bu islev
+     * hicbir sey yapmaz — eskiden flavor bayragiyla ayni sonucur.
+     */
+    private fun applyTouchInputAdjustments() {
+        if (!inputProfile.usesTouchTargets) return
         val padHorizontal = (12 * resources.displayMetrics.density).toInt()
         val padVertical = (8 * resources.displayMetrics.density).toInt()
         binding.root.setPadding(padHorizontal, padVertical, padHorizontal, padVertical)

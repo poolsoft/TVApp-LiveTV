@@ -1,5 +1,41 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-17 - Girdi UX Profili: Dokunma mı, Kumanda mı (`UI-015`)
+
+- **Sorun:** "Dokunma mı D-pad mi" kararını veren tek bir yer yoktu; `BuildConfig.MOBILE_UI_ENABLED`
+  31 satır içi `if` olarak dağınıktı. Bu bayrak aslında **"bu flavor dokunmatik kabuğu destekliyor
+  mu?"** sorusunu cevaplıyor, oysa koşullar onu **"kullanıcı dokunuyor mu?"** yerine kullanıyordu:
+  mobil APK dokunmatik olmayan bir cihaza kurulduğunda arayüz dokunma için tasarlanmış kalıp
+  dokunan hiçbir şey bırakmıyordu, BT kumandalı tablette ise dokunma hedefleri kapalıydı.
+- **Profil:** Yeni `platform/UiInputProfile` — `D_PAD` / `TOUCH` / `HYBRID`, bayrakları
+  `usesTouchTargets`, `hasDpadInput`, `hasColorKeys`. `UiInputRules.resolve(flavor, dokunmatik,
+  D-pad)` saf kararı `UiInputProfileTest` ile kilitli; `UiInputProfileSource.from(context)`
+  sinyalleri tek yerden okur (`FEATURE_TOUCHSCREEN`, `Configuration.navigation`). Karar
+  cihaz **yeteneğine** bağlıdır, anlık `isInTouchMode` değeri bilinçli olarak kullanılmaz —
+  Android odak çerçevesini dokunma modunda zaten bastırıyor, profil ekran boyunca sabit kalıyor.
+- **TV güvencesi:** `MOBILE_UI_ENABLED == false` iken cihaz sinyalleri **hiç okunmadan** `D_PAD`
+  döner; bu durumda `usesTouchTargets == false` ve `hasDpadInput == true` olduğu için dönüştürülen
+  her öncül eski flavor-bayrağı değeriyle aynı sonucu verir. Yani TV görüntüsü bit bit aynıdır.
+- **Dikiş noktası:** `TvRemoteActivity.inputProfile` (gecikmeli, Activity başına bir kez çözülür)
+  — TV biçimindeki ekranların ortak üstü.
+- **Profile bağlanan 5 gerçek girdi kararı:** oynatma ipucu barındaki `ok_long_mode_hint`
+  rozetinin dokunulabilirliği, catch-up "Canlıya dön" rozeti (`interactive`), oynatma ekranı
+  `action()` renk rozetleri (dokunma profilinde rozetler tek başına dokunulabilir),
+  `DisplaySettingsActivity` içindeki `settings_remote_hint` (yön tuşu/OK talimatı D-pad olmayan
+  profilde gizlenir) ve `IptvChannelSelectionActivity` dokunma düzeni
+  (`optimizeMobileColorActions` → `applyTouchInputAdjustments`).
+- **Bilinçli olarak bayrakta kalan 26 koşul:** flavor **yeteneği** (TIF'e bağlı ayar satırları,
+  IPTV input senkronu, `channel_focus_auto_tune` — mobil kabuk bu ayarı hiç uygulamıyor,
+  göstermek kullanıcıya yalan olurdu), **veri politikası** (`IptvRepository` kanal seçimi,
+  `recordHistory`) ve **kabuk davranışı** (mobil kanal paneli, sarı rozet eylem eşlemesi,
+  pencere boyutu/orientation, `resolveExperienceMode` girdileri). Kalem kalem döküm `TASKS.md`
+  `UI-015` kaydında.
+- **Testler:** `UiInputProfileTest` 7 yeni test → **424 birim test üç flavor'da da** geçiyor;
+  `assembleLocalDebug` / `assemblePaidDebug` / `assembleMobileDebug` başarılı.
+  **Cihaz doğrulaması gerekiyor:** telefonda renk rozetlerinin dokunulabilirliği ve ayar ipucu
+  satırının kalkması, BT kumandalı tablette hem dokunmanın hem odak çerçevesinin çalışması,
+  TV'de Ayarlar ve oynatma ipucu barının görüntüsünün değişmemesi.
+
 ## 2026-11-17 - Mobil Kabuk Yönlendirmesi (`UI-014`)
 
 - **Sorun:** Mobil/tablet yapıda VOD ekranında **"Canlı TV'ye Dön"**e basınca TV arayüzü

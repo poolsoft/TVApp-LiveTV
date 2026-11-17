@@ -125,7 +125,9 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         tabs = findViewById(R.id.settings_tabs)
         tabsScroll = findViewById(R.id.settings_tabs_scroll)
         val remoteHint = findViewById<View>(R.id.settings_remote_hint)
-        if (BuildConfig.MOBILE_UI_ENABLED && !isMasterDetail) {
+        // UI-015: metin yön tuşu/OK talimatı veriyor; D-pad olmayan profilde anlamsız.
+        // (Pencere biçimi ekran büyüklüğüne bağlıdır, bu yüzden flavor bayrağında kalır.)
+        if (!inputProfile.hasDpadInput && !isMasterDetail) {
             remoteHint?.visibility = View.GONE
         }
         selectedPage = SettingsPage.entries.getOrElse(

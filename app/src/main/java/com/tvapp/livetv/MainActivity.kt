@@ -5544,7 +5544,9 @@ class MainActivity : TvRemoteActivity() {
                 textSize = OsdTextScale.HINT_TEXT_SP
                 setPadding(dp(6), 0, dp(6), 0)
                 setSingleLine(true)
-                if (BuildConfig.MOBILE_UI_ENABLED) {
+                // UI-015: dokunma profilinde "OK uzun bas" karsiliksiz kalir; ayni eylem
+                // dokunulabilir olmali. TV profilinde (D_PAD) bloklar hic calismaz.
+                if (inputProfile.usesTouchTargets) {
                     isClickable = true
                     isFocusable = true
                     setOnClickListener { showPlaybackModeDialog() }
@@ -5558,7 +5560,7 @@ class MainActivity : TvRemoteActivity() {
                         this,
                         R.drawable.key_red,
                         getString(R.string.catchup_return_live),
-                        interactive = BuildConfig.MOBILE_UI_ENABLED,
+                        interactive = inputProfile.usesTouchTargets,
                         clicked = {
                             catchUpReturnChannel = null
                             selectChannel(liveChannel)
@@ -5592,7 +5594,9 @@ class MainActivity : TvRemoteActivity() {
             return
         }
         fun action(color: Int, label: Int, handler: () -> Unit) {
-            if (BuildConfig.MOBILE_UI_ENABLED) {
+            // UI-015: renk tusu olmayan profilde rozetler dokunulabilir eylemdir; TV
+            // profilinde (D_PAD) asagidaki statik ipucu cizimi aynen surer.
+            if (inputProfile.usesTouchTargets) {
                 binding.infoColorActions.addView(
                     TvUiComponents.colorAction(
                         this,
