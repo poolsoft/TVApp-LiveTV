@@ -21,12 +21,14 @@ class TvAppApplication : Application() {
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         val reportStore = CrashReportStore(this)
         reportStore.recordDebug("APPLICATION_START | process=${android.os.Process.myPid()}")
+        // DEBUGLOG-001: ayiklama gunlugu kapali bile olsa birikmis eski gunlukler temizlenir.
+        reportStore.ensureRetentionSweep()
         MainThreadGuard.install(reportStore)
         IptvInputSyncScheduler.schedulePeriodic(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             if (thread.name == "FinalizerWatchdogDaemon" && error is java.util.concurrent.TimeoutException) {
                 runCatching {
-                    reportStore.recordDebug("FINALIZER_WATCHDOG_TIMEOUT_SUPPRESSED | ${error.message}")
+                    reportStore.recordException("FINALIZER_WATCHDOG_TIMEOUT_SUPPRESSED | ${error.message}")
                 }
                 return@setDefaultUncaughtExceptionHandler
             }

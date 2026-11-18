@@ -1,5 +1,23 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-18 - Ayıklama Günlüğü Ayarlardan Kapatılabiliyor (`CRASH-005`)
+
+- **Kullanıcı isteği:** "debug log için ayarlara bir check koyalım. bu sayede farkı
+  görebiliriz. ama açılıştaki exceptionlar için her zaman yakalaması gerekli."
+- **Ne değişti:** Ayarlar > Sistem > **Tanılama günlüğü** altında "Ayrıntılı hata ayıklama
+  günlüğü" anahtarı var; varsayılan **kapalı**. Kapalıyken `.log` olay dosyasına yeni satır
+  yazılmaz, açılınca aynı günün dosyasında devam eder.
+- **Korumalı kısım:** istisna ve çökme raporları bu tercihten bağımsız. Karar tek yerde
+  toplanıyor (`diagnostics/DebugLogPolicy`, 4 birim test): olay satırı tercihe tabi, istisna
+  satırı değil. Çökme raporu dosyası ve açılışta gösterilen bekleyen rapor günlük yolundan
+  zaten bağımsızdı; `recordCrash` ile bastırılan FinalizerWatchdog zaman aşımı artık günlük
+  kapalıyken de yazılıyor. Çökme raporunun okuduğu "son editör olayı" da günlük kapalıyken
+  güncellenmeye devam eder.
+- **Yan etki:** günlük kapatılsa da eski günlük/rapor dosyaları periyodik silinir
+  (`ensureRetentionSweep`); temizlik eskiden ilk günlük satırıyla tetikleniyordu.
+- **Cihaz doğrulaması bekliyor:** kapalıyken olay satırı yazılmaması, açılınca devam etmesi ve
+  kapalıyken de çökme raporunun oluşması.
+
 ## 2026-11-18 - Kanal Editöründe Gezinme Gecikmesinin Kök Nedeni (`PERF-029`)
 
 - **Kullanıcı raporu:** "Kanal Liste editöründe TIF kanalları arasında yukarı aşağı geçiş

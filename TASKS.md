@@ -627,6 +627,27 @@ Android 11 Google TV cihazında doğrulanmadan **tamamlandı sayılmaz**.
   **Kalan:** Hatanın gerçekten üretildiği cihaz doğrulaması (katalog veritabanı bozukken
   VOD açılışı) — bu maddenin otomatik testi yok, UI/DAO yolu.
 
+- [~] **CRASH-005 (P2): Ayıklama günlüğü kapatılabilsin; istisna yakalama her zaman açık kalsın**
+  Kullanıcı isteği (2026-11-18): "debug log için ayarlara bir check koyalım. bu sayede farkı
+  görebiliriz. ama açılıştaki exceptionlar için her zaman yakalaması gerekli."
+  **Yapılan (2026-11-18):** (a) `settings/DebugLogStore` — kalıcı tercih, varsayılan kapalı;
+  (b) `diagnostics/DebugLogPolicy` saf kuralı: olay satırları tercihe tabi, istisna satırları
+  tercihten bağımsız (4 birim test); (c) `CrashReportStore.recordDebug` olay satırını yalnız
+  tercih açıksa yazar ve tercihi kuyruk işçisinde okur (arayüz iş parçası ilk erişimde
+  SharedPreferences yüklemez), yeni `recordException` yolu tercihe bakmadan yazar;
+  `recordCrash` ile FinalizerWatchdog kaydı bu yolu kullanır. `saveReport` ve bekleyen rapor
+  tercihten zaten bağımsız; (d) son editör olayı tercihi çökme raporunda okunduğu için
+  (`Last editor event`) günlük kapalıyken de yazılmaya devam eder; (e) `ensureRetentionSweep`
+  temizliği ilk günlük satırından bağımsız hale geldi, böylece günlük kapalıyken de eski
+  dosyalar cihazda birikmiyor; (f) Ayarlar > Sistem > **Tanılama günlüğü** bölümünde
+  "Ayrıntılı hata ayıklama günlüğü" anahtarı ve altında "İstisna yakalama: Her zaman açık"
+  bilgisi; uygulama rehberi (tr/en) güncellendi.
+  **Kabul / kalan:** TV cihazında doğrulanacak — seçenek kapatılınca `.log` dosyasına yeni olay
+  satırı yazılmaması, açılınca aynı gün içinde yazmaya devam etmesi, kapalıyken de çökme
+  raporunun (`TVApp-uncaught-exception-*.txt`) oluşması. Günlük kapalıyken olay satırları
+  kesileceği için saha teşhisi zayıflar; yeni log istenmeden önce seçeneğin açık olduğu
+  kontrol edilmeli.
+
 ### Epic MISS — Denetimde açığa çıkan eksikler
 
 - [ ] **MISS-001 (P0): paid flavor'da IPTV erişim kapısı kapalı**

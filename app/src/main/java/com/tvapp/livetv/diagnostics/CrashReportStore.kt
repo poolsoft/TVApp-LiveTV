@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.tvapp.livetv.settings.DebugLogStore
 import java.io.File
 import java.io.PrintWriter
 import java.io.Writer
@@ -25,6 +26,9 @@ class CrashReportStore(context: Context) {
      * gezinme bu yolu kullanir; `commit()` arayuz is parcasinda senkron disk yazimi oldugu icin
      * her tus basiminda gezinmeyi geciktiriyordu. Olayin kendisi zaten asenkron hata gunlugune
      * yazilir, dolayisiyla gecmis kayit kaybolmaz (karar: EditorKeyTrace).
+     *
+     * DEBUGLOG-001: son editor olayi tercihi ayiklama gunlugundan bagimsiz yazilir. Cokme
+     * raporu bu alani okur ("Last editor event"), bu yuzden gunluk kapaliyken de guncel kalir.
      */
     fun recordEditorEvent(event: String, persistToPreferences: Boolean = true) {
         if (persistToPreferences) {
@@ -35,12 +39,32 @@ class CrashReportStore(context: Context) {
         recordDebug("EDITOR_EVENT | $event")
     }
 
+    /**
+     * Ayiklama gunlugune olay/izleme satiri ekler (DEBUGLOG-001). Tercih kapaliysa satir
+     * yazilmaz; tercih okumasi kuyruk iscisinde yapilir ki ilk erisimin SharedPreferences
+     * yuklemesi arayuz is parcasina degmesin.
+     */
     fun recordDebug(event: String) {
         val line = "${timestamp()} | $event\n"
         logExecutor.execute {
-            writeDebugLineInternal(line)
+            if (DebugLogPolicy.writesDebugLine(debugLogEnabled(), DiagnosticEntryKind.EVENT)) {
+                writeDebugLineInternal(line)
+            }
         }
     }
+
+    /**
+     * Istisna/cokme kaydi (DEBUGLOG-001). Ayiklama gunlugu kapaliyken de yazilir: kullanicinin
+     * istegi geregi acilis dahil hicbir istisna kacirilmaz. Surec sonlandigi icin kuyruk
+     * kapanmis olabileceginden satir dogrudan yazilir; cokme yolundaki rapor dosyasi da
+     * zaten senkron yaziliyor (bkz. [saveReport]).
+     */
+    fun recordException(event: String) {
+        val line = "${timestamp()} | $event\n"
+        runCatching { writeDebugLineInternal(line) }
+    }
+
+    private fun debugLogEnabled(): Boolean = DebugLogStore(appContext).enabled
 
     @Synchronized
     private fun writeDebugLineInternal(line: String) {
@@ -114,7 +138,7 @@ class CrashReportStore(context: Context) {
             appendLine()
             append(trace)
         }
-        recordDebug("UNCAUGHT_EXCEPTION\n$report")
+        recordException("UNCAUGHT_EXCEPTION\n$report")
         saveReport(report, "uncaught-exception")
     }
 
@@ -266,6 +290,16 @@ class CrashReportStore(context: Context) {
 
     fun cleanExpiredLogs() {
         checkAndPurgeExpiredLogs(force = true)
+    }
+
+    /**
+     * DEBUGLOG-001: ayiklama gunlugu kapaliyken de birikmis gunluk/rapor dosyalari silinir.
+     * Saklama kontrolu ilk gunluk satiriyla tetiklendigi icin, gunluk hic yazilmadiginda eski
+     * dosyalar cihazda kalirdi. Aralik kontrolu tercihlerden okunur, tarama kendi is parcasinda
+     * yapilir; bu yuzden arayuz is parcasina bedeli yoktur.
+     */
+    fun ensureRetentionSweep() {
+        logExecutor.execute { checkAndPurgeExpiredLogs() }
     }
 
     private fun checkAndPurgeExpiredLogs(force: Boolean = false) {

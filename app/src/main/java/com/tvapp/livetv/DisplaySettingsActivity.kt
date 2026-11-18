@@ -31,6 +31,7 @@ import androidx.lifecycle.lifecycleScope
 import com.tvapp.livetv.settings.AppLanguage
 import com.tvapp.livetv.settings.AppLanguageStore
 import com.tvapp.livetv.settings.ChannelPanelSide
+import com.tvapp.livetv.settings.DebugLogStore
 import com.tvapp.livetv.settings.DisplayPreferences
 import com.tvapp.livetv.settings.DisplayPreferencesStore
 import com.tvapp.livetv.settings.InfoBarPosition
@@ -44,6 +45,7 @@ import com.tvapp.livetv.settings.LogoCachePreferencesStore
 import com.tvapp.livetv.settings.ExternalPlayerPreference
 import com.tvapp.livetv.settings.ExternalPlayerPreferencesStore
 import com.tvapp.livetv.data.XmlTvRepository
+import com.tvapp.livetv.diagnostics.CrashReportStore
 import com.tvapp.livetv.image.ChannelLogoLoader
 import com.tvapp.livetv.platform.DeviceCapabilitiesSession
 import com.tvapp.livetv.platform.ExperienceMode
@@ -78,6 +80,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
     private lateinit var iptvPlaybackStore: IptvPlaybackPreferencesStore
     private lateinit var experienceModeStore: ExperienceModePreferencesStore
     private lateinit var multiViewPreferencesStore: MultiViewPreferencesStore
+    private lateinit var debugLogStore: DebugLogStore
     private var current = DisplayPreferences()
     private var changed = false
     private var pendingApkUri: Uri? = null
@@ -119,6 +122,7 @@ class DisplaySettingsActivity : TvRemoteActivity() {
         iptvPlaybackStore = IptvPlaybackPreferencesStore(this)
         experienceModeStore = ExperienceModePreferencesStore(this)
         multiViewPreferencesStore = MultiViewPreferencesStore(this)
+        debugLogStore = DebugLogStore(this)
         logoCachePreferences = logoCacheStore.load()
         current = displayStore.load()
         content = findViewById(R.id.settings_content)
@@ -622,6 +626,21 @@ class DisplaySettingsActivity : TvRemoteActivity() {
                 update { copy(launchOnBoot = it) }
             }
         }
+
+        // DEBUGLOG-001: ayiklama gunlugü kullanici tercihidir. Istisna ve cokme raporlari bu
+        // tercihten bagimsiz kaydedilmeye devam eder (karar: DebugLogPolicy).
+        section(R.string.debug_log_settings)
+        toggle(R.string.debug_log_capture, debugLogStore.enabled) { enabled ->
+            debugLogStore.enabled = enabled
+            markChanged()
+            // Acilirken ilk satir hemen yazilir; kapatilirken kural geregi yazilmaz.
+            CrashReportStore(this@DisplaySettingsActivity)
+                .recordDebug("DEBUG_LOG_SETTING | enabled=$enabled")
+        }
+        info(
+            R.string.debug_log_exception_capture,
+            getString(R.string.debug_log_exception_always),
+        )
 
         section(R.string.application_settings)
         if (BuildConfig.DIAGNOSTICS_ENABLED || BuildConfig.DEBUG) {

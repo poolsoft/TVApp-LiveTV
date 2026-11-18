@@ -344,3 +344,7 @@ adb shell pm list permissions -g | Select-String TV
 ```
 
 Normal APK kurulumu kanal erişiminde `SecurityException` üretirse uygulamanın cihaz firmware'ine sistem/privileged uygulama olarak eklenmesi ve vendor allowlist izinleri gerekebilir.
+
+### Ayıklama günlüğü
+
+Ayarlar > Sistem > **Tanılama günlüğü** altındaki "Ayrıntılı hata ayıklama günlüğü" seçeneği olay günlüğünü açar; varsayılan kapalıdır. Açıkken olay satırları cihazda `Android/data/com.tvapp.livetv/files/logs` klasöründeki `TVApp-debug-YYYYMMDD.log` dosyasına asenkron yazılır. Günlük kapalıyken de istisna ve çökme raporları (`TVApp-uncaught-exception-*.txt` ile açılışta gösterilen bekleyen rapor) kaydedilir; bu kayıtlar tercih okunmadan yazılır (`diagnostics/DebugLogPolicy`).
