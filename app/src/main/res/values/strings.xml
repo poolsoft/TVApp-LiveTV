@@ -254,8 +254,12 @@
     <string name="editor_target_hint">Taşınacak kanalların hedef sıra numarasını seçer.</string>
     <string name="editor_multi_hint">Birden fazla kanalı OK ile seçme modunu açar.</string>
     <string name="editor_cancel_hint">Taşımayı iptal edip önceki sıraya döner.</string>
+    <string name="editor_preview_toggle">Kanal önizlemesini açar veya kapatır</string>
+    <string name="editor_preview_on_hint">Önizleme açık - OK ile kapatın; gezinme önizlemeyi beklemez.</string>
+    <string name="editor_preview_off_hint">Önizleme kapalı - OK ile açın.</string>
+    <string name="editor_preview_off_state">Önizleme kapalı</string>
     <string name="editor_sources_hint">IPTV, XMLTV ve kanal kaynaklarının yönetimini açar.</string>
-    <string name="user_guide_editor_iptv">KANAL EDİTÖRÜ\nIPTV kanal adının altında kaynak liste adı görünür. Sarı ile çoklu seçim moduna geçip OK ile kanalları seçin. Soldaki çıkar simgesi seçili IPTV kanallarını onaydan sonra ana listeden çıkarır; kaynak içerikleri ve kullanıcı tercihleri korunur, uydu kanalları etkilenmez. Soldaki araçlara odaklandığınızda alt açıklama görevini gösterir; renk tuşları satırı korunur.</string>
+    <string name="user_guide_editor_iptv">KANAL EDİTÖRÜ\nIPTV kanal adının altında kaynak liste adı görünür. Sarı ile çoklu seçim moduna geçip OK ile kanalları seçin. Soldaki çıkar simgesi seçili IPTV kanallarını onaydan sonra ana listeden çıkarır; kaynak içerikleri ve kullanıcı tercihleri korunur, uydu kanalları etkilenmez. Soldaki araçlara odaklandığınızda alt açıklama görevini gösterir; renk tuşları satırı korunur. Sol çubuktaki televizyon simgesi kanal önizlemesini açıp kapatır; kapalıyken editör hiçbir kanal açmaz ve gezinme önizlemeyi beklemez.</string>
     <string name="red_key">Kırmızı tuş</string>
     <string name="green_key">Yeşil tuş</string>
     <string name="yellow_key">Sarı tuş</string>

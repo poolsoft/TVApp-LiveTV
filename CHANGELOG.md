@@ -1,5 +1,37 @@
 # Değişiklik Günlüğü (Changelog)
 
+## 2026-11-18 - Kanal Editöründe Gezinme Gecikmesinin Kök Nedeni (`PERF-029`)
+
+- **Kullanıcı raporu:** "Kanal Liste editöründe TIF kanalları arasında yukarı aşağı geçiş
+  bile yavaş, kanal önizlemesini bekliyor… sadece önizleme ile alakalı değil gibi."
+- **Log kanıtı (`.log`):** şikâyet edilen editör oturumlarının hiçbirinde tune/session satırı
+  yok; gecikme tuşu işleyen yolda. Dört gereksiz maliyet doğrulandı:
+  1. Her tuşta `CrashReportStore.recordEditorEvent` → `SharedPreferences.commit()` =
+     arayüz iş parçasında **senkron disk yazımı**.
+  2. Odak her değiştiğinde `TvView.reset()` + iki görünürlük değişimi; "gerçekten çalan akış
+     var mı" hiç sorulmuyordu. Uydu ayarlaması 1-2 sn sürdüğü için gezinmenin tamamı sürücü
+     emriyle doluyordu.
+  3. Araç ipucu satırı her odaklanmada aynı metni yeniden yazıyordu (gereksiz requestLayout).
+  4. `ParentalControlStore.isLocked()` her çağrıda JSON çözüyordu; bu, her tuşta ve **her satır
+     bağlanırken** çalışıyordu.
+- **Düzeltmeler:** gezinme tuşları için tercih yazımı kaldırıldı (`EditorKeyTrace`; olaylar
+  asenkron günlüğe yazılmaya devam eder, renk/GERİ/rakam/menü tuşları kalıcı). Gezinme
+  kararları `EditorPreviewRules.moveAction` içine alındı: çalan akış yoksa hiçbir yüzeye
+  dokunulmaz, IPTV akışı kesilir, TIF yüzeyi yeni ayarlamaya bırakılır, `reset()` yalnız IPTV
+  yüzeyine geçiş ile kilitli/kapalı durumda. Araç ipucu yalnız değiştiğinde yazılır; kilitli
+  kanal kümesi metin değişmedikçe yeniden çözülmez.
+- **Önizleme aç/kapat düğmesi:** sol çubuğa eklendi (kalıcı, varsayılan açık). Önizleme
+  kapatılınca editör hiç tuner/ağ bedeli ödemez; durum simgeyle, ipucu satırıyla ve sağ
+  paneldeki "Önizleme kapalı" yazısıyla anlatılır.
+- **Ölçüm:** her tuş için `EDITOR_KEY_TRACE | queueDelayMs / handleMs / traceMs` ve önizleme
+  için `EDITOR_PREVIEW | action=TUNE|STOP_IPTV|RELEASE|TOGGLE` satırları; böylece bir daha
+  "ölçmeden" konuşulmaz.
+- **Bilinçli davranış farkı:** TIF önizlemesi açıkken gezinme sırasında eski kanalın
+  görüntü/sesi yeni ayarlama gelene kadar sürer (PERF-028'deki "gezinmede kutu anında kararır"
+  kararı geri alındı). Kilitli kanalda kutu yine anında karartılır.
+- **Testler:** 442 birim test × 3 flavor 0 hata. **Cihaz doğrulaması bekliyor:** ok ile gezinme
+  akıcılığı, `queueDelayMs` değerlerinin düşmesi, önizleme düğmesinin davranışı.
+
 ## 2026-11-18 - Kanal Editöründe TIF Gezinme Önizlemesi ve Alt Araç Çubuğu Hizalaması
 
 - **Kullanıcı raporu (`PERF-028` eki, TV cihazından geldi):** TIF kanalları arasında

@@ -21,6 +21,7 @@ import com.tvapp.livetv.data.XmlTvRepository
 import com.tvapp.livetv.data.TifRepository
 import com.tvapp.livetv.databinding.ActivityChannelEditorBinding
 import com.tvapp.livetv.diagnostics.CrashReportStore
+import com.tvapp.livetv.diagnostics.EditorKeyTrace
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.playback.IptvPlaybackController
 import com.tvapp.livetv.platform.DeviceCapabilitiesSession
@@ -29,8 +30,11 @@ import com.tvapp.livetv.platform.resolveExperienceMode
 import com.tvapp.livetv.settings.ChannelSourceFilterStore
 import com.tvapp.livetv.settings.ExperienceModePreferencesStore
 import com.tvapp.livetv.settings.ParentalControlStore
+import com.tvapp.livetv.settings.EditorPreviewStore
 import com.tvapp.livetv.ui.ChannelEditorAdapter
 import com.tvapp.livetv.ui.EditorPreviewRules
+import com.tvapp.livetv.ui.PreviewMoveAction
+import com.tvapp.livetv.ui.PreviewSurface
 import com.tvapp.livetv.ui.selectedIptvKeys
 import com.tvapp.livetv.ui.ParentalPinDialog
 import com.tvapp.livetv.billing.IptvAccessDialogs
@@ -54,6 +58,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
     private lateinit var adapter: ChannelEditorAdapter
     private lateinit var iptvPreview: IptvPlaybackController
     private lateinit var parentalControlStore: ParentalControlStore
+    private lateinit var previewStore: EditorPreviewStore
     private lateinit var xmlTvRepository: XmlTvRepository
     private val channels = mutableListOf<LiveChannel>()
     private val selectedKeys = linkedSetOf<String>()
@@ -68,6 +73,14 @@ class ChannelEditorActivity : TvRemoteActivity() {
     private var navigationNumberJob: Job? = null
     private var navigationNumberInput = ""
     private var previewSourceKey: String? = null
+    /**
+     * GERÇEKTEN çalan önizleme. [previewSourceKey] planlanan kanalı tutar; gezinmenin bedeli
+     * yalnız çalan akış için ödenir (PERF-028 eki).
+     */
+    private var previewActiveSurface: PreviewSurface? = null
+    private var previewActiveKey: String? = null
+    private var previewEnabled = true
+    private var lastKeyTraceMs = 0L
     private var appliedModeLabelSignature: ModeLabelSignature? = null
     private var operationInProgress = false
     private var restoredStateApplied = false
@@ -119,6 +132,8 @@ class ChannelEditorActivity : TvRemoteActivity() {
         repository = ChannelRepository(this)
         backupRepository = AppBackupRepository(this)
         parentalControlStore = ParentalControlStore(this)
+        previewStore = EditorPreviewStore(this)
+        previewEnabled = previewStore.enabled
         xmlTvRepository = XmlTvRepository(this)
         adapter = ChannelEditorAdapter(
             ::onChannelFocused,
@@ -139,6 +154,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
         // yüzden tam adapter yenilemelerinde RecyclerView yeniden ölçmek zorunda değil.
         binding.channelList.setHasFixedSize(true)
         setupEditorSidebar()
+        setupPreviewToggle()
         setupMobileColorActions()
         updateModeLabels()
         loadChannels(
@@ -160,6 +176,39 @@ class ChannelEditorActivity : TvRemoteActivity() {
         }
         binding.sidebarRemoveButton.setOnClickListener { confirmRemoveSelectedIptv() }
         binding.sidebarRemoveButton.setOnFocusChangeListener { _, _ -> updateToolHint() }
+    }
+
+    /**
+     * PERF-028 eki: önizlemeyi kapatma düğmesi. Önizleme, editörde tuner ve ağ bedeli ödeten tek
+     * bileşen; kullanıcı gezinmeyi ondan bağımsız olarak deneyebilsin diye sol çubuğa kondu.
+     */
+    private fun setupPreviewToggle() {
+        binding.sidebarPreviewToggle.setOnClickListener { togglePreview() }
+        binding.sidebarPreviewToggle.setOnFocusChangeListener { _, _ -> updateToolHint() }
+        applyPreviewToggleState()
+    }
+
+    private fun togglePreview() {
+        previewEnabled = !previewEnabled
+        previewStore.enabled = previewEnabled
+        applyPreviewToggleState()
+        crashReportStore.recordDebug("EDITOR_PREVIEW | action=TOGGLE enabled=$previewEnabled")
+        val channel = focusedChannel
+        if (!previewEnabled) {
+            stopPreviewPlayback()
+        } else if (channel != null && mode != Mode.MOVE && !parentalControlStore.isLocked(channel.sourceKey)) {
+            schedulePreview(channel)
+        }
+        updateToolHint()
+    }
+
+    /** Düğmenin simgesi ve üstüne gelince okunan anlatım önizlemenin güncel durumunu taşır. */
+    private fun applyPreviewToggleState() {
+        binding.sidebarPreviewToggleIcon.setImageResource(
+            if (previewEnabled) R.drawable.ic_tv else R.drawable.ic_tv_off,
+        )
+        val alpha = if (previewEnabled) 1f else 0.45f
+        binding.sidebarPreviewToggle.alpha = alpha
     }
 
     private fun setupMobileColorActions() {
@@ -245,10 +294,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
                 }
                 if (loaded.isEmpty()) {
                     focusedChannel = null
-                    previewSourceKey = null
-                    previewJob?.cancel()
-                    iptvPreview.stop()
-                    binding.previewTv.reset()
+                    stopPreviewPlayback()
                     binding.previewName.setText(R.string.no_channels_title)
                     binding.previewNumber.text = ""
                     binding.previewState.text = ""
@@ -294,6 +340,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
         binding.previewNumber.text = displayNumber
         binding.previewName.text = channel.displayName
         binding.previewState.text = when {
+            !previewEnabled -> getString(R.string.editor_preview_off_state)
             parentalControlStore.isLocked(channel.sourceKey) -> getString(R.string.locked_channel)
             channel.hidden -> getString(R.string.channel_skipped)
             channel.favorite -> getString(R.string.channel_favorite)
@@ -309,20 +356,31 @@ class ChannelEditorActivity : TvRemoteActivity() {
             updateModeLabels()
         }
         previewJob?.cancel()
-        val previousPreviewKey = previewSourceKey
         val locked = parentalControlStore.isLocked(channel.sourceKey)
-        // PERF-028: odak başka satıra gidince çalışan akış hemen kesilir. Eskiden yalnızca
-        // henüz başlamamış plan iptal ediliyordu; akış çalarken gezinilirse indirme, çözme ve
-        // ana iş parçacığında çalışan sağlık bekçisi (2 sn'de bir, sürekli bağlanmada 250 ms'de
-        // bir) gezinmenin tamamında listeyle yarışır. Kilitli kanaldaki bugünkü davranış
-        // korunur: her odaklanmada kutu karartılır.
-        if (locked || EditorPreviewRules.stopsRunningPlayback(previousPreviewKey, channel.sourceKey)) {
-            stopPreviewPlayback()
+        // PERF-028 eki: gezinme sırasında tuner ve oynatıcıya emir gönderilmez. Odaklanma bir tuş
+        // basımıdır; uydu/DVB ayarlaması 1-2 sn sürdüğü için "her odaklanmada iki yüzeyi de
+        // serbest bırak" kuralı gezinmenin tamamını sürücü emirleri ve yeniden yerleşimle
+        // dolduruyordu (kullanıcı raporu: "aşağı yukarı giderken çok takılıyor"). Karar
+        // EditorPreviewRules.moveAction içinde: çalan bir şey yoksa dokunulmaz, IPTV akışı kesilir,
+        // TIF yüzeyi yeni ayarlamaya bırakılır. Kilitli kanalda kutu yine anında karartılır.
+        when (
+            EditorPreviewRules.moveAction(
+                previewEnabled = previewEnabled,
+                locked = locked,
+                activeSurface = previewActiveSurface,
+                activeSourceKey = previewActiveKey,
+                nextSourceKey = channel.sourceKey,
+            )
+        ) {
+            PreviewMoveAction.NOTHING -> Unit
+            PreviewMoveAction.STOP_IPTV -> stopIptvPreview()
+            PreviewMoveAction.RELEASE_ALL -> stopPreviewPlayback()
         }
         if (!EditorPreviewRules.schedulesPlayback(
                 moveMode = mode == Mode.MOVE,
                 locked = locked,
-                previousSourceKey = previousPreviewKey,
+                previewEnabled = previewEnabled,
+                activeSourceKey = previewActiveKey,
                 nextSourceKey = channel.sourceKey,
             )
         ) {
@@ -336,36 +394,84 @@ class ChannelEditorActivity : TvRemoteActivity() {
         previewSourceKey = channel.sourceKey
         previewJob = lifecycleScope.launch {
             delay(PREVIEW_DELAY_MS)
+            if (!previewEnabled || mode == Mode.MOVE) return@launch
+            val surface = if (channel.source == LiveChannel.Source.IPTV) {
+                PreviewSurface.IPTV
+            } else {
+                PreviewSurface.TIF
+            }
             runCatching {
-                when (channel.source) {
-                    LiveChannel.Source.TIF -> {
-                        iptvPreview.stop()
-                        binding.previewIptv.visibility = View.GONE
-                        binding.previewTv.visibility = View.VISIBLE
+                when (surface) {
+                    PreviewSurface.TIF -> {
+                        if (previewActiveSurface == PreviewSurface.IPTV) stopIptvPreview()
+                        if (binding.previewTv.visibility != View.VISIBLE) {
+                            binding.previewTv.visibility = View.VISIBLE
+                        }
                         binding.previewTv.tune(channel.inputId, android.net.Uri.parse(channel.uri))
+                        previewActiveSurface = surface
+                        previewActiveKey = channel.sourceKey
                     }
-                    LiveChannel.Source.IPTV -> {
-                        binding.previewTv.reset()
-                        binding.previewTv.visibility = View.GONE
-                        binding.previewIptv.visibility = View.VISIBLE
+                    PreviewSurface.IPTV -> {
+                        if (EditorPreviewRules.releasesTunerSurface(surface, previewActiveSurface)) {
+                            binding.previewTv.reset()
+                            binding.previewTv.visibility = View.GONE
+                        }
+                        if (binding.previewIptv.visibility != View.VISIBLE) {
+                            binding.previewIptv.visibility = View.VISIBLE
+                        }
                         iptvPreview.play(channel)
+                        previewActiveSurface = surface
+                        previewActiveKey = channel.sourceKey
                     }
                 }
             }.onFailure { binding.syncStatus.text = it.message ?: it.javaClass.simpleName }
+            // PERF-028 eki: önizlemenin gerçekte açılıp açılmadığı loglarda hiç görünmüyordu;
+            // "önizlemeyi bekliyor" şikâyetini ölçülebilir kılmak için tek satır.
+            crashReportStore.recordDebug(
+                "EDITOR_PREVIEW | action=TUNE surface=$surface key=${channel.sourceKey}",
+            )
         }
     }
 
     /**
-     * Çalışan önizlemeyi keser: akış indirmeyi/cözmayı ve ana iş parçacığındaki sağlık
-     * bekçisini bırakır, önizleme kutusunu karartır.
+     * Çalışan önizlemeyi tamamen keser: oynayan yüzey serbest bırakılır, önizleme kutusu
+     * karartılır. Kesilecek bir şey yoksa binder çağrısı ve yeniden yerleşim üretilmez —
+     * [android.widget.TvView] yerleşimde görünür başlar, bu yüzden yüzeyin görünürlüğü değil
+     * gerçekten ayarlanmış olup olmaması ölçü alınır.
      */
     private fun stopPreviewPlayback() {
         previewJob?.cancel()
         previewSourceKey = null
-        binding.previewTv.reset()
-        binding.previewTv.visibility = View.GONE
+        val activeSurface = previewActiveSurface
+        previewActiveSurface = null
+        previewActiveKey = null
+        when (activeSurface) {
+            PreviewSurface.TIF -> {
+                binding.previewTv.reset()
+                binding.previewTv.visibility = View.GONE
+            }
+            PreviewSurface.IPTV -> {
+                if (::iptvPreview.isInitialized) iptvPreview.stop()
+                binding.previewIptv.visibility = View.GONE
+            }
+            null -> Unit
+        }
+        if (activeSurface != null) {
+            crashReportStore.recordDebug("EDITOR_PREVIEW | action=RELEASE was=$activeSurface")
+        }
+    }
+
+    /**
+     * Yalnız IPTV akışını keser: indirme, çözme ve bekçi bırakılır. Tuner yüzeyine dokunulmaz;
+     * onun bedeli (uydu kilidi) gezinme sırasında ödenmeyecek en pahalı kalemdir.
+     */
+    private fun stopIptvPreview() {
+        if (previewActiveSurface != PreviewSurface.IPTV) return
+        previewActiveSurface = null
+        previewActiveKey = null
         iptvPreview.stop()
         binding.previewIptv.visibility = View.GONE
+        crashReportStore.recordDebug("EDITOR_PREVIEW | action=STOP_IPTV")
     }
 
     private fun onChannelClicked(channel: LiveChannel) {
@@ -419,6 +525,9 @@ class ChannelEditorActivity : TvRemoteActivity() {
 
     private fun enterMoveMode() {
         previewJob?.cancel()
+        // PERF-028 eki: tasima modunda onizleme acilmaz; calisan bir akis varsa burada, mod
+        // gecisinde bir kez kesilir. Odak hareketleri artık kesme yapmiyor.
+        stopPreviewPlayback()
         clearMoveTargetInput()
         originalOrder = channels.toList()
         mode = Mode.MOVE
@@ -683,8 +792,11 @@ class ChannelEditorActivity : TvRemoteActivity() {
             )
             return
         }
-        binding.editorToolHint.text = when {
+        val hint = when {
             binding.sidebarRemoveButton.hasFocus() -> getString(R.string.editor_remove_selected_iptv_hint)
+            binding.sidebarPreviewToggle.hasFocus() -> getString(
+                if (previewEnabled) R.string.editor_preview_on_hint else R.string.editor_preview_off_hint,
+            )
             binding.sidebarRedButton.hasFocus() -> getString(
                 if (mode == Mode.MOVE) R.string.editor_target_hint else R.string.editor_skip_hint,
             )
@@ -701,6 +813,12 @@ class ChannelEditorActivity : TvRemoteActivity() {
             binding.sidebarBlueButton.hasFocus() -> getString(R.string.editor_sources_hint)
             else -> getString(R.string.editor_ok_hint)
         }
+        // PERF-028 eki: bu satır her odak hareketinde yazılıyordu; aynı metni yeniden yazmak
+        // gereksiz requestLayout üretir. Odak araç düğmeleri arasında gezinirken metin zaten
+        // değiştiği için davranış aynı kalır, liste gezinmesinde ise hiç yazılmaz.
+        if (binding.editorToolHint.text != hint) {
+            binding.editorToolHint.text = hint
+        }
     }
 
     private fun confirmRemoveSelectedIptv() {
@@ -715,9 +833,8 @@ class ChannelEditorActivity : TvRemoteActivity() {
                 operationInProgress = true
                 previewJob?.cancel()
                 channelLoadJob?.cancel()
-                if (previewSourceKey in keys) {
-                    iptvPreview.stop()
-                    previewSourceKey = null
+                if (previewSourceKey in keys || previewActiveKey in keys) {
+                    stopPreviewPlayback()
                 }
                 val preferredKey = focusedChannel?.sourceKey?.takeUnless { it in keys }
                     ?: channels.firstOrNull { it.sourceKey !in keys }?.sourceKey
@@ -1263,7 +1380,31 @@ class ChannelEditorActivity : TvRemoteActivity() {
             .show()
     }
 
+    /**
+     * PERF-028 eki: kumanda gecikmesi olculmeden duzeltilmez. Bu sarmalayici iki sayiyi
+     * hata gunlugune yazar:
+     * - `queueDelayMs`: olayin arayuz kuyrugunda bekleme suresi; tuş gelmeden once ana is
+     *   parcasinin ne kadar mesgul oldugunu gosterir (gezinmede "takilma" iste budur).
+     * - `handleMs`: bu tuşun editörde toplam maliyeti; `traceMs` tercih/iz yaziminin maliyeti.
+     * Olcum iki tuş arasindaki durum degisikliklerini de kapsar, cunku tuş islenene kadar olan
+     * sure kuyruk gecikmesine yazilir.
+     */
     override fun dispatchKeyEvent(rawEvent: KeyEvent): Boolean {
+        val startedAt = SystemClock.uptimeMillis()
+        val queueDelayMs = (startedAt - rawEvent.eventTime).coerceAtLeast(0L)
+        lastKeyTraceMs = 0L
+        val handled = handleEditorKeyEvent(rawEvent)
+        if (rawEvent.action == KeyEvent.ACTION_DOWN) {
+            crashReportStore.recordDebug(
+                "EDITOR_KEY_TRACE | key=${KeyEvent.keyCodeToString(rawEvent.keyCode)} " +
+                    "repeat=${rawEvent.repeatCount} queueDelayMs=$queueDelayMs " +
+                    "handleMs=${SystemClock.uptimeMillis() - startedAt} traceMs=$lastKeyTraceMs",
+            )
+        }
+        return handled
+    }
+
+    private fun handleEditorKeyEvent(rawEvent: KeyEvent): Boolean {
         val event = rawEvent.asTvRemoteEvent()
         if (operationInProgress) return true
         val editorColor = editorColorFor(event.keyCode)
@@ -1303,11 +1444,16 @@ class ChannelEditorActivity : TvRemoteActivity() {
             }
         }
 
+        val traceStartedAt = SystemClock.uptimeMillis()
         crashReportStore.recordEditorEvent(
             "keyCode=${event.keyCode}, keyName=${KeyEvent.keyCodeToString(event.keyCode)}, " +
                 "scanCode=${event.scanCode}, deviceId=${event.deviceId}, source=${event.source}, " +
                 "mode=$mode, focused=${focusedChannel?.sourceKey}, selected=${selectedKeys.size}",
+            // PERF-028 eki: ok tuslari icin tercih yazimi yok; commit() arayuz is parcasinda
+            // senkron disk yazimi ve her tuş basiminda bedeli ödeniyordu.
+            persistToPreferences = EditorKeyTrace.persistsToPreferences(event.keyCode),
         )
+        lastKeyTraceMs = SystemClock.uptimeMillis() - traceStartedAt
 
         if (editorColor != null || handlesBack) clearNavigationNumberInput()
 
@@ -1389,6 +1535,7 @@ class ChannelEditorActivity : TvRemoteActivity() {
         // içindeydi). Görünür olunca odaklanan kanal için önizleme yeniden planlanır; taşıma
         // modunda ve kilitli kanalda önizleme açılmaz.
         val channel = focusedChannel ?: return
+        if (!previewEnabled) return
         if (mode == Mode.MOVE || parentalControlStore.isLocked(channel.sourceKey)) return
         schedulePreview(channel)
     }

@@ -1575,6 +1575,49 @@ tamamlandığı için bu bulgular onlara **yeni** işler olarak eklenmiştir.
   `EDITOR_CHANNEL_*` satırları yükleme sürelerini ölçüyor, önizleme maliyetini ölçmüyor;
   şikâyet sürerse önizleme tune süresi loga yazılır.
 
+- [~] **PERF-029 (P1): Kanal editöründe her tuş basımı arayüz iş parçasında disk ve tuner işi üretiyor**
+  Kullanıcı raporu (2026-11-18): "Kanal Liste editöründe tif kanalların arasında yukarı aşağı
+  geçişi bile yavaş, kanal önizlemesini bekliyor... sadece preview ile alakalı değil gibi."
+  Log incelemesi (`.log`: 2026-11-18 00:11 ve 2026-11-17 22:57 editör oturumları) şikâyetin
+  tune bedeli olmadığını gösterdi: bu oturumların hiçbirinde `tuneRequested`/session satırı
+  yok, tuşlar arası boşluk 0,5-10 sn. Gecikme tuşu **işleyen yolda**; kodda doğrulanan dört
+  gereksiz maliyet:
+  1. `dispatchKeyEvent` → `CrashReportStore.recordEditorEvent` her tuşta
+     `SharedPreferences.commit()` yapıyordu = arayüz iş parçasında senkron flash yazımı.
+  2. PERF-028'in kuralı odak her değiştiğinde `stopPreviewPlayback()` çağırıyordu:
+     `TvView.reset()` + iki görünmezlik değişimi. `previewSourceKey` plan kurulduğu anda
+     dolduğu için "gerçekten çalan bir akış var mı" hiç sorulmuyordu; çalan akış olmasa bile
+     uydu tunerına oturum kapatma emri gidiyordu (ölçülen tek ayarlama bedeli: 00:15:39.006
+     `tuneRequested` → 00:15:41.380 `videoAvailable` = 2,4 sn).
+  3. `updateToolHint()` aynı metni her odaklanmada yeniden yazıp requestLayout üretiyordu.
+  4. `ParentalControlStore.isLocked()` her çağrısında prefs'taki JSON dizisini yeniden
+     çözüyordu; bu çağrı hem her tuşta hem **her satır bağlanırken** yapılıyor
+     (`ChannelEditorAdapter.updateState` → `isParentalLocked`).
+  Ayrıca önizlemenin gerçekte açılıp açılmadığı logda hiç görünmüyordu: ölçüm yoktu.
+  **Yapılan (2026-11-18):** (a) gezinme tuşları için tercih yazımı kaldırıldı
+  (`diagnostics/EditorKeyTrace`, 2 birim test) — olaylar asenkron hata günlüğüne yazılmaya
+  devam eder, renk/GERİ/rakam/menü tuşları eskisi gibi kalıcı; (b) gezinme kararları saf
+  `EditorPreviewRules.moveAction` + `releasesTunerSurface` içine alındı (testler yenilendi):
+  çalan akış yoksa hiçbir yüzeye dokunulmaz, IPTV akışı kesilir, TIF yüzeyi yeni ayarlamaya
+  bırakılır, `reset()` yalnız IPTV yüzeyine geçişte ile kilitli/kapalı durumda; planlanan
+  kanal yerine **çalan** kanal karşılaştırıldığı için erteleme süresi içinde inilen satıra
+  dönüldüğünde önizleme yeniden planlanıyor (önceki davranışta hiç açılmıyordu); (c) araç
+  ipucu yalnız değiştiğinde yazılıyor; (d) kilitli kanal kümesi kayıtlı metin değişmedikçe
+  yeniden çözülmüyor; (e) ölçüm eklendi: her `ACTION_DOWN` için
+  `EDITOR_KEY_TRACE | queueDelayMs/handleMs/traceMs` ve önizleme için
+  `EDITOR_PREVIEW | action=TUNE|STOP_IPTV|RELEASE|TOGGLE`; (f) kullanıcının istediği **önizleme
+  aç/kapat düğmesi** sol çubuğa eklendi (`settings/EditorPreviewStore`, kalıcı, varsayılan
+  açık, simge `ic_tv`/`ic_tv_off`, ipucu satırı durumu anlatır, sağ panelde "Önizleme kapalı").
+  **Bilinçli davranış farkı:** TIF önizlemesi açıkken gezinme sırasında eski kanalın
+  görüntü/sesi yeni ayarlama gelene kadar sürer — PERF-028'in "gezinmede kutu anında kararır"
+  kararı geri alındı, bedeli tuş başına tuner oturumu kapatmaktı. Kilitli kanalda kutu yine
+  anında karartılır; taşıma modunda kesme korundu.
+  **Kabul / kalan:** TV cihazında doğrulanacak — ok ile gezinme akıcılığı,
+  `EDITOR_KEY_TRACE` satırlarında `queueDelayMs` değerlerinin düşmesi, sol çubuktaki düğmenin
+  önizlemeyi kapatıp açması, kilitli kanalda kararma. Liste render/jank iddiası yeni ölçüm
+  çıkmadan doğrulanamaz; `queueDelayMs` hâlâ yüksekse sıradaki şüpheli satır bağlama
+  maliyetidir.
+
 ### Epic REFACTOR — Yapısal borç
 
 - [ ] **REFACTOR-001 (P0): `refactor/main-activity-split` dalını `main` üzerine al**

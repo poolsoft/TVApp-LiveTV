@@ -254,8 +254,12 @@
     <string name="editor_target_hint">Chooses the target order number for the channels being moved.</string>
     <string name="editor_multi_hint">Enters multi-select mode; use OK to select channels.</string>
     <string name="editor_cancel_hint">Cancels the move and restores the previous order.</string>
+    <string name="editor_preview_toggle">Turns the channel preview on or off</string>
+    <string name="editor_preview_on_hint">Preview is on - press OK to turn it off; browsing no longer waits for the preview.</string>
+    <string name="editor_preview_off_hint">Preview is off - press OK to turn it on.</string>
+    <string name="editor_preview_off_state">Preview off</string>
     <string name="editor_sources_hint">Opens management of IPTV, XMLTV and channel sources.</string>
-    <string name="user_guide_editor_iptv">CHANNEL EDITOR\nIPTV channels show the source playlist name below their title. Press Yellow for multi-select and OK to select channels. The remove icon on the left removes selected IPTV channels from the main list after confirmation; source entries and user preferences are kept, and tuner channels are unaffected. Focusing a sidebar tool shows its description below; color-key hints remain visible.</string>
+    <string name="user_guide_editor_iptv">CHANNEL EDITOR\nIPTV channels show the source playlist name below their title. Press Yellow for multi-select and OK to select channels. The remove icon on the left removes selected IPTV channels from the main list after confirmation; source entries and user preferences are kept, and tuner channels are unaffected. Focusing a sidebar tool shows its description below; color-key hints remain visible. The television icon on the sidebar turns the channel preview on and off; when it is off the editor opens no channel and browsing never waits for a preview.</string>
     <string name="red_key">Red key</string>
     <string name="green_key">Green key</string>
     <string name="yellow_key">Yellow key</string>

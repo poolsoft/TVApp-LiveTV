@@ -20,10 +20,18 @@ class CrashReportStore(context: Context) {
         Context.MODE_PRIVATE,
     )
 
-    fun recordEditorEvent(event: String) {
-        preferences.edit()
-            .putString(KEY_LAST_EDITOR_EVENT, "${timestamp()} | $event")
-            .commit()
+    /**
+     * PERF-028 eki: [persistToPreferences] `false` iken tercih yazimi hic yapilmaz. Ok tusleriyle
+     * gezinme bu yolu kullanir; `commit()` arayuz is parcasinda senkron disk yazimi oldugu icin
+     * her tus basiminda gezinmeyi geciktiriyordu. Olayin kendisi zaten asenkron hata gunlugune
+     * yazilir, dolayisiyla gecmis kayit kaybolmaz (karar: EditorKeyTrace).
+     */
+    fun recordEditorEvent(event: String, persistToPreferences: Boolean = true) {
+        if (persistToPreferences) {
+            preferences.edit()
+                .putString(KEY_LAST_EDITOR_EVENT, "${timestamp()} | $event")
+                .commit()
+        }
         recordDebug("EDITOR_EVENT | $event")
     }
 

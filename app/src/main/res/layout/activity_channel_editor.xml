@@ -163,6 +163,31 @@
                     android:src="@drawable/ic_close"
                     app:tint="@color/text_primary" />
             </FrameLayout>
+
+            <!-- PERF-028 eki: onizlemeyi kapatmak icin sol cakisma cubugu. Onizleme tek
+                 basina tuner/ag bedeli odeten bilesen oldugu icin kullaniciya "hic onizleme
+                 yok" secenegi burada veriliyor; durum simge ile anlatilir. -->
+            <FrameLayout
+                android:id="@+id/sidebar_preview_toggle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_focusable"
+                android:clickable="true"
+                android:contentDescription="@string/editor_preview_toggle"
+                android:focusable="true"
+                android:nextFocusRight="@id/channel_list"
+                android:nextFocusUp="@id/sidebar_blue_button">
+
+                <ImageView
+                    android:id="@+id/sidebar_preview_toggle_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_tv"
+                    app:tint="@color/text_primary" />
+            </FrameLayout>
         </LinearLayout>
 
         <LinearLayout
