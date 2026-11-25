@@ -42,6 +42,9 @@ interface ChannelDao {
     @Query("UPDATE user_channels SET favorite = :favorite WHERE sourceKey = :sourceKey")
     suspend fun setFavorite(sourceKey: String, favorite: Boolean)
 
+    @Query("SELECT sourceKey FROM user_channels WHERE favorite = 1")
+    suspend fun getFavoriteSourceKeys(): List<String>
+
     @Query("UPDATE user_channels SET hidden = :hidden WHERE sourceKey = :sourceKey")
     suspend fun setHidden(sourceKey: String, hidden: Boolean)
 

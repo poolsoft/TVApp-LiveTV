@@ -35,14 +35,20 @@ class ChannelRepository(context: Context) {
         val startedAt = SystemClock.elapsedRealtime()
         val iptvChannels = iptvRepository.channels()
         val afterIptv = SystemClock.elapsedRealtime()
+        
+        // Also include favorited IPTV channels that are not in the main list (selected=0)
+        // so they appear in the favorites filter
+        val favoriteIptvChannels = iptvRepository.favoriteChannelsNotInMainList()
+        val allIptvChannels = (iptvChannels + favoriteIptvChannels).distinctBy { it.sourceKey }
+        
         val tifChannels = if (includeTif) {
             tifRepository.channels(forceRefresh = refreshSources).getOrElse { error ->
-                if (iptvChannels.isEmpty()) throw error else emptyList()
+                if (allIptvChannels.isEmpty()) throw error else emptyList()
             }
         } else {
             emptyList()
         }
-        val source = tifChannels + iptvChannels
+        val source = tifChannels + allIptvChannels
         val afterTif = SystemClock.elapsedRealtime()
         val now = System.currentTimeMillis()
         val existingRows = source.map(LiveChannel::sourceKey).chunked(900)

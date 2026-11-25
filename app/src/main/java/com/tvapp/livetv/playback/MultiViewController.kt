@@ -149,7 +149,10 @@ class MultiViewController(
 
     fun availableMultiViewChannels(): List<LiveChannel> = buildList {
         addAll(getAllChannels())
-        if (isChannelPanelContentIptvLibrary()) addAll(getIptvLibraryChannels())
+        // Always include IPTV library channels for MultiView/PiP channel switching.
+        // The channel panel may be hidden during MultiView, but we still need access
+        // to all available IPTV channels for replacement selection.
+        addAll(getIptvLibraryChannels())
     }.asSequence()
         .filter { it.source == LiveChannel.Source.TIF || it.source == LiveChannel.Source.IPTV }
         .filter {

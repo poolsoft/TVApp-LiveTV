@@ -71,6 +71,7 @@ class IptvRepository(context: Context) {
     private val appContext = context.applicationContext
     private val database = TVAppDatabase.getInstance(appContext)
     private val dao = database.iptvDao()
+    private val channelDao = database.channelDao()
     private val debugLog = CrashReportStore(appContext)
     private val xmlTvRepository by lazy { XmlTvRepository(appContext) }
 
@@ -390,6 +391,16 @@ class IptvRepository(context: Context) {
             channels
         }
         return effective.map { it.toLiveChannel() }
+    }
+
+    /** Returns favorited IPTV channels that are not in the main list (selected=0).
+     * Used to make favorited-but-unselected channels appear in the favorites filter. */
+    suspend fun favoriteChannelsNotInMainList(): List<LiveChannel> {
+        val favoritedSourceKeys = channelDao.getFavoriteSourceKeys()
+        if (favoritedSourceKeys.isEmpty()) return emptyList()
+        val entities = dao.getChannelsForKeys(favoritedSourceKeys)
+            .filter { it.selected == false && it.contentType == "LIVE" }
+        return entities.map { it.toLiveChannel().copy(inMainList = false) }
     }
 
     private fun IptvChannelEntity.toLiveChannel() =

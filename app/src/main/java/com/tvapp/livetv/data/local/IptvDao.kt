@@ -420,6 +420,9 @@ interface IptvDao {
     @Query("SELECT * FROM iptv_channels WHERE sourceKey = :sourceKey LIMIT 1")
     suspend fun getChannel(sourceKey: String): IptvChannelEntity?
 
+    @Query("SELECT * FROM iptv_channels WHERE sourceKey IN (:sourceKeys)")
+    suspend fun getChannelsForKeys(sourceKeys: List<String>): List<IptvChannelEntity>
+
     @Query(
         "SELECT candidate.* FROM iptv_channels candidate " +
             "INNER JOIN iptv_channels active ON active.sourceKey = :sourceKey " +
