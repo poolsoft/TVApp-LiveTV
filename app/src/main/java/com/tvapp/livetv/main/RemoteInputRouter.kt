@@ -1,5 +1,6 @@
 package com.tvapp.livetv.main
 
+import android.os.SystemClock
 import android.view.KeyEvent
 import com.tvapp.livetv.model.LiveChannel
 import com.tvapp.livetv.ui.RemoteAction
@@ -26,6 +27,7 @@ class RemoteInputRouter(
     val okKeyGate by lazy { newGate() }
     val greenKeyGate by lazy { newGate() }
     val yellowKeyGate by lazy { newGate() }
+    private val repeatThrottle = RemoteInputRules.RepeatNavigationThrottle()
 
     /** Tum tus kapilarini iptal eder (kapanis veya panel kapatma aninda). */
     fun cancelAllGates() {
@@ -266,43 +268,26 @@ class RemoteInputRouter(
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_WINDOW) return true
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) return true
 
+        if (event.action == KeyEvent.ACTION_UP) {
+            repeatThrottle.reset(event.keyCode)
+        }
+
         if (event.action == KeyEvent.ACTION_DOWN) {
-            // Consume repeat events for navigation keys to prevent rapid auto-repeat
-            val isRepeat = event.repeatCount > 0
-            if (isRepeat) {
-                when (event.keyCode) {
-                    KeyEvent.KEYCODE_DPAD_UP,
-                    KeyEvent.KEYCODE_DPAD_DOWN,
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    KeyEvent.KEYCODE_CHANNEL_UP,
-                    KeyEvent.KEYCODE_CHANNEL_DOWN,
-                    KeyEvent.KEYCODE_DPAD_CENTER,
-                    KeyEvent.KEYCODE_ENTER,
-                    KeyEvent.KEYCODE_PROG_RED,
-                    KeyEvent.KEYCODE_PROG_GREEN,
-                    KeyEvent.KEYCODE_PROG_YELLOW,
-                    KeyEvent.KEYCODE_PROG_BLUE,
-                    KeyEvent.KEYCODE_WINDOW,
-                    KeyEvent.KEYCODE_LANGUAGE_SWITCH,
-                    KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
-                    KeyEvent.KEYCODE_TV_AUDIO_DESCRIPTION,
-                    KeyEvent.KEYCODE_CAPTIONS,
-                    RemoteInputRules.KEYCODE_CAPTIONS_ALT,
-                    KeyEvent.KEYCODE_TV_TELETEXT,
-                    RemoteInputRules.KEYCODE_TELETEXT_ALT,
-                    KeyEvent.KEYCODE_TV_INPUT,
-                    KeyEvent.KEYCODE_GUIDE,
-                    KeyEvent.KEYCODE_SEARCH,
-                    KeyEvent.KEYCODE_INFO,
-                    KeyEvent.KEYCODE_MENU -> {
-                        return true // consume repeat, no action
-                    }
-                    else -> {
-                        val digit = RemoteInputRules.digitFromKey(event.keyCode)
-                        if (digit != null) return true // consume repeat for number keys
-                    }
-                }
+            // Gezinme tuslarinda basili tutarak kaydirmaya kontrollu hizda izin ver,
+            // kuyrukta birikmis bayat tekrar olaylarini ve aksiyon tus tekrarlarini yut.
+            val nowMs = SystemClock.uptimeMillis()
+            val eventAgeMs = (nowMs - event.eventTime).coerceAtLeast(0L)
+            if (event.repeatCount == 0) {
+                repeatThrottle.recordInitialPress(event.keyCode, nowMs)
+            } else if (
+                repeatThrottle.shouldConsumeRepeat(
+                    keyCode = event.keyCode,
+                    repeatCount = event.repeatCount,
+                    eventAgeMs = eventAgeMs,
+                    nowMs = nowMs,
+                )
+            ) {
+                return true
             }
 
             if (env.isChannelPanelVisible()) env.scheduleChannelPanelClose()

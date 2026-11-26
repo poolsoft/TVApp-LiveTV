@@ -154,4 +154,66 @@ class RemoteInputRulesTest {
             ),
         )
     }
+
+    @Test
+    fun repeatableNavigationKeysAllowThrottledRepeatAndDropStaleEvents() {
+        val throttle = RemoteInputRules.RepeatNavigationThrottle(
+            minIntervalMs = 85L,
+            staleEventThresholdMs = 250L,
+        )
+        throttle.recordInitialPress(KeyEvent.KEYCODE_DPAD_DOWN, nowMs = 1000L)
+
+        // Cok erken gelen repeat yutulur (throttle)
+        assertTrue(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
+                repeatCount = 1,
+                eventAgeMs = 10L,
+                nowMs = 1040L,
+            ),
+        )
+
+        // Yeterli sure gectikten sonra taze repeat islenir (consume edilmez)
+        assertFalse(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
+                repeatCount = 2,
+                eventAgeMs = 10L,
+                nowMs = 1090L,
+            ),
+        )
+
+        // Kuyrukta 250ms'den fazla beklemis bayat repeat olayi yutulur
+        assertTrue(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
+                repeatCount = 3,
+                eventAgeMs = 300L,
+                nowMs = 1300L,
+            ),
+        )
+    }
+
+    @Test
+    fun nonRepeatableActionKeysAlwaysConsumeRepeat() {
+        val throttle = RemoteInputRules.RepeatNavigationThrottle()
+        throttle.recordInitialPress(KeyEvent.KEYCODE_DPAD_CENTER, nowMs = 1000L)
+
+        assertTrue(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+                repeatCount = 1,
+                eventAgeMs = 5L,
+                nowMs = 1500L,
+            ),
+        )
+        assertTrue(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_1,
+                repeatCount = 1,
+                eventAgeMs = 5L,
+                nowMs = 1500L,
+            ),
+        )
+    }
 }
