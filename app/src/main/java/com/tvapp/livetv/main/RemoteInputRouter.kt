@@ -267,6 +267,44 @@ class RemoteInputRouter(
         if (event.action != KeyEvent.ACTION_DOWN && event.keyCode == KeyEvent.KEYCODE_BACK) return true
 
         if (event.action == KeyEvent.ACTION_DOWN) {
+            // Consume repeat events for navigation keys to prevent rapid auto-repeat
+            val isRepeat = event.repeatCount > 0
+            if (isRepeat) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_CHANNEL_UP,
+                    KeyEvent.KEYCODE_CHANNEL_DOWN,
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_PROG_RED,
+                    KeyEvent.KEYCODE_PROG_GREEN,
+                    KeyEvent.KEYCODE_PROG_YELLOW,
+                    KeyEvent.KEYCODE_PROG_BLUE,
+                    KeyEvent.KEYCODE_WINDOW,
+                    KeyEvent.KEYCODE_LANGUAGE_SWITCH,
+                    KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+                    KeyEvent.KEYCODE_TV_AUDIO_DESCRIPTION,
+                    KeyEvent.KEYCODE_CAPTIONS,
+                    RemoteInputRules.KEYCODE_CAPTIONS_ALT,
+                    KeyEvent.KEYCODE_TV_TELETEXT,
+                    RemoteInputRules.KEYCODE_TELETEXT_ALT,
+                    KeyEvent.KEYCODE_TV_INPUT,
+                    KeyEvent.KEYCODE_GUIDE,
+                    KeyEvent.KEYCODE_SEARCH,
+                    KeyEvent.KEYCODE_INFO,
+                    KeyEvent.KEYCODE_MENU -> {
+                        return true // consume repeat, no action
+                    }
+                    else -> {
+                        val digit = RemoteInputRules.digitFromKey(event.keyCode)
+                        if (digit != null) return true // consume repeat for number keys
+                    }
+                }
+            }
+
             if (env.isChannelPanelVisible()) env.scheduleChannelPanelClose()
             when (event.keyCode) {
                 KeyEvent.KEYCODE_BACK -> env.handleBackNavigation()
