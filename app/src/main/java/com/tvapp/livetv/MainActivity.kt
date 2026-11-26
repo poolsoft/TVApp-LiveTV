@@ -4623,6 +4623,9 @@ class MainActivity : TvRemoteActivity() {
             if (channel.sourceKey == currentChannel?.sourceKey) {
                 action(getString(R.string.iptv_quality_action)) { showIptvVideoQuality() }
             }
+            if (iptvOverlayActive) {
+                action(getString(R.string.pip_to_multiview)) { multiViewController.switchOverlayToMultiView() }
+            }
             action(getString(R.string.iptv_pip)) { startIptvOverlay(channel) }
             action(getString(R.string.open_external_player)) { openExternalPlayer(channel) }
             action(getString(R.string.add_external_subtitle)) {

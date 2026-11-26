@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewConfiguration
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.TextView
@@ -25,6 +26,8 @@ import com.tvapp.livetv.platform.DeviceResourcePolicy
 import com.tvapp.livetv.data.IptvRepository
 import com.tvapp.livetv.databinding.ActivityMainBinding
 import com.tvapp.livetv.model.LiveChannel
+import com.tvapp.livetv.settings.MultiViewPreset
+import com.tvapp.livetv.settings.MultiViewPresetStore
 import com.tvapp.livetv.ui.MultiViewChannelAdapter
 import com.tvapp.livetv.ui.MultiViewFocusResolver
 import com.tvapp.livetv.ui.OsdCoordinator
@@ -85,6 +88,7 @@ class MultiViewController(
     private var gridLongPressJob: Job? = null
     private var gridTifViewportGeneration = 0
     private var gridReturnChannel: LiveChannel? = null
+    private val presetStore by lazy { MultiViewPresetStore(activity) }
     val gridSelectedKeys = mutableListOf<String>()
     private val gridCells = mutableListOf<FrameLayout>()
     private val gridPlayerViews = mutableListOf<PlayerView>()
@@ -218,16 +222,27 @@ class MultiViewController(
             }
         binding.secondaryIptvPlayerView.elevation = 16.dp.toFloat()
         binding.secondaryIptvPlayerView.visibility = View.VISIBLE
+        binding.secondaryIptvPlayerView.setOnClickListener { switchOverlayToMultiView() }
         secondaryIptvPlayback.setMuted(true)
         secondaryIptvPlayback.play(channel)
         hideChannelPanel()
         debugLog.recordDebug("IPTV_OVERLAY_START | channel=${channel.sourceKey}")
     }
 
+    /** Aktif PiP (overlay) ve arka plan kanalini dogrudan 2 hucreli MultiView'e gecirir. */
+    fun switchOverlayToMultiView() {
+        if (!iptvOverlayActive) return
+        val pipChannel = iptvOverlayChannel ?: return
+        val targets = listOfNotNull(getCurrentChannel(), pipChannel).distinctBy { it.sourceKey }
+        if (targets.isEmpty()) return
+        startIptvGrid(targets)
+    }
+
     fun stopIptvOverlay() {
         if (!iptvOverlayActive) return
         iptvOverlayActive = false
         iptvOverlayChannel = null
+        binding.secondaryIptvPlayerView.setOnClickListener(null)
         osdCoordinator.setPlaybackMode(PlaybackSurfaceMode.SINGLE)
         secondaryIptvPlayback.stop()
         binding.secondaryIptvPlayerView.visibility = View.GONE
@@ -297,9 +312,10 @@ class MultiViewController(
             return
         }
         val initial = initialSelection ?: when {
+            iptvOverlayActive && (!multiViewDraftInitialized || multiViewDraft.size <= 2) ->
+                listOfNotNull(getCurrentChannel(), iptvOverlayChannel)
             multiViewDraftInitialized -> multiViewDraft.values.toList()
             iptvGridActive -> gridChannels
-            iptvOverlayActive -> listOfNotNull(getCurrentChannel(), iptvOverlayChannel)
             else -> multiViewDraft.values.toList()
         }
         multiViewDraftInitialized = true
@@ -357,6 +373,9 @@ class MultiViewController(
         dialogView.findViewById<View>(R.id.picker_action_red)?.setOnClickListener { clearSelection() }
         dialogView.findViewById<View>(R.id.picker_action_green)?.setOnClickListener { startSelected() }
         dialogView.findViewById<View>(R.id.picker_action_yellow)?.setOnClickListener { addChannels() }
+        dialogView.findViewById<View>(R.id.picker_action_blue)?.setOnClickListener {
+            showPresetsDialog(multiViewDraft.values.toList()) { dialog.dismiss() }
+        }
 
         dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
             .setView(dialogView)
@@ -370,14 +389,21 @@ class MultiViewController(
                 setOnClickListener { startSelected() }
             }
             dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener { addChannels() }
-            if (multiViewDraft.isEmpty()) dialog.getButton(DialogInterface.BUTTON_NEUTRAL).requestFocus()
-            else recyclerView.requestFocus()
+            when {
+                multiViewDraft.isEmpty() -> dialog.getButton(DialogInterface.BUTTON_NEUTRAL).requestFocus()
+                iptvOverlayActive -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).requestFocus()
+                else -> recyclerView.requestFocus()
+            }
         }
         dialog.setOnKeyListener { _, code, event ->
             if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return@setOnKeyListener false
             when (code) {
                 KeyEvent.KEYCODE_PROG_GREEN -> { startSelected(); true }
                 KeyEvent.KEYCODE_PROG_YELLOW -> { addChannels(); true }
+                KeyEvent.KEYCODE_PROG_BLUE -> {
+                    showPresetsDialog(multiViewDraft.values.toList()) { dialog.dismiss() }
+                    true
+                }
                 KeyEvent.KEYCODE_PROG_RED -> {
                     clearSelection()
                     true
@@ -386,6 +412,115 @@ class MultiViewController(
             }
         }
         dialog.show()
+    }
+
+    /** MultiView hazir sablonlarini listeler, acar, kaydeder veya siler. */
+    fun showPresetsDialog(
+        currentSelection: List<LiveChannel> = emptyList(),
+        onStarted: (() -> Unit)? = null,
+    ) {
+        val themedContext = ContextThemeWrapper(activity, R.style.Theme_TVApp_Dialog)
+        val presets = presetStore.loadAll()
+        val hasSelection = currentSelection.isNotEmpty()
+        if (!hasSelection && presets.isEmpty()) {
+            Toast.makeText(activity, R.string.multiview_preset_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val items = mutableListOf<String>()
+        if (hasSelection) {
+            items += "+ ${activity.getString(R.string.multiview_preset_save)}"
+        }
+        presets.forEach { preset ->
+            items += activity.getString(R.string.multiview_preset_row, preset.name, preset.channelKeys.size)
+        }
+        val presetOffset = if (hasSelection) 1 else 0
+        val dialog = AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.multiview_presets)
+            .setItems(items.toTypedArray()) { _, which ->
+                if (hasSelection && which == 0) {
+                    showSavePresetDialog(currentSelection) {
+                        showPresetsDialog(currentSelection, onStarted)
+                    }
+                } else {
+                    val preset = presets.getOrNull(which - presetOffset) ?: return@setItems
+                    onStarted?.invoke()
+                    openPreset(preset)
+                }
+            }
+            .setNegativeButton(R.string.close, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.listView?.setOnItemLongClickListener { _, _, position, _ ->
+                val preset = presets.getOrNull(position - presetOffset) ?: return@setOnItemLongClickListener false
+                AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
+                    .setMessage(activity.getString(R.string.multiview_preset_delete_confirm, preset.name))
+                    .setPositiveButton(R.string.multiview_preset_delete) { _, _ ->
+                        presetStore.delete(preset.id)
+                        Toast.makeText(
+                            activity,
+                            activity.getString(R.string.multiview_preset_deleted, preset.name),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        dialog.dismiss()
+                        showPresetsDialog(currentSelection, onStarted)
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                true
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showSavePresetDialog(
+        channelsToSave: List<LiveChannel>,
+        onSaved: (() -> Unit)? = null,
+    ) {
+        val distinct = channelsToSave.distinctBy { it.sourceKey }.take(4)
+        if (distinct.isEmpty()) return
+        val themedContext = ContextThemeWrapper(activity, R.style.Theme_TVApp_Dialog)
+        val input = EditText(themedContext).apply {
+            setHint(R.string.multiview_preset_name_hint)
+            setText(MultiViewPresetStore.suggestName(distinct.map { it.displayName }))
+            setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(themedContext, R.color.text_secondary))
+            setSingleLine(true)
+            setSelection(text?.length ?: 0)
+        }
+        AlertDialog.Builder(themedContext, R.style.Theme_TVApp_Dialog)
+            .setTitle(R.string.multiview_preset_save_title)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                val saved = presetStore.save(name, distinct.map { it.sourceKey })
+                if (saved != null) {
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.multiview_preset_saved, saved.name),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    onSaved?.invoke()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun openPreset(preset: MultiViewPreset) {
+        val known = (getAllChannels() + getIptvLibraryChannels()).associateBy { it.sourceKey }
+        scope.launch {
+            val resolved = withContext(Dispatchers.IO) {
+                preset.channelKeys.take(4).mapNotNull { key ->
+                    known[key] ?: iptvRepository.channel(key)
+                }
+            }
+            if (activity.isFinishing || activity.isDestroyed) return@launch
+            if (resolved.isEmpty()) {
+                Toast.makeText(activity, R.string.multiview_preset_missing_channels, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            startIptvGrid(resolved)
+        }
     }
 
     fun startIptvGrid(selected: List<LiveChannel>, connectionsChecked: Boolean = false) {
@@ -739,28 +874,26 @@ class MultiViewController(
 
     fun showActiveGridChannelActions() {
         val channel = gridChannels.getOrNull(gridActiveIndex) ?: return
-        val labels = mutableListOf(
-            activity.getString(R.string.grid_channel_change),
-            activity.getString(R.string.grid_channel_close),
-            activity.getString(R.string.multiview_add_channels),
+        val actions = mutableListOf<Pair<String, () -> Unit>>(
+            activity.getString(R.string.grid_channel_change) to { showGridChannelReplacementPicker() },
+            activity.getString(R.string.grid_channel_close) to { closeActiveGridChannel() },
+            activity.getString(R.string.multiview_add_channels) to { showIptvGridPicker() },
+            activity.getString(R.string.multiview_preset_save) to { showSavePresetDialog(gridChannels) },
         )
         val pipBackground = if (gridChannels.size == 2) gridChannels.firstOrNull { it.sourceKey != channel.sourceKey } else gridReturnChannel
         val canUsePip = gridChannels.size <= 2 && channel.source == LiveChannel.Source.IPTV &&
             pipBackground != null && pipBackground.sourceKey != channel.sourceKey
-        if (canUsePip) labels += activity.getString(R.string.multiview_to_pip)
+        if (canUsePip) {
+            actions += activity.getString(R.string.multiview_to_pip) to {
+                stopIptvGrid(resumePrevious = false)
+                pipBackground?.let { playSelectedChannel(it, false) }
+                startIptvOverlay(channel)
+            }
+        }
         AlertDialog.Builder(activity, R.style.Theme_TVApp_Dialog)
             .setTitle(channel.displayName)
-            .setItems(labels.toTypedArray()) { _, which ->
-                when (which) {
-                    0 -> showGridChannelReplacementPicker()
-                    1 -> closeActiveGridChannel()
-                    2 -> showIptvGridPicker()
-                    3 -> {
-                        stopIptvGrid(resumePrevious = false)
-                        pipBackground?.let { playSelectedChannel(it, false) }
-                        startIptvOverlay(channel)
-                    }
-                }
+            .setItems(actions.map { it.first }.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.second?.invoke()
             }
             .setNegativeButton(R.string.close, null)
             .show()

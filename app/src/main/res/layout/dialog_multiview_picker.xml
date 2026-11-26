@@ -135,10 +135,15 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/picker_action_blue"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="0.8"
-            android:visibility="gone"
+            android:layout_weight="0.9"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="false"
+            android:padding="4dp"
+            android:visibility="visible"
             android:gravity="center_vertical"
             android:orientation="horizontal">
             <View
@@ -149,7 +154,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/search_short"
+                android:text="@string/multiview_presets"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
         </LinearLayout>
