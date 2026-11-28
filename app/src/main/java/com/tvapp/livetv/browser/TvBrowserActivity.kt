@@ -194,7 +194,6 @@ class TvBrowserActivity : Activity() {
         uiHandler.removeCallbacks(autoHideRunnable)
         topBarVisible = true
         topBar.visibility = View.VISIBLE
-        topBar.bringToFront()
     }
 
     private fun hideTopBar() {
