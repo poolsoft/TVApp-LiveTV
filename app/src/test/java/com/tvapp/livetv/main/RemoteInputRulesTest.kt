@@ -158,19 +158,21 @@ class RemoteInputRulesTest {
     @Test
     fun repeatableNavigationKeysAllowThrottledRepeatAndDropStaleEvents() {
         val throttle = RemoteInputRules.RepeatNavigationThrottle(
-            minIntervalMs = 110L,
-            initialRepeatDelayMs = 220L,
+            minIntervalMs = 65L,
+            fastRepeatIntervalMs = 45L,
+            fastRepeatAfterMs = 700L,
+            initialRepeatDelayMs = 150L,
             staleEventThresholdMs = 110L,
         )
         throttle.recordInitialPress(KeyEvent.KEYCODE_DPAD_DOWN, nowMs = 1000L)
 
-        // Ilk tekrar gecikmesi (220ms) icinde gelen erken repeat yutulur
+        // Ilk tekrar gecikmesi (150ms) icinde gelen erken repeat yutulur
         assertTrue(
             throttle.shouldConsumeRepeat(
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
                 repeatCount = 1,
                 eventAgeMs = 10L,
-                nowMs = 1150L,
+                nowMs = 1120L,
             ),
         )
 
@@ -180,17 +182,35 @@ class RemoteInputRulesTest {
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
                 repeatCount = 2,
                 eventAgeMs = 10L,
-                nowMs = 1230L,
+                nowMs = 1160L,
             ),
         )
 
-        // Ikinci repeat cok erken gelirse throttle edilir
+        // Ikinci repeat cok erken gelirse throttle edilir (65ms icinde)
         assertTrue(
             throttle.shouldConsumeRepeat(
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
                 repeatCount = 3,
                 eventAgeMs = 10L,
-                nowMs = 1290L,
+                nowMs = 1200L,
+            ),
+        )
+
+        // 700ms basili tutma sonrasi kademeli hizlanma (45ms aralik) aktif olur
+        assertFalse(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
+                repeatCount = 4,
+                eventAgeMs = 10L,
+                nowMs = 1710L,
+            ),
+        )
+        assertFalse(
+            throttle.shouldConsumeRepeat(
+                keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
+                repeatCount = 5,
+                eventAgeMs = 10L,
+                nowMs = 1760L,
             ),
         )
 
@@ -198,9 +218,9 @@ class RemoteInputRulesTest {
         assertTrue(
             throttle.shouldConsumeRepeat(
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
-                repeatCount = 4,
+                repeatCount = 6,
                 eventAgeMs = 150L,
-                nowMs = 1400L,
+                nowMs = 1900L,
             ),
         )
 
@@ -208,9 +228,9 @@ class RemoteInputRulesTest {
         assertTrue(
             throttle.shouldConsumeRepeat(
                 keyCode = KeyEvent.KEYCODE_DPAD_DOWN,
-                repeatCount = 5,
+                repeatCount = 7,
                 eventAgeMs = 10L,
-                nowMs = 1550L,
+                nowMs = 2000L,
                 canRepeatNavigation = false,
             ),
         )

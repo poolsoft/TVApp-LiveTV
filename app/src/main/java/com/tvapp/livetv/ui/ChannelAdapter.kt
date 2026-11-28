@@ -40,6 +40,8 @@ class ChannelAdapter(
     private var showIptvMembership = false
     private var selectedId: Long? = null
     private var lastFocusedPosition: Int = RecyclerView.NO_POSITION
+    private val prefetchHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingPrefetchRunnable: Runnable? = null
     /** Positions of rows bound with a program progress bar; advanced by the
      *  1-minute program tick instead of full adapter refreshes. */
     private val programBoundPositions = mutableSetOf<Int>()
@@ -303,22 +305,29 @@ class ChannelAdapter(
 
         private fun prefetchAround(view: View, position: Int, movingUp: Boolean) {
             if (position !in channels.indices) return
-            // Direction-aware window: nearest rows first so the next focused row's
-            // logo is almost always in cache. TIF logos resolve from the system
-            // cache instantly; only IPTV URLs hit the network.
-            val nearestFirst: Sequence<LiveChannel> = if (movingUp) {
-                (position - 1 downTo 0).asSequence().map { channels[it] } +
-                    channels.asSequence().drop(position + 1)
-            } else {
-                channels.asSequence().drop(position + 1) +
-                    (position - 1 downTo 0).asSequence().map { channels[it] }
-            }
-            val candidates = nearestFirst
-                .map { candidate ->
-                    if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
-                    else TvContract.buildChannelLogoUri(candidate.id)
+            val appContext = view.context.applicationContext
+            pendingPrefetchRunnable?.let { prefetchHandler.removeCallbacks(it) }
+            val task = Runnable {
+                if (position !in channels.indices) return@Runnable
+                // Direction-aware window: nearest rows first so the next focused row's
+                // logo is almost always in cache. TIF logos resolve from the system
+                // cache instantly; only IPTV URLs hit the network.
+                val nearestFirst: Sequence<LiveChannel> = if (movingUp) {
+                    (position - 1 downTo 0).asSequence().map { channels[it] } +
+                        channels.asSequence().drop(position + 1)
+                } else {
+                    channels.asSequence().drop(position + 1) +
+                        (position - 1 downTo 0).asSequence().map { channels[it] }
                 }
-            ChannelLogoLoader.prefetch(view.context, candidates)
+                val candidates = nearestFirst
+                    .map { candidate ->
+                        if (candidate.source == LiveChannel.Source.IPTV) candidate.logoUrl
+                        else TvContract.buildChannelLogoUri(candidate.id)
+                    }
+                ChannelLogoLoader.prefetch(appContext, candidates)
+            }
+            pendingPrefetchRunnable = task
+            prefetchHandler.postDelayed(task, PREFETCH_DEBOUNCE_MILLIS)
         }
     }
 
@@ -330,6 +339,7 @@ class ChannelAdapter(
         const val PAYLOAD_PROGRAM = "program"
         const val PAYLOAD_SELECTION = "selection"
         const val PROGRAM_TICK_MILLIS = 60_000L
+        const val PREFETCH_DEBOUNCE_MILLIS = 150L
     }
 }
 

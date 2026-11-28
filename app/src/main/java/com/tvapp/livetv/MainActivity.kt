@@ -1448,10 +1448,33 @@ class MainActivity : TvRemoteActivity() {
             )
             return
         }
+        val previousSource = currentChannel?.source
         saveCurrentIptvResumePosition()
         debugLog.recordDebug(
             "CHANNEL_SELECT | number=${channel.displayNumber}, key=${channel.sourceKey}",
         )
+        focusedTuneJob?.cancel()
+        activePassthroughInputId = null
+        currentPlaybackUsesIptvLibrary = !recordHistory
+        currentChannel = channel
+        // TIF kanalina gecerken donanim tuner'ini UI/EPG/gecmis islemlerinden once
+        // hemen baslat; onceki kanal zaten TIF ise gereksiz IPTV durdurmasini atla.
+        var earlyTifTuneError: Throwable? = null
+        if (channel.source == LiveChannel.Source.TIF) {
+            if (previousSource != LiveChannel.Source.TIF) {
+                setIptvBufferingVisible(false)
+                iptvPlayback.stop()
+                if (binding.iptvPlayerView.visibility != View.GONE) {
+                    binding.iptvPlayerView.visibility = View.GONE
+                }
+                if (binding.tvView.visibility != View.VISIBLE) {
+                    binding.tvView.visibility = View.VISIBLE
+                }
+            }
+            earlyTifTuneError = runCatching {
+                playback.play(channel)
+            }.exceptionOrNull()
+        }
         // Hide the old channel's video behind a black layer; the infobar above
         // it stays readable. If this tune renders nothing, the failure/error
         // paths end the blackout instead of leaving a permanent black screen.
@@ -1464,10 +1487,6 @@ class MainActivity : TvRemoteActivity() {
             null
         }
         startBlackout(preparingStatus)
-        focusedTuneJob?.cancel()
-        activePassthroughInputId = null
-        currentPlaybackUsesIptvLibrary = !recordHistory
-        currentChannel = channel
         if (!channel.iptvContentType.equals("CATCHUP", ignoreCase = true)) {
             catchUpReturnChannel = null
         }
@@ -1521,11 +1540,7 @@ class MainActivity : TvRemoteActivity() {
                             "serviceType=${channel.serviceType}, encrypted=${channel.encrypted}, " +
                             "locked=${channel.locked}",
                     )
-                    setIptvBufferingVisible(false)
-                    iptvPlayback.stop()
-                    binding.iptvPlayerView.visibility = View.GONE
-                    binding.tvView.visibility = View.VISIBLE
-                    playback.play(channel)
+                    earlyTifTuneError?.let { throw it }
                     // Preferred tracks onTracksChanged ile otomatik secilir
                 }
                 LiveChannel.Source.IPTV -> {

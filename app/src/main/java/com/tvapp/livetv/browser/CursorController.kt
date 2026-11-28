@@ -43,21 +43,21 @@ class CursorController(
     private var dirY = 0
     private var holdStart = 0L
     private val edgeZonePx get() = webView.resources.displayMetrics.density * 48f
-    private val sideZonePx get() = webView.resources.displayMetrics.density * 120f
 
     fun isEdgeZone(checkX: Float = x): Boolean =
-        checkX < sideZonePx || checkX > (webView.width - sideZonePx).coerceAtLeast(0f)
+        CursorGeometry.isTopScrollEdgeZone(checkX, webView.width)
 
     private val mover = object : Runnable {
         override fun run() {
             if (dirX == 0 && dirY == 0) return
             val held = SystemClock.uptimeMillis() - holdStart
             val speed = CursorGeometry.speedForHoldMs(held, speedMultiplier())
-            val effectiveMinY = if (isEdgeZone(x)) 0f else minY
+            val inScrollEdgeZone = isEdgeZone(x)
+            val effectiveMinY = if (inScrollEdgeZone) 0f else minY
             val p = CursorGeometry.step(
                 CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, effectiveMinY
             )
-            val reachedTop = dirY < 0 && p.y <= effectiveMinY + 4f && y <= effectiveMinY + 4f
+            val reachedTop = !inScrollEdgeZone && dirY < 0 && p.y <= effectiveMinY + 4f && y <= effectiveMinY + 4f
             x = p.x
             y = p.y
             onCursorMove?.invoke(x, y)
@@ -93,8 +93,9 @@ class CursorController(
     }
 
     fun startMove(dx: Int, dy: Int) {
-        val effectiveMinY = if (isEdgeZone(x)) 0f else minY
-        if (dy < 0 && y <= effectiveMinY + 4f) {
+        val inScrollEdgeZone = isEdgeZone(x)
+        val effectiveMinY = if (inScrollEdgeZone) 0f else minY
+        if (!inScrollEdgeZone && dy < 0 && y <= effectiveMinY + 4f) {
             onReachedTop?.invoke()
             return
         }

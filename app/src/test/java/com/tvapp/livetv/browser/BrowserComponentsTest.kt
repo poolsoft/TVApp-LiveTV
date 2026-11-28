@@ -32,6 +32,19 @@ class BrowserComponentsTest {
     }
 
     @Test
+    fun testCursorGeometryTopScrollEdgeZones() {
+        // 1920 genislikte %20 kenar = 384px (0..384 ve 1536..1920)
+        assertTrue(CursorGeometry.isTopScrollEdgeZone(100f, 1920))
+        assertTrue(CursorGeometry.isTopScrollEdgeZone(383f, 1920))
+        assertFalse(CursorGeometry.isTopScrollEdgeZone(385f, 1920))
+        assertFalse(CursorGeometry.isTopScrollEdgeZone(960f, 1920))
+        assertFalse(CursorGeometry.isTopScrollEdgeZone(1535f, 1920))
+        assertTrue(CursorGeometry.isTopScrollEdgeZone(1537f, 1920))
+        assertTrue(CursorGeometry.isTopScrollEdgeZone(1900f, 1920))
+        assertFalse(CursorGeometry.isTopScrollEdgeZone(100f, 0))
+    }
+
+    @Test
     fun testUrlNormalizer() {
         val normal = UrlNormalizer.normalize("example.com")
         assertEquals("https://example.com", normal)

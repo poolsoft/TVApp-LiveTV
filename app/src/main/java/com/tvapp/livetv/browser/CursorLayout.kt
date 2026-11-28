@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -180,7 +181,7 @@ class CursorLayout @JvmOverloads constructor(
 
             KeyEvent.KEYCODE_DPAD_UP -> {
                 if (cursor.mode == CursorController.Mode.CURSOR) {
-                    if (cursor.y <= 15f) {
+                    if (!cursor.isEdgeZone() && cursor.y <= 15f) {
                         if (event.action == KeyEvent.ACTION_DOWN) {
                             enterTopBar()
                         }
@@ -260,6 +261,18 @@ class CursorLayout @JvmOverloads constructor(
             canvas.drawCircle(cursor.x, cursor.y, r, dotPaint)
             canvas.drawCircle(cursor.x, cursor.y, r, shadowPaint)
             canvas.drawCircle(cursor.x, cursor.y, 3.5f * density, innerPaint)
+            // Kenar kaydirma bolgesinde ust sinira yaklasinca yukari kaydirma oku ciz
+            if (cursor.isEdgeZone() && cursor.y <= 56f * density) {
+                val arrowSize = 6f * density
+                val arrowTopY = (cursor.y - r - 10f * density).coerceAtLeast(2f * density)
+                val arrowPath = Path().apply {
+                    moveTo(cursor.x, arrowTopY)
+                    lineTo(cursor.x - arrowSize, arrowTopY + arrowSize)
+                    lineTo(cursor.x + arrowSize, arrowTopY + arrowSize)
+                    close()
+                }
+                canvas.drawPath(arrowPath, dotPaint)
+            }
         }
     }
 

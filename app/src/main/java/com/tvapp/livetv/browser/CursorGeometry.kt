@@ -9,8 +9,19 @@ object CursorGeometry {
     const val BASE_SPEED_PX = 6f
     const val MAX_SPEED_PX = 22f
     const val ACCEL_MS = 800L
+    const val TOP_SCROLL_EDGE_FRACTION = 0.20f
 
     data class Point(val x: Float, val y: Float)
+
+    /**
+     * Imlecin sol veya sag %20'lik kenar kaydirma bolgesinde olup olmadigini doner.
+     * Bu bolgelerde yukari cikildiginda ust toolbara girilmez, sayfa yukari kaydirilir.
+     */
+    fun isTopScrollEdgeZone(x: Float, width: Int): Boolean {
+        if (width <= 0) return false
+        val edgeWidth = width * TOP_SCROLL_EDGE_FRACTION
+        return x < edgeWidth || x > (width - edgeWidth)
+    }
 
     /**
      * Imleci ekran ve ust bar sinirlari icinde tutar.

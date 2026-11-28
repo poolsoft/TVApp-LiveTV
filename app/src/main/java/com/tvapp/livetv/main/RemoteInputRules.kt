@@ -134,6 +134,8 @@ object RemoteInputRules {
      */
     class RepeatNavigationThrottle(
         private val minIntervalMs: Long = DEFAULT_REPEAT_INTERVAL_MS,
+        private val fastRepeatIntervalMs: Long = DEFAULT_FAST_REPEAT_INTERVAL_MS,
+        private val fastRepeatAfterMs: Long = DEFAULT_FAST_REPEAT_AFTER_MS,
         private val initialRepeatDelayMs: Long = DEFAULT_INITIAL_REPEAT_DELAY_MS,
         private val staleEventThresholdMs: Long = DEFAULT_STALE_EVENT_THRESHOLD_MS,
     ) {
@@ -170,8 +172,10 @@ object RemoteInputRules {
                 if (!canRepeatNavigation) return true
                 if (eventAgeMs > staleEventThresholdMs) return true
                 if (lastKeyCode != keyCode) return true
-                if ((nowMs - firstPressAtMs) < initialRepeatDelayMs) return true
-                if ((nowMs - lastAcceptedAtMs) < minIntervalMs) return true
+                val heldMs = nowMs - firstPressAtMs
+                if (heldMs < initialRepeatDelayMs) return true
+                val activeInterval = if (heldMs >= fastRepeatAfterMs) fastRepeatIntervalMs else minIntervalMs
+                if ((nowMs - lastAcceptedAtMs) < activeInterval) return true
                 lastAcceptedAtMs = nowMs
                 return false
             }
@@ -179,8 +183,10 @@ object RemoteInputRules {
         }
 
         companion object {
-            const val DEFAULT_REPEAT_INTERVAL_MS = 110L
-            const val DEFAULT_INITIAL_REPEAT_DELAY_MS = 220L
+            const val DEFAULT_REPEAT_INTERVAL_MS = 65L
+            const val DEFAULT_FAST_REPEAT_INTERVAL_MS = 45L
+            const val DEFAULT_FAST_REPEAT_AFTER_MS = 700L
+            const val DEFAULT_INITIAL_REPEAT_DELAY_MS = 150L
             const val DEFAULT_STALE_EVENT_THRESHOLD_MS = 110L
         }
     }
