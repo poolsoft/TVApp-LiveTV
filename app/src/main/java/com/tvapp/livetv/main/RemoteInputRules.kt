@@ -98,14 +98,14 @@ object RemoteInputRules {
         KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN,
         KeyEvent.KEYCODE_DPAD_LEFT,
-        KeyEvent.KEYCODE_DPAD_RIGHT,
-        KeyEvent.KEYCODE_CHANNEL_UP,
-        KeyEvent.KEYCODE_CHANNEL_DOWN -> true
+        KeyEvent.KEYCODE_DPAD_RIGHT -> true
         else -> false
     }
 
     /** Tek basimlik aksiyon tuslari: basili tutma tekrarlarinda yutulmalidir. */
     fun isNonRepeatableActionKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_CHANNEL_UP,
+        KeyEvent.KEYCODE_CHANNEL_DOWN,
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_PROG_RED,
@@ -134,19 +134,23 @@ object RemoteInputRules {
      */
     class RepeatNavigationThrottle(
         private val minIntervalMs: Long = DEFAULT_REPEAT_INTERVAL_MS,
+        private val initialRepeatDelayMs: Long = DEFAULT_INITIAL_REPEAT_DELAY_MS,
         private val staleEventThresholdMs: Long = DEFAULT_STALE_EVENT_THRESHOLD_MS,
     ) {
         private var lastKeyCode: Int = KeyEvent.KEYCODE_UNKNOWN
+        private var firstPressAtMs: Long = 0L
         private var lastAcceptedAtMs: Long = 0L
 
         fun recordInitialPress(keyCode: Int, nowMs: Long) {
             lastKeyCode = keyCode
+            firstPressAtMs = nowMs
             lastAcceptedAtMs = nowMs
         }
 
         fun reset(keyCode: Int) {
             if (lastKeyCode == keyCode) {
                 lastKeyCode = KeyEvent.KEYCODE_UNKNOWN
+                firstPressAtMs = 0L
                 lastAcceptedAtMs = 0L
             }
         }
@@ -159,14 +163,15 @@ object RemoteInputRules {
             repeatCount: Int,
             eventAgeMs: Long,
             nowMs: Long,
+            canRepeatNavigation: Boolean = true,
         ): Boolean {
             if (repeatCount <= 0) return false
             if (isRepeatableNavigationKey(keyCode)) {
+                if (!canRepeatNavigation) return true
                 if (eventAgeMs > staleEventThresholdMs) return true
-                if (lastKeyCode == keyCode && (nowMs - lastAcceptedAtMs) < minIntervalMs) {
-                    return true
-                }
-                lastKeyCode = keyCode
+                if (lastKeyCode != keyCode) return true
+                if ((nowMs - firstPressAtMs) < initialRepeatDelayMs) return true
+                if ((nowMs - lastAcceptedAtMs) < minIntervalMs) return true
                 lastAcceptedAtMs = nowMs
                 return false
             }
@@ -174,8 +179,9 @@ object RemoteInputRules {
         }
 
         companion object {
-            const val DEFAULT_REPEAT_INTERVAL_MS = 85L
-            const val DEFAULT_STALE_EVENT_THRESHOLD_MS = 250L
+            const val DEFAULT_REPEAT_INTERVAL_MS = 110L
+            const val DEFAULT_INITIAL_REPEAT_DELAY_MS = 220L
+            const val DEFAULT_STALE_EVENT_THRESHOLD_MS = 110L
         }
     }
 

@@ -277,6 +277,10 @@ class RemoteInputRouter(
             // kuyrukta birikmis bayat tekrar olaylarini ve aksiyon tus tekrarlarini yut.
             val nowMs = SystemClock.uptimeMillis()
             val eventAgeMs = (nowMs - event.eventTime).coerceAtLeast(0L)
+            val canRepeatNavigation = env.isChannelPanelVisible() ||
+                env.isStatusOsd() ||
+                env.isVodPlaybackActive() ||
+                env.isIptvGridActive()
             if (event.repeatCount == 0) {
                 repeatThrottle.recordInitialPress(event.keyCode, nowMs)
             } else if (
@@ -285,6 +289,7 @@ class RemoteInputRouter(
                     repeatCount = event.repeatCount,
                     eventAgeMs = eventAgeMs,
                     nowMs = nowMs,
+                    canRepeatNavigation = canRepeatNavigation,
                 )
             ) {
                 return true
