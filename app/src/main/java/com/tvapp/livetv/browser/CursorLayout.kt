@@ -90,10 +90,18 @@ class CursorLayout @JvmOverloads constructor(
         cursor.stopMove()
         val bar = topBar ?: return
         onTopBarRequested?.invoke()
+        if (bar.visibility != View.VISIBLE) {
+            bar.visibility = View.VISIBLE
+        }
         val target = bar.findViewById<View>(R.id.edit_browser_url)
             ?: bar.findViewById<View>(R.id.btn_browser_nav_back)
             ?: bar
-        target.requestFocus()
+        if (!target.requestFocus()) {
+            bar.post {
+                target.requestFocus()
+                invalidate()
+            }
+        }
         invalidate()
     }
 
@@ -258,17 +266,19 @@ class CursorLayout @JvmOverloads constructor(
             dotPaint.alpha = (cursorAlpha * 255).toInt()
             shadowPaint.alpha = (cursorAlpha * 230).toInt()
             innerPaint.alpha = (cursorAlpha * 255).toInt()
-            canvas.drawCircle(cursor.x, cursor.y, r, dotPaint)
-            canvas.drawCircle(cursor.x, cursor.y, r, shadowPaint)
-            canvas.drawCircle(cursor.x, cursor.y, 3.5f * density, innerPaint)
+            val drawX = cursor.x.coerceIn(r, (width - r).coerceAtLeast(r))
+            val drawY = cursor.y.coerceIn(r, (height - r).coerceAtLeast(r))
+            canvas.drawCircle(drawX, drawY, r, dotPaint)
+            canvas.drawCircle(drawX, drawY, r, shadowPaint)
+            canvas.drawCircle(drawX, drawY, 3.5f * density, innerPaint)
             // Kenar kaydirma bolgesinde ust sinira yaklasinca yukari kaydirma oku ciz
             if (cursor.isEdgeZone() && cursor.y <= 56f * density) {
                 val arrowSize = 6f * density
-                val arrowTopY = (cursor.y - r - 10f * density).coerceAtLeast(2f * density)
+                val arrowTopY = (drawY - r - 10f * density).coerceAtLeast(2f * density)
                 val arrowPath = Path().apply {
-                    moveTo(cursor.x, arrowTopY)
-                    lineTo(cursor.x - arrowSize, arrowTopY + arrowSize)
-                    lineTo(cursor.x + arrowSize, arrowTopY + arrowSize)
+                    moveTo(drawX, arrowTopY)
+                    lineTo(drawX - arrowSize, arrowTopY + arrowSize)
+                    lineTo(drawX + arrowSize, arrowTopY + arrowSize)
                     close()
                 }
                 canvas.drawPath(arrowPath, dotPaint)

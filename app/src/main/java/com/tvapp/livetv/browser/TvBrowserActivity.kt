@@ -191,8 +191,10 @@ class TvBrowserActivity : Activity() {
     }
 
     private fun showTopBar() {
+        uiHandler.removeCallbacks(autoHideRunnable)
         topBarVisible = true
         topBar.visibility = View.VISIBLE
+        topBar.bringToFront()
     }
 
     private fun hideTopBar() {
@@ -349,10 +351,10 @@ class TvBrowserActivity : Activity() {
             finish()
         }
         layout.onTopBarRequested = {
-            if (!isWebFullscreen) {
-                showTopBar()
-                uiHandler.removeCallbacks(autoHideRunnable)
+            if (isWebFullscreen) {
+                isWebFullscreen = false
             }
+            showTopBar()
         }
 
         // Mod degistiginde (OK uzun basilinca) TV bildirimini goster
@@ -372,10 +374,11 @@ class TvBrowserActivity : Activity() {
 
         // Fare en tepeye ulastiginda dogrudan ust bara odaklan
         cursor.onReachedTop = {
-            if (!isWebFullscreen) {
-                showTopBar()
-                layout.enterTopBar()
+            if (isWebFullscreen) {
+                isWebFullscreen = false
             }
+            showTopBar()
+            layout.enterTopBar()
         }
 
         // Imleci baslangicta ortala

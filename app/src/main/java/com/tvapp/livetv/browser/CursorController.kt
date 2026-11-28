@@ -57,7 +57,7 @@ class CursorController(
             val p = CursorGeometry.step(
                 CursorGeometry.Point(x, y), dirX, dirY, speed, webView.width, webView.height, effectiveMinY
             )
-            val reachedTop = !inScrollEdgeZone && dirY < 0 && p.y <= effectiveMinY + 4f && y <= effectiveMinY + 4f
+            val reachedTop = !inScrollEdgeZone && dirY < 0 && p.y <= effectiveMinY + 4f
             x = p.x
             y = p.y
             onCursorMove?.invoke(x, y)
